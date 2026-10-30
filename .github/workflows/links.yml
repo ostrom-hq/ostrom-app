@@ -1,11 +1,7 @@
 name: Links
 
+# Weekly and by hand only (org CI rule): external links break without any commit.
 on:
-  pull_request:
-    paths: ['**/*.md', '**/*.mdx', '.lycheeignore', '.github/workflows/links.yml']
-  push:
-    branches: [main]
-    paths: ['**/*.md', '**/*.mdx', '.lycheeignore', '.github/workflows/links.yml']
   schedule:
     - cron: '23 6 * * 1'
   workflow_dispatch:
