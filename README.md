@@ -87,19 +87,18 @@ Maestro flows in [`.maestro/`](.maestro), run by the `E2E` workflow on an Androi
 the E2E build (`EXPO_PUBLIC_OSTROM_MOCK=1`) answers from the in-memory server of `src/api/mocks/mockServer.ts`, the
 same one the unit tests use, through the real HTTP client, repositories and screens. Only the GitHub sign-in, the
 fingerprint and push are replaced, since the emulator has none of them. `metro.config.js` swaps the services only for
-that build, and the `ci` job proves it: `scripts/check-store-bundle.sh` exports the production bundles as a store build
-makes them and fails on any trace of the mock (msw, the build flag, the mock's names and strings), then requires those
-strings in the E2E bundle, so that the search is known to see them. `scripts/run-maestro.sh` runs the flows one at a
-time. The CI emulator sometimes goes offline for a moment, mostly just after boot: before the first flow it waits for
-adb, the end of the boot and the package manager, then runs a warm-up flow that does not count
-(`.maestro/common/warm-up.yaml`). A flow that fails is run once more after `adb reconnect`, with a warning in the run,
-and a flow that fails twice fails the job.
+that build, and the `ci` job proves it: `scripts/check-store-bundle.sh` first exports the E2E bundles and requires the
+mock's strings in both (Android, iOS), so that the search is known to see them, then exports the production bundles as
+a store build makes them and fails on any trace of the mock on either platform. `scripts/run-maestro.sh` runs the flows
+one at a time once the emulator answers (with an `adb reconnect` when it does not), after a warm-up flow that does not
+count (`.maestro/common/warm-up.yaml`). A flow runs a second time only when its first failure is an outage of the
+emulator (device offline, `DeviceServerDiedException`), never on a failed assertion.
 
 | Flow | What it proves | Status |
 | --- | --- | --- |
-| `login.yaml` | Signed out on a new phone: the login screen, and an address that is not `https://` is refused before anything is sent | Green ([run 41026295995](https://github.com/ostrom-hq/ostrom-app/actions/runs/41026295995)) |
-| `step-up.yaml` | A yes the server answers with 403 `step_up_required` (production deploy): the explanation, no raw error, then a button that opens the console on this request (when the console cannot open, its address to select and copy: unit tests) | Green ([run 41041831225](https://github.com/ostrom-hq/ostrom-app/actions/runs/41041831225)) |
-| `self-approval.yaml` | A request the person asked for (`canApprove: false`, `self_approval_refused`): Approve is not offered, and the no still goes through with its reason | Green ([run 41041831225](https://github.com/ostrom-hq/ostrom-app/actions/runs/41041831225)) |
+| `login.yaml` | Signed out on a new phone: the login screen, and an address that is not `https://` is refused before anything is sent | Green ([run 41048146402](https://github.com/ostrom-hq/ostrom-app/actions/runs/41048146402)) |
+| `step-up.yaml` | A yes the server answers with 403 `step_up_required` (production deploy): the explanation, no raw error, then a button that opens the console on this request (when the console cannot open, its address to select and copy: unit tests) | Green ([run 41048146402](https://github.com/ostrom-hq/ostrom-app/actions/runs/41048146402)) |
+| `self-approval.yaml` | A request the person asked for (`canApprove: false`, `self_approval_refused`): Approve is not offered, and the no still goes through with its reason | Green ([run 41048146402](https://github.com/ostrom-hq/ostrom-app/actions/runs/41048146402)) |
 | Organization required | A member of several organizations without `Ostrom-Org` (409 `org_required`): the inbox and the request say it clearly. The header is sent on every call and the mock server checks it like the real one (unit tests) | Missing |
 | Approve a request | A yes on someone else's request is sent with the shown digest and the request shows as approved | Missing |
 | Changed request | The request changes while it is shown (409 `shown_digest_mismatch`): the app asks to read it again | Missing |

@@ -401,17 +401,23 @@ describe("RequestScreen", () => {
         })
         await renderWithServices(<RequestScreen id="appr_0001" />, services)
         expect(await screen.findByText("This request could not be loaded.")).toBeOnTheScreen()
+        expect(screen.queryByRole("button", {name: "Open the console"})).toBeNull()
         await fireEvent.press(await screen.findByRole("button", {name: "Try again"}))
         expect(await screen.findByRole("header", {name: "Merge PR #6 into main"})).toBeOnTheScreen()
     })
 
-    it("says clearly when the server wants the organization named, to read or to answer", async () => {
+    it("says clearly when the server wants the organization named to read, and offers the console and its address", async () => {
         const view = (): Promise<ApprovalView> => Promise.reject(refused(409, "org_required"))
+        const openUrl = jest.fn((_url: string) => Promise.reject(new Error("no browser")))
         const services = await signedInServices({
             repositories: fakeRepositories({approvals: {queue: jest.fn(), view, answer: jest.fn()}}),
+            openUrl,
         })
         await renderWithServices(<RequestScreen id="appr_0001" />, services)
-        expect(await screen.findByText("You are a member of several organizations, and Ostrom needs to know which one this is for. The app cannot choose yet: use the console for now.")).toBeOnTheScreen()
+        await fireEvent.press(await screen.findByRole("button", {name: "Open the console"}))
+        expect(openUrl).toHaveBeenCalledWith("https://ostrom.test/yes/appr_0001")
+        expect(await screen.findByText("https://ostrom.test/yes/appr_0001")).toBeOnTheScreen()
+        expect(screen.getByText("You are a member of several organizations, and Ostrom needs to know which one this is for. The app cannot choose yet: use the console for now.")).toBeOnTheScreen()
     })
 
     it("says clearly when an answer needs the organization named, and offers the console", async () => {

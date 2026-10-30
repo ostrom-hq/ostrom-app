@@ -158,6 +158,23 @@ function Outcome({approval}: {approval: Approval}): React.JSX.Element | null {
     )
 }
 
+/** The console did not open: its address, to select or copy and open by hand. */
+function ConsoleLink({model}: {model: RequestViewModel}): React.JSX.Element | null {
+    const {t} = useTranslation()
+    const {colors} = useTheme()
+    const link = model.consoleLink
+    if (link === undefined) return null
+    return (
+        <>
+            <Text style={[styles.body, {color: colors.text}]}>{t("request.consoleNotOpened")}</Text>
+            <Text selectable style={[styles.body, {color: colors.text}]} testID="request-console-url">
+                {link.url}
+            </Text>
+            <Button label={link.copied ? t("request.copied") : t("request.copyLink")} onPress={model.copyConsoleLink} testID="request-copy-console" />
+        </>
+    )
+}
+
 /** The buttons, after the evidence: Approve, or Decline… which asks for the reason the agent will read. */
 function Actions({model, approval}: {model: RequestViewModel; approval: Approval}): React.JSX.Element {
     const {t} = useTranslation()
@@ -175,20 +192,7 @@ function Actions({model, approval}: {model: RequestViewModel; approval: Approval
             {problem === "step-up" || problem === "org-required" ? (
                 <Button label={t("request.openConsole")} variant="signal" onPress={model.openConsole} testID="request-open-console" />
             ) : null}
-            {/* The console did not open: its address, to open by hand. */}
-            {model.consoleLink !== undefined ? (
-                <>
-                    <Text style={[styles.body, {color: colors.text}]}>{t("request.consoleNotOpened")}</Text>
-                    <Text selectable style={[styles.body, {color: colors.text}]} testID="request-console-url">
-                        {model.consoleLink.url}
-                    </Text>
-                    <Button
-                        label={model.consoleLink.copied ? t("request.copied") : t("request.copyLink")}
-                        onPress={model.copyConsoleLink}
-                        testID="request-copy-console"
-                    />
-                </>
-            ) : null}
+            <ConsoleLink model={model} />
             {noApprove === undefined ? null : (
                 <Text style={[styles.body, {color: colors.text}]}>
                     {noApprove.kind === "truncated" ? t("request.truncated") : t("request.cannotApprove")}
@@ -254,6 +258,11 @@ export function RequestScreen({id}: {id: string}): React.JSX.Element {
         return (
             <View style={styles.message}>
                 <Text style={[styles.body, {color: colors.textMuted}]}>{state.orgRequired ? t("common.orgRequired") : t("request.error")}</Text>
+                {/* The console names the organization the app cannot: the request opens there. */}
+                {state.orgRequired ? (
+                    <Button label={t("request.openConsole")} variant="signal" onPress={model.openConsole} testID="request-open-console" />
+                ) : null}
+                <ConsoleLink model={model} />
                 <Button label={t("common.retry")} onPress={state.retry} />
             </View>
         )
