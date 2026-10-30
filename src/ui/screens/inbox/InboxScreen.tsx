@@ -69,15 +69,10 @@ export function InboxScreen(): React.JSX.Element {
                     ListHeaderComponent={
                         <View style={styles.header}>
                             <ScreenTitle>{t("inbox.title")}</ScreenTitle>
+                            {/* One alert, read out once: the list may be out of date, and why when it is the organization. */}
                             {state.stale ? (
                                 <Text accessibilityRole="alert" style={[styles.stale, {color: colors.danger}]}>
-                                    {t("inbox.stale")}
-                                </Text>
-                            ) : null}
-                            {/* Why the refresh failed, when it is the organization: under the warning, not instead. */}
-                            {state.orgRequired ? (
-                                <Text accessibilityRole="alert" style={[styles.stale, {color: colors.danger}]}>
-                                    {t("common.orgRequired")}
+                                    {state.orgRequired ? `${t("inbox.stale")}\n${t("common.orgRequired")}` : t("inbox.stale")}
                                 </Text>
                             ) : null}
                         </View>

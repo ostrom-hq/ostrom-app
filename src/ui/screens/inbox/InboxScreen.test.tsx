@@ -93,10 +93,9 @@ describe("InboxScreen", () => {
         await act(async () => {
             await client.invalidateQueries()
         })
-        // Two alerts, read out by screen readers: the list may be out of date, and why.
-        const [stale, reason] = await screen.findAllByRole("alert")
-        expect(stale).toHaveTextContent(/could not be refreshed/)
-        expect(reason).toHaveTextContent(/several organizations/)
+        // One alert, read out once by screen readers: the list may be out of date, and why.
+        const alert = await screen.findByRole("alert")
+        expect(alert).toHaveTextContent(/could not be refreshed[\s\S]*several organizations/)
         expect(screen.getByText("Merge PR #6 into main")).toBeOnTheScreen()
     })
 

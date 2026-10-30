@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import {fireEvent, screen, waitFor} from "@testing-library/react-native"
+import {act, fireEvent, screen, waitFor} from "@testing-library/react-native"
 import type {Approval, ApprovalAnswer, ApprovalView} from "@/api/contract/approvals"
 import {ApiError} from "@/api/http/ApiError"
 import type {ApprovalsRepository} from "@/repositories/ApprovalsRepository"
@@ -423,6 +423,27 @@ describe("RequestScreen", () => {
             expect(screen.queryByText("https://ostrom.test/yes/appr_0001")).toBeNull()
         })
         expect(await screen.findByText("You are a member of several organizations, and Ostrom needs to know which one this is for. The app cannot choose yet: use the console for now.")).toBeOnTheScreen()
+    })
+
+    it("drops the address of the error screen once the request loads by any refetch, not only Try again", async () => {
+        const view = jest
+            .fn<Promise<ApprovalView>, [string]>()
+            .mockRejectedValueOnce(refused(409, "org_required"))
+            .mockResolvedValue(viewOf(approvals.pending))
+        const openUrl = jest.fn((_url: string) => Promise.reject(new Error("no browser")))
+        const services = await signedInServices({
+            repositories: fakeRepositories({approvals: {queue: jest.fn(), view, answer: jest.fn()}}),
+            openUrl,
+        })
+        const client = await renderWithServices(<RequestScreen id="appr_0001" />, services)
+        await fireEvent.press(await screen.findByRole("button", {name: "Open the console"}))
+        expect(await screen.findByText("https://ostrom.test/yes/appr_0001")).toBeOnTheScreen()
+        // A refetch on focus or reconnect, not the person's "Try again".
+        await act(async () => {
+            await client.invalidateQueries()
+        })
+        expect(await screen.findByRole("header", {name: "Merge PR #6 into main"})).toBeOnTheScreen()
+        expect(screen.queryByText("https://ostrom.test/yes/appr_0001")).toBeNull()
     })
 
     it("says clearly when an answer needs the organization named, and offers the console", async () => {
