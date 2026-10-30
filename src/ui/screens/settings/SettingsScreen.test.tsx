@@ -98,6 +98,16 @@ describe("SettingsScreen", () => {
         expect(unregisterDevice).toHaveBeenCalledWith("dev_1")
     })
 
+    it("signs out a phone without push, with nothing to unregister", async () => {
+        const {services, unregisterDevice} = await open()
+        await screen.findByText(/Notifications are off on this phone/)
+        await fireEvent.press(screen.getByRole("button", {name: "Sign out"}))
+        await waitFor(() => {
+            expect(services.sessionStore.getState().state).toEqual({status: "signed-out"})
+        })
+        expect(unregisterDevice).not.toHaveBeenCalled()
+    })
+
     it("signs out even when the server cannot be reached", async () => {
         const {services} = await open({permission: granted, unregister: () => Promise.reject(new ApiError({kind: "network"}))})
         await screen.findByText("This phone receives Ostrom notifications.")
