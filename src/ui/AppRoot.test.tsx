@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import {screen} from "@testing-library/react-native"
 import {renderRouter} from "expo-router/testing-library"
 import type {ApprovalPage} from "@/api/contract/approvals"

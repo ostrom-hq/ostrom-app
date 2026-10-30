@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import {z} from "zod"
 import type {AccountRepository} from "@/repositories/AccountRepository"
 import {base64Url, createPkce} from "./pkce"

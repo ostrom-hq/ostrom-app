@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import {fireEvent, screen} from "@testing-library/react-native"
 import {type SpendPeriod, type SpendReport, SpendReportSchema} from "@/api/contract/spending"
 import {ApiError} from "@/api/http/ApiError"

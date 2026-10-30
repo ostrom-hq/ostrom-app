@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import {type InfiniteData, type UseInfiniteQueryResult, useInfiniteQuery} from "@tanstack/react-query"
 import type {ActivityPage} from "@/api/contract/activity"
 import {useRepositories} from "@/services/AppServices"

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import {MemoryStorage} from "@/test/fakeServices"
 import {createSessionStore, SESSION_KEY, type Session} from "./session"
 

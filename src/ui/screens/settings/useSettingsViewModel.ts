@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import {useCallback, useState} from "react"
 import type {NotificationSettings, QuietHours} from "@/api/contract/notifications"
 import {useDeviceRegistration, useNotificationSettings, useSaveNotificationSettings} from "@/query/notifications"

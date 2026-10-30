@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import {useLocalSearchParams} from "expo-router"
 import {useTranslation} from "react-i18next"
 import {StyleSheet, Text} from "react-native"

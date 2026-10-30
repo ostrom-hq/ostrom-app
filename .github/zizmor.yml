@@ -1,0 +1,7 @@
+# zizmor configuration (https://docs.zizmor.sh/configuration/).
+# Temporary: ci.yml predates the open source checks and still uses actions by tag. CONVENTIONS.md section 11 requires
+# a commit SHA for every action; remove this exception in the pull request that pins them.
+rules:
+  unpinned-uses:
+    ignore:
+      - ci.yml

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import {receiptKey, receipts} from "@/api/mocks/fixtures"
 import {ReceiptKeysSchema, ReceiptPageSchema, type ReceiptListItem} from "@/api/contract/receipts"
 import {checkReceipt, readInstanceKeys} from "./receiptCheck"

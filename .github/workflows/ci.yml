@@ -1,4 +1,3 @@
-# One job, `ci`, for a pull request (rule of 30/10, 03:10): the required check. A draft runs nothing.
 name: CI
 
 on:
@@ -6,19 +5,23 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches: [main]
+    tags: ["[0-9]*"]
+  workflow_dispatch:
 
+# One run per workflow and ref; a new push cancels the previous run, except on main (JOURNAL 03:10).
 concurrency:
-  group: ci-${{ github.ref }}
-  # Every commit of main keeps its run; a newer push replaces the run of a branch.
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 permissions:
   contents: read
 
 jobs:
+  # The single job of a pull request and the required check on main (ostrom-e2e/templates/README.md).
   ci:
     name: ci
-    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    # A draft pull request runs no CI: mark it ready when you want it.
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:

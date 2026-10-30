@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import {type UseMutationResult, type UseQueryResult, useMutation, useQuery, useQueryClient} from "@tanstack/react-query"
 import type {AnswerResult, Approval, ApprovalAnswer, ApprovalPage} from "@/api/contract/approvals"
 import {receiptKeys} from "@/query/receipts"

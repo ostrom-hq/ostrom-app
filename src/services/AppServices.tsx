@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import {createContext, type ReactNode, use, useMemo} from "react"
 import type {StoreApi} from "zustand/vanilla"
 import {useStore} from "zustand"

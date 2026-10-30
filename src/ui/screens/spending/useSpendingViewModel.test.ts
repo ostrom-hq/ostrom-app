@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import {SpendReportSchema} from "@/api/contract/spending"
 import {spending} from "@/api/mocks/fixtures"
 import {breakdownOf, budgetOf} from "./useSpendingViewModel"

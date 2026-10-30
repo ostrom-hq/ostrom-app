@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import {type UseQueryResult, useQuery} from "@tanstack/react-query"
 import type {ReceiptPage} from "@/api/contract/receipts"
 import type {ReceiptKey} from "@/domain/receipts/publicKey"

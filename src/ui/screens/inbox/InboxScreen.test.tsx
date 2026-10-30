@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import {QueryClientProvider} from "@tanstack/react-query"
 import {act, fireEvent, screen} from "@testing-library/react-native"
 import {renderRouter} from "expo-router/testing-library"
