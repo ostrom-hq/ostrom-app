@@ -22,6 +22,23 @@ describe("session store", () => {
         expect(storage.items.has(SESSION_KEY)).toBe(false)
     })
 
+    it("opens signed out when the keychain cannot be read", async () => {
+        const storage = new MemoryStorage()
+        storage.get = (): Promise<string | undefined> => Promise.reject(new Error("locked"))
+        const store = createSessionStore(storage)
+        await store.getState().hydrate()
+        expect(store.getState().state).toEqual({status: "signed-out"})
+    })
+
+    it("still opens signed out when an unreadable session cannot be removed", async () => {
+        const storage = new MemoryStorage()
+        storage.items.set(SESSION_KEY, "not json")
+        storage.remove = (): Promise<void> => Promise.reject(new Error("locked"))
+        const store = createSessionStore(storage)
+        await store.getState().hydrate()
+        expect(store.getState().state).toEqual({status: "signed-out"})
+    })
+
     it.each(["not json", JSON.stringify({token: "x"})])("drops an unreadable stored session: %s", async (stored) => {
         const storage = new MemoryStorage()
         storage.items.set(SESSION_KEY, stored)
