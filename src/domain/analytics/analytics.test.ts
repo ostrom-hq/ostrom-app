@@ -8,6 +8,7 @@ import {
     CHOICE_KEY,
     createAnalytics,
     DEFAULT_HOST,
+    FLUSH_DELAY_MS,
     MAX_BATCH,
 } from "./analytics"
 
@@ -47,15 +48,37 @@ const BodySchema = z.object({
     ),
 })
 
+/** Storage that fails: every write, and the reads of [failingReads]. */
+class FailingStorage implements AnalyticsStorage {
+    constructor(
+        private readonly reads: Readonly<Record<string, string>>,
+        private readonly failingReads: readonly string[],
+    ) {}
+
+    get(key: string): Promise<string | undefined> {
+        return this.failingReads.includes(key) ? Promise.reject(new Error("locked")) : Promise.resolve(this.reads[key])
+    }
+
+    set(): Promise<void> {
+        return Promise.reject(new Error("locked"))
+    }
+
+    remove(): Promise<void> {
+        return Promise.reject(new Error("locked"))
+    }
+}
+
 interface Setup {
     readonly analytics: Analytics
     readonly storage: MemoryStorage
     readonly sent: Sent[]
+    readonly timers: (() => void)[]
 }
 
 function setup(overrides: Partial<AnalyticsOptions> = {}): Setup {
     const storage = new MemoryStorage()
     const sent: Sent[] = []
+    const timers: (() => void)[] = []
     let ids = 0
     const analytics = createAnalytics({
         apiKey: "phc_test",
@@ -70,9 +93,12 @@ function setup(overrides: Partial<AnalyticsOptions> = {}): Setup {
         platform: "ios",
         now: () => new Date("2026-10-30T03:00:00Z"),
         newId: () => `anon-${String(++ids)}`,
+        schedule: (task) => {
+            timers.push(task)
+        },
         ...overrides,
     })
-    return {analytics, storage, sent}
+    return {analytics, storage, sent, timers}
 }
 
 describe("analytics", () => {
@@ -110,6 +136,7 @@ describe("analytics", () => {
             $app_version: "0.1.0",
             $os: "ios",
             $process_person_profile: false,
+            $geoip_disable: true,
         })
     })
 
@@ -190,7 +217,123 @@ describe("analytics", () => {
         expect(sent).toEqual([])
     })
 
-    it("defaults to the system clock and random ids", async () => {
+    it("a small batch leaves after a delay", async () => {
+        const {analytics, sent, timers} = setup()
+        await analytics.enable()
+        await analytics.screen("Inbox")
+        expect(timers).toHaveLength(1)
+
+        timers[0]?.()
+        await analytics.flush()
+
+        expect(sent.map((batch) => batch.batch.length)).toEqual([2])
+    })
+
+    it("turning on twice announces the consent once", async () => {
+        const {analytics, sent} = setup()
+        await analytics.enable()
+        await analytics.enable()
+        await analytics.flush()
+
+        expect(sent[0]?.batch.map((event) => event.event)).toEqual(["consent_updated"])
+    })
+
+    it("an opt-out is never overtaken by a capture started before it", async () => {
+        const {analytics, storage, sent} = setup()
+        await analytics.enable()
+
+        const capture = analytics.screen("Inbox")
+        const disable = analytics.disable()
+        await Promise.all([capture, disable])
+        await analytics.flush()
+
+        expect(sent).toEqual([])
+        expect(storage.values.has(ANONYMOUS_ID_KEY)).toBe(false)
+    })
+
+    it("concurrent first captures share one anonymous id", async () => {
+        const {analytics, sent} = setup()
+        await analytics.enable()
+        await analytics.disable()
+        const enable = analytics.enable()
+        const screen = analytics.screen("Inbox")
+        await Promise.all([enable, screen])
+        await analytics.flush()
+
+        expect(new Set(sent[0]?.batch.map((event) => event.distinct_id))).toEqual(new Set(["anon-2"]))
+    })
+
+    it("an event captured before sign-out keeps its person; one captured after gets a new anonymous id", async () => {
+        const {analytics, sent} = setup()
+        await analytics.enable()
+        analytics.identify("user-1", undefined)
+
+        const before = analytics.screen("Inbox")
+        const reset = analytics.reset()
+        const after = analytics.screen("Sign in")
+        await Promise.all([before, reset, after])
+        await analytics.flush()
+
+        expect(sent.map((batch) => batch.batch.map((event) => event.distinct_id))).toEqual([
+            ["anon-1", "user-1"],
+            ["anon-2"],
+        ])
+    })
+
+    it("a capture never waits on the network", async () => {
+        const {analytics} = setup({post: () => new Promise<void>(() => undefined)})
+        await analytics.enable()
+
+        for (let index = 1; index <= MAX_BATCH; index++) await analytics.screen(`Screen ${String(index)}`)
+
+        expect(await analytics.choice()).toBe("on")
+    })
+
+    it("a storage that fails never breaks the app and keeps the choice in memory", async () => {
+        const {analytics, sent} = setup({storage: new FailingStorage({}, [ANONYMOUS_ID_KEY])})
+
+        await analytics.enable()
+        await analytics.screen("Inbox")
+        await analytics.flush()
+        await analytics.disable()
+        await analytics.reset()
+
+        expect(sent[0]?.batch.map((event) => event.distinct_id)).toEqual(["anon-1", "anon-1"])
+        expect(await analytics.choice()).toBe("off")
+    })
+
+    it("after a restart, reuses the stored choice and anonymous id", async () => {
+        const storage = new MemoryStorage()
+        storage.values.set(CHOICE_KEY, "on")
+        storage.values.set(ANONYMOUS_ID_KEY, "anon-stored")
+        const {analytics, sent} = setup({storage})
+
+        await analytics.screen("Inbox")
+        await analytics.flush()
+
+        expect(sent[0]?.batch.map((event) => event.distinct_id)).toEqual(["anon-stored"])
+    })
+
+    it("an unreadable choice is off", async () => {
+        const {analytics, sent} = setup({storage: new FailingStorage({}, [CHOICE_KEY])})
+
+        await analytics.screen("Inbox")
+        await analytics.flush()
+
+        expect(await analytics.choice()).toBe("off")
+        expect(sent).toEqual([])
+    })
+
+    it("trims the key and falls back to the EU host", async () => {
+        const {analytics, sent} = setup({apiKey: " phc_x ", host: " "})
+        await analytics.enable()
+        await analytics.flush()
+
+        expect(sent[0]).toMatchObject({url: `${DEFAULT_HOST}/batch/`, apiKey: "phc_x"})
+    })
+
+    it("defaults to the system clock, random ids and a real timer", async () => {
+        jest.useFakeTimers()
         const storage = new MemoryStorage()
         const bodies: string[] = []
         const analytics = createAnalytics({
@@ -205,6 +348,8 @@ describe("analytics", () => {
             platform: "android",
         })
         await analytics.enable()
+        jest.advanceTimersByTime(FLUSH_DELAY_MS)
+        jest.useRealTimers()
         await analytics.flush()
 
         expect(storage.values.get(ANONYMOUS_ID_KEY)).toMatch(/^[0-9a-f-]{36}$/)
