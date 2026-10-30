@@ -9,6 +9,11 @@ appId: run.ostrom.app
     direction: DOWN
 - tapOn:
     id: "request-appr_0004"
+# The buttons come after the evidence, below the fold on a phone.
+- scrollUntilVisible:
+    element:
+      id: "request-approve"
+    direction: DOWN
 - assertNotVisible:
     id: "request-open-console"
 - tapOn:
@@ -17,7 +22,9 @@ appId: run.ostrom.app
     visible: "Ostrom wants a fresh sign-in for this yes: confirm it in the console."
     timeout: 15000
 - assertNotVisible: ".*step_up_required.*"
-- assertVisible:
-    id: "request-open-console"
+- scrollUntilVisible:
+    element:
+      id: "request-open-console"
+    direction: DOWN
 # The tap opens the browser on the console, outside the app: its address is checked by the unit tests.
 - takeScreenshot: step-up

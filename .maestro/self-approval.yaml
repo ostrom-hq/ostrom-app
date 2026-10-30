@@ -9,6 +9,11 @@ appId: run.ostrom.app
     direction: DOWN
 - tapOn:
     id: "request-appr_0002"
+# The buttons come after the evidence, below the fold on a phone.
+- scrollUntilVisible:
+    element:
+      id: "request-decline"
+    direction: DOWN
 - assertVisible: "Your yes is not taken on this request."
 - assertNotVisible:
     id: "request-approve"
@@ -20,7 +25,9 @@ appId: run.ostrom.app
 - hideKeyboard
 - tapOn:
     id: "request-send-decline"
-- extendedWaitUntil:
-    visible: "Declined by rev-b.*"
+# The decision shows under the title, at the top of the request.
+- scrollUntilVisible:
+    element: "Declined by rev-b.*"
+    direction: UP
     timeout: 15000
 - takeScreenshot: self-approval-declined
