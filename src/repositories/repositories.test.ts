@@ -68,7 +68,7 @@ describe("ApprovalsRepositoryImpl", () => {
             }),
         )
         await approvals.answer("appr_0001", "reject", "d", "Wait for the migration PR")
-        expect(sent).toEqual({answer: "reject", shownDigest: "d", comment: "Wait for the migration PR"})
+        expect(sent).toEqual({answer: "reject", shownDigest: "d", note: "Wait for the migration PR"})
     })
 
     it("refuses my own yes when someone else can approve, but takes my no", async () => {

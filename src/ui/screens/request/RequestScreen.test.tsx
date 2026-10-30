@@ -21,7 +21,7 @@ async function open(
 ): Promise<Harness> {
     let current = initial
     const approval = jest.fn((_id: string) => Promise.resolve(current))
-    const answer = jest.fn((_id: string, given: ApprovalAnswer, _shownDigest: string, _comment?: string): Promise<AnswerResult> => {
+    const answer = jest.fn((_id: string, given: ApprovalAnswer, _shownDigest: string, _note?: string): Promise<AnswerResult> => {
         if (refuse !== undefined) return Promise.reject(refuse)
         current = {...current, status: given === "approve" ? "approved" : "rejected", decidedBy: "rev-b"}
         return Promise.resolve({approval: current})
@@ -83,6 +83,62 @@ describe("RequestScreen", () => {
         expect(answer).toHaveBeenCalledWith("appr_0001", "reject", approvals.pending.shownDigest, "Wait for the migration PR")
     })
 
+    it("names what a low-risk yes lets through, shows the size of the change, and approves without Face ID", async () => {
+        const merge: Approval = {
+            ...approvals.pending,
+            action: {kind: "merge", repo: "acme/acme-api", ref: "release/2", headSha: "c60f859", risk: "low"},
+            diffStats: {files: 3, additions: 120, deletions: 4},
+        }
+        const {confirm, answer} = await open(merge)
+        expect(screen.getByText("release/2")).toBeOnTheScreen()
+        expect(screen.getByText("3 files · +120 −4")).toBeOnTheScreen()
+        await fireEvent.press(screen.getByRole("button", {name: "Approve merge"}))
+        expect(await screen.findByText("Approved by rev-b")).toBeOnTheScreen()
+        expect(confirm).not.toHaveBeenCalled()
+        expect(answer).toHaveBeenCalledWith("appr_0001", "approve", merge.shownDigest, undefined)
+    })
+
+    it.each([
+        ["push", "Approve push"],
+        ["deploy", "Approve deploy"],
+        ["tool", "Approve"],
+        ["unknown", "Approve"],
+    ] as const)("names the yes of a %s action", async (kind, label) => {
+        await open({
+            ...approvals.pending,
+            action: {kind, repo: "acme/acme-api", ref: "main", headSha: "c60f859", risk: "high"},
+            diffStats: {files: 1, additions: 1, deletions: 0},
+        })
+        expect(screen.getByRole("button", {name: label})).toBeOnTheScreen()
+        expect(screen.getByText("1 file · +1 −0")).toBeOnTheScreen()
+    })
+
+    it("takes no yes on a diff the phone does not show in full, and keeps the no", async () => {
+        await open({...approvals.pending, diffTruncated: true})
+        expect(screen.getByText("The whole change is not shown on the phone: approve it from the console.")).toBeOnTheScreen()
+        expect(screen.queryByTestId("request-approve")).toBeNull()
+        expect(screen.getByRole("button", {name: "Decline…"})).toBeEnabled()
+    })
+
+    it("shows as head the commit the yes lets through, and no ref the server left empty", async () => {
+        await open({
+            ...approvals.pending,
+            sha: "1111111aaaa",
+            action: {kind: "merge", repo: "acme/acme-api", ref: "", headSha: "9f1e2d3bbbb", risk: "high"},
+        })
+        expect(screen.getByText("9f1e2d3")).toBeOnTheScreen()
+        expect(screen.queryByText("1111111")).toBeNull()
+        expect(screen.queryByText("Ref")).toBeNull()
+    })
+
+    it("shows a request in a status this app does not know, without an outcome or a button", async () => {
+        await open({...approvals.pending, status: "unknown", decidedBy: "rev-b"})
+        expect(screen.getByText("Unknown")).toBeOnTheScreen()
+        expect(screen.getByText("This app does not know this request's state: answer it from the console.")).toBeOnTheScreen()
+        expect(screen.queryByText(/by rev-b/)).toBeNull()
+        expect(screen.queryByRole("button", {name: "Decline…"})).toBeNull()
+    })
+
     it("goes back from the reason to the two buttons", async () => {
         await open(approvals.pending)
         await fireEvent.press(screen.getByRole("button", {name: "Decline…"}))
@@ -119,7 +175,7 @@ describe("RequestScreen", () => {
     it("asks for a new reading when the request changed under the screen, then binds the answer to it", async () => {
         let current: Approval = approvals.pending
         const approval = jest.fn((_id: string) => Promise.resolve(current))
-        const answer = jest.fn((_id: string, _given: ApprovalAnswer, shownDigest: string, _comment?: string): Promise<AnswerResult> => {
+        const answer = jest.fn((_id: string, _given: ApprovalAnswer, shownDigest: string, _note?: string): Promise<AnswerResult> => {
             if (shownDigest !== current.shownDigest) return Promise.reject(refused(409, "shown_digest_mismatch"))
             current = {...current, status: "approved", decidedBy: "rev-b"}
             return Promise.resolve({approval: current})

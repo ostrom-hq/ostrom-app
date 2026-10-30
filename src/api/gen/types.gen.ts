@@ -50,7 +50,7 @@ export type AnalysisState = {
 export type AnswerApprovalRequest = {
     answer: ApprovalAnswer;
     shownDigest: string;
-    comment?: string;
+    note?: string;
 };
 
 /**
@@ -84,9 +84,48 @@ export type Approval = {
     askedBy?: Array<string>;
     selfApproved?: boolean;
     expiresAt?: string;
+    action?: ApprovalAction;
+    diffStats?: DiffStats;
+    /**
+     * The approver is not shown the whole diff; the app then refuses a mobile yes
+     */
+    diffTruncated?: boolean;
 };
 
+/**
+ * The action a yes lets through. With `commitDetails`, `checks`, `diffStats` and `diffTruncated`, it is the proof an approver is shown (decision of 30/10 04:10)
+ */
+export type ApprovalAction = {
+    kind: ApprovalActionKind;
+    repo: string;
+    ref: string;
+    headSha: string;
+    baseSha?: string;
+    risk: ApprovalActionRisk;
+};
+
+/**
+ * The kind of action (clients keep an unknown kind as UNKNOWN)
+ */
+export type ApprovalActionKind = 'push' | 'merge' | 'deploy' | 'tool' | 'other';
+
+/**
+ * A high risk needs biometrics for a mobile yes
+ */
+export type ApprovalActionRisk = 'low' | 'high';
+
 export type ApprovalAnswer = 'approve' | 'reject';
+
+/**
+ * What the caller may do with an approval
+ */
+export type ApprovalCallerView = {
+    login: string;
+    self: boolean;
+    canApprove: boolean;
+    reason?: string;
+    selfApproval?: boolean;
+};
 
 /**
  * A CI check shown with an approval
@@ -107,7 +146,64 @@ export type ApprovalCommit = {
     url?: string;
 };
 
+/**
+ * The yes queue of the caller
+ */
+export type ApprovalQueue = {
+    /**
+     * Login a yes is signed as
+     */
+    operator: string;
+    you: ApprovalViewer;
+    pending: Array<ApprovalView>;
+    recent: Array<ApprovalView>;
+};
+
 export type ApprovalStatus = 'pending' | 'approved' | 'rejected' | 'expired';
+
+/**
+ * An approval as the console and the app show it: the request, the gate, the rules, the commits and checks (in `approval`), the receipt once answered
+ */
+export type ApprovalView = {
+    approval: Approval;
+    who?: {
+        dev?: string;
+        agent?: string;
+        model?: string;
+        session?: string;
+    };
+    what?: {
+        action?: string;
+        command?: string;
+        repo?: string;
+        sessionRepo?: string;
+        harness?: string;
+    };
+    gate?: GateRef;
+    rules?: Array<Rule>;
+    diff?: string;
+    pr?: GatePullRequest;
+    askedVia?: Array<string>;
+    /**
+     * What the approver told the agent with the answer
+     */
+    note?: string;
+    receipt?: Receipt;
+    verification?: Verification;
+    you: ApprovalCallerView;
+};
+
+/**
+ * Who is looking at the yes queue
+ */
+export type ApprovalViewer = {
+    login: string;
+    /**
+     * `console`, `app`, `cli`, `operator-account`
+     */
+    via: string;
+    name?: string;
+};
 
 /**
  * A published page or file set, behind the login
@@ -118,9 +214,53 @@ export type Artifact = {
     owner: string;
     access: string;
     latestVersion: number;
+    /**
+     * The console's page for it
+     */
     url: string;
+    /**
+     * Its public link, for `link` access on a server that serves pages
+     */
+    publicUrl?: string;
     createdAt: string;
     updatedAt: string;
+};
+
+/**
+ * Who reads it; `personal` when absent at publication
+ */
+export type ArtifactAccess = 'personal' | 'team' | 'link';
+
+/**
+ * A file sent for publication
+ */
+export type ArtifactFile = {
+    /**
+     * Its path in the version (`index.html`, `img/a.png`)
+     */
+    path: string;
+    content: string;
+    /**
+     * `utf8` when absent
+     */
+    encoding?: 'utf8' | 'base64';
+};
+
+/**
+ * A reading ticket
+ */
+export type ArtifactTicket = {
+    artifactId: string;
+    version: number;
+    /**
+     * The entry page's address on the content origin
+     */
+    url: string;
+    /**
+     * The same address, under TeamCode's name
+     */
+    contentUrl: string;
+    expiresAt: string;
 };
 
 export type ArtifactType = 'skill' | 'context' | 'hook' | 'script' | 'mcp' | 'approval' | 'notify' | 'subagent' | 'receipt';
@@ -131,6 +271,10 @@ export type ArtifactType = 'skill' | 'context' | 'hook' | 'script' | 'mcp' | 'ap
 export type ArtifactVersion = {
     number: number;
     files: Array<string>;
+    /**
+     * The page a reader opens first
+     */
+    entry: string;
     createdAt: string;
     createdBy: string;
 };
@@ -197,6 +341,18 @@ export type Automation = {
     version: number;
     createdAt: string;
     updatedAt: string;
+    /**
+     * The next cron slot, while the automation is enabled
+     */
+    nextRunAt?: string;
+    /**
+     * Until when the webhook's former secret is still accepted after a rotation
+     */
+    previousSecretValidUntil?: string;
+    /**
+     * The webhook secret, only in the answer to its creation (whsec_…); never readable again
+     */
+    secret?: string;
 };
 
 /**
@@ -209,6 +365,70 @@ export type AutomationAction = {
     model?: string;
     effort?: string;
     maxRuntimeMinutes?: number;
+};
+
+/**
+ * One trigger of an automation (cron, webhook or test) and the session it started, kept 14 days
+ */
+export type AutomationRun = {
+    id: string;
+    automationId: string;
+    /**
+     * cron, webhook or test
+     */
+    source: string;
+    /**
+     * queued, started, failed, invalid_payload, skipped_overlap or skipped_budget
+     */
+    status: string;
+    /**
+     * The automation's version that ran
+     */
+    version: number;
+    sessionId?: string | null;
+    /**
+     * A stable code when it failed (cloud_session_limit, cloud_hours_exhausted, owner_unavailable…)
+     */
+    reason?: string | null;
+    problems: Array<AutomationPayloadProblem>;
+    /**
+     * The cron slot it ran for
+     */
+    slotAt?: string | null;
+    createdAt: string;
+    updatedAt: string;
+};
+
+/**
+ * A webhook payload value that does not fit its variable
+ */
+export type AutomationPayloadProblem = {
+    path: string;
+    /**
+     * required, type:<type>, enum, max_length or not_scalar
+     */
+    rule: string;
+};
+
+/**
+ * What a run would do, without starting anything
+ */
+export type AutomationDryRun = {
+    renderedPrompt: string;
+    variables: Array<{
+        name: string;
+        /**
+         * Masked (••••) when the variable is sensitive
+         */
+        value?: string | null;
+        sensitive: boolean;
+    }>;
+    problems: Array<AutomationPayloadProblem>;
+    /**
+     * disabled, overlap or budget
+     */
+    wouldSkip?: string | null;
+    nextRuns: Array<string>;
 };
 
 /**
@@ -235,6 +455,159 @@ export type AutomationVariable = {
     maxLength?: number;
     required?: boolean;
     sensitive?: boolean;
+};
+
+/**
+ * An invoice or receipt. Amounts are in the currency's smallest unit (cents)
+ */
+export type BillingInvoice = {
+    id: string;
+    number: string | null;
+    /**
+     * Stripe's status (paid, open, void, uncollectible, draft)
+     */
+    status: string;
+    /**
+     * Amount including tax
+     */
+    total: number;
+    tax: number;
+    /**
+     * ISO 4217, lowercase
+     */
+    currency: string;
+    created: string;
+    /**
+     * Stripe's page of the invoice (pay it, download the receipt)
+     */
+    hostedInvoiceUrl: string | null;
+    pdfUrl: string | null;
+};
+
+/**
+ * Invoices and receipts, newest first
+ */
+export type BillingInvoiceList = {
+    invoices: Array<BillingInvoice>;
+};
+
+/**
+ * What the console's billing page shows: plan, period, limits, usage, alerts and payment state
+ */
+export type BillingOverview = {
+    orgId: string;
+    /**
+     * The plan of the subscription (free without one)
+     */
+    plan: 'free' | 'team' | 'business' | 'enterprise';
+    /**
+     * The plan whose limits apply now (free once a subscription has ended or is unpaid past retries)
+     */
+    effectivePlan: 'free' | 'team' | 'business' | 'enterprise';
+    interval: 'month' | 'year' | null;
+    /**
+     * Stripe's subscription status (active, trialing, past_due, incomplete, canceled…), null without one
+     */
+    status: string | null;
+    cancelAtPeriodEnd: boolean;
+    periodStart: string;
+    /**
+     * First instant after the period (renewal, or reset of the Free hours)
+     */
+    periodEnd: string;
+    /**
+     * People who launched an agent or answered a gate this period (billed on Team and Business)
+     */
+    activePeople: number;
+    /**
+     * People paid in advance on a yearly plan (0 on a monthly plan)
+     */
+    committedPeople: number;
+    limits: BillingPlanLimits;
+    usage: BillingUsage;
+    /**
+     * Usage alerts raised this period, in percent of the agent hours (80, 100)
+     */
+    alerts: Array<number>;
+    paymentIssue: BillingPaymentIssue | null;
+    /**
+     * Whether plans can be bought on this instance (false when self-hosted)
+     */
+    purchasable: boolean;
+    prices: Array<BillingPrice>;
+};
+
+/**
+ * A payment waiting for the customer; the console shows a banner linking to Stripe's invoice page
+ */
+export type BillingPaymentIssue = {
+    /**
+     * payment_failed (card declined, Stripe retries) or action_required (3-D Secure)
+     */
+    kind: 'payment_failed' | 'action_required';
+    hostedInvoiceUrl: string | null;
+    at: string;
+};
+
+/**
+ * The limits in force; null means unlimited. A request that would go past one (a member, a cloud agent, an agent hour, SSO, policies) is answered 402 `payment_required`, with a message naming the limit and where to upgrade.
+ */
+export type BillingPlanLimits = {
+    maxPeople: number | null;
+    maxConcurrentCloudAgents: number | null;
+    agentHoursPerPeriod: number | null;
+    sso: boolean;
+    policies: boolean;
+    receiptRetentionDays: number | null;
+};
+
+/**
+ * A plan to buy or switch to
+ */
+export type BillingPlanRequest = {
+    plan: 'team' | 'business';
+    interval: 'month' | 'year';
+};
+
+/**
+ * A price of the catalog: per active person per month (monthly), per person per year (yearly, 20 % off)
+ */
+export type BillingPrice = {
+    plan: 'team' | 'business';
+    interval: 'month' | 'year';
+    /**
+     * In cents, before tax
+     */
+    unitAmount: number;
+    currency: string;
+};
+
+/**
+ * A Stripe page to send the browser to
+ */
+export type BillingRedirect = {
+    url: string;
+};
+
+/**
+ * Cloud agent usage of the current period
+ */
+export type BillingUsage = {
+    agentSeconds: number;
+    /**
+     * Whole hours, rounded down
+     */
+    agentHours: number;
+    sessions: number;
+    /**
+     * Share of the plan's agent hours used, null without an hour limit
+     */
+    percentOfHours: number | null;
+};
+
+export type BillingWebhookAck = {
+    received: boolean;
+    outcome: 'processed' | 'duplicate' | 'ignored';
 };
 
 /**
@@ -303,20 +676,75 @@ export type CheckRun = {
 export type CheckState = 'success' | 'failure' | 'pending' | 'skipped';
 
 /**
- * An agent session run on a runner
+ * A cloud agent session: one pod (or local container) per execution, with a workspace kept across pauses
  */
 export type CloudSession = {
     id: string;
     name?: string;
     owner: string;
+    /**
+     * claude, codex, opencode, gemini or shell
+     */
     agent: string;
     model?: string;
+    /**
+     * The GitHub repository cloned at the first start, https://github.com/<owner>/<name>
+     */
+    repo?: string;
+    ref?: string;
+    /**
+     * creating, running, pausing, paused, resuming, terminated or failed
+     */
     status: string;
+    /**
+     * What the owner asked for, running, paused or terminated
+     */
+    desiredStatus?: string;
+    /**
+     * An open label of the current step (scheduling, cloning, starting…)
+     */
+    phase?: string;
+    /**
+     * The execution number, raised at each start or resume
+     */
+    epoch?: number;
+    failure?: CloudSessionFailure;
+    limits?: CloudSessionLimits;
+    updatedAt?: string;
+    readyAt?: string;
+    lastActivityAt?: string;
+    pausedAt?: string;
     runnerId?: string;
     runId?: string;
     automationId?: string;
     createdAt: string;
     endedAt?: string;
+};
+
+/**
+ * Why a cloud session failed or paused on its own
+ */
+export type CloudSessionFailure = {
+    /**
+     * start_failed, execution_lost, idle_timeout, max_duration or hours_exhausted
+     */
+    code: string;
+    message: string;
+};
+
+/**
+ * The bounds a cloud session runs under, from its organization's plan
+ */
+export type CloudSessionLimits = {
+    /**
+     * Minutes without a model request nor terminal input before it pauses
+     */
+    idleTimeoutMinutes: number;
+    /**
+     * Minutes an execution may run before it pauses
+     */
+    maxRunMinutes: number;
+    restrictedEgress: boolean;
 };
 
 /**
@@ -459,6 +887,15 @@ export type DeviceCode = {
     verificationUri: string;
     interval: number;
     expiresIn: number;
+};
+
+/**
+ * The size of a change
+ */
+export type DiffStats = {
+    files: number;
+    additions: number;
+    deletions: number;
 };
 
 /**
@@ -635,6 +1072,17 @@ export type Group = {
 };
 
 /**
+ * Liveness and the result of each check
+ */
+export type Health = {
+    status: string;
+    version: string;
+    checks: {
+        [key: string]: string;
+    };
+};
+
+/**
  * A hook delivered to developers outside session packages
  */
 export type Hook = {
@@ -642,6 +1090,33 @@ export type Hook = {
     version: string;
     pinned: boolean;
     assignedTo: Array<string>;
+};
+
+/**
+ * One line of an import report
+ */
+export type ImportItem = {
+    /**
+     * Clients keep an unknown kind as UNKNOWN
+     */
+    kind: 'setting' | 'secret' | 'server' | 'policy' | 'assignment' | 'account';
+    name: string;
+    action: 'planned' | 'created' | 'updated' | 'unchanged' | 'skipped';
+    /**
+     * Why it was skipped
+     */
+    reason?: string;
+};
+
+/**
+ * What an import did; a second run reports everything unchanged
+ */
+export type ImportReport = {
+    items: Array<ImportItem>;
+    created: number;
+    updated: number;
+    unchanged: number;
+    skipped: number;
 };
 
 /**
@@ -653,6 +1128,140 @@ export type InferenceRoute = {
     provider: string;
     account?: string;
     priority: number;
+};
+
+/**
+ * The instance as clients see it
+ */
+export type Instance = {
+    id: string;
+    /**
+     * The server version
+     */
+    version: string;
+    createdAt: string;
+    signingKey: InstanceSigningKey;
+};
+
+/**
+ * A key the instance signs with
+ */
+export type InstanceSigningKey = {
+    keyId: string;
+    /**
+     * `ed25519`
+     */
+    algorithm: string;
+    /**
+     * PEM (SPKI)
+     */
+    publicKeyPem: string;
+    firstSeenAt: string;
+};
+
+/**
+ * One test on a tool call's arguments
+ */
+export type McpArgumentCondition = {
+    /**
+     * A dotted path into the arguments (`query`, `options.database`, `items.0.id`)
+     */
+    path: string;
+    /**
+     * Answers carry these values; requests may use any case. MATCHES is a case-insensitive regular expression that may not repeat a repeated group (`(a+)+`) nor refer back to a group, and an argument longer than 8192 characters counts as matching (fail closed)
+     */
+    operator: 'EQUALS' | 'NOT_EQUALS' | 'MATCHES' | 'PREFIX' | 'CONTAINS' | 'EXISTS' | 'ABSENT';
+    /**
+     * The operand, unused for EXISTS and ABSENT
+     */
+    value?: string;
+};
+
+/**
+ * The argument policies of a relayed server, at most 64, so always one page
+ */
+export type McpArgumentPolicies = {
+    policies: Array<McpArgumentPolicy>;
+    /**
+     * Reserved for paging; always absent today
+     */
+    next?: string;
+};
+
+/**
+ * A rule on a tool's arguments, checked on every call before it reaches the upstream server
+ */
+export type McpArgumentPolicy = {
+    id: string;
+    tool: string;
+    conditions: Array<McpArgumentCondition>;
+    /**
+     * DENY refuses the call; REQUIRE_APPROVAL holds it until a human approves it
+     */
+    effect: 'DENY' | 'REQUIRE_APPROVAL';
+    /**
+     * What the agent is told
+     */
+    message: string;
+    createdAt: string;
+};
+
+/**
+ * A new argument policy; every condition must hold (none means every call of the tool)
+ */
+export type McpArgumentPolicyRequest = {
+    tool: string;
+    conditions?: Array<McpArgumentCondition>;
+    /**
+     * Any case is accepted; answers carry the upper-case value
+     */
+    effect: 'DENY' | 'REQUIRE_APPROVAL';
+    message: string;
+};
+
+/**
+ * Who reaches a relayed server and which of its tools. A member's own assignment replaces the one for every member (`all`) for that member, it never adds to it; removing `all` leaves members' own assignments
+ */
+export type McpAssignment = {
+    server: string;
+    /**
+     * The member's id; absent for every member of the org
+     */
+    member?: string;
+    /**
+     * The allowlist; absent for every tool, empty for none
+     */
+    tools?: Array<string>;
+    /**
+     * The member's personal secret used as credential, for a per-member server
+     */
+    credentialSecret?: string;
+    assignedAt: string;
+};
+
+/**
+ * An assignment; hiding a tool is not the boundary, every call is checked again
+ */
+export type McpAssignmentRequest = {
+    /**
+     * The allowlist; absent for every tool, empty for none (send `[]`, never drop it)
+     */
+    tools?: Array<string>;
+    /**
+     * The name of one of the member's personal secrets, only for a per-member server and one member (400 with `all`)
+     */
+    credentialSecret?: string;
+};
+
+/**
+ * The assignments of a server, one per member and one for `all` at most, so always one page
+ */
+export type McpAssignmentsPage = {
+    items: Array<McpAssignment>;
+    /**
+     * Reserved for paging; always absent today
+     */
+    next?: string;
 };
 
 /**
@@ -673,13 +1282,96 @@ export type McpCall = {
  * An MCP server relayed by Ostrom; its credentials stay on the server
  */
 export type McpServer = {
+    /**
+     * 1 to 64 characters; `servers`, `settings`, `calls` and `usage` are reserved (they are paths of this API)
+     */
     name: string;
-    url: string;
+    /**
+     * The upstream URL of an HTTP server; absent for a stdio server. In answers, a stdio server reads `stdio:<launcher>:<package>`, and a member's list (`mine=true`) gives the relay path, never the upstream
+     */
+    url?: string;
+    /**
+     * http, sse or stdio
+     */
     transport: string;
-    secretNames: Array<string>;
+    /**
+     * The org secrets the server uses, in an admin's list only
+     */
+    secretNames?: Array<string>;
     tools?: Array<string>;
     enabled: boolean;
     scope: string;
+    /**
+     * The name the agent sees (`<agentPrefix>-<name>`), in a member's list
+     */
+    readonly agentName?: string;
+    /**
+     * The relay endpoint, in a member's list
+     */
+    readonly path?: string;
+    /**
+     * The header carrying the credential, when not `Authorization: Bearer`
+     */
+    credentialHeader?: string;
+    stdio?: McpStdioSpec;
+    /**
+     * Bumped at each change
+     */
+    readonly version?: number;
+    readonly createdAt?: string;
+};
+
+/**
+ * How the gateway reaches model providers for the org (bring your own key)
+ */
+export type InferenceSettings = {
+    /**
+     * Name of the org secret holding an Anthropic API key, used when no shared Claude account serves
+     */
+    anthropicKeySecret?: string;
+    /**
+     * Name of the org secret holding an OpenAI API key
+     */
+    openaiKeySecret?: string;
+    /**
+     * Name of the org secret holding an OpenRouter key (models named `vendor/model`)
+     */
+    openrouterKeySecret?: string;
+    /**
+     * Whether members' shared subscription accounts serve before the org's keys
+     */
+    useSharedAccounts?: boolean;
+};
+
+/**
+ * How agents see relayed servers
+ */
+export type McpSettings = {
+    /**
+     * Tools are `mcp__<agentPrefix>-<server>__<tool>`; 1 to 32 characters of a-z 0-9 _ -, default `ostrom`
+     */
+    agentPrefix: string;
+};
+
+/**
+ * A server run by the MCP host from a pinned package
+ */
+export type McpStdioSpec = {
+    launcher: 'npm' | 'pypi';
+    /**
+     * name@1.2.3 (npm) or name==1.2.3 (PyPI)
+     */
+    packageName: string;
+    args?: Array<string>;
+    env?: {
+        [key: string]: string;
+    };
+    /**
+     * Variable name to the name of the org secret injected by the server
+     */
+    secretEnv?: {
+        [key: string]: string;
+    };
 };
 
 /**
@@ -717,6 +1409,27 @@ export type ModelPolicy = {
     byMember?: {
         [key: string]: Array<string>;
     };
+};
+
+/**
+ * The caller's budget this month, in millionths of a US dollar
+ */
+export type MyBudget = {
+    /**
+     * Absent when no limit applies
+     */
+    limitMicros?: number;
+    spentMicros: number;
+    /**
+     * Absent without a limit
+     */
+    remainingMicros?: number;
+    resetsAt: string;
+    /**
+     * Model calls are refused now
+     */
+    exhausted: boolean;
+    exhaustedScope?: 'org' | 'member';
 };
 
 /**
@@ -1187,6 +1900,14 @@ export type Secret = {
     createdAt: string;
     updatedAt: string;
     updatedBy: string;
+    /**
+     * Bumped at each rotation
+     */
+    version: number;
+    /**
+     * The member a personal secret belongs to
+     */
+    owner?: string;
     usedBy?: Array<string>;
 };
 
@@ -1197,6 +1918,17 @@ export type SecretWrite = {
     name: string;
     value: string;
     scope?: string;
+};
+
+/**
+ * 403 self_approval_refused: the asker answered while another approver exists
+ */
+export type SelfApprovalRefused = {
+    error: ErrorDetail;
+    /**
+     * Approvers who may answer instead
+     */
+    others: Array<string>;
 };
 
 /**
@@ -1303,6 +2035,44 @@ export type SharedAccount = {
     pool?: string;
     dailyAllocationUsd?: number;
     paused: boolean;
+};
+
+/**
+ * A gate policy signed by the instance: `signature` (base64, Ed25519 by the key `kid` of `/api/v1/instance/keys`) over the UTF-8 bytes of `payload`, the JSON text of a `SignedGatePolicyPayload`
+ */
+export type SignedGatePolicy = {
+    format: 'ostrom.gates/1';
+    alg: string;
+    kid: string;
+    signature: string;
+    payload: string;
+};
+
+/**
+ * What `SignedGatePolicy.payload` contains. The hooks refuse it after `expiresAt` (10 minutes after `issuedAt`) or if it claims more than an hour
+ */
+export type SignedGatePolicyPayload = {
+    repo: string;
+    issuedAt: string;
+    expiresAt: string;
+    failMode: 'closed';
+    waitSeconds: number;
+    gates: Array<GateRef>;
+    actions: Array<GateAction>;
+};
+
+/**
+ * A completed sign-in; the session itself is in the cookies
+ */
+export type SignedIn = {
+    /**
+     * The console path to go to
+     */
+    redirect: string;
+    /**
+     * The same value as the `ostrom_csrf` cookie, for the `X-CSRF-Token` header
+     */
+    csrfToken?: string;
 };
 
 /**
@@ -1423,6 +2193,83 @@ export type Team = {
 };
 
 /**
+ * A shared subscription account of TeamCode, tokens in clear (sent once, over TLS)
+ */
+export type TeamCodeAccount = {
+    provider: 'claude' | 'codex';
+    providerAccountId: string;
+    label: string;
+    email?: string;
+    expiresAt: string;
+    disabled?: boolean;
+};
+
+/**
+ * A TeamCode member's assignment to an MCP variant
+ */
+export type TeamCodeAssignment = {
+    memberId: string;
+    /**
+     * TeamCode's variant id
+     */
+    serverId: string;
+};
+
+/**
+ * What `ostrom import teamcode` read from TeamCode (read-only there), and its member map
+ */
+export type TeamCodeImportRequest = {
+    members?: Array<TeamCodeMember>;
+    mcpServers?: Array<TeamCodeMcpServer>;
+    assignments?: Array<TeamCodeAssignment>;
+    accounts?: Array<TeamCodeAccount>;
+    /**
+     * TeamCode member id to Ostrom member id; unmapped members are skipped
+     */
+    memberMap?: {
+        [key: string]: string;
+    };
+};
+
+/**
+ * An MCP variant of TeamCode; a slot's most assigned variant keeps the slot's name
+ */
+export type TeamCodeMcpServer = {
+    id: string;
+    /**
+     * The slot, the name agents see
+     */
+    target: string;
+    variant: string;
+    perMember?: boolean;
+    url?: string;
+    /**
+     * Absent, or Authorization, for a Bearer credential
+     */
+    credentialHeader?: string;
+    stdio?: TeamCodeStdio;
+    /**
+     * Absent for every tool
+     */
+    toolMode?: 'allow' | 'deny';
+    tools?: Array<string>;
+};
+
+export type TeamCodeMember = {
+    id: string;
+    username: string;
+};
+
+/**
+ * A command of TeamCode run by the MCP host
+ */
+export type TeamCodeStdio = {
+    launcher: 'npm' | 'pypi';
+    packageName: string;
+    args?: Array<string>;
+};
+
+/**
  * Spending over a period
  */
 export type Usage = {
@@ -1437,6 +2284,77 @@ export type Usage = {
     byModel?: {
         [key: string]: number;
     };
+    cacheReadTokens: number;
+    cacheWriteTokens: number;
+    events: number;
+};
+
+/**
+ * A usage event; costs in millionths of a US dollar
+ */
+export type UsageEvent = {
+    id: string;
+    memberId?: string;
+    /**
+     * `model`, `mcp`, `skill`, `hook` or `session`
+     */
+    kind: string;
+    name: string;
+    provider?: string;
+    accountId?: string;
+    sessionId?: string;
+    inputTokens: number;
+    outputTokens: number;
+    cacheReadTokens: number;
+    cacheWriteTokens: number;
+    costMicros: number;
+    durationMillis: number;
+    outcome: string;
+    at: string;
+};
+
+/**
+ * An event a client declares
+ */
+export type UsageEventInput = {
+    kind: 'skill' | 'hook' | 'session' | 'mcp';
+    /**
+     * The skill, the hook event, the session id or `server/tool`
+     */
+    name: string;
+    sessionId?: string;
+    durationMillis?: number;
+    /**
+     * `ok` or a short error key
+     */
+    outcome?: string;
+    /**
+     * ISO 8601; now when absent
+     */
+    at?: string;
+};
+
+/**
+ * Totals per group since a date
+ */
+export type UsageSummary = {
+    since: string;
+    groupBy: string;
+    groups: Array<UsageTotal>;
+    total: UsageTotal;
+};
+
+/**
+ * The totals of a group; `key` is absent for the total and for events without one
+ */
+export type UsageTotal = {
+    key?: string;
+    events: number;
+    inputTokens: number;
+    outputTokens: number;
+    cacheReadTokens: number;
+    cacheWriteTokens: number;
+    costMicros: number;
 };
 
 /**
@@ -1636,6 +2554,149 @@ export type WorkflowRun = {
 
 export type WorkflowStatus = 'proposed' | 'accepted' | 'edited';
 
+/**
+ * An MCP server relayed by Ostrom; its credentials stay on the server
+ */
+export type McpServerWritable = {
+    /**
+     * 1 to 64 characters; `servers`, `settings`, `calls` and `usage` are reserved (they are paths of this API)
+     */
+    name: string;
+    /**
+     * The upstream URL of an HTTP server; absent for a stdio server. In answers, a stdio server reads `stdio:<launcher>:<package>`, and a member's list (`mine=true`) gives the relay path, never the upstream
+     */
+    url?: string;
+    /**
+     * http, sse or stdio
+     */
+    transport: string;
+    /**
+     * The org secrets the server uses, in an admin's list only
+     */
+    secretNames?: Array<string>;
+    tools?: Array<string>;
+    enabled: boolean;
+    scope: string;
+    /**
+     * The header carrying the credential, when not `Authorization: Bearer`
+     */
+    credentialHeader?: string;
+    stdio?: McpStdioSpec;
+};
+
+/**
+ * A shared subscription account of TeamCode, tokens in clear (sent once, over TLS)
+ */
+export type TeamCodeAccountWritable = {
+    provider: 'claude' | 'codex';
+    providerAccountId: string;
+    label: string;
+    email?: string;
+    accessToken: string;
+    refreshToken: string;
+    expiresAt: string;
+    disabled?: boolean;
+};
+
+/**
+ * A TeamCode member's assignment to an MCP variant
+ */
+export type TeamCodeAssignmentWritable = {
+    memberId: string;
+    /**
+     * TeamCode's variant id
+     */
+    serverId: string;
+    /**
+     * The member's own credential, in clear
+     */
+    memberSecret?: string;
+};
+
+/**
+ * What `ostrom import teamcode` read from TeamCode (read-only there), and its member map
+ */
+export type TeamCodeImportRequestWritable = {
+    members?: Array<TeamCodeMember>;
+    mcpServers?: Array<TeamCodeMcpServerWritable>;
+    assignments?: Array<TeamCodeAssignmentWritable>;
+    accounts?: Array<TeamCodeAccountWritable>;
+    /**
+     * TeamCode member id to Ostrom member id; unmapped members are skipped
+     */
+    memberMap?: {
+        [key: string]: string;
+    };
+};
+
+/**
+ * An MCP variant of TeamCode; a slot's most assigned variant keeps the slot's name
+ */
+export type TeamCodeMcpServerWritable = {
+    id: string;
+    /**
+     * The slot, the name agents see
+     */
+    target: string;
+    variant: string;
+    perMember?: boolean;
+    url?: string;
+    /**
+     * Absent, or Authorization, for a Bearer credential
+     */
+    credentialHeader?: string;
+    /**
+     * The shared credential, in clear
+     */
+    sharedSecret?: string;
+    stdio?: TeamCodeStdioWritable;
+    /**
+     * Absent for every tool
+     */
+    toolMode?: 'allow' | 'deny';
+    tools?: Array<string>;
+};
+
+/**
+ * A command of TeamCode run by the MCP host
+ */
+export type TeamCodeStdioWritable = {
+    launcher: 'npm' | 'pypi';
+    packageName: string;
+    args?: Array<string>;
+    /**
+     * Secret variables, values in clear; never returned nor logged
+     */
+    secretEnv?: {
+        [key: string]: string;
+    };
+};
+
+export type HealthRootData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/health';
+};
+
+export type HealthRootErrors = {
+    /**
+     * A check failed
+     */
+    503: Health;
+};
+
+export type HealthRootError = HealthRootErrors[keyof HealthRootErrors];
+
+export type HealthRootResponses = {
+    /**
+     * OK
+     */
+    200: Health;
+};
+
+export type HealthRootResponse = HealthRootResponses[keyof HealthRootResponses];
+
 export type HealthData = {
     body?: never;
     path?: never;
@@ -1652,6 +2713,10 @@ export type HealthErrors = {
      * A refusal
      */
     404: ApiError;
+    /**
+     * A check failed
+     */
+    503: Health;
 };
 
 export type HealthError = HealthErrors[keyof HealthErrors];
@@ -1660,13 +2725,44 @@ export type HealthResponses = {
     /**
      * OK
      */
-    200: {
-        status: string;
-        version: string;
-    };
+    200: Health;
 };
 
 export type HealthResponse = HealthResponses[keyof HealthResponses];
+
+export type GetInstanceData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/instance';
+};
+
+export type GetInstanceResponses = {
+    /**
+     * OK
+     */
+    200: Instance;
+};
+
+export type GetInstanceResponse = GetInstanceResponses[keyof GetInstanceResponses];
+
+export type ListInstanceKeysData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/instance/keys';
+};
+
+export type ListInstanceKeysResponses = {
+    /**
+     * OK
+     */
+    200: {
+        keys: Array<InstanceSigningKey>;
+    };
+};
+
+export type ListInstanceKeysResponse = ListInstanceKeysResponses[keyof ListInstanceKeysResponses];
 
 export type CapabilitiesData = {
     body?: never;
@@ -2090,6 +3186,137 @@ export type GetMeResponses = {
 };
 
 export type GetMeResponse = GetMeResponses[keyof GetMeResponses];
+
+export type RequestSignInEmailData = {
+    body: {
+        email: string;
+        /**
+         * The console path to return to after signing in
+         */
+        redirect?: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/v1/auth/email';
+};
+
+export type RequestSignInEmailErrors = {
+    /**
+     * A refusal
+     */
+    400: ApiError;
+    /**
+     * A refusal
+     */
+    401: ApiError;
+    /**
+     * A refusal
+     */
+    403: ApiError;
+    /**
+     * A refusal
+     */
+    404: ApiError;
+    /**
+     * A refusal
+     */
+    409: ApiError;
+};
+
+export type RequestSignInEmailError = RequestSignInEmailErrors[keyof RequestSignInEmailErrors];
+
+export type RequestSignInEmailResponses = {
+    /**
+     * Sent if the address may sign in
+     */
+    202: unknown;
+};
+
+export type VerifySignInEmailData = {
+    body: {
+        token: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/v1/auth/email/verify';
+};
+
+export type VerifySignInEmailErrors = {
+    /**
+     * A refusal
+     */
+    400: ApiError;
+    /**
+     * A refusal
+     */
+    401: ApiError;
+    /**
+     * A refusal
+     */
+    403: ApiError;
+    /**
+     * A refusal
+     */
+    404: ApiError;
+    /**
+     * A refusal
+     */
+    409: ApiError;
+};
+
+export type VerifySignInEmailError = VerifySignInEmailErrors[keyof VerifySignInEmailErrors];
+
+export type VerifySignInEmailResponses = {
+    /**
+     * Signed in; the session is in the cookies, never in the body
+     */
+    200: SignedIn;
+};
+
+export type VerifySignInEmailResponse = VerifySignInEmailResponses[keyof VerifySignInEmailResponses];
+
+export type ExchangeSignInLinkData = {
+    body: {
+        token: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/v1/auth/link';
+};
+
+export type ExchangeSignInLinkErrors = {
+    /**
+     * A refusal
+     */
+    400: ApiError;
+    /**
+     * A refusal
+     */
+    401: ApiError;
+    /**
+     * A refusal
+     */
+    403: ApiError;
+    /**
+     * A refusal
+     */
+    404: ApiError;
+    /**
+     * A refusal
+     */
+    409: ApiError;
+};
+
+export type ExchangeSignInLinkError = ExchangeSignInLinkErrors[keyof ExchangeSignInLinkErrors];
+
+export type ExchangeSignInLinkResponses = {
+    /**
+     * Signed in; the session is in the cookies, never in the body
+     */
+    200: SignedIn;
+};
+
+export type ExchangeSignInLinkResponse = ExchangeSignInLinkResponses[keyof ExchangeSignInLinkResponses];
 
 export type LogoutData = {
     body?: never;
@@ -2858,7 +4085,7 @@ export type GithubWebhookData = {
     body: unknown;
     path?: never;
     query?: never;
-    url: '/api/v1/github/webhook';
+    url: '/webhooks/github';
 };
 
 export type GithubWebhookErrors = {
@@ -2882,6 +4109,42 @@ export type GithubWebhookResponses = {
 };
 
 export type GithubWebhookResponse = GithubWebhookResponses[keyof GithubWebhookResponses];
+
+export type ReceiveSlackInteractionData = {
+    body: {
+        /**
+         * The interaction, as Slack sends it (JSON text)
+         */
+        payload: string;
+    };
+    headers: {
+        'X-Slack-Signature': string;
+        'X-Slack-Request-Timestamp': string;
+    };
+    path?: never;
+    query?: never;
+    url: '/webhooks/slack';
+};
+
+export type ReceiveSlackInteractionErrors = {
+    /**
+     * A refusal
+     */
+    400: ApiError;
+    /**
+     * A refusal
+     */
+    401: ApiError;
+};
+
+export type ReceiveSlackInteractionError = ReceiveSlackInteractionErrors[keyof ReceiveSlackInteractionErrors];
+
+export type ReceiveSlackInteractionResponses = {
+    /**
+     * Handled; the message in Slack is updated
+     */
+    200: unknown;
+};
 
 export type GithubCheckData = {
     body: {
@@ -3906,6 +5169,49 @@ export type GetGateCatalogResponses = {
 
 export type GetGateCatalogResponse = GetGateCatalogResponses[keyof GetGateCatalogResponses];
 
+export type GetSignedGatePolicyData = {
+    body?: never;
+    path?: never;
+    query: {
+        repo: string;
+    };
+    url: '/api/v1/gates/catalog/signed';
+};
+
+export type GetSignedGatePolicyErrors = {
+    /**
+     * A refusal
+     */
+    400: ApiError;
+    /**
+     * A refusal
+     */
+    401: ApiError;
+    /**
+     * A refusal
+     */
+    403: ApiError;
+    /**
+     * A refusal
+     */
+    404: ApiError;
+    /**
+     * A refusal
+     */
+    409: ApiError;
+};
+
+export type GetSignedGatePolicyError = GetSignedGatePolicyErrors[keyof GetSignedGatePolicyErrors];
+
+export type GetSignedGatePolicyResponses = {
+    /**
+     * OK
+     */
+    200: SignedGatePolicy;
+};
+
+export type GetSignedGatePolicyResponse = GetSignedGatePolicyResponses[keyof GetSignedGatePolicyResponses];
+
 export type GetGatePolicyData = {
     body?: never;
     path?: never;
@@ -3998,9 +5304,16 @@ export type ListApprovalsData = {
     body?: never;
     path?: never;
     query?: {
-        status?: string;
+        /**
+         * One status or several, comma-separated (`approved,rejected,expired`); every status when absent
+         */
+        status?: Array<ApprovalStatus>;
         mine?: boolean;
+        /**
+         * The `next` of the previous page
+         */
         before?: string;
+        limit?: number;
     };
     url: '/api/v1/approvals';
 };
@@ -4041,6 +5354,47 @@ export type ListApprovalsResponses = {
 };
 
 export type ListApprovalsResponse = ListApprovalsResponses[keyof ListApprovalsResponses];
+
+export type GetApprovalQueueData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/approvals/queue';
+};
+
+export type GetApprovalQueueErrors = {
+    /**
+     * A refusal
+     */
+    400: ApiError;
+    /**
+     * A refusal
+     */
+    401: ApiError;
+    /**
+     * A refusal
+     */
+    403: ApiError;
+    /**
+     * A refusal
+     */
+    404: ApiError;
+    /**
+     * A refusal
+     */
+    409: ApiError;
+};
+
+export type GetApprovalQueueError = GetApprovalQueueErrors[keyof GetApprovalQueueErrors];
+
+export type GetApprovalQueueResponses = {
+    /**
+     * OK
+     */
+    200: ApprovalQueue;
+};
+
+export type GetApprovalQueueResponse = GetApprovalQueueResponses[keyof GetApprovalQueueResponses];
 
 export type GetApprovalData = {
     body?: never;
@@ -4085,16 +5439,16 @@ export type GetApprovalResponses = {
 
 export type GetApprovalResponse = GetApprovalResponses[keyof GetApprovalResponses];
 
-export type AnswerApprovalData = {
-    body: AnswerApprovalRequest;
+export type GetApprovalViewData = {
+    body?: never;
     path: {
         id: string;
     };
     query?: never;
-    url: '/api/v1/approvals/{id}/answer';
+    url: '/api/v1/approvals/{id}/view';
 };
 
-export type AnswerApprovalErrors = {
+export type GetApprovalViewErrors = {
     /**
      * A refusal
      */
@@ -4117,16 +5471,56 @@ export type AnswerApprovalErrors = {
     409: ApiError;
 };
 
+export type GetApprovalViewError = GetApprovalViewErrors[keyof GetApprovalViewErrors];
+
+export type GetApprovalViewResponses = {
+    /**
+     * OK
+     */
+    200: ApprovalView;
+};
+
+export type GetApprovalViewResponse = GetApprovalViewResponses[keyof GetApprovalViewResponses];
+
+export type AnswerApprovalData = {
+    body: AnswerApprovalRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/v1/approvals/{id}/answer';
+};
+
+export type AnswerApprovalErrors = {
+    /**
+     * A refusal
+     */
+    400: ApiError;
+    /**
+     * A refusal
+     */
+    401: ApiError;
+    /**
+     * self_approval_refused, or not an approver
+     */
+    403: SelfApprovalRefused;
+    /**
+     * A refusal
+     */
+    404: ApiError;
+    /**
+     * A refusal
+     */
+    409: ApiError;
+};
+
 export type AnswerApprovalError = AnswerApprovalErrors[keyof AnswerApprovalErrors];
 
 export type AnswerApprovalResponses = {
     /**
-     * OK
+     * The answered approval and its receipt
      */
-    200: {
-        approval: Approval;
-        receipt?: Receipt;
-    };
+    200: ApprovalView;
 };
 
 export type AnswerApprovalResponse = AnswerApprovalResponses[keyof AnswerApprovalResponses];
@@ -5940,9 +7334,13 @@ export type TestAutomationError = TestAutomationErrors[keyof TestAutomationError
 
 export type TestAutomationResponses = {
     /**
-     * OK
+     * A dry run (dryRun: true): nothing starts
      */
-    200: WorkflowRun;
+    200: AutomationDryRun;
+    /**
+     * A test run, started with the saved definition (Idempotency-Key required)
+     */
+    202: AutomationRun;
 };
 
 export type TestAutomationResponse = TestAutomationResponses[keyof TestAutomationResponses];
@@ -5952,7 +7350,10 @@ export type ListAutomationRunsData = {
     path: {
         id: string;
     };
-    query?: never;
+    query?: {
+        before?: string;
+        limit?: number;
+    };
     url: '/api/v1/automations/{id}/runs';
 };
 
@@ -5986,7 +7387,7 @@ export type ListAutomationRunsResponses = {
      * OK
      */
     200: {
-        items: Array<WorkflowRun>;
+        items: Array<AutomationRun>;
         next?: string;
     };
 };
@@ -6010,7 +7411,19 @@ export type TriggerAutomationErrors = {
     /**
      * A refusal
      */
+    401: ApiError;
+    /**
+     * A refusal
+     */
     404: ApiError;
+    /**
+     * A refusal
+     */
+    409: ApiError;
+    /**
+     * A refusal
+     */
+    429: ApiError;
 };
 
 export type TriggerAutomationError = TriggerAutomationErrors[keyof TriggerAutomationErrors];
@@ -6021,6 +7434,10 @@ export type TriggerAutomationResponses = {
      */
     202: {
         runId?: string;
+        /**
+         * The run's status (started, failed, invalid_payload, skipped_overlap…)
+         */
+        status?: string;
         deduplicated: boolean;
     };
 };
@@ -6260,7 +7677,12 @@ export type CancelWaitResponse = CancelWaitResponses[keyof CancelWaitResponses];
 export type ListMcpServersData = {
     body?: never;
     path?: never;
-    query?: never;
+    query?: {
+        /**
+         * Only the servers the caller reaches, with their tools and agent names (what `ostrom claude` connects). A member, an agent session or an `mcp:use` token always gets this list, whatever `mine` says; the whole list, with upstream URLs and secret names, is for an admin with `mcp:read` or a browser session
+         */
+        mine?: boolean;
+    };
     url: '/api/v1/mcp/servers';
 };
 
@@ -6302,7 +7724,7 @@ export type ListMcpServersResponses = {
 export type ListMcpServersResponse = ListMcpServersResponses[keyof ListMcpServersResponses];
 
 export type CreateMcpServerData = {
-    body: McpServer;
+    body: McpServerWritable;
     path?: never;
     query?: never;
     url: '/api/v1/mcp/servers';
@@ -6386,7 +7808,7 @@ export type DeleteMcpServerResponses = {
 export type DeleteMcpServerResponse = DeleteMcpServerResponses[keyof DeleteMcpServerResponses];
 
 export type SaveMcpServerData = {
-    body: McpServer;
+    body: McpServerWritable;
     path: {
         name: string;
     };
@@ -6427,6 +7849,355 @@ export type SaveMcpServerResponses = {
 };
 
 export type SaveMcpServerResponse = SaveMcpServerResponses[keyof SaveMcpServerResponses];
+
+export type ListMcpAssignmentsData = {
+    body?: never;
+    path: {
+        name: string;
+    };
+    query?: never;
+    url: '/api/v1/mcp/servers/{name}/assignments';
+};
+
+export type ListMcpAssignmentsErrors = {
+    /**
+     * A refusal
+     */
+    400: ApiError;
+    /**
+     * A refusal
+     */
+    401: ApiError;
+    /**
+     * A refusal
+     */
+    403: ApiError;
+    /**
+     * A refusal
+     */
+    404: ApiError;
+    /**
+     * A refusal
+     */
+    409: ApiError;
+};
+
+export type ListMcpAssignmentsError = ListMcpAssignmentsErrors[keyof ListMcpAssignmentsErrors];
+
+export type ListMcpAssignmentsResponses = {
+    /**
+     * OK
+     */
+    200: McpAssignmentsPage;
+};
+
+export type ListMcpAssignmentsResponse = ListMcpAssignmentsResponses[keyof ListMcpAssignmentsResponses];
+
+export type UnassignMcpServerData = {
+    body?: never;
+    path: {
+        name: string;
+        /**
+         * The member's id, or `all` for every member of the org
+         */
+        member: string;
+    };
+    query?: never;
+    url: '/api/v1/mcp/servers/{name}/assignments/{member}';
+};
+
+export type UnassignMcpServerErrors = {
+    /**
+     * A refusal
+     */
+    400: ApiError;
+    /**
+     * A refusal
+     */
+    401: ApiError;
+    /**
+     * A refusal
+     */
+    403: ApiError;
+    /**
+     * A refusal
+     */
+    404: ApiError;
+    /**
+     * A refusal
+     */
+    409: ApiError;
+};
+
+export type UnassignMcpServerError = UnassignMcpServerErrors[keyof UnassignMcpServerErrors];
+
+export type UnassignMcpServerResponses = {
+    /**
+     * Done
+     */
+    204: void;
+};
+
+export type UnassignMcpServerResponse = UnassignMcpServerResponses[keyof UnassignMcpServerResponses];
+
+export type AssignMcpServerData = {
+    body: McpAssignmentRequest;
+    path: {
+        name: string;
+        /**
+         * The member's id, or `all` for every member of the org
+         */
+        member: string;
+    };
+    query?: never;
+    url: '/api/v1/mcp/servers/{name}/assignments/{member}';
+};
+
+export type AssignMcpServerErrors = {
+    /**
+     * A refusal
+     */
+    400: ApiError;
+    /**
+     * A refusal
+     */
+    401: ApiError;
+    /**
+     * A refusal
+     */
+    403: ApiError;
+    /**
+     * A refusal
+     */
+    404: ApiError;
+    /**
+     * A refusal
+     */
+    409: ApiError;
+};
+
+export type AssignMcpServerError = AssignMcpServerErrors[keyof AssignMcpServerErrors];
+
+export type AssignMcpServerResponses = {
+    /**
+     * OK
+     */
+    200: McpAssignment;
+};
+
+export type AssignMcpServerResponse = AssignMcpServerResponses[keyof AssignMcpServerResponses];
+
+export type ListMcpArgumentPoliciesData = {
+    body?: never;
+    path: {
+        name: string;
+    };
+    query?: never;
+    url: '/api/v1/mcp/servers/{name}/policies';
+};
+
+export type ListMcpArgumentPoliciesErrors = {
+    /**
+     * A refusal
+     */
+    400: ApiError;
+    /**
+     * A refusal
+     */
+    401: ApiError;
+    /**
+     * A refusal
+     */
+    403: ApiError;
+    /**
+     * A refusal
+     */
+    404: ApiError;
+    /**
+     * A refusal
+     */
+    409: ApiError;
+};
+
+export type ListMcpArgumentPoliciesError = ListMcpArgumentPoliciesErrors[keyof ListMcpArgumentPoliciesErrors];
+
+export type ListMcpArgumentPoliciesResponses = {
+    /**
+     * OK
+     */
+    200: McpArgumentPolicies;
+};
+
+export type ListMcpArgumentPoliciesResponse = ListMcpArgumentPoliciesResponses[keyof ListMcpArgumentPoliciesResponses];
+
+export type CreateMcpArgumentPolicyData = {
+    body: McpArgumentPolicyRequest;
+    path: {
+        name: string;
+    };
+    query?: never;
+    url: '/api/v1/mcp/servers/{name}/policies';
+};
+
+export type CreateMcpArgumentPolicyErrors = {
+    /**
+     * A refusal
+     */
+    400: ApiError;
+    /**
+     * A refusal
+     */
+    401: ApiError;
+    /**
+     * A refusal
+     */
+    403: ApiError;
+    /**
+     * A refusal
+     */
+    404: ApiError;
+    /**
+     * A refusal
+     */
+    409: ApiError;
+};
+
+export type CreateMcpArgumentPolicyError = CreateMcpArgumentPolicyErrors[keyof CreateMcpArgumentPolicyErrors];
+
+export type CreateMcpArgumentPolicyResponses = {
+    /**
+     * OK
+     */
+    201: McpArgumentPolicy;
+};
+
+export type CreateMcpArgumentPolicyResponse = CreateMcpArgumentPolicyResponses[keyof CreateMcpArgumentPolicyResponses];
+
+export type DeleteMcpArgumentPolicyData = {
+    body?: never;
+    path: {
+        name: string;
+        policyId: string;
+    };
+    query?: never;
+    url: '/api/v1/mcp/servers/{name}/policies/{policyId}';
+};
+
+export type DeleteMcpArgumentPolicyErrors = {
+    /**
+     * A refusal
+     */
+    400: ApiError;
+    /**
+     * A refusal
+     */
+    401: ApiError;
+    /**
+     * A refusal
+     */
+    403: ApiError;
+    /**
+     * A refusal
+     */
+    404: ApiError;
+    /**
+     * A refusal
+     */
+    409: ApiError;
+};
+
+export type DeleteMcpArgumentPolicyError = DeleteMcpArgumentPolicyErrors[keyof DeleteMcpArgumentPolicyErrors];
+
+export type DeleteMcpArgumentPolicyResponses = {
+    /**
+     * Done
+     */
+    204: void;
+};
+
+export type DeleteMcpArgumentPolicyResponse = DeleteMcpArgumentPolicyResponses[keyof DeleteMcpArgumentPolicyResponses];
+
+export type GetMcpSettingsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/mcp/settings';
+};
+
+export type GetMcpSettingsErrors = {
+    /**
+     * A refusal
+     */
+    400: ApiError;
+    /**
+     * A refusal
+     */
+    401: ApiError;
+    /**
+     * A refusal
+     */
+    403: ApiError;
+    /**
+     * A refusal
+     */
+    404: ApiError;
+    /**
+     * A refusal
+     */
+    409: ApiError;
+};
+
+export type GetMcpSettingsError = GetMcpSettingsErrors[keyof GetMcpSettingsErrors];
+
+export type GetMcpSettingsResponses = {
+    /**
+     * OK
+     */
+    200: McpSettings;
+};
+
+export type GetMcpSettingsResponse = GetMcpSettingsResponses[keyof GetMcpSettingsResponses];
+
+export type PutMcpSettingsData = {
+    body: McpSettings;
+    path?: never;
+    query?: never;
+    url: '/api/v1/mcp/settings';
+};
+
+export type PutMcpSettingsErrors = {
+    /**
+     * A refusal
+     */
+    400: ApiError;
+    /**
+     * A refusal
+     */
+    401: ApiError;
+    /**
+     * A refusal
+     */
+    403: ApiError;
+    /**
+     * A refusal
+     */
+    404: ApiError;
+    /**
+     * A refusal
+     */
+    409: ApiError;
+};
+
+export type PutMcpSettingsError = PutMcpSettingsErrors[keyof PutMcpSettingsErrors];
+
+export type PutMcpSettingsResponses = {
+    /**
+     * OK
+     */
+    200: McpSettings;
+};
+
+export type PutMcpSettingsResponse = PutMcpSettingsResponses[keyof PutMcpSettingsResponses];
 
 export type RelayMcpData = {
     body: unknown;
@@ -6736,6 +8507,52 @@ export type RotateSecretResponses = {
 
 export type RotateSecretResponse = RotateSecretResponses[keyof RotateSecretResponses];
 
+export type ImportTeamCodeData = {
+    body: TeamCodeImportRequestWritable;
+    path?: never;
+    query?: {
+        /**
+         * Report the plan without writing anything
+         */
+        dryRun?: boolean;
+    };
+    url: '/api/v1/import/teamcode';
+};
+
+export type ImportTeamCodeErrors = {
+    /**
+     * A refusal
+     */
+    400: ApiError;
+    /**
+     * A refusal
+     */
+    401: ApiError;
+    /**
+     * A refusal
+     */
+    403: ApiError;
+    /**
+     * A refusal
+     */
+    404: ApiError;
+    /**
+     * A refusal
+     */
+    409: ApiError;
+};
+
+export type ImportTeamCodeError = ImportTeamCodeErrors[keyof ImportTeamCodeErrors];
+
+export type ImportTeamCodeResponses = {
+    /**
+     * OK
+     */
+    200: ImportReport;
+};
+
+export type ImportTeamCodeResponse = ImportTeamCodeResponses[keyof ImportTeamCodeResponses];
+
 export type InferenceMessagesData = {
     body: unknown;
     path?: never;
@@ -6769,6 +8586,45 @@ export type InferenceMessagesErrors = {
 export type InferenceMessagesError = InferenceMessagesErrors[keyof InferenceMessagesErrors];
 
 export type InferenceMessagesResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
+};
+
+export type InferenceResponsesData = {
+    body: unknown;
+    path?: never;
+    query?: never;
+    url: '/api/v1/inference/v1/responses';
+};
+
+export type InferenceResponsesErrors = {
+    /**
+     * A refusal
+     */
+    400: ApiError;
+    /**
+     * A refusal
+     */
+    401: ApiError;
+    /**
+     * A refusal
+     */
+    403: ApiError;
+    /**
+     * A refusal
+     */
+    404: ApiError;
+    /**
+     * A refusal
+     */
+    409: ApiError;
+};
+
+export type InferenceResponsesError = InferenceResponsesErrors[keyof InferenceResponsesErrors];
+
+export type InferenceResponsesResponses = {
     /**
      * OK
      */
@@ -6858,6 +8714,88 @@ export type InferenceModelsResponses = {
 };
 
 export type InferenceModelsResponse = InferenceModelsResponses[keyof InferenceModelsResponses];
+
+export type GetInferenceSettingsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/inference/settings';
+};
+
+export type GetInferenceSettingsErrors = {
+    /**
+     * A refusal
+     */
+    400: ApiError;
+    /**
+     * A refusal
+     */
+    401: ApiError;
+    /**
+     * A refusal
+     */
+    403: ApiError;
+    /**
+     * A refusal
+     */
+    404: ApiError;
+    /**
+     * A refusal
+     */
+    409: ApiError;
+};
+
+export type GetInferenceSettingsError = GetInferenceSettingsErrors[keyof GetInferenceSettingsErrors];
+
+export type GetInferenceSettingsResponses = {
+    /**
+     * OK
+     */
+    200: InferenceSettings;
+};
+
+export type GetInferenceSettingsResponse = GetInferenceSettingsResponses[keyof GetInferenceSettingsResponses];
+
+export type SetInferenceSettingsData = {
+    body: InferenceSettings;
+    path?: never;
+    query?: never;
+    url: '/api/v1/inference/settings';
+};
+
+export type SetInferenceSettingsErrors = {
+    /**
+     * A refusal
+     */
+    400: ApiError;
+    /**
+     * A refusal
+     */
+    401: ApiError;
+    /**
+     * A refusal
+     */
+    403: ApiError;
+    /**
+     * A refusal
+     */
+    404: ApiError;
+    /**
+     * A refusal
+     */
+    409: ApiError;
+};
+
+export type SetInferenceSettingsError = SetInferenceSettingsErrors[keyof SetInferenceSettingsErrors];
+
+export type SetInferenceSettingsResponses = {
+    /**
+     * OK
+     */
+    200: InferenceSettings;
+};
+
+export type SetInferenceSettingsResponse = SetInferenceSettingsResponses[keyof SetInferenceSettingsResponses];
 
 export type GetModelPolicyData = {
     body?: never;
@@ -7108,6 +9046,18 @@ export type ListBudgetsResponses = {
     200: {
         items: Array<Budget>;
         next?: string;
+        /**
+         * What the organization spent this month
+         */
+        orgSpentUsd: number;
+        /**
+         * The start of this month (UTC, ISO 8601)
+         */
+        periodStart: string;
+        /**
+         * The start of next month (UTC, ISO 8601)
+         */
+        resetsAt: string;
     };
 };
 
@@ -7154,6 +9104,47 @@ export type SetBudgetResponses = {
 
 export type SetBudgetResponse = SetBudgetResponses[keyof SetBudgetResponses];
 
+export type GetMyBudgetData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/budgets/me';
+};
+
+export type GetMyBudgetErrors = {
+    /**
+     * A refusal
+     */
+    400: ApiError;
+    /**
+     * A refusal
+     */
+    401: ApiError;
+    /**
+     * A refusal
+     */
+    403: ApiError;
+    /**
+     * A refusal
+     */
+    404: ApiError;
+    /**
+     * A refusal
+     */
+    409: ApiError;
+};
+
+export type GetMyBudgetError = GetMyBudgetErrors[keyof GetMyBudgetErrors];
+
+export type GetMyBudgetResponses = {
+    /**
+     * OK
+     */
+    200: MyBudget;
+};
+
+export type GetMyBudgetResponse = GetMyBudgetResponses[keyof GetMyBudgetResponses];
+
 export type GetUsageData = {
     body?: never;
     path?: never;
@@ -7198,6 +9189,190 @@ export type GetUsageResponses = {
 };
 
 export type GetUsageResponse = GetUsageResponses[keyof GetUsageResponses];
+
+export type GetUsageSummaryData = {
+    body?: never;
+    path?: never;
+    query?: {
+        days?: number;
+        groupBy?: 'member' | 'kind' | 'model' | 'provider' | 'account';
+    };
+    url: '/api/v1/usage/summary';
+};
+
+export type GetUsageSummaryErrors = {
+    /**
+     * A refusal
+     */
+    400: ApiError;
+    /**
+     * A refusal
+     */
+    401: ApiError;
+    /**
+     * A refusal
+     */
+    403: ApiError;
+    /**
+     * A refusal
+     */
+    404: ApiError;
+    /**
+     * A refusal
+     */
+    409: ApiError;
+};
+
+export type GetUsageSummaryError = GetUsageSummaryErrors[keyof GetUsageSummaryErrors];
+
+export type GetUsageSummaryResponses = {
+    /**
+     * OK
+     */
+    200: UsageSummary;
+};
+
+export type GetUsageSummaryResponse = GetUsageSummaryResponses[keyof GetUsageSummaryResponses];
+
+export type ListUsageEventsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * The `next` of the previous page, or an ISO 8601 time
+         */
+        before?: string;
+        limit?: number;
+    };
+    url: '/api/v1/usage/events';
+};
+
+export type ListUsageEventsErrors = {
+    /**
+     * A refusal
+     */
+    400: ApiError;
+    /**
+     * A refusal
+     */
+    401: ApiError;
+    /**
+     * A refusal
+     */
+    403: ApiError;
+    /**
+     * A refusal
+     */
+    404: ApiError;
+    /**
+     * A refusal
+     */
+    409: ApiError;
+};
+
+export type ListUsageEventsError = ListUsageEventsErrors[keyof ListUsageEventsErrors];
+
+export type ListUsageEventsResponses = {
+    /**
+     * OK
+     */
+    200: {
+        events: Array<UsageEvent>;
+        next?: string;
+    };
+};
+
+export type ListUsageEventsResponse = ListUsageEventsResponses[keyof ListUsageEventsResponses];
+
+export type RecordUsageEventsData = {
+    body: {
+        events: Array<UsageEventInput>;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/v1/usage/events';
+};
+
+export type RecordUsageEventsErrors = {
+    /**
+     * A refusal
+     */
+    400: ApiError;
+    /**
+     * A refusal
+     */
+    401: ApiError;
+    /**
+     * A refusal
+     */
+    403: ApiError;
+    /**
+     * A refusal
+     */
+    404: ApiError;
+    /**
+     * A refusal
+     */
+    409: ApiError;
+    /**
+     * A refusal
+     */
+    413: ApiError;
+};
+
+export type RecordUsageEventsError = RecordUsageEventsErrors[keyof RecordUsageEventsErrors];
+
+export type RecordUsageEventsResponses = {
+    /**
+     * Recorded
+     */
+    202: {
+        accepted: number;
+    };
+};
+
+export type RecordUsageEventsResponse = RecordUsageEventsResponses[keyof RecordUsageEventsResponses];
+
+export type StreamUsageData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/usage/live';
+};
+
+export type StreamUsageErrors = {
+    /**
+     * A refusal
+     */
+    400: ApiError;
+    /**
+     * A refusal
+     */
+    401: ApiError;
+    /**
+     * A refusal
+     */
+    403: ApiError;
+    /**
+     * A refusal
+     */
+    404: ApiError;
+    /**
+     * A refusal
+     */
+    409: ApiError;
+};
+
+export type StreamUsageError = StreamUsageErrors[keyof StreamUsageErrors];
+
+export type StreamUsageResponses = {
+    /**
+     * The event stream
+     */
+    200: string;
+};
+
+export type StreamUsageResponse = StreamUsageResponses[keyof StreamUsageResponses];
 
 export type ListPendingUsageData = {
     body?: never;
@@ -7663,6 +9838,7 @@ export type ListCloudSessionsData = {
     query?: {
         status?: string;
         before?: string;
+        limit?: number;
     };
     url: '/api/v1/cloud/sessions';
 };
@@ -7708,8 +9884,18 @@ export type CreateCloudSessionData = {
     body: {
         agent: string;
         model?: string;
+        /**
+         * https://github.com/<owner>/<name>, cloned through the organization's GitHub App
+         */
         repo?: string;
-        prompt: string;
+        /**
+         * Branch, tag or commit; the default branch when absent
+         */
+        ref?: string;
+        /**
+         * The agent's first message, up to 20,000 characters; an interactive agent when absent
+         */
+        prompt?: string;
         name?: string;
     };
     path?: never;
@@ -7787,9 +9973,9 @@ export type StopCloudSessionError = StopCloudSessionErrors[keyof StopCloudSessio
 
 export type StopCloudSessionResponses = {
     /**
-     * Done
+     * Accepted, the reconciler stops it
      */
-    204: void;
+    202: CloudSession;
 };
 
 export type StopCloudSessionResponse = StopCloudSessionResponses[keyof StopCloudSessionResponses];
@@ -7836,6 +10022,227 @@ export type GetCloudSessionResponses = {
 };
 
 export type GetCloudSessionResponse = GetCloudSessionResponses[keyof GetCloudSessionResponses];
+
+export type PauseCloudSessionData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/v1/cloud/sessions/{id}/pause';
+};
+
+export type PauseCloudSessionErrors = {
+    /**
+     * A refusal
+     */
+    400: ApiError;
+    /**
+     * A refusal
+     */
+    401: ApiError;
+    /**
+     * A refusal
+     */
+    403: ApiError;
+    /**
+     * A refusal
+     */
+    404: ApiError;
+    /**
+     * A refusal
+     */
+    409: ApiError;
+};
+
+export type PauseCloudSessionError = PauseCloudSessionErrors[keyof PauseCloudSessionErrors];
+
+export type PauseCloudSessionResponses = {
+    /**
+     * Accepted, the reconciler pauses it
+     */
+    202: CloudSession;
+};
+
+export type PauseCloudSessionResponse = PauseCloudSessionResponses[keyof PauseCloudSessionResponses];
+
+export type ResumeCloudSessionData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/v1/cloud/sessions/{id}/resume';
+};
+
+export type ResumeCloudSessionErrors = {
+    /**
+     * A refusal
+     */
+    400: ApiError;
+    /**
+     * A refusal
+     */
+    401: ApiError;
+    /**
+     * A refusal
+     */
+    403: ApiError;
+    /**
+     * A refusal
+     */
+    404: ApiError;
+    /**
+     * A refusal
+     */
+    409: ApiError;
+};
+
+export type ResumeCloudSessionError = ResumeCloudSessionErrors[keyof ResumeCloudSessionErrors];
+
+export type ResumeCloudSessionResponses = {
+    /**
+     * Accepted, the reconciler starts a new execution
+     */
+    202: CloudSession;
+};
+
+export type ResumeCloudSessionResponse = ResumeCloudSessionResponses[keyof ResumeCloudSessionResponses];
+
+export type IssueCloudTerminalTicketData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/v1/cloud/sessions/{id}/terminal/ticket';
+};
+
+export type IssueCloudTerminalTicketErrors = {
+    /**
+     * A refusal
+     */
+    400: ApiError;
+    /**
+     * A refusal
+     */
+    401: ApiError;
+    /**
+     * A refusal
+     */
+    403: ApiError;
+    /**
+     * A refusal
+     */
+    404: ApiError;
+    /**
+     * A refusal
+     */
+    409: ApiError;
+};
+
+export type IssueCloudTerminalTicketError = IssueCloudTerminalTicketErrors[keyof IssueCloudTerminalTicketErrors];
+
+export type IssueCloudTerminalTicketResponses = {
+    /**
+     * OK
+     */
+    200: {
+        ticket: string;
+        expiresAt: string;
+    };
+};
+
+export type IssueCloudTerminalTicketResponse = IssueCloudTerminalTicketResponses[keyof IssueCloudTerminalTicketResponses];
+
+export type AttachCloudTerminalData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: {
+        ticket?: string;
+    };
+    url: '/api/v1/cloud/sessions/{id}/terminal';
+};
+
+export type AttachCloudTerminalErrors = {
+    /**
+     * A refusal
+     */
+    400: ApiError;
+    /**
+     * A refusal
+     */
+    401: ApiError;
+    /**
+     * A refusal
+     */
+    403: ApiError;
+    /**
+     * A refusal
+     */
+    404: ApiError;
+    /**
+     * A refusal
+     */
+    409: ApiError;
+};
+
+export type AttachCloudTerminalError = AttachCloudTerminalErrors[keyof AttachCloudTerminalErrors];
+
+export type CloudRunnerHeartbeatData = {
+    body: {
+        sessionId: string;
+        epoch: number;
+        ready?: boolean;
+        stopped?: boolean;
+        lastModelRequestAt?: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/v1/cloud/runner/heartbeat';
+};
+
+export type CloudRunnerHeartbeatErrors = {
+    /**
+     * A refusal
+     */
+    400: ApiError;
+    /**
+     * A refusal
+     */
+    401: ApiError;
+    /**
+     * A refusal
+     */
+    403: ApiError;
+    /**
+     * A refusal
+     */
+    404: ApiError;
+    /**
+     * A refusal
+     */
+    409: ApiError;
+};
+
+export type CloudRunnerHeartbeatError = CloudRunnerHeartbeatErrors[keyof CloudRunnerHeartbeatErrors];
+
+export type CloudRunnerHeartbeatResponses = {
+    /**
+     * OK
+     */
+    200: {
+        /**
+         * run or stop
+         */
+        instruction: string;
+        state: string;
+    };
+};
+
+export type CloudRunnerHeartbeatResponse = CloudRunnerHeartbeatResponses[keyof CloudRunnerHeartbeatResponses];
 
 export type SendCloudMessageData = {
     body: {
@@ -7930,7 +10337,13 @@ export type StreamCloudSessionResponse = StreamCloudSessionResponses[keyof Strea
 export type ListArtifactsData = {
     body?: never;
     path?: never;
-    query?: never;
+    query?: {
+        /**
+         * The `next` of the previous page
+         */
+        before?: string;
+        limit?: number;
+    };
     url: '/api/v1/artifacts';
 };
 
@@ -7974,10 +10387,8 @@ export type ListArtifactsResponse = ListArtifactsResponses[keyof ListArtifactsRe
 export type PublishArtifactData = {
     body: {
         title: string;
-        access: string;
-        files: Array<{
-            [key: string]: string;
-        }>;
+        access?: ArtifactAccess;
+        files: Array<ArtifactFile>;
     };
     path?: never;
     query?: never;
@@ -8104,6 +10515,52 @@ export type GetArtifactResponses = {
 
 export type GetArtifactResponse = GetArtifactResponses[keyof GetArtifactResponses];
 
+export type UpdateArtifactData = {
+    body: {
+        title?: string;
+        access?: ArtifactAccess;
+    };
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/v1/artifacts/{id}';
+};
+
+export type UpdateArtifactErrors = {
+    /**
+     * A refusal
+     */
+    400: ApiError;
+    /**
+     * A refusal
+     */
+    401: ApiError;
+    /**
+     * A refusal
+     */
+    403: ApiError;
+    /**
+     * A refusal
+     */
+    404: ApiError;
+    /**
+     * A refusal
+     */
+    409: ApiError;
+};
+
+export type UpdateArtifactError = UpdateArtifactErrors[keyof UpdateArtifactErrors];
+
+export type UpdateArtifactResponses = {
+    /**
+     * OK
+     */
+    200: Artifact;
+};
+
+export type UpdateArtifactResponse = UpdateArtifactResponses[keyof UpdateArtifactResponses];
+
 export type ListArtifactVersionsData = {
     body?: never;
     path: {
@@ -8152,9 +10609,7 @@ export type ListArtifactVersionsResponse = ListArtifactVersionsResponses[keyof L
 
 export type PublishArtifactVersionData = {
     body: {
-        files: Array<{
-            [key: string]: string;
-        }>;
+        files: Array<ArtifactFile>;
     };
     path: {
         id: string;
@@ -8282,6 +10737,9 @@ export type ListArtifactMembersResponses = {
      * OK
      */
     200: {
+        /**
+         * Member ids
+         */
         members: Array<string>;
     };
 };
@@ -8292,10 +10750,13 @@ export type UnshareArtifactData = {
     body?: never;
     path: {
         id: string;
-        login: string;
+        /**
+         * The member's id (not a login)
+         */
+        memberId: string;
     };
     query?: never;
-    url: '/api/v1/artifacts/{id}/members/{login}';
+    url: '/api/v1/artifacts/{id}/members/{memberId}';
 };
 
 export type UnshareArtifactErrors = {
@@ -8336,10 +10797,13 @@ export type ShareArtifactData = {
     body?: never;
     path: {
         id: string;
-        login: string;
+        /**
+         * The member's id (not a login)
+         */
+        memberId: string;
     };
     query?: never;
-    url: '/api/v1/artifacts/{id}/members/{login}';
+    url: '/api/v1/artifacts/{id}/members/{memberId}';
 };
 
 export type ShareArtifactErrors = {
@@ -8377,7 +10841,12 @@ export type ShareArtifactResponses = {
 export type ShareArtifactResponse = ShareArtifactResponses[keyof ShareArtifactResponses];
 
 export type CreateArtifactTicketData = {
-    body?: never;
+    body?: {
+        /**
+         * The version; the latest when absent
+         */
+        version?: number;
+    };
     path: {
         id: string;
     };
@@ -8414,10 +10883,7 @@ export type CreateArtifactTicketResponses = {
     /**
      * OK
      */
-    200: {
-        url: string;
-        expiresAt: string;
-    };
+    200: ArtifactTicket;
 };
 
 export type CreateArtifactTicketResponse = CreateArtifactTicketResponses[keyof CreateArtifactTicketResponses];
@@ -9880,3 +12346,311 @@ export type RunTaskResponses = {
 };
 
 export type RunTaskResponse = RunTaskResponses[keyof RunTaskResponses];
+
+export type GetBillingData = {
+    body?: never;
+    path: {
+        orgId: string;
+    };
+    query?: never;
+    url: '/api/v1/orgs/{orgId}/billing';
+};
+
+export type GetBillingErrors = {
+    /**
+     * A refusal
+     */
+    401: ApiError;
+    /**
+     * A refusal
+     */
+    404: ApiError;
+};
+
+export type GetBillingError = GetBillingErrors[keyof GetBillingErrors];
+
+export type GetBillingResponses = {
+    /**
+     * OK
+     */
+    200: BillingOverview;
+};
+
+export type GetBillingResponse = GetBillingResponses[keyof GetBillingResponses];
+
+export type StartBillingCheckoutData = {
+    body: BillingPlanRequest;
+    path: {
+        orgId: string;
+    };
+    query?: never;
+    url: '/api/v1/orgs/{orgId}/billing/checkout';
+};
+
+export type StartBillingCheckoutErrors = {
+    /**
+     * A refusal
+     */
+    400: ApiError;
+    /**
+     * A refusal
+     */
+    401: ApiError;
+    /**
+     * A refusal
+     */
+    403: ApiError;
+    /**
+     * A refusal
+     */
+    404: ApiError;
+    /**
+     * A refusal
+     */
+    409: ApiError;
+};
+
+export type StartBillingCheckoutError = StartBillingCheckoutErrors[keyof StartBillingCheckoutErrors];
+
+export type StartBillingCheckoutResponses = {
+    /**
+     * OK
+     */
+    200: BillingRedirect;
+};
+
+export type StartBillingCheckoutResponse = StartBillingCheckoutResponses[keyof StartBillingCheckoutResponses];
+
+export type OpenBillingPortalData = {
+    body?: never;
+    path: {
+        orgId: string;
+    };
+    query?: never;
+    url: '/api/v1/orgs/{orgId}/billing/portal';
+};
+
+export type OpenBillingPortalErrors = {
+    /**
+     * A refusal
+     */
+    401: ApiError;
+    /**
+     * A refusal
+     */
+    403: ApiError;
+    /**
+     * A refusal
+     */
+    404: ApiError;
+    /**
+     * A refusal
+     */
+    409: ApiError;
+};
+
+export type OpenBillingPortalError = OpenBillingPortalErrors[keyof OpenBillingPortalErrors];
+
+export type OpenBillingPortalResponses = {
+    /**
+     * OK
+     */
+    200: BillingRedirect;
+};
+
+export type OpenBillingPortalResponse = OpenBillingPortalResponses[keyof OpenBillingPortalResponses];
+
+export type ChangeBillingPlanData = {
+    body: BillingPlanRequest;
+    path: {
+        orgId: string;
+    };
+    query?: never;
+    url: '/api/v1/orgs/{orgId}/billing/plan';
+};
+
+export type ChangeBillingPlanErrors = {
+    /**
+     * A refusal
+     */
+    400: ApiError;
+    /**
+     * A refusal
+     */
+    401: ApiError;
+    /**
+     * A refusal
+     */
+    403: ApiError;
+    /**
+     * A refusal
+     */
+    404: ApiError;
+    /**
+     * A refusal
+     */
+    409: ApiError;
+};
+
+export type ChangeBillingPlanError = ChangeBillingPlanErrors[keyof ChangeBillingPlanErrors];
+
+export type ChangeBillingPlanResponses = {
+    /**
+     * OK
+     */
+    200: BillingOverview;
+};
+
+export type ChangeBillingPlanResponse = ChangeBillingPlanResponses[keyof ChangeBillingPlanResponses];
+
+export type CancelBillingSubscriptionData = {
+    body?: never;
+    path: {
+        orgId: string;
+    };
+    query?: never;
+    url: '/api/v1/orgs/{orgId}/billing/cancel';
+};
+
+export type CancelBillingSubscriptionErrors = {
+    /**
+     * A refusal
+     */
+    401: ApiError;
+    /**
+     * A refusal
+     */
+    403: ApiError;
+    /**
+     * A refusal
+     */
+    404: ApiError;
+    /**
+     * A refusal
+     */
+    409: ApiError;
+};
+
+export type CancelBillingSubscriptionError = CancelBillingSubscriptionErrors[keyof CancelBillingSubscriptionErrors];
+
+export type CancelBillingSubscriptionResponses = {
+    /**
+     * OK
+     */
+    200: BillingOverview;
+};
+
+export type CancelBillingSubscriptionResponse = CancelBillingSubscriptionResponses[keyof CancelBillingSubscriptionResponses];
+
+export type ResumeBillingSubscriptionData = {
+    body?: never;
+    path: {
+        orgId: string;
+    };
+    query?: never;
+    url: '/api/v1/orgs/{orgId}/billing/resume';
+};
+
+export type ResumeBillingSubscriptionErrors = {
+    /**
+     * A refusal
+     */
+    401: ApiError;
+    /**
+     * A refusal
+     */
+    403: ApiError;
+    /**
+     * A refusal
+     */
+    404: ApiError;
+    /**
+     * A refusal
+     */
+    409: ApiError;
+};
+
+export type ResumeBillingSubscriptionError = ResumeBillingSubscriptionErrors[keyof ResumeBillingSubscriptionErrors];
+
+export type ResumeBillingSubscriptionResponses = {
+    /**
+     * OK
+     */
+    200: BillingOverview;
+};
+
+export type ResumeBillingSubscriptionResponse = ResumeBillingSubscriptionResponses[keyof ResumeBillingSubscriptionResponses];
+
+export type ListBillingInvoicesData = {
+    body?: never;
+    path: {
+        orgId: string;
+    };
+    query?: {
+        limit?: number;
+    };
+    url: '/api/v1/orgs/{orgId}/billing/invoices';
+};
+
+export type ListBillingInvoicesErrors = {
+    /**
+     * A refusal
+     */
+    401: ApiError;
+    /**
+     * A refusal
+     */
+    403: ApiError;
+    /**
+     * A refusal
+     */
+    404: ApiError;
+};
+
+export type ListBillingInvoicesError = ListBillingInvoicesErrors[keyof ListBillingInvoicesErrors];
+
+export type ListBillingInvoicesResponses = {
+    /**
+     * OK
+     */
+    200: BillingInvoiceList;
+};
+
+export type ListBillingInvoicesResponse = ListBillingInvoicesResponses[keyof ListBillingInvoicesResponses];
+
+export type ReceiveStripeWebhookData = {
+    /**
+     * A Stripe event, as Stripe sends it
+     */
+    body: {
+        [key: string]: unknown;
+    };
+    headers: {
+        'Stripe-Signature': string;
+    };
+    path?: never;
+    query?: never;
+    url: '/webhooks/stripe';
+};
+
+export type ReceiveStripeWebhookErrors = {
+    /**
+     * A refusal
+     */
+    400: ApiError;
+    /**
+     * A refusal
+     */
+    413: ApiError;
+};
+
+export type ReceiveStripeWebhookError = ReceiveStripeWebhookErrors[keyof ReceiveStripeWebhookErrors];
+
+export type ReceiveStripeWebhookResponses = {
+    /**
+     * OK
+     */
+    200: BillingWebhookAck;
+};
+
+export type ReceiveStripeWebhookResponse = ReceiveStripeWebhookResponses[keyof ReceiveStripeWebhookResponses];

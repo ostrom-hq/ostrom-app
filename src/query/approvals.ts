@@ -27,7 +27,7 @@ export interface AnswerVariables {
     /** The digest of the request as the screen showed it: the server refuses if it changed since. */
     readonly shownDigest: string
     /** The reason of a no, for the agent. */
-    readonly comment?: string
+    readonly note?: string
 }
 
 /** Sends a yes or a no, once; the request and the waiting list are then read again from the answer and the server. */
@@ -35,7 +35,7 @@ export function useAnswer(id: string): UseMutationResult<AnswerResult, Error, An
     const {approvals} = useRepositories()
     const queryClient = useQueryClient()
     return useMutation({
-        mutationFn: ({answer, shownDigest, comment}: AnswerVariables) => approvals.answer(id, answer, shownDigest, comment),
+        mutationFn: ({answer, shownDigest, note}: AnswerVariables) => approvals.answer(id, answer, shownDigest, note),
         onSuccess: (result) => {
             queryClient.setQueryData(approvalKeys.detail(id), result.approval)
         },

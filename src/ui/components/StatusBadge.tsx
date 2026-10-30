@@ -16,6 +16,7 @@ function colorsOf(status: ApprovalStatus, colors: ThemeColors): {text: string; b
         case "rejected":
             return {text: colors.danger, background: colors.dangerTint}
         case "expired":
+        case "unknown":
             return {text: colors.textMuted, background: colors.bgSubtle}
     }
 }

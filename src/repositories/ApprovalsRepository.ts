@@ -7,7 +7,7 @@ export interface ApprovalsRepository {
     approval(id: string): Promise<Approval>
     /**
      * Answers, bound to the digest of what the screen showed (the server refuses with 409 if it changed).
-     * `comment` carries the reason of a no, which the agent reads to know what to do instead.
+     * `note` carries the reason of a no, which the agent reads to know what to do instead.
      */
-    answer(id: string, answer: ApprovalAnswer, shownDigest: string, comment?: string): Promise<AnswerResult>
+    answer(id: string, answer: ApprovalAnswer, shownDigest: string, note?: string): Promise<AnswerResult>
 }

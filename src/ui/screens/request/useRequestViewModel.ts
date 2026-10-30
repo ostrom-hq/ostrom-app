@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import {useCallback, useState} from "react"
 import {useTranslation} from "react-i18next"
-import type {Approval, ApprovalAnswer} from "@/api/contract/approvals"
+import {type Approval, type ApprovalAnswer, needsBiometrics, phoneMayApprove} from "@/api/contract/approvals"
 import {useAnswer, useApproval} from "@/query/approvals"
 import {useServices, useSessionState} from "@/services/AppServices"
 import {biometricProblem, type DecisionProblem, decisionProblem} from "./decisionProblem"
@@ -17,6 +17,11 @@ export interface RequestViewModel {
     readonly open: boolean
     /** The person asked for this themselves: said in clear, the server takes their yes only as sole approver. */
     readonly askedByMe: boolean
+    /**
+     * The phone may take a yes: false when the whole change is not shown (decision of 30/10 02:55). The screen hides
+     * Approve and `approve` sends nothing; a no stays possible.
+     */
+    readonly mayApprove: boolean
     /** The answer being confirmed or sent, to show which button is busy. */
     readonly sending: ApprovalAnswer | undefined
     readonly problem: DecisionProblem | undefined
@@ -56,20 +61,26 @@ export function useRequestViewModel(id: string): RequestViewModel {
     const login = session.status === "signed-in" ? session.session.user.login : undefined
     const askedByMe = login !== undefined && approval?.askedBy?.includes(login) === true
     const open = approval?.status === "pending"
+    const mayApprove = approval !== undefined && phoneMayApprove(approval)
     const {refetch} = query
 
     const send = useCallback(
-        (answer: ApprovalAnswer, comment?: string) => {
+        (answer: ApprovalAnswer, note?: string) => {
             if (approval === undefined || !open || pinned === undefined || changed) return
+            if (answer === "approve" && !mayApprove) return
             setSending(answer)
             setProblem(undefined)
             void (async () => {
-                const prompt = t(answer === "approve" ? "request.confirm.approve" : "request.confirm.decline", {title: approval.title})
-                const outcome = await biometrics.confirm(prompt)
+                // Biometrics unless the contract says the action is low risk (`needsBiometrics`).
+                const outcome = needsBiometrics(approval)
+                    ? await biometrics.confirm(
+                          t(answer === "approve" ? "request.confirm.approve" : "request.confirm.decline", {title: approval.title}),
+                      )
+                    : "confirmed"
                 if (outcome === "confirmed") {
                     try {
                         const shownDigest = pinned
-                        await mutateAsync(comment === undefined ? {answer, shownDigest} : {answer, shownDigest, comment})
+                        await mutateAsync(note === undefined ? {answer, shownDigest} : {answer, shownDigest, note})
                         setDeclining(false)
                     } catch (error) {
                         // The answer's own invalidation reads the request again (`useAnswer`).
@@ -81,7 +92,7 @@ export function useRequestViewModel(id: string): RequestViewModel {
                 setSending(undefined)
             })()
         },
-        [approval, open, pinned, changed, biometrics, t, mutateAsync, askedByMe],
+        [approval, open, mayApprove, pinned, changed, biometrics, t, mutateAsync, askedByMe],
     )
 
     const state: RequestScreenState =
@@ -99,6 +110,7 @@ export function useRequestViewModel(id: string): RequestViewModel {
         state,
         open,
         askedByMe,
+        mayApprove,
         sending,
         problem: changed ? "changed" : problem,
         changed,
@@ -119,8 +131,8 @@ export function useRequestViewModel(id: string): RequestViewModel {
             send("approve")
         },
         decline: () => {
-            const comment = reason.trim()
-            if (comment !== "") send("reject", comment)
+            const note = reason.trim()
+            if (note !== "") send("reject", note)
         },
     }
 }

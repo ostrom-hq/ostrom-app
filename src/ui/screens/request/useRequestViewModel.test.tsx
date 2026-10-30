@@ -56,6 +56,23 @@ describe("useRequestViewModel", () => {
         expect(confirm).not.toHaveBeenCalled()
     })
 
+    it("takes no yes on a diff the phone does not show in full", async () => {
+        const confirm = jest.fn()
+        const answer = jest.fn<Promise<AnswerResult>, Parameters<ApprovalsRepository["answer"]>>()
+        const services = await servicesFor(() => Promise.resolve({...approvals.pending, diffTruncated: true}), confirm, answer)
+        const {result} = await renderHook(() => useRequestViewModel("appr_0001"), {wrapper: wrapperOf(services)})
+        await waitFor(() => {
+            expect(result.current.open).toBe(true)
+        })
+        await act(async () => {
+            result.current.approve()
+            await Promise.resolve()
+        })
+        expect(confirm).not.toHaveBeenCalled()
+        expect(answer).not.toHaveBeenCalled()
+        expect(result.current.sending).toBeUndefined()
+    })
+
     it("sends no decline without a reason, and trims the reason it sends", async () => {
         const confirm = jest.fn(() => Promise.resolve("confirmed"))
         const answer = jest.fn<Promise<AnswerResult>, Parameters<ApprovalsRepository["answer"]>>(() =>
