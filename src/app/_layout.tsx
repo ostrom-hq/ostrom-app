@@ -1,26 +1,14 @@
 import "@/config/i18n"
-import {DarkTheme, DefaultTheme, Stack, ThemeProvider} from "expo-router"
+import {Stack, ThemeProvider} from "expo-router"
 import {StatusBar} from "expo-status-bar"
+import {navigationThemeFor} from "@/ui/theme/navigationTheme"
 import {useTheme} from "@/ui/theme/useTheme"
 
 export default function RootLayout(): React.JSX.Element {
-    const theme = useTheme()
-    const base = theme.scheme === "dark" ? DarkTheme : DefaultTheme
+    const {navigation, statusBar} = navigationThemeFor(useTheme())
     return (
-        <ThemeProvider
-            value={{
-                ...base,
-                colors: {
-                    ...base.colors,
-                    primary: theme.colors.signal,
-                    background: theme.colors.bg,
-                    card: theme.colors.surface,
-                    text: theme.colors.text,
-                    border: theme.colors.border,
-                },
-            }}
-        >
-            <StatusBar style={theme.scheme === "dark" ? "light" : "dark"} />
+        <ThemeProvider value={navigation}>
+            <StatusBar style={statusBar} />
             <Stack screenOptions={{headerShown: false}} />
         </ThemeProvider>
     )
