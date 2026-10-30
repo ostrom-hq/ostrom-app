@@ -35,11 +35,9 @@ export interface ReceiptEnvelope {
 
 export const ReceiptEnvelopeSchema = z.unknown().transform((raw, context): ReceiptEnvelope => {
     const view = ReceiptViewSchema.safeParse(raw)
-    if (!view.success) {
-        for (const issue of view.error.issues) context.issues.push({...issue, input: raw})
-        return z.NEVER
-    }
-    return {raw, view: view.data}
+    if (view.success) return {raw, view: view.data}
+    context.issues.push({code: "custom", message: z.prettifyError(view.error), input: raw})
+    return z.NEVER
 })
 
 /** `GET /api/receipts/pubkey`: the instance key that signs receipts. */
