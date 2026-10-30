@@ -44,8 +44,11 @@ export interface Analytics {
     disable(): Promise<void>
     /** The person signed in: later events carry their opaque user id and organization. */
     identify(userId: string, organizationId: string | undefined): void
-    /** The person signed out: back to the anonymous id. */
-    reset(): void
+    /**
+     * The person signed out: what was queued leaves, then a new anonymous id starts, so that the next person on this
+     * device is never merged with this one.
+     */
+    reset(): Promise<void>
     screen(name: string): Promise<void>
     capture(event: string, properties?: Readonly<Record<string, string | number | boolean>>): Promise<void>
     /** Sends what is queued; failures are dropped (analytics never change what the app does). */
@@ -123,8 +126,10 @@ export function createAnalytics(options: AnalyticsOptions): Analytics {
         identify(userId, organizationId) {
             user = {id: userId, organization: organizationId}
         },
-        reset() {
+        async reset() {
+            await flush()
             user = undefined
+            await options.storage.remove(ANONYMOUS_ID_KEY)
         },
         screen: (name) => capture("$screen", {$screen_name: name}),
         capture,

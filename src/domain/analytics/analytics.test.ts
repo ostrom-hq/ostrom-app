@@ -113,7 +113,16 @@ describe("analytics", () => {
         })
     })
 
-    it("uses the opaque user id and organization once signed in, and the anonymous id after sign-out", async () => {
+    it("captures an event without properties", async () => {
+        const {analytics, sent} = setup()
+        await analytics.enable()
+        await analytics.capture("app_opened")
+        await analytics.flush()
+
+        expect(sent[0]?.batch[1]?.event).toBe("app_opened")
+    })
+
+    it("uses the opaque user id and organization once signed in, and a new anonymous id after sign-out", async () => {
         const {analytics, sent} = setup()
         await analytics.enable()
 
@@ -121,17 +130,19 @@ describe("analytics", () => {
         await analytics.capture("gate_opened_in_client", {channel: "app"})
         analytics.identify("user-2", undefined)
         await analytics.capture("gate_opened_in_client", {channel: "app"})
-        analytics.reset()
+        await analytics.reset()
         await analytics.screen("Sign in")
         await analytics.flush()
 
-        const [, signedIn, noOrganization, signedOut] = sent[0]?.batch ?? []
+        const [consent, signedIn, noOrganization] = sent[0]?.batch ?? []
+        const [signedOut] = sent[1]?.batch ?? []
+        expect(consent?.distinct_id).toBe("anon-1")
         expect(signedIn?.distinct_id).toBe("user-1")
         expect(signedIn?.properties["$groups"]).toEqual({organization: "org-1"})
         expect(signedIn?.properties["$process_person_profile"]).toBe(true)
         expect(signedIn?.properties["channel"]).toBe("app")
         expect(noOrganization?.properties["$groups"]).toBeUndefined()
-        expect(signedOut?.distinct_id).toBe("anon-1")
+        expect(signedOut?.distinct_id).toBe("anon-2")
     })
 
     it("turning off forgets the id and drops what was not sent", async () => {
