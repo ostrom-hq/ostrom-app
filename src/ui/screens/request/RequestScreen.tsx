@@ -37,7 +37,10 @@ function approveLabel(kind: ActionKind | undefined, t: ReturnType<typeof useTran
         case "merge":
         case "deploy":
             return t(`request.approveKind.${kind}`)
-        default:
+        case "tool":
+        case "other":
+        case "unknown":
+        case undefined:
             return t("request.approve")
     }
 }
