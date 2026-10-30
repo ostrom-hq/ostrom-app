@@ -67,6 +67,14 @@ describe("HistoryScreen", () => {
         expect((await screen.findAllByText("Not verified: the instance key is unavailable")).length).toBe(golden.length)
     })
 
+    it("never claims a verification with a key the server did not announce", async () => {
+        await show(
+            jest.fn(() => Promise.resolve(golden)),
+            jest.fn(() => Promise.resolve({...served, kid: "another-key"})),
+        )
+        expect((await screen.findAllByText("Not verified: the instance key is unavailable")).length).toBe(golden.length)
+    })
+
     it("names the decision in the person's words, or says who it was signed for", async () => {
         const decided = (result: string, by = "rev-b", selfApproved = false): ReceiptListItem => {
             const decision = {approvalId: "a", by, at: "2026-10-30T09:00:00.000Z", result, selfApproved}
