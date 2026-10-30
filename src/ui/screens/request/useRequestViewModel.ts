@@ -11,8 +11,11 @@ export type RequestScreenState =
     | {readonly kind: "error"; readonly retry: () => void}
     | {readonly kind: "ready"; readonly approval: Approval; readonly view: ApprovalView}
 
-/** The whole change is not on the phone, or the server refuses the person's yes (with its reason when it gives one). */
-export type NoApprove = {readonly kind: "truncated"} | {readonly kind: "refused"; readonly reason: string | undefined}
+/**
+ * The whole change is not on the phone, or the server does not take the person's yes. Its `reason` is free text in
+ * the server's language: the screen says it in the person's language instead.
+ */
+export type NoApprove = {readonly kind: "truncated"} | {readonly kind: "refused"}
 
 export interface RequestViewModel {
     readonly state: RequestScreenState
@@ -47,9 +50,17 @@ export interface RequestViewModel {
     readonly decline: () => void
 }
 
+/**
+ * What the person read: the server's digest of the request, and what the view shows around it (who asks, the command,
+ * the gate), which a refetch could change under the same digest.
+ */
+function readingOf(view: ApprovalView): string {
+    return JSON.stringify([view.approval.shownDigest, view.who, view.what, view.gate])
+}
+
 /** Why the phone takes no yes on this request, if it takes none: the server's word first, then the change not shown. */
 function noApproveOf(view: ApprovalView): NoApprove | undefined {
-    if (!view.you.canApprove) return {kind: "refused", reason: view.you.reason}
+    if (!view.you.canApprove) return {kind: "refused"}
     return phoneMayApprove(view.approval) ? undefined : {kind: "truncated"}
 }
 
@@ -66,9 +77,10 @@ export function useRequestViewModel(id: string): RequestViewModel {
     const approval = view?.approval
     // The digest of the request as the person first read it: the answer is bound to it, never to data that a
     // refetch swapped in under their eyes (the server then refuses, and the screen asks for a new reading).
+    const reading = view === undefined ? undefined : readingOf(view)
     const [pinned, setPinned] = useState<string>()
-    if (approval !== undefined && pinned === undefined) setPinned(approval.shownDigest)
-    const changed = approval !== undefined && pinned !== undefined && approval.shownDigest !== pinned
+    if (reading !== undefined && pinned === undefined) setPinned(reading)
+    const changed = reading !== undefined && pinned !== undefined && reading !== pinned
     const askedByMe = view?.you.self === true
     const open = approval?.status === "pending"
     const noApprove = view === undefined ? undefined : noApproveOf(view)
@@ -90,7 +102,8 @@ export function useRequestViewModel(id: string): RequestViewModel {
                     : "confirmed"
                 if (outcome === "confirmed") {
                     try {
-                        const shownDigest = pinned
+                        // Not changed: what is on screen is what the person read, digest included.
+                        const {shownDigest} = approval
                         await mutateAsync(note === undefined ? {answer, shownDigest} : {answer, shownDigest, note})
                         setDeclining(false)
                     } catch (error) {
@@ -127,7 +140,7 @@ export function useRequestViewModel(id: string): RequestViewModel {
         problem: changed ? "changed" : problem,
         changed,
         reread: () => {
-            if (approval !== undefined) setPinned(approval.shownDigest)
+            if (reading !== undefined) setPinned(reading)
             setProblem(undefined)
         },
         declining,

@@ -156,10 +156,37 @@ describe("useRequestViewModel", () => {
             expect(result.current.state.kind).toBe("ready")
         })
         expect(result.current.mayApprove).toBe(false)
-        expect(result.current.noApprove).toEqual({kind: "refused", reason})
+        expect(result.current.noApprove).toEqual({kind: "refused"})
         result.current.approve()
         expect(confirm).not.toHaveBeenCalled()
         expect(answer).not.toHaveBeenCalled()
+    })
+
+    it("asks for a new reading when the command on screen changed under the same digest", async () => {
+        const confirm = jest.fn()
+        const answer = jest.fn<Promise<ApprovalView>, Parameters<ApprovalsRepository["answer"]>>()
+        let command = "gh pr merge 6 --squash"
+        const view = (_id: string): Promise<ApprovalView> => Promise.resolve({...viewOf(approvals.pending), what: {command}})
+        const services = await signedInServices({biometrics: {confirm}, repositories: fakeRepositories({approvals: {queue: jest.fn(), view, answer}})})
+        const client = testQueryClient()
+        const {result} = await renderHook(() => useRequestViewModel("appr_0001"), {wrapper: wrapperOf(services, client)})
+        await waitFor(() => {
+            expect(result.current.state.kind).toBe("ready")
+        })
+        command = "git push --force origin main"
+        await act(async () => {
+            await client.invalidateQueries()
+        })
+        await waitFor(() => {
+            expect(result.current.changed).toBe(true)
+        })
+        result.current.approve()
+        expect(confirm).not.toHaveBeenCalled()
+        await act(async () => {
+            result.current.reread()
+            await Promise.resolve()
+        })
+        expect(result.current.changed).toBe(false)
     })
 
     it("is mine when the server says the request is mine", async () => {

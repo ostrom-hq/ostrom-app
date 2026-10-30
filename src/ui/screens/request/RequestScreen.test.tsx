@@ -232,16 +232,12 @@ describe("RequestScreen", () => {
         expect(screen.queryByText("People")).toBeNull()
     })
 
-    it("hides Approve when the server does not take my yes, with its reason or in plain words, and keeps the no", async () => {
+    it("hides Approve when the server does not take my yes, says so in my language, and keeps the no", async () => {
         await open(approvals.pending, {you: {canApprove: false, reason: "Only a maintainer of acme-api approves a deploy"}})
-        expect(screen.getByText("Only a maintainer of acme-api approves a deploy")).toBeOnTheScreen()
+        expect(screen.getByText("Your yes is not taken on this request.")).toBeOnTheScreen()
+        expect(screen.queryByText("Only a maintainer of acme-api approves a deploy")).toBeNull()
         expect(screen.queryByTestId("request-approve")).toBeNull()
         expect(screen.getByRole("button", {name: "Decline…"})).toBeEnabled()
-    })
-
-    it("says my yes is not taken when the server gives no reason", async () => {
-        await open(approvals.pending, {you: {canApprove: false}})
-        expect(screen.getByText("Your yes is not taken on this request.")).toBeOnTheScreen()
     })
 
     it("shows what the approver told the agent, once answered", async () => {

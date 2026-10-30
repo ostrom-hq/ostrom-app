@@ -173,7 +173,7 @@ function Actions({model, approval}: {model: RequestViewModel; approval: Approval
             )}
             {noApprove === undefined ? null : (
                 <Text style={[styles.body, {color: colors.text}]}>
-                    {noApprove.kind === "truncated" ? t("request.truncated") : (noApprove.reason ?? t("request.cannotApprove"))}
+                    {noApprove.kind === "truncated" ? t("request.truncated") : t("request.cannotApprove")}
                 </Text>
             )}
             {changed ? (
