@@ -2,8 +2,8 @@
 import {screen} from "@testing-library/react-native"
 import {renderRouter} from "expo-router/testing-library"
 // Kept out of src/app/: Expo Router bundles every file of that folder as a route, tests included.
-import RootLayout from "@/app/_layout"
-import AskById from "@/app/ask/[id]"
+import RootLayout, {unstable_settings} from "@/app/_layout"
+import RequestById from "@/app/request/[id]"
 import Tabs from "@/app/(tabs)/_layout"
 import Activity from "@/app/(tabs)/activity"
 import History from "@/app/(tabs)/history"
@@ -32,10 +32,14 @@ describe("RootLayout", () => {
                 "(tabs)/spending": Spending,
                 "(tabs)/settings": Settings,
                 login: Login,
-                "ask/[id]": AskById,
+                "request/[id]": RequestById,
             },
             {initialUrl: "/"},
         )
         expect(await screen.findByRole("button", {name: "Continue with GitHub"})).toBeOnTheScreen()
+    })
+
+    it("puts a deep-linked request on top of the tabs", () => {
+        expect(unstable_settings).toEqual({anchor: "(tabs)"})
     })
 })

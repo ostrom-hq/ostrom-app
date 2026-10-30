@@ -1,46 +1,72 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import {receiptKey, receipts} from "@/api/mocks/fixtures"
-import {ReceiptListSchema, ReceiptPublicKeySchema} from "@/api/contract/receipts"
-import {checkReceipt, readInstanceKey} from "./receiptCheck"
+import {ReceiptKeysSchema, ReceiptPageSchema, type ReceiptListItem} from "@/api/contract/receipts"
+import {checkReceipt, readInstanceKeys} from "./receiptCheck"
 
-const items = ReceiptListSchema.parse(receipts)
-const served = ReceiptPublicKeySchema.parse(receiptKey)
+const {items} = ReceiptPageSchema.parse({items: receipts})
+const {keys: served} = ReceiptKeysSchema.parse({keys: [receiptKey]})
+const otherPem = "-----BEGIN PUBLIC KEY-----\nAAAA\n-----END PUBLIC KEY-----"
 
-describe("readInstanceKey", () => {
+function firstItem(): ReceiptListItem {
+    const [first] = items
+    if (first === undefined) throw new Error("no receipt in the vectors")
+    return first
+}
+
+function withRaw(raw: unknown): ReceiptListItem {
+    return {readable: false, raw, detail: "test"}
+}
+
+describe("readInstanceKeys", () => {
     it("reads the instance key the server announces", () => {
-        expect(readInstanceKey(served)?.kid).toBe(receiptKey.kid)
+        expect([...readInstanceKeys(served).keys()]).toEqual([receiptKey.kid])
     })
 
-    it("refuses a key whose id is not the one announced", () => {
-        expect(readInstanceKey({...served, kid: "0000000000000000"})).toBeUndefined()
-    })
-
-    it("refuses a PEM that is not an Ed25519 key", () => {
-        expect(readInstanceKey({...served, publicKeyPem: "-----BEGIN PUBLIC KEY-----\nAAAA\n-----END PUBLIC KEY-----"})).toBeUndefined()
+    it("leaves out a key whose id is not the one announced, a non-Ed25519 PEM and another algorithm", () => {
+        const [key] = served
+        if (key === undefined) throw new Error("no key")
+        const keys = readInstanceKeys([
+            {...key, kid: "0000000000000000"},
+            {...key, kid: "1111111111111111", publicKeyPem: otherPem},
+            {...key, alg: "rsa"},
+        ])
+        expect(keys.size).toBe(0)
     })
 })
 
 describe("checkReceipt", () => {
-    const key = readInstanceKey(served)
+    const keys = readInstanceKeys(served)
 
     it("verifies the golden receipts on the phone", () => {
         for (const item of items) {
-            expect(checkReceipt(item, key)).toEqual({kind: "verified", kid: receiptKey.kid})
+            expect(checkReceipt(item, keys)).toEqual({kind: "verified", kid: receiptKey.kid})
         }
     })
 
     it("rejects a receipt whose content was changed after signing", () => {
-        const [first] = items
-        if (first === undefined) throw new Error("no receipt in the vectors")
-        const raw: unknown = first.raw
+        const raw: unknown = firstItem().raw
         if (typeof raw !== "object" || raw === null) throw new Error("receipt is not an object")
-        const tampered = {...first, raw: {...raw, initiator: "mallory"}}
-        expect(checkReceipt(tampered, key)).toEqual({kind: "rejected", reason: "digest-mismatch"})
+        expect(checkReceipt(withRaw({...raw, initiator: "mallory"}), keys)).toEqual({kind: "rejected", reason: "digest-mismatch"})
     })
 
-    it("checks nothing without the key", () => {
-        const [first] = items
-        if (first === undefined) throw new Error("no receipt in the vectors")
-        expect(checkReceipt(first, undefined)).toEqual({kind: "no-key"})
+    it("rejects a receipt signed by a key the instance does not serve", () => {
+        const raw: unknown = firstItem().raw
+        if (typeof raw !== "object" || raw === null || !("signature" in raw) || typeof raw.signature !== "string") {
+            throw new Error("receipt has no signature")
+        }
+        const signature = raw.signature.replace(receiptKey.kid, "ffffffffffffffff")
+        expect(checkReceipt(withRaw({...raw, signature}), keys)).toEqual({kind: "rejected", reason: "unknown-key"})
+    })
+
+    it("says why a receipt without a readable signature fails", () => {
+        expect(checkReceipt(withRaw("not a receipt"), keys)).toEqual({kind: "rejected", reason: "not-an-object"})
+        expect(checkReceipt(withRaw({id: "r"}), keys)).toEqual({kind: "rejected", reason: "missing-signature"})
+        expect(checkReceipt(withRaw({signature: 42}), keys)).toEqual({kind: "rejected", reason: "missing-signature"})
+        expect(checkReceipt(withRaw({signature: "ed25519"}), keys)).toEqual({kind: "rejected", reason: "malformed-signature"})
+        expect(checkReceipt(withRaw(null), keys)).toEqual({kind: "rejected", reason: "not-an-object"})
+    })
+
+    it("checks nothing without a key", () => {
+        expect(checkReceipt(firstItem(), new Map())).toEqual({kind: "no-key"})
     })
 })

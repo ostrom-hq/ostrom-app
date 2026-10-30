@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+import {focusManager} from "@tanstack/react-query"
+import {AppState, type AppStateStatus} from "react-native"
 import {ApiError} from "@/api/http/ApiError"
-import {createQueryClient, isUnauthorized, shouldRetry} from "./queryClient"
+import {createQueryClient, followAppFocus, isUnauthorized, shouldRetry} from "./queryClient"
 
 describe("shouldRetry", () => {
     it.each([
@@ -42,10 +44,48 @@ describe("createQueryClient", () => {
         client.clear()
     })
 
+    it("ignores a 401 of a request the sign-out already dropped", async () => {
+        const onUnauthorized = jest.fn()
+        const client = createQueryClient({onUnauthorized, retry: false})
+        // A mutation of the previous account, still in flight when sign-out clears the cache, answered 401 after.
+        const mutation = client.getMutationCache().build(client, {
+            mutationFn: () =>
+                new Promise((_resolve, reject) => {
+                    setTimeout(() => {
+                        reject(new ApiError({kind: "unauthorized"}))
+                    }, 0)
+                }),
+        })
+        const sent = mutation.execute(undefined)
+        client.clear()
+        await sent.catch(() => undefined)
+        expect(onUnauthorized).not.toHaveBeenCalled()
+    })
+
     it("retries by policy, or not at all for tests", () => {
         const retrying = createQueryClient({onUnauthorized: jest.fn()})
         expect(retrying.getDefaultOptions().queries?.retry).toBe(shouldRetry)
         const strict = createQueryClient({onUnauthorized: jest.fn(), retry: false})
         expect(strict.getDefaultOptions().queries?.retry).toBe(false)
+    })
+})
+
+describe("followAppFocus", () => {
+    it("reads the app coming back to the foreground as the focus", () => {
+        let listener: (status: AppStateStatus) => void = () => undefined
+        const remove = jest.fn()
+        const subscribe = jest.spyOn(AppState, "addEventListener").mockImplementation((_type, handler) => {
+            listener = handler
+            return {remove}
+        })
+        const stop = followAppFocus()
+        listener("background")
+        expect(focusManager.isFocused()).toBe(false)
+        listener("active")
+        expect(focusManager.isFocused()).toBe(true)
+        stop()
+        expect(remove).toHaveBeenCalledTimes(1)
+        subscribe.mockRestore()
+        focusManager.setFocused(undefined)
     })
 })

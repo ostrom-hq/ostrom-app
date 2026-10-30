@@ -18,7 +18,13 @@ function AskStub(): React.JSX.Element {
     return <Text>request</Text>
 }
 
-async function launch(launchData: unknown): Promise<{router: Awaited<ReturnType<typeof renderRouter>>; tap: (data: unknown) => void; unsubscribe: jest.Mock}> {
+interface Launched {
+    readonly router: Awaited<ReturnType<typeof renderRouter>>
+    readonly tap: (data: unknown) => void
+    readonly unsubscribe: jest.Mock
+}
+
+async function launch(launchData: unknown, read: () => Promise<unknown> = () => Promise.resolve(launchData)): Promise<Launched> {
     let tap: (data: unknown) => void = () => undefined
     const unsubscribe = jest.fn()
     const services = await signedInServices({
@@ -28,7 +34,7 @@ async function launch(launchData: unknown): Promise<{router: Awaited<ReturnType<
                 tap = listener
                 return unsubscribe
             },
-            launchData: () => Promise.resolve(launchData),
+            launchData: read,
         },
     })
     const client = testQueryClient()
@@ -37,7 +43,7 @@ async function launch(launchData: unknown): Promise<{router: Awaited<ReturnType<
             <QueryClientProvider client={client}>{children}</QueryClientProvider>
         </ServicesProvider>
     )
-    const router = await renderRouter({index: Home, "ask/[id]": AskStub}, {initialUrl: "/", wrapper})
+    const router = await renderRouter({index: Home, "request/[id]": AskStub}, {initialUrl: "/", wrapper})
     return {
         router,
         tap: (data) => {
@@ -49,9 +55,35 @@ async function launch(launchData: unknown): Promise<{router: Awaited<ReturnType<
 
 describe("usePushBridge", () => {
     it("opens the request of the notification that launched the app", async () => {
-        const {router} = await launch({kind: "ask", askId: "appr_0001"})
+        const {router} = await launch({kind: "approval", approvalId: "appr_0001"})
         expect(await screen.findByText("request")).toBeOnTheScreen()
-        expect(router.getPathname()).toBe("/ask/appr_0001")
+        expect(router.getPathname()).toBe("/request/appr_0001")
+    })
+
+    it("opens nothing when the launch notification cannot be read", async () => {
+        const {router} = await launch(undefined, () => Promise.reject(new Error("no module")))
+        await act(async () => {
+            await Promise.resolve()
+        })
+        expect(router.getPathname()).toBe("/")
+    })
+
+    it("opens nothing when the launch notification is read after the screen left", async () => {
+        let answer: (data: unknown) => void = () => undefined
+        const {router, unsubscribe} = await launch(
+            undefined,
+            () =>
+                new Promise((resolve) => {
+                    answer = resolve
+                }),
+        )
+        await router.unmount()
+        expect(unsubscribe).toHaveBeenCalledTimes(1)
+        await act(async () => {
+            answer({kind: "approval", approvalId: "appr_0001"})
+            await Promise.resolve()
+        })
+        expect(screen.queryByText("request")).toBeNull()
     })
 
     it("opens the request of a tapped notification, and ignores anything else", async () => {
@@ -62,15 +94,15 @@ describe("usePushBridge", () => {
         })
         expect(router.getPathname()).toBe("/")
         await act(async () => {
-            tap({kind: "ask", askId: "../settings"})
+            tap({kind: "approval", approvalId: "../settings"})
             await Promise.resolve()
         })
         expect(router.getPathname()).toBe("/")
         await act(async () => {
-            tap({kind: "ask", askId: "appr_0002"})
+            tap({kind: "approval", approvalId: "appr_0002"})
             await Promise.resolve()
         })
         expect(await screen.findByText("request")).toBeOnTheScreen()
-        expect(router.getPathname()).toBe("/ask/appr_0002")
+        expect(router.getPathname()).toBe("/request/appr_0002")
     })
 })

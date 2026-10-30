@@ -1,0 +1,231 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+import {fireEvent, screen, waitFor} from "@testing-library/react-native"
+import type {AnswerResult, Approval, ApprovalAnswer} from "@/api/contract/approvals"
+import {ApiError} from "@/api/http/ApiError"
+import type {ApprovalsRepository} from "@/repositories/ApprovalsRepository"
+import type {BiometricOutcome} from "@/services/biometrics/BiometricGate"
+import {approvals, fakeRepositories, signedInServices} from "@/test/fakeServices"
+import {renderWithServices} from "@/test/renderWithServices"
+import {RequestScreen} from "./RequestScreen"
+
+interface Harness {
+    readonly approval: jest.Mock<Promise<Approval>, [string]>
+    readonly answer: jest.Mock<Promise<AnswerResult>, Parameters<ApprovalsRepository["answer"]>>
+    readonly confirm: jest.Mock<Promise<BiometricOutcome>, [string]>
+}
+
+/** A server holding one request, which an answer changes, and a phone whose biometrics answer `outcome`. */
+async function open(
+    initial: Approval,
+    {outcome = "confirmed", refuse}: {outcome?: BiometricOutcome; refuse?: ApiError} = {},
+): Promise<Harness> {
+    let current = initial
+    const approval = jest.fn((_id: string) => Promise.resolve(current))
+    const answer = jest.fn((_id: string, given: ApprovalAnswer, _shownDigest: string, _comment?: string): Promise<AnswerResult> => {
+        if (refuse !== undefined) return Promise.reject(refuse)
+        current = {...current, status: given === "approve" ? "approved" : "rejected", decidedBy: "rev-b"}
+        return Promise.resolve({approval: current})
+    })
+    const confirm = jest.fn((_prompt: string) => Promise.resolve(outcome))
+    const services = await signedInServices({
+        biometrics: {confirm},
+        repositories: fakeRepositories({approvals: {waiting: jest.fn(), approval, answer}}),
+    })
+    await renderWithServices(<RequestScreen id={initial.id} />, services)
+    await screen.findByRole("header", {name: initial.title})
+    return {approval, answer, confirm}
+}
+
+const refused = (status: number, type: string): ApiError => new ApiError({kind: "refused", status, type, message: ""})
+const bare: Approval = {id: "appr_bare", title: "Bare request", requestedFrom: "rev-b", channel: "app", status: "pending", shownDigest: "d0"}
+
+describe("RequestScreen", () => {
+    it("shows the evidence before any button: who asks, where, the exact commits and checks", async () => {
+        await open(approvals.pending)
+        for (const text of [
+            "dev-a",
+            "acme/acme-api",
+            "c60f859",
+            "feat: expose readiness",
+            "b0ff918",
+            "Passed",
+            "Running",
+            "rev-b",
+            "#6",
+            "gh pr merge 6 --squash",
+            /Expires/,
+        ]) {
+            expect(screen.getAllByText(text).length).toBeGreaterThan(0)
+        }
+        expect(screen.getByText(/c60f859a1b2c3d4e5f60718293a4b5c6d7e8f901/)).toBeOnTheScreen()
+        const scroll = screen.getByTestId("request-scroll")
+        expect(scroll).toContainElement(screen.getByTestId("request-approve"))
+    })
+
+    it("approves after Face ID, bound to the digest the screen showed", async () => {
+        const {confirm, answer} = await open(approvals.pending)
+        await fireEvent.press(screen.getByRole("button", {name: "Approve"}))
+        expect(await screen.findByText("Approved")).toBeOnTheScreen()
+        expect(confirm).toHaveBeenCalledWith("Approve “Merge PR #6 into main”")
+        expect(answer).toHaveBeenCalledWith("appr_0001", "approve", approvals.pending.shownDigest, undefined)
+        expect(screen.getByText("Approved by rev-b")).toBeOnTheScreen()
+        expect(screen.queryByRole("button", {name: "Approve"})).toBeNull()
+    })
+
+    it("declines with a reason the agent reads, after Face ID", async () => {
+        const {confirm, answer} = await open(approvals.pending)
+        await fireEvent.press(screen.getByRole("button", {name: "Decline…"}))
+        expect(screen.getByRole("button", {name: "Decline"})).toBeDisabled()
+        await fireEvent.changeText(screen.getByTestId("request-reason"), "Wait for the migration PR")
+        await fireEvent.press(screen.getByRole("button", {name: "Decline"}))
+        expect(await screen.findByText("Declined by rev-b")).toBeOnTheScreen()
+        expect(confirm).toHaveBeenCalledWith("Decline “Merge PR #6 into main”")
+        expect(answer).toHaveBeenCalledWith("appr_0001", "reject", approvals.pending.shownDigest, "Wait for the migration PR")
+    })
+
+    it("goes back from the reason to the two buttons", async () => {
+        await open(approvals.pending)
+        await fireEvent.press(screen.getByRole("button", {name: "Decline…"}))
+        await fireEvent.press(screen.getByRole("button", {name: "Back"}))
+        expect(screen.getByRole("button", {name: "Approve"})).toBeOnTheScreen()
+    })
+
+    it("sends nothing when the person cancels Face ID", async () => {
+        const {confirm, answer} = await open(approvals.pending, {outcome: "cancelled"})
+        await fireEvent.press(screen.getByRole("button", {name: "Approve"}))
+        await waitFor(() => {
+            expect(screen.getByRole("button", {name: "Decline…"})).toBeEnabled()
+        })
+        expect(confirm).toHaveBeenCalled()
+        expect(answer).not.toHaveBeenCalled()
+        expect(screen.queryByRole("alert")).toBeNull()
+    })
+
+    it("refuses to answer from a phone without biometrics or passcode", async () => {
+        const {answer} = await open(approvals.pending, {outcome: "unavailable"})
+        await fireEvent.press(screen.getByRole("button", {name: "Approve"}))
+        expect(await screen.findByText("Set up Face ID, a fingerprint or a passcode on this phone to answer from it.")).toBeOnTheScreen()
+        expect(answer).not.toHaveBeenCalled()
+    })
+
+    it("reads the request again when it changed after the screen showed it", async () => {
+        const {approval} = await open(approvals.pending, {refuse: refused(409, "shown_digest_mismatch")})
+        const reads = approval.mock.calls.length
+        await fireEvent.press(screen.getByRole("button", {name: "Approve"}))
+        expect(await screen.findByText("The request changed after you opened it. Read it again before answering.")).toBeOnTheScreen()
+        expect(approval.mock.calls.length).toBeGreaterThan(reads)
+    })
+
+    it("asks for a new reading when the request changed under the screen, then binds the answer to it", async () => {
+        let current: Approval = approvals.pending
+        const approval = jest.fn((_id: string) => Promise.resolve(current))
+        const answer = jest.fn((_id: string, _given: ApprovalAnswer, shownDigest: string, _comment?: string): Promise<AnswerResult> => {
+            if (shownDigest !== current.shownDigest) return Promise.reject(refused(409, "shown_digest_mismatch"))
+            current = {...current, status: "approved", decidedBy: "rev-b"}
+            return Promise.resolve({approval: current})
+        })
+        const services = await signedInServices({
+            biometrics: {confirm: () => Promise.resolve<BiometricOutcome>("confirmed")},
+            repositories: fakeRepositories({approvals: {waiting: jest.fn(), approval, answer}}),
+        })
+        await renderWithServices(<RequestScreen id="appr_0001" />, services)
+        await screen.findByRole("header", {name: "Merge PR #6 into main"})
+        // An agent pushed one more commit after the screen showed the request.
+        current = {...approvals.pending, commits: ["c0ffee0"], commitDetails: [], shownDigest: "d-after-push"}
+        await fireEvent.press(screen.getByRole("button", {name: "Approve"}))
+        expect(await screen.findByRole("button", {name: "I read it again"})).toBeOnTheScreen()
+        expect(screen.getByText("c0ffee0")).toBeOnTheScreen()
+        expect(screen.queryByRole("button", {name: "Approve"})).toBeNull()
+        await fireEvent.press(screen.getByRole("button", {name: "I read it again"}))
+        await fireEvent.press(screen.getByRole("button", {name: "Approve"}))
+        expect(await screen.findByText("Approved by rev-b")).toBeOnTheScreen()
+        expect(answer).toHaveBeenLastCalledWith("appr_0001", "approve", "d-after-push", undefined)
+    })
+
+    it("says in clear that the request is mine, and why the server refused my yes", async () => {
+        await open(approvals.self, {refuse: refused(403, "forbidden")})
+        expect(screen.getByText("You asked for this. Ostrom takes your yes only if nobody else can give it.")).toBeOnTheScreen()
+        await fireEvent.press(screen.getByRole("button", {name: "Approve"}))
+        expect(await screen.findByText("Someone else can approve this request, so your own yes is not taken.")).toBeOnTheScreen()
+    })
+
+    it("shows who answered and when, without actions", async () => {
+        await open({...approvals.decided, selfApproved: true})
+        expect(screen.getByText(/^Approved by rev-b · .+ · self-approved$/)).toBeOnTheScreen()
+        expect(screen.queryByRole("button", {name: "Approve"})).toBeNull()
+    })
+
+    it("dates a declined request when the server says when", async () => {
+        await open({...approvals.decided, status: "rejected"})
+        expect(screen.getByText(/^Declined by rev-b · /)).toBeOnTheScreen()
+    })
+
+    it("says an expired request expired, with its time when known", async () => {
+        await open({...approvals.pending, status: "expired"})
+        expect(screen.getByText(/^Expired at .+ without an answer$/)).toBeOnTheScreen()
+        expect(screen.queryByRole("button", {name: "Approve"})).toBeNull()
+    })
+
+    it("colours every check state, and reads an unknown one as unknown", async () => {
+        await open({
+            ...approvals.pending,
+            checks: [
+                {name: "a", state: "success"},
+                {name: "b", state: "failure"},
+                {name: "c", state: "pending"},
+                {name: "d", state: "skipped"},
+                {name: "e", state: "unknown"},
+                {name: "e", state: "failure"},
+            ],
+        })
+        for (const label of ["Passed", "Running", "Skipped", "Unknown"]) {
+            expect(screen.getByText(label)).toBeOnTheScreen()
+        }
+        expect(screen.getAllByText("e")).toHaveLength(2)
+        expect(screen.getAllByText("Failed")).toHaveLength(2)
+    })
+
+    it("shows the commit SHAs when the server gives no titles", async () => {
+        await open({...approvals.pending, commitDetails: [], commits: ["abcdef1234567"]})
+        expect(screen.getByText("abcdef1")).toBeOnTheScreen()
+    })
+
+    it("leaves out what the server did not send", async () => {
+        await open(bare)
+        expect(screen.queryByText("Commits")).toBeNull()
+        expect(screen.queryByText("Checks")).toBeNull()
+        expect(screen.queryByText("Evidence")).toBeNull()
+        expect(screen.queryByText("Asked by")).toBeNull()
+        expect(screen.queryByText("Repository")).toBeNull()
+        expect(screen.getByText(/^appr_bare\s+d0$/)).toBeOnTheScreen()
+    })
+
+    it("shows a commit without author, and an answer or expiry the server did not date", async () => {
+        await open({...bare, status: "approved", decidedBy: "rev-b", commitDetails: [{sha: "1234567890", title: "fix"}]})
+        expect(screen.getByText("Approved by rev-b")).toBeOnTheScreen()
+        expect(screen.getByText("fix")).toBeOnTheScreen()
+    })
+
+    it("says an undated expiry, and nothing for an answer without its author", async () => {
+        await open({...bare, status: "expired"})
+        expect(screen.getByText("Expired without an answer")).toBeOnTheScreen()
+    })
+
+    it("says nothing about a decision whose author the server did not send", async () => {
+        await open({...bare, status: "rejected"})
+        expect(screen.queryByText(/Declined by/)).toBeNull()
+    })
+
+    it("offers to try again when the request cannot be loaded", async () => {
+        const approval = jest
+            .fn<Promise<Approval>, [string]>()
+            .mockRejectedValueOnce(new ApiError({kind: "network"}))
+            .mockResolvedValue(approvals.pending)
+        const services = await signedInServices({
+            repositories: fakeRepositories({approvals: {waiting: jest.fn(), approval, answer: jest.fn()}}),
+        })
+        await renderWithServices(<RequestScreen id="appr_0001" />, services)
+        await fireEvent.press(await screen.findByRole("button", {name: "Try again"}))
+        expect(await screen.findByRole("header", {name: "Merge PR #6 into main"})).toBeOnTheScreen()
+    })
+})

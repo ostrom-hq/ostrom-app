@@ -1,64 +1,78 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import {QueryClientProvider} from "@tanstack/react-query"
-import {fireEvent, screen, within} from "@testing-library/react-native"
+import {act, fireEvent, screen} from "@testing-library/react-native"
 import {renderRouter} from "expo-router/testing-library"
 import type {ReactNode} from "react"
-import type {Ask, YesQueue} from "@/api/contract/yes"
+import type {Approval, ApprovalPage} from "@/api/contract/approvals"
 import {ApiError} from "@/api/http/ApiError"
 import {ServicesProvider} from "@/services/AppServices"
-import {asks, fakeRepositories, signedInServices} from "@/test/fakeServices"
+import {approvals, fakeRepositories, fakeServices, signedInServices} from "@/test/fakeServices"
 import {testQueryClient} from "@/test/renderWithServices"
 import {InboxScreen} from "./InboxScreen"
 import {toRow} from "./useInboxViewModel"
 
-async function launch(queue: () => Promise<YesQueue>): Promise<ReturnType<typeof renderRouter>> {
-    const services = await signedInServices({
-        repositories: fakeRepositories({approvals: {queue, ask: () => Promise.resolve(asks.pending), decide: jest.fn()}}),
-    })
-    const client = testQueryClient()
+async function launch(
+    waiting: () => Promise<ApprovalPage>,
+    signedIn = true,
+    client = testQueryClient(),
+): Promise<ReturnType<typeof renderRouter>> {
+    const repositories = fakeRepositories({approvals: {waiting, approval: () => Promise.resolve(approvals.pending), answer: jest.fn()}})
+    const services = signedIn ? await signedInServices({repositories}) : fakeServices({repositories})
     const wrapper = ({children}: {children: ReactNode}): React.JSX.Element => (
         <ServicesProvider services={services}>
             <QueryClientProvider client={client}>{children}</QueryClientProvider>
         </ServicesProvider>
     )
-    return renderRouter(
-        {index: InboxScreen, "ask/[id]": (): React.JSX.Element => <></>},
-        {initialUrl: "/", wrapper},
-    )
+    return renderRouter({index: InboxScreen, "request/[id]": (): React.JSX.Element => <></>}, {initialUrl: "/", wrapper})
 }
 
 describe("InboxScreen", () => {
-    it("lists what waits for me first, then what was decided, and opens a request", async () => {
-        const router = await launch(() =>
-            Promise.resolve({
-                operator: "rev-b",
-                pending: [asks.pending, asks.self],
-                recent: [asks.decided, {...asks.decided, id: "appr_bare", title: "Bare request", who: {}, what: {}, askedBy: []}],
-            }),
-        )
+    it("lists what waits for my answer, and only opens a request: no answer from the list", async () => {
+        // A request answered elsewhere since the list was read keeps its row, without the garnet edge.
+        const bare: Approval = {id: "appr_bare", title: "Bare request", requestedFrom: "rev-b", channel: "app", status: "pending", shownDigest: "d"}
+        const decided = {...approvals.decided, askedBy: ["dev-c"]}
+        const router = await launch(() => Promise.resolve({items: [approvals.pending, approvals.self, decided, bare]}))
         expect(await screen.findByText("Merge PR #6 into main")).toBeOnTheScreen()
-        // The pending request and the decided one share their repository and asker: the line is read inside its row.
-        expect(within(screen.getByRole("button", {name: "Merge PR #6 into main"})).getByText("acme/acme-api · dev-a")).toBeOnTheScreen()
+        expect(screen.getByText("acme/acme-api · dev-a")).toBeOnTheScreen()
         expect(screen.getByText("Your request")).toBeOnTheScreen()
-        expect(screen.getByText("Recently decided")).toBeOnTheScreen()
-        expect(screen.getByText("Push to main on acme-api")).toBeOnTheScreen()
-        expect(screen.getByText("Bare request")).toBeOnTheScreen()
+        expect(screen.queryByRole("button", {name: "Approve"})).toBeNull()
         await fireEvent.press(screen.getByRole("button", {name: "Merge PR #6 into main"}))
-        expect(router.getPathname()).toBe("/ask/appr_0001")
+        expect(router.getPathname()).toBe("/request/appr_0001")
+    })
+
+    it("calls nothing mine once the session is gone", async () => {
+        const waiting = jest.fn<Promise<ApprovalPage>, []>(() => Promise.resolve({items: [approvals.self]}))
+        await launch(waiting, false)
+        expect(await screen.findByRole("button", {name: "Try again"})).toBeOnTheScreen()
+        expect(waiting).not.toHaveBeenCalled()
     })
 
     it("says when nothing waits", async () => {
-        await launch(() => Promise.resolve({operator: "rev-b", pending: [], recent: []}))
+        await launch(() => Promise.resolve({items: []}))
         expect(await screen.findByText("Nothing waits for your yes right now.")).toBeOnTheScreen()
-        expect(screen.queryByText("Recently decided")).toBeNull()
+    })
+
+    it("keeps the last list when a refresh fails, and says it may be out of date", async () => {
+        const waiting = jest
+            .fn<Promise<ApprovalPage>, []>()
+            .mockResolvedValueOnce({items: [approvals.pending]})
+            .mockRejectedValue(new ApiError({kind: "network"}))
+        const client = testQueryClient()
+        await launch(waiting, true, client)
+        expect(await screen.findByText("Merge PR #6 into main")).toBeOnTheScreen()
+        await act(async () => {
+            await client.invalidateQueries()
+        })
+        expect(await screen.findByRole("alert")).toHaveTextContent(/could not be refreshed/)
+        expect(screen.getByText("Merge PR #6 into main")).toBeOnTheScreen()
     })
 
     it("offers to try again when the requests cannot be loaded", async () => {
-        const queue = jest
-            .fn<Promise<YesQueue>, []>()
+        const waiting = jest
+            .fn<Promise<ApprovalPage>, []>()
             .mockRejectedValueOnce(new ApiError({kind: "network"}))
-            .mockResolvedValue({operator: "rev-b", pending: [asks.pending], recent: []})
-        await launch(queue)
+            .mockResolvedValue({items: [approvals.pending]})
+        await launch(waiting)
         await fireEvent.press(await screen.findByRole("button", {name: "Try again"}))
         expect(await screen.findByText("Merge PR #6 into main")).toBeOnTheScreen()
     })
@@ -66,12 +80,13 @@ describe("InboxScreen", () => {
 
 describe("toRow", () => {
     it("keeps the second line empty when the server says neither where nor who", () => {
-        const bare: Ask = {...asks.pending, who: {}, what: {}, askedBy: [], you: null}
-        expect(toRow(bare)).toEqual({id: "appr_0001", title: "Merge PR #6 into main", status: "pending", detail: "", yours: false})
+        const bare: Approval = {id: "appr_1", title: "Bare", requestedFrom: "rev-b", channel: "app", status: "pending", shownDigest: "d"}
+        expect(toRow(bare, "rev-b")).toEqual({id: "appr_1", title: "Bare", status: "pending", detail: "", yours: false})
     })
 
-    it("falls back on the session repository and the first asker", () => {
-        const ask: Ask = {...asks.pending, who: {}, what: {sessionRepo: "acme/tools"}, askedBy: ["dev-c"]}
-        expect(toRow(ask).detail).toBe("acme/tools · dev-c")
+    it("names the first asker, and is never mine without a session", () => {
+        const approval: Approval = {...approvals.pending, repo: "", askedBy: ["dev-c", "rev-b"]}
+        expect(toRow(approval, "rev-b")).toMatchObject({detail: "dev-c", yours: true})
+        expect(toRow(approval, undefined).yours).toBe(false)
     })
 })

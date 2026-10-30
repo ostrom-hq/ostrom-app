@@ -1,31 +1,7 @@
 import {z} from "zod"
-import {DateTimeSchema} from "./common"
+import {zListReceiptKeysResponse, zListReceiptsResponse, zReceipt} from "@/api/gen/zod.gen"
 
-export const ReceiptDecisionSchema = z.object({
-    approvalId: z.string(),
-    by: z.string(),
-    at: DateTimeSchema,
-    result: z.string(),
-    selfApproved: z.boolean().nullish(),
-})
-
-/**
- * The fields of a receipt the app displays (prototype `Receipt`, shared/src/types.ts).
- * Display only: verification works on the raw object, since this schema drops fields it does not know.
- */
-export const ReceiptViewSchema = z.object({
-    id: z.string(),
-    subject: z.object({kind: z.string(), id: z.string(), digest: z.string()}),
-    initiator: z.string(),
-    agent: z.string().nullish(),
-    model: z.string().nullish(),
-    rules: z.array(z.object({id: z.string(), digest: z.string()})),
-    decisions: z.array(ReceiptDecisionSchema),
-    costUsd: z.number().nullish(),
-    createdAt: DateTimeSchema,
-    signature: z.string(),
-})
-export type ReceiptView = z.output<typeof ReceiptViewSchema>
+export type ReceiptView = z.output<typeof zReceipt>
 
 /** A receipt as received: the untouched object, for the signature, and its typed view, for the screen. */
 export interface ReceiptEnvelope {
@@ -43,12 +19,13 @@ export interface UnreadableReceipt {
 
 export type ReceiptListItem = ReceiptEnvelope | UnreadableReceipt
 
+/** Display only: verification works on the raw object, since the schema drops the fields it does not know. */
 function readReceipt(raw: unknown): ReceiptListItem {
-    const view = ReceiptViewSchema.safeParse(raw)
+    const view = zReceipt.safeParse(raw)
     return view.success ? {readable: true, raw, view: view.data} : {readable: false, raw, detail: z.prettifyError(view.error)}
 }
 
-/** One receipt, which must be readable. */
+/** `GET /api/v1/receipts/{id}`: one receipt, which must be readable. */
 export const ReceiptEnvelopeSchema = z.unknown().transform((raw, context): ReceiptEnvelope => {
     const item = readReceipt(raw)
     if (item.readable) return item
@@ -56,13 +33,12 @@ export const ReceiptEnvelopeSchema = z.unknown().transform((raw, context): Recei
     return z.NEVER
 })
 
-/** A list of receipts: one unreadable receipt never hides the others. */
-export const ReceiptListSchema = z.array(z.unknown()).transform((items) => items.map(readReceipt))
+/** `GET /api/v1/receipts`: one unreadable receipt never hides the others. */
+export const ReceiptPageSchema = zListReceiptsResponse
+    .extend({items: z.array(z.unknown())})
+    .transform((page) => ({items: page.items.map(readReceipt), next: page.next}))
+export type ReceiptPage = z.output<typeof ReceiptPageSchema>
 
-/** `GET /api/receipts/pubkey`: the instance key that signs receipts. */
-export const ReceiptPublicKeySchema = z.object({
-    kid: z.string(),
-    alg: z.literal("ed25519"),
-    publicKeyPem: z.string(),
-})
-export type ReceiptPublicKey = z.output<typeof ReceiptPublicKeySchema>
+/** `GET /api/v1/receipts/keys`: the public keys of the instance that sign receipts. */
+export const ReceiptKeysSchema = zListReceiptKeysResponse
+export type ReceiptPublicKey = z.output<typeof zListReceiptKeysResponse>["keys"][number]

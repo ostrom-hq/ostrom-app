@@ -17,7 +17,7 @@ function browser(answer: (start: URL) => AuthSessionResult): jest.Mock<Promise<A
 }
 
 function account(exchange: AccountRepository["exchangeCode"] = jest.fn()): AccountRepository {
-    return {me: jest.fn(), exchangeCode: exchange}
+    return {me: jest.fn(), exchangeCode: exchange, logout: jest.fn()}
 }
 
 const callback = (query: Record<string, string>): AuthSessionResult => ({
@@ -41,7 +41,7 @@ describe("GithubSignInImpl", () => {
         })
         const [startUrl, redirect] = openAuthSession.mock.calls[0] ?? []
         const start = new URL(startUrl ?? "")
-        expect(`${start.origin}${start.pathname}`).toBe(`${SERVER}/api/auth/github/start`)
+        expect(`${start.origin}${start.pathname}`).toBe(`${SERVER}/api/v1/auth/github/start`)
         expect(redirect).toBe(REDIRECT_URI)
         expect(start.searchParams.get("code_challenge_method")).toBe("S256")
         const exchange = exchangeCode.mock.calls[0]?.[0]

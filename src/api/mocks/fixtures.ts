@@ -1,36 +1,27 @@
 import type {z} from "zod"
-import type {MeSchema} from "@/api/contract/account"
 import type {ActivityPageSchema} from "@/api/contract/activity"
+import type {MeSchema} from "@/api/contract/account"
+import type {ApprovalSchema} from "@/api/contract/approvals"
 import type {NotificationSettingsSchema} from "@/api/contract/notifications"
 import type {SpendReportSchema} from "@/api/contract/spending"
-import type {AskSchema} from "@/api/contract/yes"
 import receiptVectors from "@/domain/receipts/__fixtures__/receipts.json"
 
 /** Example data shaped like the server's answers. Names are neutral (`acme`, `dev-a`, `rev-b`), as in the vectors. */
 export const MOCK_BASE_URL = "https://ostrom.test"
 
 export const me: z.input<typeof MeSchema> = {
-    login: "rev-b",
-    name: "Reviewer B",
-    avatarUrl: null,
-    org: {login: "acme", name: "Acme"},
+    dev: {login: "rev-b", verified: true, via: "github"},
+    member: {login: "rev-b", name: "Reviewer B", avatarUrl: "https://avatars.test/rev-b", role: "member"},
+    capabilities: ["approvals.answer"],
 }
 
-export const pendingAsk: z.input<typeof AskSchema> = {
+export const pendingApproval: z.input<typeof ApprovalSchema> = {
     id: "appr_0001",
-    status: "pending",
     title: "Merge PR #6 into main",
-    requestedAt: "2026-10-30T08:00:00.000Z",
-    who: {dev: "dev-a", agent: "claude-code", model: "sonnet", session: "sess-simple"},
-    what: {action: "Merge to main", command: "gh pr merge 6 --squash", repo: "acme/acme-api", harness: "0.4.0"},
-    gate: {label: "Production merge", workflow: "Ship", workflowId: "wf-ship", approvers: ["rev-b"]},
-    rules: [{id: "r-commit-style", statement: "Commits follow Conventional Commits", strength: "must"}],
-    diff: "diff --git a/src/api.ts b/src/api.ts\n+export const ready = true\n",
-    evidence: [
-        {label: "Repository", value: "acme/acme-api", url: "https://github.com/acme/acme-api"},
-        {label: "Pull request", value: "#6", url: "https://github.com/acme/acme-api/pull/6"},
-    ],
-    commits: [
+    repo: "acme/acme-api",
+    sha: "c60f859a1b2c3d4e5f60718293a4b5c6d7e8f901",
+    commits: ["c60f859a1b2c3d4e5f60718293a4b5c6d7e8f901", "b0ff918a1b2c3d4e5f60718293a4b5c6d7e8f902"],
+    commitDetails: [
         {sha: "c60f859a1b2c3d4e5f60718293a4b5c6d7e8f901", title: "feat: expose readiness", author: "dev-a"},
         {sha: "b0ff918a1b2c3d4e5f60718293a4b5c6d7e8f902", title: "test: cover readiness", author: "dev-a"},
     ],
@@ -39,45 +30,35 @@ export const pendingAsk: z.input<typeof AskSchema> = {
         {name: "tests", state: "success"},
         {name: "lint", state: "pending"},
     ],
+    evidence: [
+        {label: "Pull request", value: "#6", url: "https://github.com/acme/acme-api/pull/6"},
+        {label: "Command", value: "gh pr merge 6 --squash"},
+    ],
+    requestedFrom: "rev-b",
+    channel: "app",
+    status: "pending",
     shownDigest: "5c1b3f4a9d2e7c8b6a5f4e3d2c1b0a9f8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b",
     askedBy: ["dev-a"],
-    askedVia: ["hook", "ci"],
-    pr: {number: "6", sha: "c60f859"},
-    you: {login: "rev-b", self: false, canApprove: true},
+    expiresAt: "2026-10-30T18:00:00.000Z",
 }
 
-export const selfAsk: z.input<typeof AskSchema> = {
-    ...pendingAsk,
+/** A request the person asked for themselves: the server takes their yes only when nobody else can give it. */
+export const selfApproval: z.input<typeof ApprovalSchema> = {
+    ...pendingApproval,
     id: "appr_0002",
     title: "Push to main on acme-web",
-    what: {action: "Push to main", repo: "acme/acme-web"},
+    repo: "acme/acme-web",
     shownDigest: "0a9f8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b5c1b3f4a9d2e7c8b6a5f4e3d2c1b",
     askedBy: ["rev-b"],
-    you: {
-        login: "rev-b",
-        self: true,
-        canApprove: false,
-        reason: "rev-b asked for this action and cannot approve it: dev-a must say yes",
-    },
 }
 
-export const decidedAsk: z.input<typeof AskSchema> = {
-    ...pendingAsk,
+export const decidedApproval: z.input<typeof ApprovalSchema> = {
+    ...pendingApproval,
     id: "appr_0000",
-    status: "approved",
     title: "Push to main on acme-api",
+    status: "approved",
     decidedBy: "rev-b",
     decidedAt: "2026-10-30T09:00:00.000Z",
-    receipt: {
-        id: "rcpt_gate",
-        kind: "gate",
-        createdAt: "2026-10-30T09:00:00.000Z",
-        valid: true,
-        digest: "e619010d5fa8d39e45088e29dceb6df4719e3c28537125729291b8d8d2ee48bd",
-        by: "rev-b",
-        result: "approved",
-    },
-    you: {login: "rev-b", self: false, canApprove: false},
 }
 
 /** Receipts signed by the public test key of the golden vectors: they verify on the phone. */
@@ -93,7 +74,7 @@ export const activity: z.input<typeof ActivityPageSchema> = {
             actor: {kind: "person", name: "rev-b"},
             summary: "rev-b approved the merge of PR #6",
             repo: "acme/acme-api",
-            askId: "appr_0000",
+            approvalId: "appr_0000",
         },
         {
             id: "act_2",
@@ -102,7 +83,7 @@ export const activity: z.input<typeof ActivityPageSchema> = {
             actor: {kind: "agent", name: "claude-code"},
             summary: "claude-code asks to merge PR #6",
             repo: "acme/acme-api",
-            askId: "appr_0001",
+            approvalId: "appr_0001",
         },
         {
             id: "act_1",
@@ -114,7 +95,7 @@ export const activity: z.input<typeof ActivityPageSchema> = {
             costUsd: 0.128,
         },
     ],
-    nextCursor: "act_1",
+    next: "act_1",
 }
 
 export const olderActivity: z.input<typeof ActivityPageSchema> = {
@@ -128,7 +109,6 @@ export const olderActivity: z.input<typeof ActivityPageSchema> = {
             repo: "acme/acme-web",
         },
     ],
-    nextCursor: null,
 }
 
 export const spending: z.input<typeof SpendReportSchema> = {

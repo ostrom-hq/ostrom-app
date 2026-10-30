@@ -28,7 +28,7 @@ describe("SpendingScreen", () => {
     it("switches to the week, with no budget and nothing spent by anyone", async () => {
         const report = jest.fn((period: SpendPeriod) =>
             Promise.resolve(
-                period === "month" ? month : {...month, period, totalUsd: 0, budgetUsd: null, byAgent: [], byRepo: [], byPerson: []},
+                period === "month" ? month : {period, from: month.from, to: month.to, totalUsd: 0, byAgent: [], byRepo: [], byPerson: [], daily: []},
             ),
         )
         await show(report)

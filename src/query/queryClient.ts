@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import {MutationCache, QueryCache, QueryClient} from "@tanstack/react-query"
+import {focusManager, MutationCache, QueryCache, QueryClient} from "@tanstack/react-query"
+import {AppState} from "react-native"
 import {ApiError} from "@/api/http/ApiError"
 
 const MAX_RETRIES = 2
@@ -22,17 +23,41 @@ export interface QueryClientOptions {
     readonly retry?: boolean
 }
 
-/** The server state cache. Mutations are never retried: a decision is sent once, then read back. */
+/**
+ * The server state cache. Mutations are never retried: a decision is sent once, then read back.
+ * A 401 signs out only when it comes from a query or a mutation still in the cache: a request of the previous account,
+ * answered after sign-out cleared the cache and someone signed in again, never signs the new one out.
+ */
 export function createQueryClient({onUnauthorized, retry = true}: QueryClientOptions): QueryClient {
-    const onError = (error: unknown): void => {
-        if (isUnauthorized(error)) onUnauthorized()
-    }
+    const queryCache: QueryCache = new QueryCache({
+        onError: (error, query) => {
+            if (isUnauthorized(error) && queryCache.get(query.queryHash) === query) onUnauthorized()
+        },
+    })
+    const mutationCache: MutationCache = new MutationCache({
+        onError: (error, _variables, _context, mutation) => {
+            if (isUnauthorized(error) && mutationCache.getAll().some((cached) => cached === mutation)) onUnauthorized()
+        },
+    })
     return new QueryClient({
-        queryCache: new QueryCache({onError}),
-        mutationCache: new MutationCache({onError}),
+        queryCache,
+        mutationCache,
         defaultOptions: {
             queries: {retry: retry ? shouldRetry : false, staleTime: 10_000},
             mutations: {retry: false},
         },
     })
+}
+
+/**
+ * React Native has no window focus: the app coming back to the foreground is the focus, so the inbox is read again
+ * then (`refetchOnWindowFocus`). Returns the unsubscription.
+ */
+export function followAppFocus(): () => void {
+    const subscription = AppState.addEventListener("change", (status) => {
+        focusManager.setFocused(status === "active")
+    })
+    return () => {
+        subscription.remove()
+    }
 }

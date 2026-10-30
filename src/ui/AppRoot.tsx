@@ -4,7 +4,7 @@ import {Stack, ThemeProvider} from "expo-router"
 import {StatusBar} from "expo-status-bar"
 import {useEffect, useState} from "react"
 import {useTranslation} from "react-i18next"
-import {createQueryClient} from "@/query/queryClient"
+import {createQueryClient, followAppFocus} from "@/query/queryClient"
 import {type AppServices, ServicesProvider, useServices, useSessionState} from "@/services/AppServices"
 import {navigationThemeFor} from "@/ui/theme/navigationTheme"
 import {useTheme} from "@/ui/theme/useTheme"
@@ -18,6 +18,7 @@ function RootNavigator(): React.JSX.Element | null {
     useEffect(() => {
         void sessionStore.getState().hydrate()
     }, [sessionStore])
+    useEffect(followAppFocus, [])
     useEffect(() => {
         // Nothing of one account may show under the next one.
         if (state.status === "signed-out") queryClient.clear()
@@ -28,7 +29,7 @@ function RootNavigator(): React.JSX.Element | null {
         <Stack screenOptions={{headerShown: false}}>
             <Stack.Protected guard={signedIn}>
                 <Stack.Screen name="(tabs)" />
-                <Stack.Screen name="ask/[id]" options={{headerShown: true, title: t("ask.title"), headerBackTitle: t("inbox.title")}} />
+                <Stack.Screen name="request/[id]" options={{headerShown: true, title: t("request.title"), headerBackTitle: t("inbox.title")}} />
             </Stack.Protected>
             <Stack.Protected guard={!signedIn}>
                 <Stack.Screen name="login" />

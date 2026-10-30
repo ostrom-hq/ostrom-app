@@ -1,27 +1,10 @@
-import {z} from "zod"
-import {DateTimeSchema} from "./common"
+import type {z} from "zod"
+import {zSpending} from "@/api/gen/zod.gen"
 
-export const SpendLineSchema = z.object({
-    key: z.string(),
-    label: z.string(),
-    usd: z.number(),
-    sessions: z.number().int(),
-})
-export type SpendLine = z.output<typeof SpendLineSchema>
+/** The periods the app asks for (`GET /api/v1/spending?period=`). */
+export type SpendPeriod = "week" | "month"
 
-export const SpendPeriodSchema = z.enum(["week", "month"])
-export type SpendPeriod = z.output<typeof SpendPeriodSchema>
-
-/** `GET /api/spending?period=month`: what the agents cost, by agent, repository and person. */
-export const SpendReportSchema = z.object({
-    period: SpendPeriodSchema,
-    from: DateTimeSchema,
-    to: DateTimeSchema,
-    totalUsd: z.number(),
-    budgetUsd: z.number().nullish(),
-    byAgent: z.array(SpendLineSchema),
-    byRepo: z.array(SpendLineSchema),
-    byPerson: z.array(SpendLineSchema),
-    daily: z.array(z.object({date: z.iso.date(), usd: z.number()})),
-})
-export type SpendReport = z.output<typeof SpendReportSchema>
+/** What the agents cost, by agent, repository and person. */
+export const SpendReportSchema = zSpending
+export type SpendReport = z.output<typeof zSpending>
+export type SpendLine = SpendReport["byAgent"][number]

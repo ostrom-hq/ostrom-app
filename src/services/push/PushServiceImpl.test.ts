@@ -10,6 +10,9 @@ jest.mock("expo-notifications", () => ({
     getExpoPushTokenAsync: jest.fn(),
     addNotificationResponseReceivedListener: jest.fn(),
     getLastNotificationResponse: jest.fn(),
+    clearLastNotificationResponse: jest.fn(),
+    setNotificationChannelAsync: jest.fn(() => Promise.resolve(null)),
+    AndroidImportance: {HIGH: 6},
 }))
 
 const mocked = jest.mocked(Notifications)
@@ -43,7 +46,7 @@ describe("PushServiceImpl", () => {
     })
 
     it("shows an Ostrom notification even while the app is open", async () => {
-        await expect(handler?.handleNotification(response({}).notification)).resolves.toMatchObject({shouldShowBanner: true})
+        await expect(handler?.handleNotification(response({}).notification)).resolves.toMatchObject({shouldShowBanner: true, shouldSetBadge: false})
     })
 
     it("gives this phone's address once the person allowed it", async () => {
@@ -60,6 +63,8 @@ describe("PushServiceImpl", () => {
         mocked.getExpoPushTokenAsync.mockResolvedValue({type: "expo", data: "t"})
         await new PushServiceImpl({projectId: PROJECT, platform: "android"}).register()
         expect(mocked.requestPermissionsAsync).not.toHaveBeenCalled()
+        // Android: the channel exists before the permission is read.
+        expect(mocked.setNotificationChannelAsync).toHaveBeenCalledWith("requests", {name: "Requests", importance: 6})
     })
 
     it("respects a no, without asking again when the system forbids it", async () => {
@@ -86,14 +91,16 @@ describe("PushServiceImpl", () => {
         const listener = jest.fn()
         const push = new PushServiceImpl({projectId: PROJECT, platform: "ios"})
         const unsubscribe = push.onOpen(listener)
-        tap?.(response({kind: "ask", askId: "appr_0001"}))
-        expect(listener).toHaveBeenCalledWith({kind: "ask", askId: "appr_0001"})
+        tap?.(response({kind: "approval", approvalId: "appr_0001"}))
+        expect(listener).toHaveBeenCalledWith({kind: "approval", approvalId: "appr_0001"})
         unsubscribe()
         expect(remove).toHaveBeenCalled()
 
-        mocked.getLastNotificationResponse.mockReturnValue(response({kind: "ask", askId: "appr_0002"}))
-        await expect(push.launchData()).resolves.toEqual({kind: "ask", askId: "appr_0002"})
+        mocked.getLastNotificationResponse.mockReturnValue(response({kind: "approval", approvalId: "appr_0002"}))
+        await expect(push.launchData()).resolves.toEqual({kind: "approval", approvalId: "appr_0002"})
+        expect(mocked.clearLastNotificationResponse).toHaveBeenCalledTimes(1)
         mocked.getLastNotificationResponse.mockReturnValue(null)
         await expect(push.launchData()).resolves.toBeUndefined()
+        expect(mocked.clearLastNotificationResponse).toHaveBeenCalledTimes(1)
     })
 })

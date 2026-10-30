@@ -5,6 +5,7 @@ import {SafeAreaView} from "react-native-safe-area-context"
 import {Button} from "@/ui/components/Button"
 import {ScreenTitle} from "@/ui/components/ScreenTitle"
 import {Field, Section} from "@/ui/components/Section"
+import {TAB_EDGES} from "@/ui/navigation/tabEdges"
 import {fontSize, radius, space} from "@/ui/theme/tokens"
 import {useTheme} from "@/ui/theme/useTheme"
 import {type Toggle, useSettingsViewModel} from "./useSettingsViewModel"
@@ -70,8 +71,8 @@ export function SettingsScreen(): React.JSX.Element {
                             }}
                         />
                     ))}
-                    <SwitchRow label={t("settings.quietHours")} value={quietHours !== undefined && quietHours !== null} onChange={vm.setQuietHours} />
-                    {quietHours === undefined || quietHours === null ? null : (
+                    <SwitchRow label={t("settings.quietHours")} value={quietHours !== undefined} onChange={vm.setQuietHours} />
+                    {quietHours === undefined ? null : (
                         <Text style={[styles.body, {color: colors.textMuted}]}>
                             {t("settings.quietHoursRange", {start: quietHours.start, end: quietHours.end, timeZone: quietHours.timeZone})}
                         </Text>
@@ -89,7 +90,7 @@ export function SettingsScreen(): React.JSX.Element {
 
     const push = vm.pushOn === undefined ? undefined : vm.pushOn ? t("settings.pushOn") : t("settings.pushOff")
     return (
-        <SafeAreaView style={[styles.container, {backgroundColor: colors.bg}]}>
+        <SafeAreaView edges={TAB_EDGES} style={[styles.container, {backgroundColor: colors.bg}]}>
             <ScrollView contentContainerStyle={styles.content}>
                 <ScreenTitle>{t("settings.title")}</ScreenTitle>
                 <Section title={t("settings.account")}>

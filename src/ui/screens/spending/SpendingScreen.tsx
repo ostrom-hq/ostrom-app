@@ -7,6 +7,7 @@ import {Button} from "@/ui/components/Button"
 import {ScreenTitle} from "@/ui/components/ScreenTitle"
 import {Section} from "@/ui/components/Section"
 import {formatUsd} from "@/ui/format/money"
+import {TAB_EDGES} from "@/ui/navigation/tabEdges"
 import {fontSize, radius, space} from "@/ui/theme/tokens"
 import {useTheme} from "@/ui/theme/useTheme"
 import {type Breakdown, type Budget, useSpendingViewModel} from "./useSpendingViewModel"
@@ -111,7 +112,7 @@ export function SpendingScreen(): React.JSX.Element {
             break
     }
     return (
-        <SafeAreaView style={[styles.container, {backgroundColor: colors.bg}]}>
+        <SafeAreaView edges={TAB_EDGES} style={[styles.container, {backgroundColor: colors.bg}]}>
             <ScrollView contentContainerStyle={styles.content}>
                 <ScreenTitle>{t("spending.title")}</ScreenTitle>
                 <PeriodPicker period={period} onChange={setPeriod} />

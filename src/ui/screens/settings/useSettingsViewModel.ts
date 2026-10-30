@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import {useCallback, useState} from "react"
 import type {NotificationSettings, QuietHours} from "@/api/contract/notifications"
-import {useDeviceRegistration, useNotificationSettings, useSaveNotificationSettings} from "@/query/notifications"
+import {useDeviceRegistration, useNotificationSettings, useNotificationSettingsEditor} from "@/query/notifications"
 import {useRepositories, useServices, useSessionState} from "@/services/AppServices"
 import {isPresent} from "@/ui/format/presence"
 
@@ -34,34 +34,41 @@ export interface SettingsViewModel {
 export function useSettingsViewModel(locale: string, timeZone: string): SettingsViewModel {
     const session = useSessionState()
     const {sessionStore} = useServices()
-    const {notifications} = useRepositories()
+    const {account, notifications} = useRepositories()
     const query = useNotificationSettings()
-    const save = useSaveNotificationSettings()
+    const editor = useNotificationSettingsEditor()
     const [signingOut, setSigningOut] = useState(false)
     const device = useDeviceRegistration(locale).data
     const settings = query.data
-    const {mutate} = save
+    const {change} = editor
 
     const toggle = useCallback(
         (key: Toggle, value: boolean) => {
-            if (settings !== undefined) mutate({...settings, [key]: value})
+            change((current) => ({...current, [key]: value}))
         },
-        [settings, mutate],
+        [change],
     )
     const setQuietHours = useCallback(
         (on: boolean) => {
-            if (settings !== undefined) mutate({...settings, quietHours: on ? defaultQuietHours(timeZone) : null})
+            // Off is the field left out: the contract has no `null` for it.
+            change(({requests, decisions, spending}) =>
+                on
+                    ? {requests, decisions, spending, quietHours: defaultQuietHours(timeZone)}
+                    : {requests, decisions, spending},
+            )
         },
-        [settings, mutate, timeZone],
+        [change, timeZone],
     )
     const signOut = useCallback(() => {
         setSigningOut(true)
+        // Best effort, never waited for: this phone stops taking push, then the token is revoked on the server (in this
+        // order, the revocation would refuse the first). The keychain is cleared at once, reachable server or not.
         void (async () => {
-            // Best effort: a phone that cannot reach the server still signs out, and stops showing its pushes.
             if (isPresent(device)) await notifications.unregisterDevice(device.id).catch(() => undefined)
-            await sessionStore.getState().signOut()
+            await account.logout().catch(() => undefined)
         })()
-    }, [device, notifications, sessionStore])
+        void sessionStore.getState().signOut()
+    }, [device, notifications, account, sessionStore])
 
     const signedIn = session.status === "signed-in" ? session.session : undefined
     const state: SettingsState =
@@ -71,7 +78,7 @@ export function useSettingsViewModel(locale: string, timeZone: string): Settings
         serverUrl: signedIn?.serverUrl,
         pushOn: device === undefined ? undefined : device !== null,
         state,
-        saveFailed: save.isError,
+        saveFailed: editor.failed,
         toggle,
         setQuietHours,
         retry: () => {

@@ -1,5 +1,5 @@
 import {z} from "zod"
-import {ErrorBodySchema} from "@/api/contract/common"
+import {zApiError} from "@/api/gen/zod.gen"
 import {ApiError} from "./ApiError"
 import type {HttpClient, HttpRequest} from "./HttpClient"
 
@@ -85,7 +85,7 @@ function parseJson(text: string): unknown {
 }
 
 function problemOf(status: number, body: unknown): ApiError {
-    const error = ErrorBodySchema.safeParse(body)
+    const error = zApiError.safeParse(body)
     if (status === 401) return new ApiError(error.success ? {kind: "unauthorized", type: error.data.error.type} : {kind: "unauthorized"})
     if (status >= 500) return new ApiError({kind: "server", status})
     if (!error.success) return new ApiError({kind: "unexpected-status", status})

@@ -1,33 +1,18 @@
-import {z} from "zod"
-import {DateTimeSchema} from "./common"
+import type {z} from "zod"
+import {zAuthUser, zMe, type zMobileTokenBody, zMobileTokenResponse} from "@/api/gen/zod.gen"
 
-export const UserSchema = z.object({
-    login: z.string(),
-    name: z.string().nullish(),
-    avatarUrl: z.string().nullish(),
-})
-export type User = z.output<typeof UserSchema>
+export const UserSchema = zAuthUser
+export type User = z.output<typeof zAuthUser>
 
-/** `GET /api/me`: who the token belongs to, and the organisation of the instance. */
-export const MeSchema = UserSchema.extend({
-    org: z.object({login: z.string(), name: z.string().nullish(), avatarUrl: z.string().nullish()}).nullish(),
-})
-export type Me = z.output<typeof MeSchema>
+/** `GET /api/v1/auth/me`: who the token belongs to, their membership and organisation. */
+export const MeSchema = zMe
+export type Me = z.output<typeof zMe>
 
 /**
- * `POST /api/auth/mobile/token`: the one-time code the server put in the `ostrom://auth/callback` deep link,
+ * `POST /api/v1/auth/mobile/token`: the one-time code the server put in the `ostrom://auth/callback` deep link,
  * exchanged with the PKCE verifier only the app knows.
  */
-export const TokenExchangeRequestSchema = z.object({
-    code: z.string(),
-    codeVerifier: z.string(),
-    redirectUri: z.string(),
-})
-export type TokenExchangeRequest = z.output<typeof TokenExchangeRequestSchema>
+export type TokenExchangeRequest = z.output<typeof zMobileTokenBody>
 
-export const SessionTokenSchema = z.object({
-    token: z.string(),
-    user: UserSchema,
-    expiresAt: DateTimeSchema.nullish(),
-})
-export type SessionToken = z.output<typeof SessionTokenSchema>
+export const SessionTokenSchema = zMobileTokenResponse
+export type SessionToken = z.output<typeof zMobileTokenResponse>

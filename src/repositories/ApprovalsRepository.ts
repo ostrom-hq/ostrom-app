@@ -1,9 +1,13 @@
-import type {Ask, Decision, YesQueue} from "@/api/contract/yes"
+import type {AnswerResult, Approval, ApprovalAnswer, ApprovalPage} from "@/api/contract/approvals"
 
-/** The requests for a yes: what waits for me, one request with its evidence, and my decision. */
+/** The requests for a yes: what waits for me, one request with its evidence, and my answer. */
 export interface ApprovalsRepository {
-    queue(): Promise<YesQueue>
-    ask(id: string): Promise<Ask>
-    /** Decides, bound to the digest of what the screen showed. Refusals come back as `ApiError` `refused`. */
-    decide(id: string, decision: Decision, shownDigest: string): Promise<Ask>
+    /** The requests waiting for my answer. */
+    waiting(): Promise<ApprovalPage>
+    approval(id: string): Promise<Approval>
+    /**
+     * Answers, bound to the digest of what the screen showed (the server refuses with 409 if it changed).
+     * `comment` carries the reason of a no, which the agent reads to know what to do instead.
+     */
+    answer(id: string, answer: ApprovalAnswer, shownDigest: string, comment?: string): Promise<AnswerResult>
 }
