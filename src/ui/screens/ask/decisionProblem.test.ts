@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import {ApiError, type ApiProblem} from "@/api/http/ApiError"
 import {biometricProblem, type DecisionProblem, decisionProblem, shouldReload} from "./decisionProblem"
 

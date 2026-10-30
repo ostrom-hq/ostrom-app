@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import {ActivityIndicator, Pressable, StyleSheet, Text} from "react-native"
 import {fontSize, radius, space} from "@/ui/theme/tokens"
 import type {ThemeColors} from "@/ui/theme/theme"

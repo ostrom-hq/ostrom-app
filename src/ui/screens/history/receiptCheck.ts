@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type {ReceiptListItem, ReceiptPublicKey} from "@/api/contract/receipts"
 import {parseEd25519PublicKeyPem, type ReceiptKey} from "@/domain/receipts/publicKey"
 import {type ReceiptRejection, verifyReceipt} from "@/domain/receipts/verifyReceipt"
