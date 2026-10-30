@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import {mockFrom, serverUrlFrom} from "./env"
+import {serverUrlFrom} from "./env"
 
 describe("serverUrlFrom", () => {
     it("proposes the server the build was made for, as an origin", () => {
@@ -11,16 +11,5 @@ describe("serverUrlFrom", () => {
         for (const configured of [undefined, "", "  ", "http://staging.example.com"]) {
             expect(serverUrlFrom(configured)).toBe("https://app.ostrom.run")
         }
-    })
-})
-
-describe("mockFrom", () => {
-    it.each([
-        ["1", true],
-        [undefined, false],
-        ["", false],
-        ["true", false],
-    ])("reads %p as %p", (configured, mock) => {
-        expect(mockFrom(configured)).toBe(mock)
     })
 })

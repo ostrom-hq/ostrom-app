@@ -12,9 +12,14 @@ describe("mockFetch", () => {
         expect(await response.json()).toEqual(me)
     })
 
-    it("reads the address from a URL or a Request too", async () => {
+    it("reads a URL or a Request too, with the Request's method and body", async () => {
         expect((await fetch(new URL(`${MOCK_BASE_URL}/api/v1/auth/me`))).status).toBe(200)
-        expect((await fetch(new Request(`${MOCK_BASE_URL}/api/v1/auth/me`))).status).toBe(200)
+        const request = new Request(`${MOCK_BASE_URL}/api/v1/auth/mobile/token`, {method: "POST", body: JSON.stringify({code: "good-code"})})
+        expect(await (await fetch(request)).json()).toEqual({token: "ost_mock_token", user: {login: "rev-b"}})
+    })
+
+    it("fails as fetch does, with a rejected promise, on a body that is not JSON", async () => {
+        await expect(fetch(`${MOCK_BASE_URL}/api/v1/auth/mobile/token`, {method: "POST", body: "not json"})).rejects.toThrow(SyntaxError)
     })
 
     it("passes the method, the query and the JSON body", async () => {

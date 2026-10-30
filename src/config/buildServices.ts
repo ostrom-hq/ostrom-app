@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type {AppServices} from "@/services/AppServices"
-import {createMockAppServices} from "./mockServices"
 import {createAppServices} from "./services"
 
-/** The services of this build: the real ones, or the in-memory server's for the E2E build. */
-export function servicesForBuild(mock: boolean): AppServices {
-    return mock ? createMockAppServices() : createAppServices()
+/**
+ * The services of this build. The E2E build resolves this module to `buildServicesE2e.ts` instead (`metro.config.js`),
+ * so no other build bundles the in-memory server.
+ */
+export function servicesForBuild(): AppServices {
+    return createAppServices()
 }

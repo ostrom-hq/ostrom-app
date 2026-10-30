@@ -45,6 +45,11 @@ export function repositoriesOver(http: HttpClient): Repositories {
     }
 }
 
+/** Opens a link outside the app: a link of the console opens the console (browser, or its app when installed). */
+export async function openOutside(url: string): Promise<void> {
+    await Linking.openURL(url)
+}
+
 /** The composition root: the only place that picks the implementations. */
 export function createAppServices(): AppServices {
     return {
@@ -58,8 +63,6 @@ export function createAppServices(): AppServices {
                 new AccountRepositoryImpl(new HttpClientImpl({baseUrl: serverUrl, token: () => undefined})),
         }),
         repositoriesFor,
-        openUrl: async (url) => {
-            await Linking.openURL(url)
-        },
+        openUrl: openOutside,
     }
 }

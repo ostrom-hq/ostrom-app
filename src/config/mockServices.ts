@@ -4,19 +4,20 @@ import {mockFetch} from "@/api/mocks/mockFetch"
 import {createMockServer} from "@/api/mocks/mockServer"
 import {HttpClientImpl} from "@/api/http/HttpClientImpl"
 import type {AppServices} from "@/services/AppServices"
-import {createAppServices, repositoriesOver} from "./services"
+import {SecureStorageImpl} from "@/services/storage/SecureStorageImpl"
+import {createSessionStore} from "@/stores/session"
+import {openOutside, repositoriesOver} from "./services"
 
 /**
- * The services of the E2E build (`EXPO_PUBLIC_OSTROM_MOCK=1`): no Ostrom server runs on the CI runner, so the app
- * talks to the in-memory server of `api/mocks`, through the real HTTP client, repositories and screens. Only what the
- * emulator cannot do is replaced: the GitHub sign-in (the server's answer, signed in as `rev-b` on the address typed),
- * the fingerprint (no finger is enrolled: confirmed), and push (no project id: unavailable). The session store and
- * the links stay the real ones.
+ * The services of the E2E build: no Ostrom server runs on the CI runner, so the app talks to the in-memory server of
+ * `api/mocks`, through the real HTTP client, repositories and screens. Only what the emulator cannot do is replaced:
+ * the GitHub sign-in (signed in as `rev-b` on the address typed), the fingerprint (no finger is enrolled: confirmed),
+ * and push (no project id: unavailable). The session store and the links are the real ones.
  */
 export function createMockAppServices(): AppServices {
     const fetch = mockFetch(createMockServer())
     return {
-        ...createAppServices(),
+        sessionStore: createSessionStore(new SecureStorageImpl()),
         signIn: {
             signIn: (serverUrl) =>
                 Promise.resolve({kind: "signed-in", session: {serverUrl, token: "ost_mock_token", user: {login: fixtures.me.dev.login}}}),
@@ -29,5 +30,6 @@ export function createMockAppServices(): AppServices {
         },
         repositoriesFor: (session) =>
             repositoriesOver(new HttpClientImpl({baseUrl: session.serverUrl, token: () => session.token, fetch})),
+        openUrl: openOutside,
     }
 }

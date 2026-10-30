@@ -5,6 +5,7 @@ import * as WebBrowser from "expo-web-browser"
 import {ApprovalsRepositoryImpl} from "@/repositories/ApprovalsRepositoryImpl"
 import {GithubSignInImpl} from "@/services/signIn/GithubSignInImpl"
 import {servicesForBuild} from "./buildServices"
+import {servicesForBuild as e2eServicesForBuild} from "./buildServicesE2e"
 import {createMockAppServices} from "./mockServices"
 import {createAppServices, easProjectId, repositoriesFor} from "./services"
 
@@ -89,7 +90,7 @@ describe("createMockAppServices", () => {
 
 describe("servicesForBuild", () => {
     it("gives the real services, or the in-memory server's for the E2E build", async () => {
-        expect(servicesForBuild(false).signIn).toBeInstanceOf(GithubSignInImpl)
-        expect(await servicesForBuild(true).signIn.signIn("https://ostrom.e2e")).toMatchObject({kind: "signed-in"})
+        expect(servicesForBuild().signIn).toBeInstanceOf(GithubSignInImpl)
+        expect(await e2eServicesForBuild().signIn.signIn("https://ostrom.e2e")).toMatchObject({kind: "signed-in"})
     })
 })

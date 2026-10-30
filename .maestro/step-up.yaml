@@ -19,6 +19,5 @@ appId: run.ostrom.app
 - assertNotVisible: ".*step_up_required.*"
 - assertVisible:
     id: "request-open-console"
+# The tap opens the browser on the console, outside the app: its address is checked by the unit tests.
 - takeScreenshot: step-up
-- tapOn:
-    id: "request-open-console"

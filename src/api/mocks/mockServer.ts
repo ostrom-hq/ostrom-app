@@ -36,6 +36,15 @@ function refusal(status: number, type: string, message: string): MockResponse {
 
 const ok = (body: unknown): MockResponse => ({status: 200, body})
 
+/** A path segment decoded, or nothing when it is not valid percent-encoding. */
+function idOf(segment: string): string | undefined {
+    try {
+        return decodeURIComponent(segment)
+    } catch {
+        return undefined
+    }
+}
+
 interface Route {
     readonly method: string
     readonly path: RegExp
@@ -67,14 +76,18 @@ export function createMockServer(): MockServer {
     let settings = fixtures.notificationSettings
     const caller = fixtures.me.dev.login
 
+    /** Whether the caller asked for it: then their yes is not taken, as the server does when someone else can approve. */
+    const isSelf = (approval: ApprovalInput): boolean => approval.askedBy?.includes(caller) === true
+
     /** A request as the console and the app show it: the caller's own request is theirs, and not theirs to approve. */
     const view = (approval: ApprovalInput): z.input<typeof ApprovalViewSchema> => {
-        const self = approval.askedBy?.includes(caller) === true
+        const self = isSelf(approval)
+        const deploy = approval.action?.kind === "deploy"
         return {
             approval,
             who: {agent: "claude-code", model: "claude-opus-5-5"},
-            what: {command: "gh pr merge 6 --squash"},
-            gate: {workflowName: "Release", label: "Merge to main"},
+            what: {command: deploy ? "ostrom deploy --env production" : "gh pr merge 6 --squash"},
+            gate: {workflowName: "Release", label: deploy ? "Deploy to production" : "Merge to main"},
             you: self
                 ? {login: caller, self, canApprove: false, reason: "You asked for this action: another approver must say yes"}
                 : {login: caller, self, canApprove: true},
@@ -90,7 +103,8 @@ export function createMockServer(): MockServer {
             return refusal(409, "shown_digest_mismatch", "The request changed since it was shown")
         }
         if (approval.status !== "pending") return refusal(409, "conflict", "This gate was already answered.")
-        if (body.data.answer === "approve" && approval.askedBy?.includes(caller) === true) {
+        // The server's order: the shown digest and the status first, then who may say yes, then a fresh sign-in.
+        if (body.data.answer === "approve" && isSelf(approval)) {
             return refusal(403, "self_approval_refused", "You asked for this action: another approver must say yes")
         }
         if (body.data.answer === "approve" && approval.id === fixtures.stepUpApproval.id) {
@@ -186,8 +200,10 @@ export function createMockServer(): MockServer {
         handle(request) {
             for (const {method, path, respond} of routes) {
                 const match = method === request.method ? path.exec(request.path) : null
+                if (match === null) continue
                 // Routes without an id have no group: their id is empty, and unused.
-                if (match !== null) return respond(request, decodeURIComponent(match[1] ?? ""))
+                const id = idOf(match[1] ?? "")
+                return id === undefined ? refusal(404, "not_found", "No such request") : respond(request, id)
             }
             return refusal(404, "not_found", "No such route")
         },

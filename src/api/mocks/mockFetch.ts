@@ -1,30 +1,27 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type {MockServer} from "./mockServer"
 
-/** The address of a call, whatever form `fetch` was given it in. */
-function urlOf(input: string | URL | Request): URL {
-    if (typeof input === "string") return new URL(input)
-    return input instanceof URL ? input : new URL(input.url)
+/** A body read as JSON, or nothing when the call has none. */
+function jsonOf(text: string): unknown {
+    return text === "" ? undefined : JSON.parse(text)
 }
 
 /**
  * A `fetch` answered by the in-memory server, without any network: what the E2E build talks to, since no Ostrom
- * server runs on the CI runner. Only the JSON bodies the app sends are read.
+ * server runs on the CI runner. The call is read as a `Request`, whatever form it came in.
  */
 export function mockFetch(server: MockServer): typeof fetch {
-    return (input, init) => {
-        const url = urlOf(input)
-        const raw = init?.body
+    return async (input, init) => {
+        const request = new Request(input, init)
+        const url = new URL(request.url)
         const answer = server.handle({
-            method: init?.method ?? "GET",
+            method: request.method,
             path: url.pathname,
             query: Object.fromEntries(url.searchParams),
-            body: typeof raw === "string" ? JSON.parse(raw) : undefined,
+            body: jsonOf(await request.text()),
         })
-        return Promise.resolve(
-            answer.status === 204
-                ? new Response(null, {status: 204})
-                : new Response(JSON.stringify(answer.body), {status: answer.status, headers: {"content-type": "application/json"}}),
-        )
+        return answer.status === 204
+            ? new Response(null, {status: 204})
+            : new Response(JSON.stringify(answer.body), {status: answer.status, headers: {"content-type": "application/json"}})
     }
 }
