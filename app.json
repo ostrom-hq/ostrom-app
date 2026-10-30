@@ -14,7 +14,18 @@
       "package": "run.ostrom.app",
       "predictiveBackGestureEnabled": false
     },
-    "plugins": ["expo-router", "expo-localization"],
+    "plugins": [
+      "expo-router",
+      "expo-localization",
+      "expo-secure-store",
+      "expo-web-browser",
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Ostrom uses Face ID to confirm that you are the one saying yes or no."
+        }
+      ]
+    ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
