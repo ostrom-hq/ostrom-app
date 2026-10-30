@@ -79,7 +79,7 @@ export function InboxScreen(): React.JSX.Element {
                     ListEmptyComponent={<Text style={[styles.body, {color: colors.textMuted}]}>{t("inbox.empty")}</Text>}
                     // What was answered lately comes after what waits, under its own heading: it only opens.
                     ListFooterComponent={
-                        state.recent.length === 0 ? null : (
+                        state.recent.length === 0 ? undefined : (
                             <View style={styles.recent}>
                                 <Text accessibilityRole="header" style={[styles.recentTitle, {color: colors.textMuted}]}>
                                     {t("inbox.recent")}

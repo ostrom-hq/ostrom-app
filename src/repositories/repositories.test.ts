@@ -43,7 +43,8 @@ describe("ApprovalsRepositoryImpl", () => {
         expect(queue.pending.map((view) => view.approval.id)).toEqual(["appr_0001", "appr_0002", "appr_0003"])
         expect(queue.recent.map((view) => view.approval.id)).toEqual(["appr_0000"])
         // My own request is mine, and not mine to approve: the server says why.
-        expect(queue.pending[1]?.you).toMatchObject({self: true, canApprove: false, reason: expect.any(String) as unknown})
+        expect(queue.pending[1]?.you).toMatchObject({self: true, canApprove: false})
+        expect(queue.pending[1]?.you.reason).toMatch(/another approver/)
     })
 
     it("reads one request with its evidence, commits and checks, and who asks through which gate", async () => {
@@ -185,10 +186,10 @@ describe("SpendingRepositoryImpl", () => {
 })
 
 describe("createMockApi", () => {
-    it("lists every request when no status is asked", async () => {
-        const raw = await fetch(`${MOCK_BASE_URL}/api/v1/approvals`)
+    it("serves the yes queue as the contract shapes it", async () => {
+        const raw = await fetch(`${MOCK_BASE_URL}/api/v1/approvals/queue`)
         const body: unknown = await raw.json()
-        expect(body).toMatchObject({items: [{id: "appr_0001"}, {id: "appr_0002"}, {id: "appr_0000"}]})
+        expect(body).toMatchObject({operator: "rev-b", you: {login: "rev-b", via: "app"}, recent: [{approval: {id: "appr_0000"}}]})
     })
 
     it("serves another origin when asked", async () => {

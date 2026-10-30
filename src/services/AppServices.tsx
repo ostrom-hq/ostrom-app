@@ -60,7 +60,7 @@ function refuse(): Promise<never> {
 export const SIGNED_OUT_REPOSITORIES: Repositories = {
     account: {me: refuse, exchangeCode: refuse, logout: refuse},
     activity: {page: refuse},
-    approvals: {waiting: refuse, approval: refuse, answer: refuse},
+    approvals: {queue: refuse, view: refuse, answer: refuse},
     notifications: {registerDevice: refuse, unregisterDevice: refuse, settings: refuse, saveSettings: refuse},
     receipts: {list: refuse, get: refuse, keys: refuse},
     spending: {report: refuse},
