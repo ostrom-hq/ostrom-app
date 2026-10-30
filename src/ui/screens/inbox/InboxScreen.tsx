@@ -71,10 +71,9 @@ export function InboxScreen(): React.JSX.Element {
             )
             break
         case "ready": {
-            const sections: readonly SectionListData<AskRowModel, InboxSection>[] = [
-                {key: "pending", title: t("inbox.title"), data: state.pending},
-                ...(state.recent.length > 0 ? [{key: "recent", title: t("inbox.recent"), data: state.recent}] : []),
-            ]
+            const pending: SectionListData<AskRowModel, InboxSection> = {key: "pending", title: t("inbox.title"), data: state.pending}
+            const recent: SectionListData<AskRowModel, InboxSection> = {key: "recent", title: t("inbox.recent"), data: state.recent}
+            const sections = state.recent.length > 0 ? [pending, recent] : [pending]
             body = (
                 <SectionList<AskRowModel, InboxSection>
                     sections={sections}
