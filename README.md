@@ -89,7 +89,9 @@ same one the unit tests use, through the real HTTP client, repositories and scre
 fingerprint and push are replaced, since the emulator has none of them. `metro.config.js` swaps the services only for
 that build, and the `ci` job proves it: `scripts/check-store-bundle.sh` exports the production bundles as a store build
 makes them and fails on any trace of the mock (msw, the build flag, the mock's names and strings), then requires those
-strings in the E2E bundle, so that the search is known to see them.
+strings in the E2E bundle, so that the search is known to see them. `scripts/run-maestro.sh` runs the flows one at a
+time once the emulator has booted; a flow that fails is run once more from a clean state, with a warning in the run
+(the CI emulator sometimes goes offline for a moment), and a flow that fails twice fails the job.
 
 | Flow | What it proves | Status |
 | --- | --- | --- |

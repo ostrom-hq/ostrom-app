@@ -75,12 +75,12 @@ jobs:
           disk-size: 4096M
           script: |
             adb install android/app/build/outputs/apk/release/app-release.apk
-            maestro test --format junit --output maestro-report.xml --test-output-dir maestro-output .maestro/
+            scripts/run-maestro.sh
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: maestro-report
           path: |
-            maestro-report.xml
+            maestro-report-*.xml
             maestro-output/
           if-no-files-found: ignore
