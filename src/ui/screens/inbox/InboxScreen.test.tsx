@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import {QueryClientProvider} from "@tanstack/react-query"
-import {fireEvent, screen} from "@testing-library/react-native"
+import {fireEvent, screen, within} from "@testing-library/react-native"
 import {renderRouter} from "expo-router/testing-library"
 import type {ReactNode} from "react"
 import type {Ask, YesQueue} from "@/api/contract/yes"
@@ -37,7 +37,8 @@ describe("InboxScreen", () => {
             }),
         )
         expect(await screen.findByText("Merge PR #6 into main")).toBeOnTheScreen()
-        expect(screen.getByText("acme/acme-api · dev-a")).toBeOnTheScreen()
+        // The pending request and the decided one share their repository and asker: the line is read inside its row.
+        expect(within(screen.getByRole("button", {name: "Merge PR #6 into main"})).getByText("acme/acme-api · dev-a")).toBeOnTheScreen()
         expect(screen.getByText("Your request")).toBeOnTheScreen()
         expect(screen.getByText("Recently decided")).toBeOnTheScreen()
         expect(screen.getByText("Push to main on acme-api")).toBeOnTheScreen()
