@@ -16,7 +16,7 @@
     "test": "jest",
     "test:ci": "jest --ci --coverage",
     "check": "npm run typecheck && npm run lint && npm run test",
-    "gen:api": "npx --yes @hey-api/openapi-ts@0.99.0",
+    "gen:api": "npx --yes -p typescript@6.0.3 -p @hey-api/openapi-ts@0.99.0 openapi-ts",
     "gen:check": "npm run gen:api && git diff --exit-code -- src/api/gen && test -z \"$(git status --porcelain -- src/api/gen)\""
   },
   "dependencies": {
