@@ -68,9 +68,10 @@ describe("HistoryScreen", () => {
     })
 
     it("never claims a verification with a key the server did not announce", async () => {
+        // The key's PEM is the instance key, but the server names it another id: it is left out.
         await show(
-            jest.fn(() => Promise.resolve(golden)),
-            jest.fn(() => Promise.resolve({...served, kid: "another-key"})),
+            jest.fn(() => page(golden)),
+            jest.fn(() => Promise.resolve(served.map((key) => ({...key, kid: "another-key"})))),
         )
         expect((await screen.findAllByText("Not verified: the instance key is unavailable")).length).toBe(golden.length)
     })
