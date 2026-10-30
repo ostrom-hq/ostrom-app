@@ -28,6 +28,7 @@ function response(data: Record<string, unknown>): Notifications.NotificationResp
         data,
         categoryIdentifier: null,
         sound: null,
+        threadIdentifier: null,
     }
     return {
         actionIdentifier: "expo.modules.notifications.actions.DEFAULT",

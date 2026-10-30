@@ -31,19 +31,22 @@ function lineOf(check: ReceiptCheck, t: ReturnType<typeof useTranslation>["t"], 
 function ReceiptRow({row}: {row: ReceiptRowModel}): React.JSX.Element {
     const {t, i18n} = useTranslation()
     const {colors} = useTheme()
+    const style = [styles.row, {backgroundColor: colors.surface, borderColor: colors.border}]
+    if (!row.readable) {
+        return (
+            <View style={style} testID={`receipt-${row.key}`}>
+                <Text style={[styles.rowTitle, {color: colors.text}]}>{t("history.unreadable")}</Text>
+                <CheckLine check={row.check} />
+            </View>
+        )
+    }
     const result = row.result === "approved" || row.result === "rejected" ? t(`status.${row.result}`) : row.result
-    const title = !row.readable
-        ? t("history.unreadable")
-        : result === undefined
-          ? t("history.signed", {who: row.by})
-          : t("history.decided", {result, who: row.by})
+    const title = result === undefined ? t("history.signed", {who: row.by}) : t("history.decided", {result, who: row.by})
     return (
-        <View style={[styles.row, {backgroundColor: colors.surface, borderColor: colors.border}]} testID={`receipt-${row.key}`}>
+        <View style={style} testID={`receipt-${row.key}`}>
             <Text style={[styles.rowTitle, {color: colors.text}]}>{title}</Text>
-            {row.subject === undefined ? null : <Text style={[styles.detail, {color: colors.textMuted}]}>{row.subject}</Text>}
-            {row.at === undefined ? null : (
-                <Text style={[styles.detail, {color: colors.textMuted}]}>{formatDateTime(row.at, i18n.language)}</Text>
-            )}
+            <Text style={[styles.detail, {color: colors.textMuted}]}>{row.subject}</Text>
+            <Text style={[styles.detail, {color: colors.textMuted}]}>{formatDateTime(row.at, i18n.language)}</Text>
             <CheckLine check={row.check} />
         </View>
     )

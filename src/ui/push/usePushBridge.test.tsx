@@ -17,7 +17,7 @@ function AskStub(): React.JSX.Element {
     return <Text>request</Text>
 }
 
-async function launch(launchData: unknown): Promise<{router: ReturnType<typeof renderRouter>; tap: (data: unknown) => void; unsubscribe: jest.Mock}> {
+async function launch(launchData: unknown): Promise<{router: Awaited<ReturnType<typeof renderRouter>>; tap: (data: unknown) => void; unsubscribe: jest.Mock}> {
     let tap: (data: unknown) => void = () => undefined
     const unsubscribe = jest.fn()
     const services = await signedInServices({

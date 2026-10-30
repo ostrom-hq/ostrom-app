@@ -103,7 +103,6 @@ describe("HistoryScreen", () => {
 describe("toReceiptRow", () => {
     it("dates a receipt without decision by its creation", () => {
         const row = toReceiptRow({readable: true, raw: {}, view: view({decisions: [], createdAt: "2026-10-29T10:00:00.000Z"})}, 0, {kind: "no-key"})
-        expect(row.at).toBe("2026-10-29T10:00:00.000Z")
-        expect(row.result).toBeUndefined()
+        expect(row).toMatchObject({readable: true, at: "2026-10-29T10:00:00.000Z", result: undefined})
     })
 })
