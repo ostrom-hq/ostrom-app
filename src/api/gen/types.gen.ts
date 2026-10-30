@@ -2211,6 +2211,13 @@ export type StartSessionRequest = {
 };
 
 /**
+ * 403 step_up_required: a yes needs a sign-in less than 5 minutes old (a sign-in of unknown age is refused too); sign in again, then answer. A no never needs it
+ */
+export type StepUpRequired = {
+    error: ErrorDetail;
+};
+
+/**
  * A list of strings suggested by the analysis, with what proves it
  */
 export type StringListSuggestion = {
@@ -5663,9 +5670,9 @@ export type AnswerApprovalErrors = {
      */
     401: ApiError;
     /**
-     * self_approval_refused, or not an approver
+     * self_approval_refused, step_up_required, or not an approver (the key is `error.type`)
      */
-    403: SelfApprovalRefused;
+    403: SelfApprovalRefused | StepUpRequired;
     /**
      * A refusal
      */
@@ -12816,3 +12823,40 @@ export type ReceiveStripeWebhookResponses = {
 };
 
 export type ReceiveStripeWebhookResponse = ReceiveStripeWebhookResponses[keyof ReceiveStripeWebhookResponses];
+
+export type ReceiveStripeWebhookAliasData = {
+    /**
+     * A Stripe event, as Stripe sends it
+     */
+    body: {
+        [key: string]: unknown;
+    };
+    headers: {
+        'Stripe-Signature': string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/v1/billing/stripe/webhook';
+};
+
+export type ReceiveStripeWebhookAliasErrors = {
+    /**
+     * A refusal
+     */
+    400: ApiError;
+    /**
+     * A refusal
+     */
+    413: ApiError;
+};
+
+export type ReceiveStripeWebhookAliasError = ReceiveStripeWebhookAliasErrors[keyof ReceiveStripeWebhookAliasErrors];
+
+export type ReceiveStripeWebhookAliasResponses = {
+    /**
+     * OK
+     */
+    200: BillingWebhookAck;
+};
+
+export type ReceiveStripeWebhookAliasResponse = ReceiveStripeWebhookAliasResponses[keyof ReceiveStripeWebhookAliasResponses];

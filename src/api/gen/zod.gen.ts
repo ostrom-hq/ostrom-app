@@ -1772,6 +1772,13 @@ export const zStartSessionRequest = z.object({
 });
 
 /**
+ * 403 step_up_required: a yes needs a sign-in less than 5 minutes old (a sign-in of unknown age is refused too); sign in again, then answer. A no never needs it
+ */
+export const zStepUpRequired = z.object({
+    error: zErrorDetail
+});
+
+/**
  * A list of strings suggested by the analysis, with what proves it
  */
 export const zStringListSuggestion = z.object({
@@ -4771,3 +4778,17 @@ export const zReceiveStripeWebhookHeaders = z.object({
  * OK
  */
 export const zReceiveStripeWebhookResponse = zBillingWebhookAck;
+
+/**
+ * A Stripe event, as Stripe sends it
+ */
+export const zReceiveStripeWebhookAliasBody = z.record(z.string(), z.unknown());
+
+export const zReceiveStripeWebhookAliasHeaders = z.object({
+    'Stripe-Signature': z.string()
+});
+
+/**
+ * OK
+ */
+export const zReceiveStripeWebhookAliasResponse = zBillingWebhookAck;
