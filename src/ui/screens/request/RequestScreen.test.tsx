@@ -4,6 +4,7 @@ import type {Approval, ApprovalAnswer, ApprovalView} from "@/api/contract/approv
 import {ApiError} from "@/api/http/ApiError"
 import type {ApprovalsRepository} from "@/repositories/ApprovalsRepository"
 import type {BiometricOutcome} from "@/services/biometrics/BiometricGate"
+import type {UnlockOutcome} from "@/services/unlock/PhoneUnlock"
 import {approvals, fakeRepositories, signedInServices, viewOf} from "@/test/fakeServices"
 import {renderWithServices} from "@/test/renderWithServices"
 import {RequestScreen} from "./RequestScreen"
@@ -185,6 +186,20 @@ describe("RequestScreen", () => {
         const {answer} = await open(approvals.pending, {outcome: "unavailable"})
         await fireEvent.press(screen.getByRole("button", {name: "Approve"}))
         expect(await screen.findByText("Set up Face ID, a fingerprint or a passcode on this phone to answer from it.")).toBeOnTheScreen()
+        expect(answer).not.toHaveBeenCalled()
+    })
+
+    it("sends nothing when the server does not take this phone's unlock, and says to sign in again", async () => {
+        const answer = jest.fn()
+        const unlock = jest.fn(() => Promise.resolve<UnlockOutcome>("refused"))
+        const services = await signedInServices({
+            unlock: {keep: jest.fn(), unlock, forget: jest.fn()},
+            repositories: fakeRepositories({approvals: {queue: jest.fn(), view: () => Promise.resolve(viewOf(approvals.pending)), answer}}),
+        })
+        await renderWithServices(<RequestScreen id="appr_0001" />, services)
+        await fireEvent.press(await screen.findByRole("button", {name: "Approve"}))
+        expect(await screen.findByText(/Ostrom did not take this phone's proof that it is you/)).toBeOnTheScreen()
+        expect(unlock).toHaveBeenCalledWith(expect.stringContaining("Merge PR #6"), expect.anything(), {always: true})
         expect(answer).not.toHaveBeenCalled()
     })
 

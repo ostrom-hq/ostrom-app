@@ -1,5 +1,13 @@
 import {z} from "zod"
-import {type Me, MeSchema, type SessionToken, SessionTokenSchema, type TokenExchangeRequest} from "@/api/contract/account"
+import {
+    type Me,
+    MeSchema,
+    type SessionToken,
+    SessionTokenSchema,
+    type TokenExchangeRequest,
+    type Unlock,
+    UnlockSchema,
+} from "@/api/contract/account"
 import {type MyOrganization, MyOrganizationsSchema} from "@/api/contract/organizations"
 import type {HttpClient} from "@/api/http/HttpClient"
 import type {AccountRepository} from "./AccountRepository"
@@ -18,6 +26,10 @@ export class AccountRepositoryImpl implements AccountRepository {
 
     exchangeCode(request: TokenExchangeRequest): Promise<SessionToken> {
         return this.http.send({method: "POST", path: "/api/v1/auth/mobile/token", body: request, response: SessionTokenSchema})
+    }
+
+    unlock(unlockKey: string): Promise<Unlock> {
+        return this.http.send({method: "POST", path: "/api/v1/auth/mobile/unlock", body: {unlockKey}, response: UnlockSchema})
     }
 
     /** Whatever the server answers with a success (204, `{}`) means the token is revoked. */

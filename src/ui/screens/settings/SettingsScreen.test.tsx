@@ -18,6 +18,7 @@ interface Harness {
     readonly registerDevice: jest.Mock<Promise<Device>, [DeviceRegistration]>
     readonly unregisterDevice: jest.Mock<Promise<void>, [string]>
     readonly logout: jest.Mock<Promise<void>, []>
+    readonly forget: jest.Mock<Promise<void>, []>
 }
 
 async function open({
@@ -26,12 +27,14 @@ async function open({
     save,
     unregister = () => Promise.resolve(),
     revoke = () => Promise.resolve(),
+    forgetKey = () => Promise.resolve(),
 }: {
     permission?: PushPermission
     refuseSave?: boolean
     save?: (settings: NotificationSettings) => Promise<NotificationSettings>
     unregister?: (id: string) => Promise<void>
     revoke?: () => Promise<void>
+    forgetKey?: () => Promise<void>
 } = {}): Promise<Harness> {
     const saveSettings = jest.fn(
         save ??
@@ -43,13 +46,16 @@ async function open({
     )
     const unregisterDevice = jest.fn(unregister)
     const logout = jest.fn(revoke)
+    const forget = jest.fn(forgetKey)
     const services = await signedInServices({
+        unlock: {keep: jest.fn(), unlock: jest.fn(), forget},
         push: {register: () => Promise.resolve(permission), onOpen: () => () => undefined, launchData: () => Promise.resolve(undefined)},
         repositories: fakeRepositories({
             account: {
                 me: jest.fn(),
                 organizations: () => Promise.resolve([{id: "org_acme", name: "acme"}]),
                 exchangeCode: jest.fn(),
+                unlock: jest.fn(),
                 logout,
             },
             notifications: {registerDevice, unregisterDevice, settings: () => Promise.resolve(initial), saveSettings},
@@ -57,7 +63,7 @@ async function open({
     })
     await renderWithServices(<SettingsScreen />, services)
     await screen.findByRole("switch", {name: "A request waits for my yes"})
-    return {services, saveSettings, registerDevice, unregisterDevice, logout}
+    return {services, saveSettings, registerDevice, unregisterDevice, logout, forget}
 }
 
 const granted: PushPermission = {kind: "granted", address: {pushToken: "ExponentPushToken[abc]", platform: "ios"}}
@@ -147,7 +153,7 @@ describe("SettingsScreen", () => {
     })
 
     it("signs out, stops push on this phone, then revokes the token on the server", async () => {
-        const {services, unregisterDevice, logout} = await open({permission: granted})
+        const {services, unregisterDevice, logout, forget} = await open({permission: granted})
         await screen.findByText("This phone receives Ostrom notifications.")
         await fireEvent.press(screen.getByRole("button", {name: "Sign out"}))
         await waitFor(() => {
@@ -158,6 +164,8 @@ describe("SettingsScreen", () => {
         })
         expect(unregisterDevice).toHaveBeenCalledWith("dev_1")
         expect(unregisterDevice.mock.invocationCallOrder[0]).toBeLessThan(logout.mock.invocationCallOrder[0] ?? 0)
+        // The unlock key goes with the token.
+        expect(forget).toHaveBeenCalledTimes(1)
     })
 
     it("signs out at once, without waiting for the server", async () => {
@@ -173,7 +181,7 @@ describe("SettingsScreen", () => {
 
     it("signs out even when the server refuses both calls", async () => {
         const offline = (): Promise<void> => Promise.reject(new ApiError({kind: "network"}))
-        const {services, logout} = await open({permission: granted, unregister: offline, revoke: offline})
+        const {services, logout} = await open({permission: granted, unregister: offline, revoke: offline, forgetKey: offline})
         await screen.findByText("This phone receives Ostrom notifications.")
         await fireEvent.press(screen.getByRole("button", {name: "Sign out"}))
         await waitFor(() => {

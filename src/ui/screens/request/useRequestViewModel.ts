@@ -4,7 +4,7 @@ import {useTranslation} from "react-i18next"
 import {type Approval, type ApprovalAnswer, type ApprovalView, needsBiometrics, phoneMayApprove} from "@/api/contract/approvals"
 import {isOrgRequired} from "@/api/http/ApiError"
 import {useAnswer, useApprovalView} from "@/query/approvals"
-import {useServices} from "@/services/AppServices"
+import {useRepositories, useServices} from "@/services/AppServices"
 import {biometricProblem, type DecisionProblem, decisionProblem} from "./decisionProblem"
 
 export type RequestScreenState =
@@ -87,7 +87,8 @@ interface ConsoleLinkState {
 
 export function useRequestViewModel(id: string): RequestViewModel {
     const {t} = useTranslation()
-    const {biometrics, openUrl, copyText, sessionStore} = useServices()
+    const {unlock, openUrl, copyText, sessionStore} = useServices()
+    const {account} = useRepositories()
     // Tagged with the screen it was asked from: a link that failed on the error screen means nothing once the request
     // loads (a refetch on focus, a late rejection after "Try again"), and the other way round.
     const [consoleLink, setConsoleLink] = useState<ConsoleLinkState>()
@@ -119,12 +120,13 @@ export function useRequestViewModel(id: string): RequestViewModel {
             setProblem(undefined)
             setConsoleLink(undefined)
             void (async () => {
-                // Biometrics unless the contract says the action is low risk (`needsBiometrics`).
-                const outcome = needsBiometrics(approval)
-                    ? await biometrics.confirm(
-                          t(answer === "approve" ? "request.confirm.approve" : "request.confirm.decline", {title: approval.title}),
-                      )
-                    : "confirmed"
+                // Biometrics unless the contract says the action is low risk (`needsBiometrics`), and then proven to
+                // the server; a low-risk answer asks them only when the last unlock is too old for the server.
+                const outcome = await unlock.unlock(
+                    t(answer === "approve" ? "request.confirm.approve" : "request.confirm.decline", {title: approval.title}),
+                    account,
+                    {always: needsBiometrics(approval)},
+                )
                 if (outcome === "confirmed") {
                     try {
                         // Not changed: what is on screen is what the person read, digest included.
@@ -141,7 +143,7 @@ export function useRequestViewModel(id: string): RequestViewModel {
                 setSending(undefined)
             })()
         },
-        [approval, open, mayApprove, pinned, changed, biometrics, t, mutateAsync, askedByMe],
+        [approval, open, mayApprove, pinned, changed, unlock, account, t, mutateAsync, askedByMe],
     )
 
     const state: RequestScreenState =

@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import {ApiError} from "@/api/http/ApiError"
-import type {BiometricOutcome} from "@/services/biometrics/BiometricGate"
+import type {UnlockOutcome} from "@/services/unlock/PhoneUnlock"
 
 /** Why a yes or a no did not go through, as the person reads it. */
 export type DecisionProblem =
     /** No biometrics and no passcode on this phone: it cannot be the one that says yes. */
     | "biometrics-unavailable"
     | "biometrics-failed"
+    /** The server did not take this phone's unlock key: signing in again gives a new one. */
+    | "unlock-refused"
     /** The yes needs a sign-in less than 5 minutes old: the console, just opened on the request, takes it. */
     | "step-up"
     /** The person asked for this, and someone else can approve it: the server never takes that yes. */
@@ -22,8 +24,15 @@ export type DecisionProblem =
     | "session-expired"
     | "failed"
 
-export function biometricProblem(outcome: Exclude<BiometricOutcome, "confirmed" | "cancelled">): DecisionProblem {
-    return outcome === "unavailable" ? "biometrics-unavailable" : "biometrics-failed"
+export function biometricProblem(outcome: Exclude<UnlockOutcome, "confirmed" | "cancelled">): DecisionProblem {
+    switch (outcome) {
+        case "unavailable":
+            return "biometrics-unavailable"
+        case "refused":
+            return "unlock-refused"
+        case "failed":
+            return "biometrics-failed"
+    }
 }
 
 /**

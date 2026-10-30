@@ -185,6 +185,7 @@ export const en = {
         problems: {
             "biometrics-unavailable": "Set up Face ID, a fingerprint or a passcode on this phone to answer from it.",
             "biometrics-failed": "Your identity could not be confirmed. Nothing was sent.",
+            "unlock-refused": "Ostrom did not take this phone's proof that it is you. Nothing was sent: sign out, then sign in again.",
             "step-up": "Ostrom wants a fresh sign-in for this yes: confirm it in the console.",
             "org-required":
                 "You are a member of several organizations, and Ostrom needs to know which one this answer is for: choose it in Settings, or answer in the console.",

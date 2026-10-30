@@ -30,6 +30,23 @@ describe("LoginScreen", () => {
         expect(signIn).toHaveBeenCalledWith("https://app.ostrom.run")
     })
 
+    it.each([
+        ["keeps", () => Promise.resolve()],
+        ["cannot keep", () => Promise.reject(new Error("no biometrics"))],
+    ])("%s the unlock key of the sign-in behind the biometrics, and signs in", async (_case: string, keeping: () => Promise<void>) => {
+        const keep = jest.fn((_key: string) => keeping())
+        const services = fakeServices({
+            signIn: {signIn: () => Promise.resolve({kind: "signed-in", session: testSession, unlockKey: "key-1"})},
+            unlock: {keep, unlock: jest.fn(), forget: jest.fn()},
+        })
+        await renderLogin(services)
+        await fireEvent.press(screen.getByRole("button", {name: "Continue with GitHub"}))
+        await waitFor(() => {
+            expect(services.sessionStore.getState().state).toEqual({status: "signed-in", session: testSession})
+        })
+        expect(keep).toHaveBeenCalledWith("key-1")
+    })
+
     it("signs in on a self-hosted server", async () => {
         const {signIn, services} = setup({kind: "cancelled"})
         await renderLogin(services)

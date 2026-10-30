@@ -13,6 +13,12 @@ describe("createMockServer", () => {
     })
 })
 
+describe("createMockServer and the phone unlock", () => {
+    it.each([undefined, null, {}, {unlockKey: "another-key"}])("refuses an unlock without the key it gave: %p", (body) => {
+        expect(createMockServer().handle({method: "POST", path: "/api/v1/auth/mobile/unlock", query: {}, body}).status).toBe(403)
+    })
+})
+
 describe("createMockServer and Ostrom-Org", () => {
     const get = (path: string, org?: string): {method: string; path: string; query: Record<string, string>; body: undefined; org?: string} =>
         org === undefined ? {method: "GET", path, query: {}, body: undefined} : {method: "GET", path, query: {}, body: undefined, org}

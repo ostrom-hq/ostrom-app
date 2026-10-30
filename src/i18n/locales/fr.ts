@@ -186,6 +186,7 @@ export const fr: TranslationShape = {
         problems: {
             "biometrics-unavailable": "Active Face ID, une empreinte ou un code sur ce téléphone pour répondre depuis lui.",
             "biometrics-failed": "Ton identité n'a pas pu être confirmée. Rien n'est parti.",
+            "unlock-refused": "Ostrom n'a pas pris la preuve que c'est toi sur ce téléphone. Rien n'est parti : déconnecte-toi, puis reconnecte-toi.",
             "step-up": "Ostrom veut une connexion récente pour ce oui : confirme-le dans la console.",
             "org-required":
                 "Tu es membre de plusieurs organisations, et Ostrom doit savoir pour laquelle est cette réponse : choisis-la dans les Réglages, ou réponds dans la console.",

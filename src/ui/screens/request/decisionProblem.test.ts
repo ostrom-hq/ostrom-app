@@ -34,5 +34,6 @@ describe("decisionProblem", () => {
     it("maps biometric outcomes", () => {
         expect(biometricProblem("unavailable")).toBe("biometrics-unavailable")
         expect(biometricProblem("failed")).toBe("biometrics-failed")
+        expect(biometricProblem("refused")).toBe("unlock-refused")
     })
 })

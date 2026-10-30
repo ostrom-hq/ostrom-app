@@ -1,4 +1,4 @@
-import type {z} from "zod"
+import {z} from "zod"
 import {zAuthUser, zMe, type zMobileTokenBody, zMobileTokenResponse} from "@/api/gen/zod.gen"
 
 export const UserSchema = zAuthUser
@@ -14,5 +14,13 @@ export type Me = z.output<typeof zMe>
  */
 export type TokenExchangeRequest = z.output<typeof zMobileTokenBody>
 
-export const SessionTokenSchema = zMobileTokenResponse
-export type SessionToken = z.output<typeof zMobileTokenResponse>
+/**
+ * With the `unlockKey` server#75 adds, not in the contract copy yet (CORE-CONTRAT ports it after that merge): the key
+ * the app keeps behind the biometrics and presents to `POST /auth/mobile/unlock` before an answer.
+ */
+export const SessionTokenSchema = zMobileTokenResponse.extend({unlockKey: z.string().min(1).optional()})
+export type SessionToken = z.output<typeof SessionTokenSchema>
+
+/** `POST /api/v1/auth/mobile/unlock` (server#75, written by hand until the contract has `unlockMobileApp`). */
+export const UnlockSchema = z.object({authenticatedAt: z.string()})
+export type Unlock = z.output<typeof UnlockSchema>

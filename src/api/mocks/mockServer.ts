@@ -12,6 +12,9 @@ import * as fixtures from "./fixtures"
 
 type ApprovalInput = z.input<typeof ApprovalSchema>
 
+/** The unlock key the mock server gives with its token, and takes back. */
+export const MOCK_UNLOCK_KEY = "mock-unlock-key"
+
 /** A call as the mock server reads it: the method, the path under the origin, its query, and the parsed JSON body. */
 export interface MockRequest {
     readonly method: string
@@ -166,9 +169,15 @@ export function createMockServer({memberships = [fixtures.acme.id]}: MockServerO
             ({body}) => {
                 const parsed = zMobileTokenBody.safeParse(body)
                 return parsed.success && parsed.data.code === "good-code"
-                    ? ok({token: "ost_mock_token", user: {login: caller}})
+                    ? ok({token: "ost_mock_token", user: {login: caller}, unlockKey: MOCK_UNLOCK_KEY})
                     : refusal(400, "invalid_request", "Unknown code")
             },
+        ),
+        // server#75: the key of the exchange, presented after the phone's biometrics.
+        route("POST", "/api/v1/auth/mobile/unlock", ({body}) =>
+            typeof body === "object" && body !== null && "unlockKey" in body && body.unlockKey === MOCK_UNLOCK_KEY
+                ? ok({authenticatedAt: new Date().toISOString()})
+                : refusal(403, "forbidden", "This key does not unlock this token"),
         ),
         route("POST", "/api/v1/auth/logout", () => ({status: 204})),
         route(

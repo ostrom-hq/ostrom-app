@@ -17,7 +17,7 @@ async function open(
     const services = await signedInServices({
         storage,
         repositories: fakeRepositories({
-            account: {me: jest.fn(), organizations, exchangeCode: jest.fn(), logout: jest.fn()},
+            account: {me: jest.fn(), organizations, exchangeCode: jest.fn(), unlock: jest.fn(), logout: jest.fn()},
         }),
     })
     const client = testQueryClient()

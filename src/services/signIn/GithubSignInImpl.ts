@@ -55,7 +55,8 @@ export class GithubSignInImpl implements GithubSignIn {
                 .exchangeCode({code: callback.data.code, codeVerifier: pkce.verifier, redirectUri: REDIRECT_URI})
             const session = {serverUrl, token: token.token, user: token.user}
             const orgId = await this.orgOf(serverUrl, token.token)
-            return {kind: "signed-in", session: orgId === undefined ? session : {...session, orgId}}
+            const signedIn = {kind: "signed-in", session: orgId === undefined ? session : {...session, orgId}} as const
+            return token.unlockKey === undefined ? signedIn : {...signedIn, unlockKey: token.unlockKey}
         } catch {
             return {kind: "failed", reason: "exchange-failed"}
         }

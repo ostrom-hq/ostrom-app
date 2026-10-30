@@ -82,10 +82,15 @@ describe("createMockAppServices", () => {
         expect(outcome).toEqual({
             kind: "signed-in",
             session: {serverUrl: "https://ostrom.e2e", token: "ost_mock_token", user: {login: "rev-b"}, orgId: "org_acme"},
+            unlockKey: "mock-unlock-key",
         })
         if (outcome.kind !== "signed-in") throw new Error("not signed in")
-        const queue = await services.repositoriesFor(outcome.session).approvals.queue()
+        const repositories = services.repositoriesFor(outcome.session)
+        const queue = await repositories.approvals.queue()
         expect(queue.pending.map((view) => view.approval.id)).toContain("appr_0004")
+        // The key of the sign-in unlocks against the in-memory server, as against the real one.
+        await services.unlock.keep(outcome.unlockKey ?? "")
+        expect(await services.unlock.unlock("Approve", repositories.account, {always: true})).toBe("confirmed")
     })
 
     it("confirms without a finger and has no push, as on the emulator", async () => {
