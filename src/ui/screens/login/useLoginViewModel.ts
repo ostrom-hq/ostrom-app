@@ -2,7 +2,8 @@
 import {useCallback, useState} from "react"
 import {useServices} from "@/services/AppServices"
 import type {SignInFailure} from "@/services/signIn/GithubSignIn"
-import {DEFAULT_SERVER_URL, normalizeServerUrl} from "./serverUrl"
+import {DEFAULT_SERVER_URL} from "@/config/env"
+import {normalizeServerUrl} from "./serverUrl"
 
 /** `unexpected`: the browser or the keychain failed outside the sign-in itself. */
 export type LoginError = "invalid-url" | "unexpected" | SignInFailure

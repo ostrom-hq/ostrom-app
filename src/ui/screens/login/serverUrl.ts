@@ -22,4 +22,3 @@ export function normalizeServerUrl(input: string): string | undefined {
     return url.origin
 }
 
-export const DEFAULT_SERVER_URL = "https://app.ostrom.run"
