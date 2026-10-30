@@ -1,0 +1,17 @@
+# Signed out on a new phone: the login screen, and an address that is not a server is refused.
+appId: run.ostrom.app
+---
+- launchApp:
+    clearState: true
+- assertVisible:
+    id: "login-github"
+- assertVisible: "Agents propose. People decide."
+- tapOn:
+    id: "login-server"
+- eraseText: 60
+- inputText: "http://ostrom.acme.dev"
+- hideKeyboard
+- tapOn:
+    id: "login-github"
+- assertVisible: "Enter the address of your Ostrom server, starting with https://."
+- takeScreenshot: login-refused
