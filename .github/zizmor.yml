@@ -5,3 +5,8 @@ rules:
   unpinned-uses:
     ignore:
       - ci.yml
+  # Temporary: ci.yml caches npm (setup-node) in a workflow that also runs on release tags. Drop the cache
+  # on tag runs, or split the release job, then remove this exception.
+  cache-poisoning:
+    ignore:
+      - ci.yml

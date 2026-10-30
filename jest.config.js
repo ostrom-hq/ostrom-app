@@ -37,7 +37,8 @@ module.exports = {
             // Some of them ship `.mjs` files (rettime): Babel transforms those too.
             transform: {"^.+\\.[cm]?[jt]sx?$": "babel-jest"},
             moduleFileExtensions: ["ts", "tsx", "js", "mjs", "cjs", "jsx", "json"],
-            transformIgnorePatterns: [`/node_modules/(?!(${esmOnly.join("|")})/)`],
+            // expo/virtual/env.js (ESM) is what babel-preset-expo turns `process.env.EXPO_PUBLIC_*` into.
+            transformIgnorePatterns: [`/node_modules/(?!(${[...esmOnly, "expo/virtual"].join("|")})/)`],
         },
     ],
 }
