@@ -1,4 +1,6 @@
+import {z} from "zod"
 import {
+    type Analytics,
     ANONYMOUS_ID_KEY,
     type AnalyticsEvent,
     type AnalyticsOptions,
@@ -33,7 +35,25 @@ interface Sent {
     readonly batch: AnalyticsEvent[]
 }
 
-function setup(overrides: Partial<AnalyticsOptions> = {}) {
+const BodySchema = z.object({
+    api_key: z.string(),
+    batch: z.array(
+        z.object({
+            event: z.string(),
+            distinct_id: z.string(),
+            timestamp: z.string(),
+            properties: z.record(z.string(), z.unknown()),
+        }),
+    ),
+})
+
+interface Setup {
+    readonly analytics: Analytics
+    readonly storage: MemoryStorage
+    readonly sent: Sent[]
+}
+
+function setup(overrides: Partial<AnalyticsOptions> = {}): Setup {
     const storage = new MemoryStorage()
     const sent: Sent[] = []
     let ids = 0
@@ -42,7 +62,7 @@ function setup(overrides: Partial<AnalyticsOptions> = {}) {
         host: `${DEFAULT_HOST}/`,
         storage,
         post: (url, body) => {
-            const parsed = JSON.parse(body) as {api_key: string; batch: AnalyticsEvent[]}
+            const parsed = BodySchema.parse(JSON.parse(body))
             sent.push({url, apiKey: parsed.api_key, batch: parsed.batch})
             return Promise.resolve()
         },
