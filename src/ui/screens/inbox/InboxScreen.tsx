@@ -76,7 +76,9 @@ export function InboxScreen(): React.JSX.Element {
                             ) : null}
                             {/* Why the refresh failed, when it is the organization: under the warning, not instead. */}
                             {state.orgRequired ? (
-                                <Text style={[styles.stale, {color: colors.danger}]}>{t("common.orgRequired")}</Text>
+                                <Text accessibilityRole="alert" style={[styles.stale, {color: colors.danger}]}>
+                                    {t("common.orgRequired")}
+                                </Text>
                             ) : null}
                         </View>
                     }

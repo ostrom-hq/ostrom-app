@@ -143,6 +143,8 @@ export function useRequestViewModel(id: string): RequestViewModel {
                     kind: "error",
                     orgRequired: isOrgRequired(query.error),
                     retry: () => {
+                        // A console link that did not open belongs to this attempt, not to the request read next.
+                        setConsoleLink(undefined)
                         void refetch()
                     },
                 }

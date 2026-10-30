@@ -26,7 +26,7 @@ export type InboxState =
           readonly recent: readonly RequestRowModel[]
           /** The last refresh failed: the rows are the last list read, perhaps out of date. */
           readonly stale: boolean
-          /** The failed refresh wants the organization named: said instead of "out of date". */
+          /** The failed refresh wants the organization named: said under "out of date", as the reason. */
           readonly orgRequired: boolean
       }
 

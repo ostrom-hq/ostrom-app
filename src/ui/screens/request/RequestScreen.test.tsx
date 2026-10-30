@@ -417,6 +417,11 @@ describe("RequestScreen", () => {
         await fireEvent.press(await screen.findByRole("button", {name: "Open the console"}))
         expect(openUrl).toHaveBeenCalledWith("https://ostrom.test/yes/appr_0001")
         expect(await screen.findByText("https://ostrom.test/yes/appr_0001")).toBeOnTheScreen()
+        // Trying again forgets the link of this attempt.
+        await fireEvent.press(screen.getByRole("button", {name: "Try again"}))
+        await waitFor(() => {
+            expect(screen.queryByText("https://ostrom.test/yes/appr_0001")).toBeNull()
+        })
         expect(screen.getByText("You are a member of several organizations, and Ostrom needs to know which one this is for. The app cannot choose yet: use the console for now.")).toBeOnTheScreen()
     })
 

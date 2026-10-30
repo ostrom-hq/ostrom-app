@@ -10,8 +10,9 @@ set -uo pipefail
 
 # Waits at most this long for each condition.
 LIMIT_SECONDS=180
-# What Maestro and adb print when the emulator, not the app, is the problem.
-OUTAGE='device offline|DeviceServerDiedException|host:transport|device not found|no devices/emulators found|adb: '
+# What Maestro and adb print when the emulator or Maestro's driver on it, not the app, is the problem. Read in the
+# flow's console only: Maestro's own log lists adb commands that worked, and a failed assertion prints none of these.
+OUTAGE='device offline|DeviceServerDiedException|device not found|no devices/emulators found|Maestro driver did not start up in time|Failed to connect to /127\.0\.0\.1:7001|UNAVAILABLE: io exception'
 
 until_ok() {
     local deadline=$((SECONDS + LIMIT_SECONDS))
@@ -47,21 +48,30 @@ run() {
 
 # The first attempt failed because the emulator went away, not because the app did.
 outage() {
-    local name="$1"
-    grep -rqsE "$OUTAGE" "maestro-output/$name-1.console" "maestro-output/$name-1"
+    grep -qsE "$OUTAGE" "maestro-output/$1-1.console"
 }
 
-steady
-maestro test --test-output-dir maestro-output/warm-up .maestro/common/warm-up.yaml \
-    || { adb reconnect offline; steady; maestro test --test-output-dir maestro-output/warm-up-2 .maestro/common/warm-up.yaml; } \
-    || echo "::warning::the warm-up did not pass: the flows run anyway"
+# An emulator that stays away after a reconnect fails the job at once, rather than each flow waiting for it in turn.
+steady_or_stop() {
+    steady && return 0
+    echo "::error::the emulator does not answer: the remaining flows are not run"
+    exit 1
+}
+
+steady_or_stop
+if ! maestro test --test-output-dir maestro-output/warm-up .maestro/common/warm-up.yaml; then
+    adb reconnect offline
+    steady_or_stop
+    maestro test --test-output-dir maestro-output/warm-up-2 .maestro/common/warm-up.yaml \
+        || echo "::warning::the warm-up did not pass twice: the flows run anyway"
+fi
 
 failed=0
 for flow in .maestro/*.yaml; do
     name="$(basename "$flow" .yaml)"
     # A workspace configuration is not a flow.
     [ "$name" = "config" ] && continue
-    steady
+    steady_or_stop
     if run "$flow" 1; then continue; fi
     if ! outage "$name"; then
         echo "::error::$name failed (no outage of the emulator: not run again)"
@@ -70,7 +80,7 @@ for flow in .maestro/*.yaml; do
     fi
     echo "::warning::$name failed on an outage of the emulator: adb reconnect, then run it again from a clean state"
     adb reconnect offline
-    steady
+    steady_or_stop
     if ! run "$flow" 2; then
         echo "::error::$name failed twice"
         failed=1

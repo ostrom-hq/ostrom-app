@@ -12,7 +12,8 @@ platforms=(android ios)
 
 # Strings only the mock server and its fixtures hold: a minifier keeps string literals.
 strings=("ost_mock_token" "No such route" "Name the organization with the Ostrom-Org header" "Deploy acme-api to production")
-# Names and words of the mock: searched too where the control shows the bundle keeps them (a minifier may drop names).
+# Names and words of the mock, always searched in the store bundles too. A minifier may drop a name: the control says
+# which ones the E2E bundles keep, so the reader knows which of these searches can find something.
 words=("msw" "EXPO_PUBLIC_OSTROM_MOCK" "createMockServer" "createMockApi" "createMockAppServices" "mockFetch")
 
 # The JavaScript bundles of one platform (Hermes bytecode or JS), never the fonts and images next to them.
@@ -27,7 +28,6 @@ bundles() {
 
 echo "E2E build (EXPO_PUBLIC_OSTROM_MOCK=1), the control:"
 EXPO_PUBLIC_OSTROM_MOCK=1 npx expo export --platform android --platform ios --output-dir "$out/e2e" > /dev/null
-checked_words=()
 for platform in "${platforms[@]}"; do
     dir="$(bundles "$out/e2e" "$platform")"
     for text in "${strings[@]}"; do
@@ -36,15 +36,12 @@ for platform in "${platforms[@]}"; do
             exit 1
         fi
     done
+    kept=()
+    for word in "${words[@]}"; do
+        if grep -rqaw -- "$word" "$dir"; then kept+=("$word"); fi
+    done
+    echo "  $platform: the mock's strings are there; names kept: ${kept[*]:-none}"
 done
-for word in "${words[@]}"; do
-    if grep -rqaw -- "$word" "$(bundles "$out/e2e" android)" && grep -rqaw -- "$word" "$(bundles "$out/e2e" ios)"; then
-        checked_words+=("$word")
-    else
-        echo "  \"$word\" is not kept in the E2E bundles either: the strings stand for it"
-    fi
-done
-echo "  the mock's strings are in both E2E bundles; words checked: ${checked_words[*]:-none}"
 
 echo "Store build (production):"
 env -u EXPO_PUBLIC_OSTROM_MOCK npx expo export --platform android --platform ios --output-dir "$out/store" > /dev/null
@@ -54,7 +51,7 @@ for platform in "${platforms[@]}"; do
     for text in "${strings[@]}"; do
         if grep -rqaF -- "$text" "$dir"; then echo "  $platform: found \"$text\""; found=1; fi
     done
-    for word in "${checked_words[@]}"; do
+    for word in "${words[@]}"; do
         if grep -rqaw -- "$word" "$dir"; then echo "  $platform: found \"$word\""; found=1; fi
     done
 done
