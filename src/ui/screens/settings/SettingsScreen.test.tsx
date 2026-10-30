@@ -189,7 +189,9 @@ describe("SettingsScreen", () => {
         await renderWithServices(<SettingsScreen />, services)
         expect(await screen.findByText("The notification settings could not be loaded.")).toBeOnTheScreen()
         expect(screen.queryByText("rev-b")).toBeNull()
-        await fireEvent.press(screen.getByRole("button", {name: "Try again"}))
+        // The organizations cannot be read either: each section offers its own retry.
+        expect(await screen.findByText("Your organizations could not be loaded.")).toBeOnTheScreen()
+        for (const retry of screen.getAllByRole("button", {name: "Try again"})) await fireEvent.press(retry)
         expect(await screen.findByText("The notification settings could not be loaded.")).toBeOnTheScreen()
     })
 })
