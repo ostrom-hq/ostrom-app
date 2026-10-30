@@ -4,7 +4,8 @@ import type {SignInFailure} from "@/services/signIn/GithubSignIn"
 import {DEFAULT_SERVER_URL} from "@/config/env"
 import {normalizeServerUrl} from "./serverUrl"
 
-export type LoginError = "invalid-url" | SignInFailure
+/** `unexpected`: the browser or the keychain failed outside the sign-in itself. */
+export type LoginError = "invalid-url" | "unexpected" | SignInFailure
 
 export interface LoginViewModel {
     readonly serverUrl: string
@@ -35,18 +36,23 @@ export function useLoginViewModel(): LoginViewModel {
         setBusy(true)
         setError(undefined)
         void (async () => {
-            const outcome = await signIn.signIn(origin)
-            switch (outcome.kind) {
-                case "signed-in":
-                    await sessionStore.getState().signIn(outcome.session)
-                    break
-                case "failed":
-                    setError(outcome.reason)
-                    break
-                case "cancelled":
-                    break
+            try {
+                const outcome = await signIn.signIn(origin)
+                switch (outcome.kind) {
+                    case "signed-in":
+                        await sessionStore.getState().signIn(outcome.session)
+                        break
+                    case "failed":
+                        setError(outcome.reason)
+                        break
+                    case "cancelled":
+                        break
+                }
+            } catch {
+                setError("unexpected")
+            } finally {
+                setBusy(false)
             }
-            setBusy(false)
         })()
     }, [serverUrl, signIn, sessionStore])
 

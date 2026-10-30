@@ -79,6 +79,12 @@ describe("GithubSignInImpl", () => {
             accountOf: () => account(),
         })
         await expect(garbled.signIn(SERVER)).resolves.toEqual({kind: "failed", reason: "denied"})
+        const stateless = new GithubSignInImpl({
+            openAuthSession: browser(() => callback({error: "access_denied"})),
+            randomBytes: bytes,
+            accountOf: () => account(),
+        })
+        await expect(stateless.signIn(SERVER)).resolves.toEqual({kind: "failed", reason: "denied"})
     })
 
     it("reports a code the server does not accept", async () => {

@@ -15,6 +15,7 @@ export function base64Url(bytes: Uint8Array): string {
             bits -= 6
             out += ALPHABET.charAt((buffer >> bits) & 0x3f)
         }
+        buffer &= (1 << bits) - 1
     }
     if (bits > 0) out += ALPHABET.charAt((buffer << (6 - bits)) & 0x3f)
     return out

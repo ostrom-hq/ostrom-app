@@ -7,6 +7,7 @@ describe("normalizeServerUrl", () => {
         ["https://ostrom.acme.dev:8443", "https://ostrom.acme.dev:8443"],
         ["http://localhost:4961", "http://localhost:4961"],
         ["http://10.0.2.2:4961", "http://10.0.2.2:4961"],
+        ["localhost:4961", "http://localhost:4961"],
     ])("reads %s as %s", (input, origin) => {
         expect(normalizeServerUrl(input)).toBe(origin)
     })
