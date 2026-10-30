@@ -36,7 +36,7 @@ export function createQueryClient({onUnauthorized, retry = true}: QueryClientOpt
     })
     const mutationCache: MutationCache = new MutationCache({
         onError: (error, _variables, _context, mutation) => {
-            if (isUnauthorized(error) && mutationCache.getAll().includes(mutation)) onUnauthorized()
+            if (isUnauthorized(error) && mutationCache.getAll().some((cached) => cached === mutation)) onUnauthorized()
         },
     })
     return new QueryClient({
