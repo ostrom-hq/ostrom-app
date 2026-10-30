@@ -94,6 +94,10 @@ describe("PhoneUnlockImpl", () => {
         expect(serverUnlock).toHaveBeenCalledTimes(1)
     })
 
+    it("gives nothing back from an empty memory store", async () => {
+        expect(await new MemoryUnlockKeyStore().read()).toEqual({kind: "none"})
+    })
+
     it("forgets the key and the last unlock at sign-out", async () => {
         const {unlock, keys, account, serverUnlock} = harness()
         await unlock.keep("key-1")
