@@ -28,7 +28,10 @@ async function launch(
             <QueryClientProvider client={client}>{children}</QueryClientProvider>
         </ServicesProvider>
     )
-    return renderRouter({index: InboxScreen, "request/[id]": (): React.JSX.Element => <></>}, {initialUrl: "/", wrapper})
+    return renderRouter(
+        {index: InboxScreen, "request/[id]": (): React.JSX.Element => <></>, settings: (): React.JSX.Element => <></>},
+        {initialUrl: "/", wrapper},
+    )
 }
 
 describe("InboxScreen", () => {
@@ -88,7 +91,7 @@ describe("InboxScreen", () => {
             .mockResolvedValueOnce(queueOf([approvals.pending]))
             .mockRejectedValue(new ApiError({kind: "refused", status: 409, type: "org_required", message: ""}))
         const client = testQueryClient()
-        await launch(queue, true, client)
+        const router = await launch(queue, true, client)
         expect(await screen.findByText("Merge PR #6 into main")).toBeOnTheScreen()
         await act(async () => {
             await client.invalidateQueries()
@@ -97,12 +100,26 @@ describe("InboxScreen", () => {
         const alert = await screen.findByRole("alert")
         expect(alert).toHaveTextContent(/could not be refreshed[\s\S]*several organizations/)
         expect(screen.getByText("Merge PR #6 into main")).toBeOnTheScreen()
+        await fireEvent.press(screen.getByRole("button", {name: "Choose the organization"}))
+        expect(router.getPathname()).toBe("/settings")
     })
 
-    it("says clearly when the server wants the organization named, instead of a plain failure", async () => {
-        await launch(() => Promise.reject(new ApiError({kind: "refused", status: 409, type: "org_required", message: ""})))
-        expect(await screen.findByText("You are a member of several organizations, and Ostrom needs to know which one this is for. The app cannot choose yet: use the console for now.")).toBeOnTheScreen()
+    it("says clearly when the server wants the organization named, and leads to the choice in Settings", async () => {
+        const router = await launch(() => Promise.reject(new ApiError({kind: "refused", status: 409, type: "org_required", message: ""})))
+        expect(
+            await screen.findByText(
+                "You are a member of several organizations, and Ostrom needs to know which one this is for: choose it in Settings.",
+            ),
+        ).toBeOnTheScreen()
         expect(screen.queryByText("Your requests could not be loaded.")).toBeNull()
+        await fireEvent.press(screen.getByRole("button", {name: "Choose the organization"}))
+        expect(router.getPathname()).toBe("/settings")
+    })
+
+    it("offers no choice of organization on a plain failure", async () => {
+        await launch(() => Promise.reject(new ApiError({kind: "network"})))
+        expect(await screen.findByText("Your requests could not be loaded.")).toBeOnTheScreen()
+        expect(screen.queryByRole("button", {name: "Choose the organization"})).toBeNull()
     })
 
     it("offers to try again when the requests cannot be loaded", async () => {

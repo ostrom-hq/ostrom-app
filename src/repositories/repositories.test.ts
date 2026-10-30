@@ -133,6 +133,14 @@ describe("AccountRepositoryImpl", () => {
         await expect(account.me()).resolves.toMatchObject({dev: {login: "rev-b"}, member: {name: "Reviewer B"}})
     })
 
+    it("lists the organizations I may act in, without a picture where there is none", async () => {
+        server.resetHandlers(...createMockApi(MOCK_BASE_URL, {memberships: ["org_acme", "org_globex"]}).handlers)
+        await expect(account.organizations()).resolves.toEqual([
+            {id: "org_acme", name: "acme", avatarUrl: "https://avatars.test/acme"},
+            {id: "org_globex", name: "globex", avatarUrl: undefined},
+        ])
+    })
+
     it("trades the sign-in code for a token, and refuses a wrong code", async () => {
         const request = {codeVerifier: "v", redirectUri: "ostrom://auth/callback"}
         await expect(account.exchangeCode({...request, code: "good-code"})).resolves.toMatchObject({token: "ost_mock_token"})

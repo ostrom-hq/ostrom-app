@@ -20,7 +20,8 @@ export const fr: TranslationShape = {
     common: {
         retry: "Réessayer",
         orgRequired:
-            "Tu es membre de plusieurs organisations, et Ostrom doit savoir pour laquelle. L'app ne sait pas encore choisir : passe par la console pour l'instant.",
+            "Tu es membre de plusieurs organisations, et Ostrom doit savoir pour laquelle : choisis-la dans les Réglages.",
+        chooseOrganization: "Choisir l'organisation",
     },
     status: {
         pending: "En attente",
@@ -72,6 +73,12 @@ export const fr: TranslationShape = {
         account: "Compte",
         login: "GitHub",
         server: "Serveur",
+        organization: "Organisation",
+        organizationIntro: "Ostrom agit dans l'organisation choisie ici : ses demandes, son historique, ses dépenses.",
+        chooseOrganization: "Tu es membre de plusieurs organisations : choisis celle où Ostrom agit.",
+        organizationsError: "Tes organisations n'ont pas pu être chargées.",
+        noOrganizations: "Tu n'es encore membre d'aucune organisation.",
+        chooseFailed: "L'organisation n'a pas pu être changée. Réessaie.",
         notifications: "Notifications",
         pushOn: "Ce téléphone reçoit les notifications d'Ostrom.",
         pushOff: "Les notifications sont coupées sur ce téléphone. Autorise-les dans les réglages du système pour savoir quand une demande attend.",
@@ -181,7 +188,7 @@ export const fr: TranslationShape = {
             "biometrics-failed": "Ton identité n'a pas pu être confirmée. Rien n'est parti.",
             "step-up": "Ostrom veut une connexion récente pour ce oui : confirme-le dans la console.",
             "org-required":
-                "Tu es membre de plusieurs organisations, et Ostrom doit savoir pour laquelle est cette réponse. L'app ne sait pas encore choisir : réponds dans la console.",
+                "Tu es membre de plusieurs organisations, et Ostrom doit savoir pour laquelle est cette réponse : choisis-la dans les Réglages, ou réponds dans la console.",
             "self-approval": "Quelqu'un d'autre peut approuver cette demande : ton propre oui n'est pas pris.",
             changed: "La demande a changé depuis que tu l'as ouverte. Relis-la avant de répondre.",
             "already-decided": "Quelqu'un a déjà répondu à cette demande.",

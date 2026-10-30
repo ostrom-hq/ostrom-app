@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type {TokenExchangeRequest} from "@/api/contract/account"
+import type {MyOrganization} from "@/api/contract/organizations"
 import type {AccountRepository} from "@/repositories/AccountRepository"
 import {ApiError} from "@/api/http/ApiError"
 import {pkceChallenge} from "./pkce"
@@ -16,8 +17,16 @@ function browser(answer: (start: URL) => AuthSessionResult): jest.Mock<Promise<A
     return jest.fn((url: string, _redirectUri: string) => Promise.resolve(answer(new URL(url))))
 }
 
-function account(exchange: AccountRepository["exchangeCode"] = jest.fn(), me: AccountRepository["me"] = jest.fn()): AccountRepository {
-    return {me, exchangeCode: exchange, logout: jest.fn()}
+/** A server before `GET /me/organizations`: the route answers 404. */
+const noOrganizationRoute = (): Promise<never> =>
+    Promise.reject(new ApiError({kind: "refused", status: 404, type: "not_found", message: "No such route"}))
+
+function account(
+    exchange: AccountRepository["exchangeCode"] = jest.fn(),
+    me: AccountRepository["me"] = jest.fn(),
+    organizations: AccountRepository["organizations"] = noOrganizationRoute,
+): AccountRepository {
+    return {me, organizations, exchangeCode: exchange, logout: jest.fn()}
 }
 
 const acme = {id: "org_acme", name: "acme", avatarUrl: "https://avatars.test/acme", connectedVia: "github-app" as const}
@@ -68,6 +77,42 @@ describe("GithubSignInImpl", () => {
             session: {serverUrl: SERVER, token: "ost_1", user: {login: "rev-b"}, orgId: "org_acme"},
         })
         expect(accountOf).toHaveBeenCalledWith(SERVER, "ost_1")
+    })
+
+    it("acts in the only organization the person is a member of, without asking me", async () => {
+        const me = jest.fn<ReturnType<AccountRepository["me"]>, []>()
+        const signIn = new GithubSignInImpl({
+            openAuthSession: browser((start) => callback({code: "good-code", state: start.searchParams.get("state") ?? ""})),
+            randomBytes: bytes,
+            accountOf: () =>
+                account(
+                    () => Promise.resolve({token: "ost_1", user: {login: "rev-b"}}),
+                    me,
+                    () => Promise.resolve([{id: "org_globex", name: "globex", avatarUrl: undefined}]),
+                ),
+        })
+        await expect(signIn.signIn(SERVER)).resolves.toEqual({
+            kind: "signed-in",
+            session: {serverUrl: SERVER, token: "ost_1", user: {login: "rev-b"}, orgId: "org_globex"},
+        })
+        expect(me).not.toHaveBeenCalled()
+    })
+
+    it.each([
+        ["several", [{id: "org_acme", name: "acme", avatarUrl: undefined}, {id: "org_globex", name: "globex", avatarUrl: undefined}]],
+        ["none", []],
+    ])("asks me which organization to act in when the person is a member of %s", async (_case: string, organizations: readonly MyOrganization[]) => {
+        const signIn = new GithubSignInImpl({
+            openAuthSession: browser((start) => callback({code: "good-code", state: start.searchParams.get("state") ?? ""})),
+            randomBytes: bytes,
+            accountOf: () =>
+                account(
+                    () => Promise.resolve({token: "ost_1", user: {login: "rev-b"}}),
+                    () => Promise.resolve({dev: {login: "rev-b", verified: true, via: "github"}, organization: acme, capabilities: []}),
+                    () => Promise.resolve(organizations),
+                ),
+        })
+        await expect(signIn.signIn(SERVER)).resolves.toMatchObject({kind: "signed-in", session: {orgId: "org_acme"}})
     })
 
     it.each([

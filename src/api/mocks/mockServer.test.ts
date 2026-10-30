@@ -47,5 +47,20 @@ describe("createMockServer and Ostrom-Org", () => {
         const server = createMockServer({memberships: ["org_acme", "org_beta"]})
         expect(server.handle(get("/api/v1/receipts/keys")).status).toBe(200)
         expect(server.handle(get("/api/v1/me/notifications")).status).toBe(200)
+        expect(server.handle(get("/api/v1/auth/me")).status).toBe(200)
+    })
+
+    it("lists the caller's organizations as server#64 does, without the header", () => {
+        const server = createMockServer({memberships: ["org_acme", "org_globex", "org_beta"]})
+        expect(server.handle(get("/api/v1/me/organizations"))).toEqual({
+            status: 200,
+            body: {
+                items: [
+                    {id: "org_acme", slug: "acme", name: "acme", avatarUrl: "https://avatars.test/acme", role: "member"},
+                    {id: "org_globex", slug: "globex", name: "globex", avatarUrl: "", role: "member"},
+                    {id: "org_beta", slug: "org_beta", name: "org_beta", avatarUrl: "", role: "member"},
+                ],
+            },
+        })
     })
 })

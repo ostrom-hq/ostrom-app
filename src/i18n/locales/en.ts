@@ -19,7 +19,8 @@ export const en = {
     common: {
         retry: "Try again",
         orgRequired:
-            "You are a member of several organizations, and Ostrom needs to know which one this is for. The app cannot choose yet: use the console for now.",
+            "You are a member of several organizations, and Ostrom needs to know which one this is for: choose it in Settings.",
+        chooseOrganization: "Choose the organization",
     },
     status: {
         pending: "Waiting",
@@ -71,6 +72,12 @@ export const en = {
         account: "Account",
         login: "GitHub",
         server: "Server",
+        organization: "Organization",
+        organizationIntro: "Ostrom acts in the organization chosen here: its requests, its history, its spending.",
+        chooseOrganization: "You are a member of several organizations: choose the one Ostrom acts in.",
+        organizationsError: "Your organizations could not be loaded.",
+        noOrganizations: "You are not a member of any organization yet.",
+        chooseFailed: "The organization could not be changed. Try again.",
         notifications: "Notifications",
         pushOn: "This phone receives Ostrom notifications.",
         pushOff: "Notifications are off on this phone. Allow them in the system settings to be told when a request waits.",
@@ -180,7 +187,7 @@ export const en = {
             "biometrics-failed": "Your identity could not be confirmed. Nothing was sent.",
             "step-up": "Ostrom wants a fresh sign-in for this yes: confirm it in the console.",
             "org-required":
-                "You are a member of several organizations, and Ostrom needs to know which one this answer is for. The app cannot choose yet: answer in the console.",
+                "You are a member of several organizations, and Ostrom needs to know which one this answer is for: choose it in Settings, or answer in the console.",
             "self-approval": "Someone else can approve this request, so your own yes is not taken.",
             changed: "The request changed after you opened it. Read it again before answering.",
             "already-decided": "Someone already answered this request.",

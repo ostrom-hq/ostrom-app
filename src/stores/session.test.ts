@@ -23,6 +23,19 @@ describe("session store", () => {
         expect(storage.items.has(SESSION_KEY)).toBe(false)
     })
 
+    it("keeps the organization chosen across launches, and chooses nothing signed out", async () => {
+        const storage = new MemoryStorage()
+        const store = createSessionStore(storage)
+        await store.getState().chooseOrg("org_acme")
+        expect(storage.items.has(SESSION_KEY)).toBe(false)
+        await store.getState().signIn(session)
+        await store.getState().chooseOrg("org_globex")
+        expect(store.getState().state).toEqual({status: "signed-in", session: {...session, orgId: "org_globex"}})
+        const relaunched = createSessionStore(storage)
+        await relaunched.getState().hydrate()
+        expect(relaunched.getState().state).toEqual({status: "signed-in", session: {...session, orgId: "org_globex"}})
+    })
+
     it("signs out even when the keychain refuses to remove the token, and blanks it instead", async () => {
         const storage = new MemoryStorage()
         const store = createSessionStore(storage)

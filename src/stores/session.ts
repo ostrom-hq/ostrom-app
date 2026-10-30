@@ -26,6 +26,8 @@ export interface SessionStore {
     /** Reads the stored session at launch; a missing or unreadable one means signed out. */
     hydrate(): Promise<void>
     signIn(session: Session): Promise<void>
+    /** Keeps the organization the calls act in from now on; nothing happens signed out. */
+    chooseOrg(orgId: string): Promise<void>
     signOut(): Promise<void>
 }
 
@@ -43,7 +45,7 @@ function parseStored(text: string | undefined): Session | undefined {
 
 /** The session, kept in the secure storage. Client state only: nothing from the server is copied here. */
 export function createSessionStore(storage: SecureStorage): StoreApi<SessionStore> {
-    return createStore<SessionStore>()((set) => ({
+    return createStore<SessionStore>()((set, get) => ({
         state: {status: "loading"},
         hydrate: async () => {
             let stored: string | undefined
@@ -59,6 +61,13 @@ export function createSessionStore(storage: SecureStorage): StoreApi<SessionStor
             set({state: session === undefined ? {status: "signed-out"} : {status: "signed-in", session}})
         },
         signIn: async (session) => {
+            await storage.set(SESSION_KEY, JSON.stringify(session))
+            set({state: {status: "signed-in", session}})
+        },
+        chooseOrg: async (orgId) => {
+            const {state} = get()
+            if (state.status !== "signed-in") return
+            const session = {...state.session, orgId}
             await storage.set(SESSION_KEY, JSON.stringify(session))
             set({state: {status: "signed-in", session}})
         },

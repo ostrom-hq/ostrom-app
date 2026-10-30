@@ -62,7 +62,7 @@ function refuse(): Promise<never> {
  * so nothing reaches the server without a session and the screen goes away with the guard.
  */
 export const SIGNED_OUT_REPOSITORIES: Repositories = {
-    account: {me: refuse, exchangeCode: refuse, logout: refuse},
+    account: {me: refuse, organizations: refuse, exchangeCode: refuse, logout: refuse},
     activity: {page: refuse},
     approvals: {queue: refuse, view: refuse, answer: refuse},
     notifications: {registerDevice: refuse, unregisterDevice: refuse, settings: refuse, saveSettings: refuse},

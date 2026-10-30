@@ -38,7 +38,12 @@ function unexpected(name: string): () => never {
 /** Repositories whose every method fails the test unless the test overrides it. */
 export function fakeRepositories(overrides: Partial<Repositories> = {}): Repositories {
     return {
-        account: {me: unexpected("account.me"), exchangeCode: unexpected("account.exchangeCode"), logout: unexpected("account.logout")},
+        account: {
+            me: unexpected("account.me"),
+            organizations: unexpected("account.organizations"),
+            exchangeCode: unexpected("account.exchangeCode"),
+            logout: unexpected("account.logout"),
+        },
         activity: {page: unexpected("activity.page")},
         approvals: {
             queue: unexpected("approvals.queue"),

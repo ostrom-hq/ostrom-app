@@ -2,6 +2,7 @@ import {receipts} from "@/api/mocks/fixtures"
 import {activityKind} from "./activity"
 import {ApprovalSchema, ApprovalViewSchema, needsBiometrics, phoneMayApprove} from "./approvals"
 import {PushDataSchema} from "./notifications"
+import {MyOrganizationsSchema} from "./organizations"
 import {ReceiptEnvelopeSchema, ReceiptPageSchema} from "./receipts"
 
 const approval = {id: "appr_1", title: "Merge PR #6", requestedFrom: "rev-b", channel: "app", status: "pending", shownDigest: "d"}
@@ -64,6 +65,22 @@ describe("contract", () => {
     it("reads an activity kind of a newer server as other", () => {
         expect(activityKind("agent.dreamed")).toBe("other")
         expect(activityKind("gate.decided")).toBe("gate.decided")
+    })
+
+    it("reads an organization of the list with or without a picture, and ignores what it does not use", () => {
+        const page = MyOrganizationsSchema.parse({
+            items: [
+                {id: "org_acme", slug: "acme", name: "acme", avatarUrl: "https://avatars.test/acme", role: "admin"},
+                {id: "org_globex", name: "globex", avatarUrl: ""},
+                {id: "org_initech", name: "initech"},
+            ],
+        })
+        expect(page.items).toEqual([
+            {id: "org_acme", name: "acme", avatarUrl: "https://avatars.test/acme"},
+            {id: "org_globex", name: "globex", avatarUrl: undefined},
+            {id: "org_initech", name: "initech", avatarUrl: undefined},
+        ])
+        expect(MyOrganizationsSchema.safeParse({items: [{id: "", name: "x"}]}).success).toBe(false)
     })
 
     it("opens only an Ostrom push whose id cannot be a path", () => {

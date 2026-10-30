@@ -46,7 +46,12 @@ async function open({
     const services = await signedInServices({
         push: {register: () => Promise.resolve(permission), onOpen: () => () => undefined, launchData: () => Promise.resolve(undefined)},
         repositories: fakeRepositories({
-            account: {me: jest.fn(), exchangeCode: jest.fn(), logout},
+            account: {
+                me: jest.fn(),
+                organizations: () => Promise.resolve([{id: "org_acme", name: "acme", avatarUrl: undefined}]),
+                exchangeCode: jest.fn(),
+                logout,
+            },
             notifications: {registerDevice, unregisterDevice, settings: () => Promise.resolve(initial), saveSettings},
         }),
     })
@@ -62,6 +67,7 @@ describe("SettingsScreen", () => {
         await open()
         expect(screen.getByText("rev-b")).toBeOnTheScreen()
         expect(screen.getByText("https://ostrom.test")).toBeOnTheScreen()
+        expect(await screen.findByText("acme")).toBeOnTheScreen()
         expect(screen.getByRole("switch", {name: "A request waits for my yes"})).toBeChecked()
         expect(screen.getByRole("switch", {name: "Spending passes a budget threshold"})).not.toBeChecked()
         expect(screen.getByText("No notification from 22:00 to 07:00 (Europe/Paris)")).toBeOnTheScreen()

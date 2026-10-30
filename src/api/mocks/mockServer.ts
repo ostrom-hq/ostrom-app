@@ -60,8 +60,11 @@ interface Route {
     readonly respond: (request: MockRequest, id: string) => MockResponse
 }
 
-/** The routes of the app that act in the caller's organization (contract 0.1.142); the others take no header. */
-const IN_ORG = /^\/api\/v1\/(auth\/me|push-devices|activity|spending|approvals|receipts(?!\/keys))(?=\/|$)/
+/**
+ * The routes of the app that act in the caller's organization (contract 0.1.142); the others take no header. `me` and
+ * `me/organizations` never need it (core#31, server#64): they are how the app learns which organization to name.
+ */
+const IN_ORG = /^\/api\/v1\/(push-devices|activity|spending|approvals|receipts(?!\/keys))(?=\/|$)/
 
 /** A route of the contract; `:id` is one path segment. */
 function route(method: string, pattern: string, respond: Route["respond"]): Route {
@@ -146,6 +149,16 @@ export function createMockServer({memberships = [fixtures.acme.id]}: MockServerO
 
     const routes: readonly Route[] = [
         route("GET", "/api/v1/auth/me", () => ok(fixtures.me)),
+        // As server#64 serves it: slug and role besides what the app reads, no picture without a GitHub organization.
+        route("GET", "/api/v1/me/organizations", () =>
+            ok({
+                items: memberships.map((id) => {
+                    const known = [fixtures.acme, fixtures.globex].find((organization) => organization.id === id)
+                    const name = known?.name ?? id
+                    return {id, slug: name, name, avatarUrl: known?.avatarUrl ?? "", role: "member"}
+                }),
+            }),
+        ),
         route(
             "POST",
             "/api/v1/auth/mobile/token",
