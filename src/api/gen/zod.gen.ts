@@ -112,6 +112,35 @@ export const zApprovalViewer = z.object({
 });
 
 /**
+ * A gate seen from its approvers, with the actions it covers
+ */
+export const zApproverGate = z.object({
+    workflowId: z.string(),
+    workflowName: z.string(),
+    nodeId: z.string(),
+    label: z.string(),
+    enforce: z.boolean(),
+    actions: z.array(z.string())
+});
+
+/**
+ * One approver and the gates they answer
+ */
+export const zApproverLine = z.object({
+    approver: z.string(),
+    gates: z.array(zApproverGate)
+});
+
+/**
+ * Who approves what in a repository, the gates catalogue seen from the approvers' side
+ */
+export const zApproversGraph = z.object({
+    approvers: z.array(zApproverLine),
+    unanswered: z.array(zApproverGate),
+    ungated: z.array(z.string())
+});
+
+/**
  * A published page or file set, behind the login
  */
 export const zArtifact = z.object({
@@ -1011,6 +1040,7 @@ export const zMemberRole = z.enum([
  * A member of an organization
  */
 export const zMember = z.object({
+    id: z.uuid(),
     login: z.string(),
     name: z.string().optional(),
     avatarUrl: z.string(),
@@ -1019,6 +1049,15 @@ export const zMember = z.object({
     role: zMemberRole,
     slackUserId: z.string().optional(),
     discordUserId: z.string().optional()
+});
+
+/**
+ * One person to invite into the organization
+ */
+export const zMemberInvite = z.object({
+    login: z.string(),
+    role: zMemberRole.optional(),
+    team: z.string().optional()
 });
 
 /**
@@ -2793,6 +2832,15 @@ export const zListMembersResponse = z.object({
     next: z.string().optional()
 });
 
+export const zRemoveMemberPath = z.object({
+    login: z.string()
+});
+
+/**
+ * Done
+ */
+export const zRemoveMemberResponse = z.void();
+
 export const zGetMemberPath = z.object({
     login: z.string()
 });
@@ -2818,7 +2866,7 @@ export const zUpdateMemberPath = z.object({
 export const zUpdateMemberResponse = zMember;
 
 export const zInviteMembersBody = z.object({
-    invites: z.array(z.record(z.string(), z.string()))
+    invites: z.array(zMemberInvite)
 });
 
 /**
@@ -3000,6 +3048,15 @@ export const zConsumeGatePath = z.object({
  * OK
  */
 export const zConsumeGateResponse = zGateResponse;
+
+export const zGetApproversGraphQuery = z.object({
+    repo: z.string().optional()
+});
+
+/**
+ * OK
+ */
+export const zGetApproversGraphResponse = zApproversGraph;
 
 export const zGetGateCatalogQuery = z.object({
     repo: z.string().optional()
