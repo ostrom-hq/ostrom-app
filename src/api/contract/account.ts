@@ -1,5 +1,5 @@
 import type {z} from "zod"
-import {zAuthUser, zMe, zMobileTokenBody, zMobileTokenResponse} from "@/api/gen/zod.gen"
+import {zAuthUser, zMe, type zMobileTokenBody, zMobileTokenResponse} from "@/api/gen/zod.gen"
 
 export const UserSchema = zAuthUser
 export type User = z.output<typeof zAuthUser>

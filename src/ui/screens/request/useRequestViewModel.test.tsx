@@ -21,7 +21,7 @@ function wrapperOf(services: AppServices, client = testQueryClient()): (props: {
 async function servicesFor(
     approval: () => Promise<Approval>,
     confirm: jest.Mock,
-    answer: jest.Mock<Promise<AnswerResult>, Parameters<ApprovalsRepository["answer"]>> = jest.fn(),
+    answer = jest.fn<Promise<AnswerResult>, Parameters<ApprovalsRepository["answer"]>>(),
 ): Promise<AppServices> {
     return signedInServices({
         biometrics: {confirm},

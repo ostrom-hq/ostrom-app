@@ -1,5 +1,5 @@
 import {z} from "zod"
-import {zNotificationPreferences, zPushDevice, zRegisterPushDeviceBody} from "@/api/gen/zod.gen"
+import {zNotificationPreferences, zPushDevice, type zRegisterPushDeviceBody} from "@/api/gen/zod.gen"
 
 export type DevicePlatform = "ios" | "android"
 
