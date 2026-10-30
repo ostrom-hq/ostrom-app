@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import * as Notifications from "expo-notifications"
 import type {PushPermission, PushService} from "./PushService"
 

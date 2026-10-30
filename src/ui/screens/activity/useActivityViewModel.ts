@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type {ActivityItem} from "@/api/contract/activity"
 import {useActivity} from "@/query/activity"
 
