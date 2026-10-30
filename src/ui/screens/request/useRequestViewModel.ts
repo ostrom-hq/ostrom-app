@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import {useCallback, useState} from "react"
 import {useTranslation} from "react-i18next"
-import type {Approval, ApprovalAnswer} from "@/api/contract/approvals"
+import {type Approval, type ApprovalAnswer, needsBiometrics, phoneMayApprove} from "@/api/contract/approvals"
 import {useAnswer, useApproval} from "@/query/approvals"
 import {useServices, useSessionState} from "@/services/AppServices"
 import {biometricProblem, type DecisionProblem, decisionProblem} from "./decisionProblem"
@@ -59,17 +59,22 @@ export function useRequestViewModel(id: string): RequestViewModel {
     const {refetch} = query
 
     const send = useCallback(
-        (answer: ApprovalAnswer, comment?: string) => {
+        (answer: ApprovalAnswer, note?: string) => {
             if (approval === undefined || !open || pinned === undefined || changed) return
+            if (answer === "approve" && !phoneMayApprove(approval)) return
             setSending(answer)
             setProblem(undefined)
             void (async () => {
-                const prompt = t(answer === "approve" ? "request.confirm.approve" : "request.confirm.decline", {title: approval.title})
-                const outcome = await biometrics.confirm(prompt)
+                // Biometrics unless the contract says the action is low risk (`needsBiometrics`).
+                const outcome = needsBiometrics(approval)
+                    ? await biometrics.confirm(
+                          t(answer === "approve" ? "request.confirm.approve" : "request.confirm.decline", {title: approval.title}),
+                      )
+                    : "confirmed"
                 if (outcome === "confirmed") {
                     try {
                         const shownDigest = pinned
-                        await mutateAsync(comment === undefined ? {answer, shownDigest} : {answer, shownDigest, comment})
+                        await mutateAsync(note === undefined ? {answer, shownDigest} : {answer, shownDigest, note})
                         setDeclining(false)
                     } catch (error) {
                         // The answer's own invalidation reads the request again (`useAnswer`).
@@ -119,8 +124,8 @@ export function useRequestViewModel(id: string): RequestViewModel {
             send("approve")
         },
         decline: () => {
-            const comment = reason.trim()
-            if (comment !== "") send("reject", comment)
+            const note = reason.trim()
+            if (note !== "") send("reject", note)
         },
     }
 }

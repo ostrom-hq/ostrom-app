@@ -28,8 +28,8 @@ export class ApprovalsRepositoryImpl implements ApprovalsRepository {
         return this.http.send({method: "GET", path: `/api/v1/approvals/${segment(id)}`, response: ApprovalSchema})
     }
 
-    answer(id: string, answer: ApprovalAnswer, shownDigest: string, comment?: string): Promise<AnswerResult> {
-        const body: AnswerRequest = comment === undefined ? {answer, shownDigest} : {answer, shownDigest, comment}
+    answer(id: string, answer: ApprovalAnswer, shownDigest: string, note?: string): Promise<AnswerResult> {
+        const body: AnswerRequest = note === undefined ? {answer, shownDigest} : {answer, shownDigest, note}
         return this.http.send({method: "POST", path: `/api/v1/approvals/${segment(id)}/answer`, body, response: AnswerResultSchema})
     }
 }

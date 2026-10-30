@@ -2,7 +2,7 @@
 import {useTranslation} from "react-i18next"
 import {ActivityIndicator, Platform, ScrollView, StyleSheet, Text, View} from "react-native"
 import {SafeAreaView} from "react-native-safe-area-context"
-import type {Approval, CheckState} from "@/api/contract/approvals"
+import {type ActionKind, type Approval, type CheckState, phoneMayApprove} from "@/api/contract/approvals"
 import {Button} from "@/ui/components/Button"
 import {Field, Section} from "@/ui/components/Section"
 import {StatusBadge} from "@/ui/components/StatusBadge"
@@ -30,6 +30,18 @@ function checkColor(state: CheckState, colors: ThemeColors): string {
     }
 }
 
+/** "Approve push", "Approve merge", "Approve deploy": the button names what the yes lets through, when it is known. */
+function approveLabel(kind: ActionKind | undefined, t: ReturnType<typeof useTranslation>["t"]): string {
+    switch (kind) {
+        case "push":
+        case "merge":
+        case "deploy":
+            return t(`request.approveKind.${kind}`)
+        default:
+            return t("request.approve")
+    }
+}
+
 /** The exact commits the yes covers: their titles when the server gives them, else their SHAs. */
 function commitsOf(approval: Approval): readonly {readonly sha: string; readonly title: string | undefined; readonly author: string | undefined}[] {
     const details = approval.commitDetails ?? []
@@ -45,6 +57,7 @@ function Evidence({approval}: {approval: Approval}): React.JSX.Element {
     const commits = commitsOf(approval)
     const checks = approval.checks ?? []
     const evidence = approval.evidence ?? []
+    const {action, diffStats} = approval
     return (
         <>
             {askedBy.length === 0 ? null : (
@@ -55,6 +68,13 @@ function Evidence({approval}: {approval: Approval}): React.JSX.Element {
             <Section title={t("request.target")}>
                 {!hasText(approval.repo) ? null : <Field label={t("request.repository")} value={approval.repo} />}
                 {!hasText(approval.sha) ? null : <Field label={t("request.head")} value={approval.sha.slice(0, 7)} />}
+                {action === undefined ? null : <Field label={t("request.ref")} value={action.ref} />}
+                {diffStats === undefined ? null : (
+                    <Field
+                        label={t("request.change")}
+                        value={t("request.diffStats", {count: diffStats.files, additions: diffStats.additions, deletions: diffStats.deletions})}
+                    />
+                )}
                 <Field label={t("request.approver")} value={approval.requestedFrom} />
                 {!hasText(approval.expiresAt) ? null : (
                     <Field label={t("request.expires")} value={formatDateTime(approval.expiresAt, i18n.language)} />
@@ -110,7 +130,7 @@ function Outcome({approval}: {approval: Approval}): React.JSX.Element | null {
             : t("request.expired")
         return <Text style={[styles.body, {color: colors.textMuted}]}>{text}</Text>
     }
-    if (approval.status === "pending" || !hasText(approval.decidedBy)) return null
+    if ((approval.status !== "approved" && approval.status !== "rejected") || !hasText(approval.decidedBy)) return null
     const who = approval.decidedBy
     const approved = approval.status === "approved"
     const line = hasText(approval.decidedAt)
@@ -125,10 +145,12 @@ function Outcome({approval}: {approval: Approval}): React.JSX.Element | null {
 }
 
 /** The buttons, after the evidence: Approve, or Decline… which asks for the reason the agent will read. */
-function Actions({model}: {model: RequestViewModel}): React.JSX.Element {
+function Actions({model, approval}: {model: RequestViewModel; approval: Approval}): React.JSX.Element {
     const {t} = useTranslation()
     const {colors} = useTheme()
     const {askedByMe, sending, problem, changed, declining, reason} = model
+    // The whole change is not shown: no yes from the phone (decision of 30/10 02:55), a no stays possible.
+    const mayApprove = phoneMayApprove(approval)
     return (
         <View style={[styles.actions, {borderTopColor: colors.border}]}>
             {askedByMe ? <Text style={[styles.body, {color: colors.text}]}>{t("request.askedByMe")}</Text> : null}
@@ -137,6 +159,7 @@ function Actions({model}: {model: RequestViewModel}): React.JSX.Element {
                     {t(`request.problems.${problem}`)}
                 </Text>
             )}
+            {mayApprove ? null : <Text style={[styles.body, {color: colors.text}]}>{t("request.truncated")}</Text>}
             {changed ? (
                 <Button label={t("request.reread")} variant="signal" onPress={model.reread} testID="request-reread" />
             ) : declining ? (
@@ -169,15 +192,17 @@ function Actions({model}: {model: RequestViewModel}): React.JSX.Element {
                             testID="request-decline"
                         />
                     </View>
-                    <View style={styles.button}>
-                        <Button
-                            label={t("request.approve")}
-                            variant="signal"
-                            onPress={model.approve}
-                            busy={sending === "approve"}
-                            testID="request-approve"
-                        />
-                    </View>
+                    {mayApprove ? (
+                        <View style={styles.button}>
+                            <Button
+                                label={approveLabel(approval.action?.kind, t)}
+                                variant="signal"
+                                onPress={model.approve}
+                                busy={sending === "approve"}
+                                testID="request-approve"
+                            />
+                        </View>
+                    ) : null}
                 </View>
             )}
         </View>
@@ -212,7 +237,7 @@ export function RequestScreen({id}: {id: string}): React.JSX.Element {
                     <Outcome approval={approval} />
                 </View>
                 <Evidence approval={approval} />
-                {model.open ? <Actions model={model} /> : null}
+                {model.open ? <Actions model={model} approval={approval} /> : null}
             </ScrollView>
         </SafeAreaView>
     )

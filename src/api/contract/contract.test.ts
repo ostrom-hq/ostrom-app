@@ -1,5 +1,5 @@
 import {activityKind} from "./activity"
-import {ApprovalSchema} from "./approvals"
+import {ApprovalSchema, needsBiometrics, phoneMayApprove} from "./approvals"
 import {PushDataSchema} from "./notifications"
 import {ReceiptEnvelopeSchema, ReceiptPageSchema} from "./receipts"
 
@@ -19,6 +19,23 @@ describe("contract", () => {
     it("reads a check state of a newer server as unknown, never as a pass", () => {
         const parsed = ApprovalSchema.parse({...approval, checks: [{name: "ci", state: "timed_out"}, {name: "lint", state: "success"}]})
         expect(parsed.checks?.map((check) => check.state)).toEqual(["unknown", "success"])
+    })
+
+    it("reads a status, an action kind and a risk of a newer server without failing the request", () => {
+        const action = {kind: "release", repo: "acme/acme-api", ref: "main", headSha: "c60f859", risk: "extreme"}
+        const parsed = ApprovalSchema.parse({...approval, status: "withdrawn", action})
+        expect(parsed.status).toBe("unknown")
+        expect(parsed.action).toMatchObject({kind: "unknown", risk: "high"})
+    })
+
+    it("asks for biometrics unless the action is low risk, and takes no yes on a truncated diff", () => {
+        const action = {kind: "merge", repo: "acme/acme-api", ref: "main", headSha: "c60f859"}
+        const low = ApprovalSchema.parse({...approval, action: {...action, risk: "low"}})
+        expect(needsBiometrics(low)).toBe(false)
+        expect(needsBiometrics(ApprovalSchema.parse({...approval, action: {...action, risk: "high"}}))).toBe(true)
+        expect(needsBiometrics(ApprovalSchema.parse(approval))).toBe(true)
+        expect(phoneMayApprove(low)).toBe(true)
+        expect(phoneMayApprove(ApprovalSchema.parse({...approval, diffTruncated: true}))).toBe(false)
     })
 
     it("reads an activity kind of a newer server as other", () => {

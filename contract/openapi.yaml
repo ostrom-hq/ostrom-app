@@ -8,7 +8,18 @@ info:
     identifier: Apache-2.0
   description: 'The contract of the Ostrom server, owned by ostrom-core. Schemas without `x-ostrom-kotlin: pending` have a
     Kotlin model in `dev.ostrom.core.api.models` with the same JSON shape (checked by `api-types/scripts/check-contract.mjs`).
-    TypeScript types are generated from this file (`@ostrom-hq/api-types`).'
+    TypeScript types are generated from this file (`@ostrom-hq/api-types`).
+
+    Every operation carries `x-ostrom-status`: `served` when the server on `main` of ostrom-server answers it, `planned`
+    otherwise. The public API reference lists the `served` ones only. A server PR that serves a route sets its operation
+    to `served` here, in the same change set.
+
+    A browser signs in with the `ostrom_session` cookie (HttpOnly, Secure, SameSite=Lax); the CLI, the app, devices,
+    runners and service keys send a bearer token. With the cookie, every request that changes something (POST, PUT,
+    PATCH, DELETE) also sends `X-CSRF-Token`, equal to the readable `ostrom_csrf` cookie, or is refused with 403.
+
+    Every route is under `/api/v1`, except `/health` and the incoming webhooks (`/webhooks/stripe`, `/webhooks/github`,
+    `/webhooks/slack`), each authenticated by its sender''s signature.'
 servers:
 - url: https://{host}
   variables:
@@ -16,6 +27,7 @@ servers:
       default: localhost:4317
 security:
 - bearer: []
+- sessionCookie: []
 tags:
 - name: analysis
 - name: approvals
@@ -23,12 +35,14 @@ tags:
 - name: audit
 - name: auth
 - name: automations
+- name: billing
 - name: budgets
 - name: checks
 - name: delivery
 - name: events
 - name: gates
 - name: github
+- name: import
 - name: inference
 - name: mcp
 - name: meta
@@ -45,9 +59,31 @@ tags:
 - name: webhooks
 - name: workflows
 paths:
+  /health:
+    get:
+      operationId: healthRoot
+      x-ostrom-status: served
+      tags:
+      - meta
+      summary: Liveness, outside the API prefix for probes (same answer as `/api/v1/health`)
+      security: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+        '503':
+          description: A check failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
   /api/v1/health:
     get:
       operationId: health
+      x-ostrom-status: served
       tags:
       - meta
       summary: Liveness
@@ -58,22 +94,58 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  status:
-                    type: string
-                  version:
-                    type: string
-                required:
-                - status
-                - version
+                $ref: '#/components/schemas/Health'
+        '503':
+          description: A check failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
         '400':
           $ref: '#/components/responses/Error'
         '404':
           $ref: '#/components/responses/Error'
+  /api/v1/instance:
+    get:
+      operationId: getInstance
+      x-ostrom-status: served
+      tags:
+      - meta
+      summary: The instance and the key it signs with now; unauthenticated, clients verify signatures before signing in
+      security: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Instance'
+  /api/v1/instance/keys:
+    get:
+      operationId: listInstanceKeys
+      x-ostrom-status: served
+      tags:
+      - meta
+      summary: Every signing key the instance has used, oldest first
+      security: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  keys:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/InstanceSigningKey'
+                required:
+                - keys
   /api/v1/capabilities:
     get:
       operationId: capabilities
+      x-ostrom-status: planned
       tags:
       - meta
       summary: Capabilities of this server (feature keys and versions)
@@ -102,6 +174,7 @@ paths:
   /api/v1/auth/github/start:
     get:
       operationId: startGithubLogin
+      x-ostrom-status: planned
       tags:
       - auth
       summary: 'Start the GitHub OAuth sign-in. Browser: `redirect`. Mobile app: `redirect_uri` (ostrom://auth/callback),
@@ -143,6 +216,7 @@ paths:
   /api/v1/auth/mobile/token:
     post:
       operationId: mobileToken
+      x-ostrom-status: planned
       tags:
       - auth
       summary: Exchange the one-time code of the mobile sign-in (PKCE) for a token
@@ -188,6 +262,7 @@ paths:
   /api/v1/auth/github/callback:
     get:
       operationId: githubLoginCallback
+      x-ostrom-status: planned
       tags:
       - auth
       summary: GitHub OAuth callback
@@ -213,6 +288,7 @@ paths:
   /api/v1/auth/device:
     post:
       operationId: startDeviceLogin
+      x-ostrom-status: planned
       tags:
       - auth
       summary: Start the device flow (CLI sign-in)
@@ -231,6 +307,7 @@ paths:
   /api/v1/auth/device/token:
     post:
       operationId: pollDeviceLogin
+      x-ostrom-status: planned
       tags:
       - auth
       summary: Exchange a confirmed device code for a token
@@ -262,6 +339,7 @@ paths:
   /api/v1/auth/token/refresh:
     post:
       operationId: refreshToken
+      x-ostrom-status: planned
       tags:
       - auth
       summary: Refresh a token
@@ -291,6 +369,7 @@ paths:
   /api/v1/auth/launcher/config:
     get:
       operationId: getLauncherConfig
+      x-ostrom-status: planned
       tags:
       - auth
       summary: What the CLI needs to sign in (GitHub OAuth client id)
@@ -314,6 +393,7 @@ paths:
   /api/v1/auth/launcher/login:
     post:
       operationId: launcherLogin
+      x-ostrom-status: planned
       tags:
       - auth
       summary: Exchange a GitHub token proven by the CLI for a device token
@@ -356,6 +436,7 @@ paths:
   /api/v1/launches:
     post:
       operationId: createLaunch
+      x-ostrom-status: planned
       tags:
       - auth
       summary: 'Start an agent launch: returns an agent token scoped to the sessions of this launch, expiring at its end.
@@ -406,6 +487,7 @@ paths:
   /api/v1/policy/agents:
     get:
       operationId: checkAgentPolicy
+      x-ostrom-status: planned
       tags:
       - auth
       summary: May this developer launch this agent with this model
@@ -454,6 +536,7 @@ paths:
   /api/v1/auth/me:
     get:
       operationId: getMe
+      x-ostrom-status: planned
       tags:
       - auth
       summary: 'The caller: login, member, organization'
@@ -476,12 +559,137 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Me'
+  /api/v1/auth/email:
+    post:
+      operationId: requestSignInEmail
+      x-ostrom-status: planned
+      tags:
+      - auth
+      summary: E-mail a sign-in link; the answer is the same whether the address has an account or not
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                redirect:
+                  type: string
+                  description: The console path to return to after signing in
+              required:
+              - email
+      responses:
+        '202':
+          description: Sent if the address may sign in
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+  /api/v1/auth/email/verify:
+    post:
+      operationId: verifySignInEmail
+      x-ostrom-status: planned
+      tags:
+      - auth
+      summary: 'Sign in with the token of an e-mailed link, read by the console from the link''s fragment
+        (`/auth/email#token=…`). The `Origin` header must be the console''s'
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                token:
+                  type: string
+              required:
+              - token
+      responses:
+        '200':
+          description: Signed in; the session is in the cookies, never in the body
+          headers:
+            Set-Cookie:
+              description: '`ostrom_session` (HttpOnly) and the readable `ostrom_csrf`'
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SignedIn'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+  /api/v1/auth/link:
+    post:
+      operationId: exchangeSignInLink
+      x-ostrom-status: planned
+      tags:
+      - auth
+      summary: 'Exchange an approver''s link (`/yes#signin=opk_…`) for the session cookie. The console and the app read
+        the token from the fragment, erase it at once (`history.replaceState`) and post it here: it never appears in a
+        URL the server receives. Single-use. Not the e-mail sign-in, which is `/api/v1/auth/email/verify`'
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                token:
+                  type: string
+              required:
+              - token
+      responses:
+        '200':
+          description: Signed in; the session is in the cookies, never in the body
+          headers:
+            Set-Cookie:
+              description: '`ostrom_session=…; HttpOnly; Secure; SameSite=Lax; Path=/` and the readable
+                `ostrom_csrf=…; Secure; SameSite=Lax; Path=/`'
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SignedIn'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
   /api/v1/auth/logout:
     post:
       operationId: logout
+      x-ostrom-status: planned
       tags:
       - auth
-      summary: Revoke the current token
+      summary: Sign out
+      description: 'Revokes the calling token or browser session, deletes the push devices registered with it (the app
+        receives no more yes requests), and for a browser session expires the `ostrom_session` and `ostrom_csrf`
+        cookies.'
       responses:
         '204':
           description: Done
@@ -498,6 +706,7 @@ paths:
   /api/v1/auth/sessions:
     get:
       operationId: listAuthSessions
+      x-ostrom-status: planned
       tags:
       - auth
       summary: Signed-in sessions of the caller
@@ -530,6 +739,7 @@ paths:
   /api/v1/auth/sessions/{id}:
     delete:
       operationId: revokeAuthSession
+      x-ostrom-status: planned
       tags:
       - auth
       summary: Revoke a signed-in session
@@ -555,6 +765,7 @@ paths:
   /api/v1/service-keys:
     get:
       operationId: listServiceKeys
+      x-ostrom-status: planned
       tags:
       - auth
       summary: Service keys (admins)
@@ -586,6 +797,7 @@ paths:
           $ref: '#/components/responses/Error'
     post:
       operationId: createServiceKey
+      x-ostrom-status: planned
       tags:
       - auth
       summary: Create a service key; its secret is returned once
@@ -625,6 +837,7 @@ paths:
   /api/v1/service-keys/{id}:
     delete:
       operationId: deleteServiceKey
+      x-ostrom-status: planned
       tags:
       - auth
       summary: Delete a service key
@@ -650,6 +863,7 @@ paths:
   /api/v1/devices:
     get:
       operationId: listDevices
+      x-ostrom-status: planned
       tags:
       - auth
       summary: Workstations where the caller is signed in
@@ -682,6 +896,7 @@ paths:
   /api/v1/devices/{id}:
     delete:
       operationId: deleteDevice
+      x-ostrom-status: planned
       tags:
       - auth
       summary: Sign a workstation out
@@ -707,6 +922,7 @@ paths:
   /api/v1/push-devices:
     post:
       operationId: registerPushDevice
+      x-ostrom-status: planned
       tags:
       - notifications
       summary: 'Register a phone for push notifications (push data: {kind: "approval", approvalId})'
@@ -749,6 +965,7 @@ paths:
   /api/v1/push-devices/{id}:
     delete:
       operationId: deletePushDevice
+      x-ostrom-status: planned
       tags:
       - notifications
       summary: Stop push notifications to a phone
@@ -774,6 +991,7 @@ paths:
   /api/v1/me/notifications:
     get:
       operationId: getNotificationPreferences
+      x-ostrom-status: planned
       tags:
       - notifications
       summary: Notification preferences of the caller
@@ -796,6 +1014,7 @@ paths:
           $ref: '#/components/responses/Error'
     put:
       operationId: setNotificationPreferences
+      x-ostrom-status: planned
       tags:
       - notifications
       summary: Set the notification preferences of the caller
@@ -825,6 +1044,7 @@ paths:
   /api/v1/activity:
     get:
       operationId: listActivity
+      x-ostrom-status: planned
       tags:
       - events
       summary: Activity feed, newest first
@@ -868,6 +1088,7 @@ paths:
   /api/v1/spending:
     get:
       operationId: getSpending
+      x-ostrom-status: planned
       tags:
       - budgets
       summary: Spending by agent, repository and person
@@ -897,6 +1118,7 @@ paths:
   /api/v1/github/app:
     get:
       operationId: getGithubApp
+      x-ostrom-status: planned
       tags:
       - github
       summary: The GitHub App of the organization and its installation
@@ -931,6 +1153,7 @@ paths:
   /api/v1/github/app/manifest/start:
     get:
       operationId: startGithubAppManifest
+      x-ostrom-status: planned
       tags:
       - github
       summary: Create the GitHub App by the manifest flow
@@ -950,6 +1173,7 @@ paths:
   /api/v1/github/app/manifest/callback:
     get:
       operationId: githubAppManifestCallback
+      x-ostrom-status: planned
       tags:
       - github
       summary: Manifest flow callback
@@ -975,6 +1199,7 @@ paths:
   /api/v1/github/app/install/start:
     get:
       operationId: startGithubAppInstall
+      x-ostrom-status: planned
       tags:
       - github
       summary: Install the GitHub App on the organization
@@ -994,6 +1219,7 @@ paths:
   /api/v1/github/app/install/callback:
     get:
       operationId: githubAppInstallCallback
+      x-ostrom-status: planned
       tags:
       - github
       summary: Installation callback
@@ -1016,9 +1242,10 @@ paths:
           $ref: '#/components/responses/Error'
         '404':
           $ref: '#/components/responses/Error'
-  /api/v1/github/webhook:
+  /webhooks/github:
     post:
       operationId: githubWebhook
+      x-ostrom-status: planned
       tags:
       - github
       summary: GitHub webhook (X-Hub-Signature-256)
@@ -1035,9 +1262,50 @@ paths:
           $ref: '#/components/responses/Error'
         '404':
           $ref: '#/components/responses/Error'
+  /webhooks/slack:
+    post:
+      operationId: receiveSlackInteraction
+      x-ostrom-status: planned
+      tags:
+      - notifications
+      summary: 'Slack interactions (the Approve and Reject buttons of a yes request). Called by Slack only, authenticated
+        by `X-Slack-Signature` (HMAC-SHA256 of `v0:<timestamp>:<body>`) with `X-Slack-Request-Timestamp` at most 5 minutes
+        old'
+      security: []
+      parameters:
+      - name: X-Slack-Signature
+        in: header
+        required: true
+        schema:
+          type: string
+      - name: X-Slack-Request-Timestamp
+        in: header
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                payload:
+                  type: string
+                  description: The interaction, as Slack sends it (JSON text)
+              required:
+              - payload
+      responses:
+        '200':
+          description: Handled; the message in Slack is updated
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
   /api/v1/github/checks:
     post:
       operationId: githubCheck
+      x-ostrom-status: planned
       tags:
       - github
       summary: A CI check asks the gate of a pull request merge or a push
@@ -1081,6 +1349,7 @@ paths:
   /api/v1/org:
     get:
       operationId: getOrganization
+      x-ostrom-status: planned
       tags:
       - organization
       summary: The organization
@@ -1104,6 +1373,7 @@ paths:
   /api/v1/members:
     get:
       operationId: listMembers
+      x-ostrom-status: planned
       tags:
       - organization
       summary: Members
@@ -1136,6 +1406,7 @@ paths:
   /api/v1/members/{login}:
     get:
       operationId: getMember
+      x-ostrom-status: planned
       tags:
       - organization
       summary: A member
@@ -1164,6 +1435,7 @@ paths:
           $ref: '#/components/responses/Error'
     patch:
       operationId: updateMember
+      x-ostrom-status: planned
       tags:
       - organization
       summary: Change a member (role, linked chat accounts)
@@ -1206,6 +1478,7 @@ paths:
   /api/v1/members/invites:
     post:
       operationId: inviteMembers
+      x-ostrom-status: planned
       tags:
       - organization
       summary: Invite people
@@ -1251,6 +1524,7 @@ paths:
   /api/v1/teams:
     get:
       operationId: listTeams
+      x-ostrom-status: planned
       tags:
       - organization
       summary: Teams
@@ -1283,6 +1557,7 @@ paths:
   /api/v1/repos:
     get:
       operationId: listRepos
+      x-ostrom-status: planned
       tags:
       - organization
       summary: Repositories
@@ -1315,6 +1590,7 @@ paths:
   /api/v1/settings:
     get:
       operationId: getSettings
+      x-ostrom-status: planned
       tags:
       - organization
       summary: Organization settings
@@ -1337,6 +1613,7 @@ paths:
           $ref: '#/components/responses/Error'
     patch:
       operationId: updateSettings
+      x-ostrom-status: planned
       tags:
       - organization
       summary: Change organization settings (signed decision)
@@ -1366,6 +1643,7 @@ paths:
   /api/v1/sessions:
     post:
       operationId: startSession
+      x-ostrom-status: planned
       tags:
       - sessions
       summary: Start a session or a segment (hook SessionStart); a resumed session opens a chained segment
@@ -1394,6 +1672,7 @@ paths:
           $ref: '#/components/responses/Error'
     get:
       operationId: listSessions
+      x-ostrom-status: planned
       tags:
       - sessions
       summary: Sessions
@@ -1447,6 +1726,7 @@ paths:
   /api/v1/sessions/{id}:
     get:
       operationId: getSession
+      x-ostrom-status: planned
       tags:
       - sessions
       summary: A session segment and its receipt
@@ -1476,6 +1756,7 @@ paths:
   /api/v1/sessions/{id}/alive:
     post:
       operationId: sessionAlive
+      x-ostrom-status: planned
       tags:
       - sessions
       summary: Sign of life of the launcher (every 20 s)
@@ -1514,6 +1795,7 @@ paths:
   /api/v1/sessions/{id}/end:
     post:
       operationId: endSession
+      x-ostrom-status: planned
       tags:
       - sessions
       summary: 'End a session: the server signs the segment receipt'
@@ -1549,6 +1831,7 @@ paths:
   /api/v1/sessions/{id}/reopen:
     post:
       operationId: reopenSession
+      x-ostrom-status: planned
       tags:
       - sessions
       summary: Reopen a closed session as a new segment chained to its receipt (launcher woke up)
@@ -1587,6 +1870,7 @@ paths:
   /api/v1/sessions/{id}/workflow-receipt:
     post:
       operationId: signWorkflowReceipt
+      x-ostrom-status: planned
       tags:
       - sessions
       summary: 'Sign the workflow receipt of the session: what each compiled node did'
@@ -1639,6 +1923,7 @@ paths:
   /api/v1/sessions/{id}/seen:
     post:
       operationId: reportSeen
+      x-ostrom-status: planned
       tags:
       - sessions
       summary: A skill or sub-agent of the package was opened
@@ -1681,6 +1966,7 @@ paths:
   /api/v1/gates:
     post:
       operationId: askGate
+      x-ostrom-status: planned
       tags:
       - gates
       summary: Ask the gate of a boundary action (hook PreToolUse, CI, MCP); 409 session_closed in a closed session
@@ -1709,6 +1995,7 @@ paths:
           $ref: '#/components/responses/Error'
     get:
       operationId: listGates
+      x-ostrom-status: planned
       tags:
       - gates
       summary: Gate requests
@@ -1762,6 +2049,7 @@ paths:
   /api/v1/gates/{id}:
     get:
       operationId: getGate
+      x-ostrom-status: planned
       tags:
       - gates
       summary: A gate request; `wait` long-polls up to that many seconds for an answer
@@ -1796,6 +2084,7 @@ paths:
   /api/v1/gates/{id}/consume:
     post:
       operationId: consumeGate
+      x-ostrom-status: planned
       tags:
       - gates
       summary: 'Consume a yes: it serves the action once'
@@ -1825,6 +2114,7 @@ paths:
   /api/v1/gates/catalog:
     get:
       operationId: getGateCatalog
+      x-ostrom-status: planned
       tags:
       - gates
       summary: Gates of a repository and the actions they cover
@@ -1851,9 +2141,42 @@ paths:
           $ref: '#/components/responses/Error'
         '409':
           $ref: '#/components/responses/Error'
+  /api/v1/gates/catalog/signed:
+    get:
+      operationId: getSignedGatePolicy
+      x-ostrom-status: planned
+      tags:
+      - gates
+      summary: 'The gate policy of a repository signed by the instance (Ed25519, key on `/api/v1/instance/keys`), valid 10
+        minutes (`expiresAt`). The hooks trust only this list of guarded actions; a local file may add guarded actions,
+        never remove one; without a valid policy every action is held'
+      parameters:
+      - name: repo
+        in: query
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SignedGatePolicy'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
   /api/v1/gates/policy:
     get:
       operationId: getGatePolicy
+      x-ostrom-status: planned
       tags:
       - gates
       summary: Self-approval policy
@@ -1881,6 +2204,7 @@ paths:
           $ref: '#/components/responses/Error'
     put:
       operationId: setGatePolicy
+      x-ostrom-status: planned
       tags:
       - gates
       summary: Set the self-approval policy (`sole-approver` or `never`), signed decision
@@ -1920,15 +2244,21 @@ paths:
   /api/v1/approvals:
     get:
       operationId: listApprovals
+      x-ostrom-status: planned
       tags:
       - approvals
-      summary: Approvals; `mine` lists those waiting for the caller
+      summary: Approvals, most recent first; `mine` lists those waiting for the caller
       parameters:
       - name: status
         in: query
         required: false
+        description: One status or several, comma-separated (`approved,rejected,expired`); every status when absent
+        style: form
+        explode: false
         schema:
-          type: string
+          type: array
+          items:
+            $ref: '#/components/schemas/ApprovalStatus'
       - name: mine
         in: query
         required: false
@@ -1937,8 +2267,17 @@ paths:
       - name: before
         in: query
         required: false
+        description: The `next` of the previous page
         schema:
           type: string
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 200
+          default: 50
       responses:
         '200':
           description: OK
@@ -1965,9 +2304,34 @@ paths:
           $ref: '#/components/responses/Error'
         '409':
           $ref: '#/components/responses/Error'
+  /api/v1/approvals/queue:
+    get:
+      operationId: getApprovalQueue
+      x-ostrom-status: planned
+      tags:
+      - approvals
+      summary: 'The yes queue of the caller: pending approvals and recent answers, as the console and the app show them'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApprovalQueue'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
   /api/v1/approvals/{id}:
     get:
       operationId: getApproval
+      x-ostrom-status: planned
       tags:
       - approvals
       summary: An approval, with what it shows
@@ -1994,13 +2358,45 @@ paths:
           $ref: '#/components/responses/Error'
         '409':
           $ref: '#/components/responses/Error'
+  /api/v1/approvals/{id}/view:
+    get:
+      operationId: getApprovalView
+      x-ostrom-status: planned
+      tags:
+      - approvals
+      summary: An approval as the console and the app show it
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApprovalView'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
   /api/v1/approvals/{id}/answer:
     post:
       operationId: answerApproval
+      x-ostrom-status: planned
       tags:
       - approvals
-      summary: Say yes or no; 409 shown_digest_mismatch when the shown digest differs; refused when the caller asked (unless
-        sole approver) or is not an approver
+      summary: Say yes or no, as the caller. 409 shown_digest_mismatch when the shown digest differs, 409 approval_closed
+        when already answered (a signed answer never changes); 403 self_approval_refused when the asker answers while another
+        approver exists
       parameters:
       - name: id
         in: path
@@ -2015,24 +2411,21 @@ paths:
               $ref: '#/components/schemas/AnswerApprovalRequest'
       responses:
         '200':
-          description: OK
+          description: The answered approval and its receipt
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  approval:
-                    $ref: '#/components/schemas/Approval'
-                  receipt:
-                    $ref: '#/components/schemas/Receipt'
-                required:
-                - approval
+                $ref: '#/components/schemas/ApprovalView'
         '400':
           $ref: '#/components/responses/Error'
         '401':
           $ref: '#/components/responses/Error'
         '403':
-          $ref: '#/components/responses/Error'
+          description: self_approval_refused, or not an approver
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SelfApprovalRefused'
         '404':
           $ref: '#/components/responses/Error'
         '409':
@@ -2040,6 +2433,7 @@ paths:
   /api/v1/decisions:
     get:
       operationId: listDecisions
+      x-ostrom-status: planned
       tags:
       - approvals
       summary: Signed decisions
@@ -2088,6 +2482,7 @@ paths:
   /api/v1/receipts:
     get:
       operationId: listReceipts
+      x-ostrom-status: planned
       tags:
       - receipts
       summary: Receipts
@@ -2136,6 +2531,7 @@ paths:
   /api/v1/receipts/keys:
     get:
       operationId: listReceiptKeys
+      x-ostrom-status: planned
       tags:
       - receipts
       summary: Public keys of the instance
@@ -2161,6 +2557,7 @@ paths:
   /api/v1/receipts/{id}:
     get:
       operationId: getReceipt
+      x-ostrom-status: planned
       tags:
       - receipts
       summary: A receipt
@@ -2190,6 +2587,7 @@ paths:
   /api/v1/receipts/{id}/verify:
     get:
       operationId: verifyReceipt
+      x-ostrom-status: planned
       tags:
       - receipts
       summary: Verify a receipt with the instance keys
@@ -2219,6 +2617,7 @@ paths:
   /api/v1/receipts/{id}/bundle:
     get:
       operationId: getReceiptBundle
+      x-ostrom-status: planned
       tags:
       - receipts
       summary: The receipt with every signed piece it cites, for `ostrom verify`
@@ -2248,6 +2647,7 @@ paths:
   /api/v1/packages/current:
     get:
       operationId: getCurrentPackage
+      x-ostrom-status: planned
       tags:
       - packages
       summary: The pinned package of a repository (served as signed, bytes untouched)
@@ -2277,6 +2677,7 @@ paths:
   /api/v1/packages:
     get:
       operationId: listPackages
+      x-ostrom-status: planned
       tags:
       - packages
       summary: Package versions
@@ -2315,6 +2716,7 @@ paths:
   /api/v1/packages/preview:
     post:
       operationId: previewPackage
+      x-ostrom-status: planned
       tags:
       - packages
       summary: Compile without signing
@@ -2347,6 +2749,7 @@ paths:
   /api/v1/packages/audit:
     get:
       operationId: listPackageAudit
+      x-ostrom-status: planned
       tags:
       - packages
       summary: Audit of compilations, pins and revocations
@@ -2379,6 +2782,7 @@ paths:
   /api/v1/packages/{digest}:
     get:
       operationId: getPackage
+      x-ostrom-status: planned
       tags:
       - packages
       summary: A package by digest
@@ -2408,6 +2812,7 @@ paths:
   /api/v1/packages/{digest}/status:
     get:
       operationId: getPackageStatus
+      x-ostrom-status: planned
       tags:
       - packages
       summary: Pinned or revoked
@@ -2437,6 +2842,7 @@ paths:
   /api/v1/packages/{digest}/revoke:
     post:
       operationId: revokePackage
+      x-ostrom-status: planned
       tags:
       - packages
       summary: 'Revoke a version: launchers refuse it'
@@ -2477,6 +2883,7 @@ paths:
   /api/v1/packages/{digest}/restore:
     post:
       operationId: restorePackage
+      x-ostrom-status: planned
       tags:
       - packages
       summary: Restore a revoked version
@@ -2506,6 +2913,7 @@ paths:
   /api/v1/checks:
     post:
       operationId: reportCheck
+      x-ostrom-status: planned
       tags:
       - checks
       summary: Report a check run
@@ -2534,6 +2942,7 @@ paths:
           $ref: '#/components/responses/Error'
     get:
       operationId: listChecks
+      x-ostrom-status: planned
       tags:
       - checks
       summary: Check runs
@@ -2582,6 +2991,7 @@ paths:
   /api/v1/notifications:
     post:
       operationId: sendNotification
+      x-ostrom-status: planned
       tags:
       - notifications
       summary: Ask the server to send a compiled notification (hook PostToolUse)
@@ -2625,6 +3035,7 @@ paths:
           $ref: '#/components/responses/Error'
     get:
       operationId: listNotifications
+      x-ostrom-status: planned
       tags:
       - notifications
       summary: Notifications
@@ -2673,6 +3084,7 @@ paths:
   /api/v1/rules:
     get:
       operationId: listRules
+      x-ostrom-status: planned
       tags:
       - rules
       summary: Rules
@@ -2721,6 +3133,7 @@ paths:
   /api/v1/rules/{id}:
     get:
       operationId: getRule
+      x-ostrom-status: planned
       tags:
       - rules
       summary: A rule
@@ -2749,6 +3162,7 @@ paths:
           $ref: '#/components/responses/Error'
     patch:
       operationId: updateRule
+      x-ostrom-status: planned
       tags:
       - rules
       summary: Decide or edit a rule (signed decision)
@@ -2797,6 +3211,7 @@ paths:
   /api/v1/rules/bulk:
     post:
       operationId: bulkUpdateRules
+      x-ostrom-status: planned
       tags:
       - rules
       summary: Decide several rules
@@ -2841,6 +3256,7 @@ paths:
   /api/v1/workflows:
     get:
       operationId: listWorkflows
+      x-ostrom-status: planned
       tags:
       - workflows
       summary: Workflows
@@ -2883,6 +3299,7 @@ paths:
           $ref: '#/components/responses/Error'
     post:
       operationId: createWorkflow
+      x-ostrom-status: planned
       tags:
       - workflows
       summary: Create a workflow
@@ -2912,6 +3329,7 @@ paths:
   /api/v1/workflows/{id}:
     get:
       operationId: getWorkflow
+      x-ostrom-status: planned
       tags:
       - workflows
       summary: A workflow
@@ -2940,6 +3358,7 @@ paths:
           $ref: '#/components/responses/Error'
     put:
       operationId: saveWorkflow
+      x-ostrom-status: planned
       tags:
       - workflows
       summary: Save a workflow; 409 workflow_conflict when `expectedVersion` is stale (signed decision)
@@ -2981,6 +3400,7 @@ paths:
           $ref: '#/components/responses/Error'
     delete:
       operationId: deleteWorkflow
+      x-ostrom-status: planned
       tags:
       - workflows
       summary: Delete a workflow; 409 workflow_in_use
@@ -3006,6 +3426,7 @@ paths:
   /api/v1/workflows/{id}/runs:
     post:
       operationId: startWorkflowRun
+      x-ostrom-status: planned
       tags:
       - workflows
       summary: Start a run
@@ -3045,6 +3466,7 @@ paths:
           $ref: '#/components/responses/Error'
     get:
       operationId: listWorkflowRuns
+      x-ostrom-status: planned
       tags:
       - workflows
       summary: Runs of a workflow
@@ -3093,6 +3515,7 @@ paths:
   /api/v1/runs:
     get:
       operationId: listRuns
+      x-ostrom-status: planned
       tags:
       - workflows
       summary: Runs
@@ -3136,6 +3559,7 @@ paths:
   /api/v1/runs/{id}:
     get:
       operationId: getRun
+      x-ostrom-status: planned
       tags:
       - workflows
       summary: A run with its visits
@@ -3165,6 +3589,7 @@ paths:
   /api/v1/runs/{id}/cancel:
     post:
       operationId: cancelRun
+      x-ostrom-status: planned
       tags:
       - workflows
       summary: Cancel a run
@@ -3194,6 +3619,7 @@ paths:
   /api/v1/automations:
     get:
       operationId: listAutomations
+      x-ostrom-status: planned
       tags:
       - automations
       summary: Automations
@@ -3225,6 +3651,7 @@ paths:
           $ref: '#/components/responses/Error'
     post:
       operationId: createAutomation
+      x-ostrom-status: planned
       tags:
       - automations
       summary: Create an automation
@@ -3254,6 +3681,7 @@ paths:
   /api/v1/automations/{id}:
     get:
       operationId: getAutomation
+      x-ostrom-status: planned
       tags:
       - automations
       summary: An automation
@@ -3282,6 +3710,7 @@ paths:
           $ref: '#/components/responses/Error'
     put:
       operationId: saveAutomation
+      x-ostrom-status: planned
       tags:
       - automations
       summary: Save an automation
@@ -3316,6 +3745,7 @@ paths:
           $ref: '#/components/responses/Error'
     delete:
       operationId: deleteAutomation
+      x-ostrom-status: planned
       tags:
       - automations
       summary: Delete an automation
@@ -3341,6 +3771,7 @@ paths:
   /api/v1/automations/{id}/enable:
     post:
       operationId: enableAutomation
+      x-ostrom-status: planned
       tags:
       - automations
       summary: Enable
@@ -3370,6 +3801,7 @@ paths:
   /api/v1/automations/{id}/disable:
     post:
       operationId: disableAutomation
+      x-ostrom-status: planned
       tags:
       - automations
       summary: Disable
@@ -3399,6 +3831,7 @@ paths:
   /api/v1/automations/{id}/webhook/rotate-secret:
     post:
       operationId: rotateAutomationSecret
+      x-ostrom-status: planned
       tags:
       - automations
       summary: Rotate the webhook secret (the old one stays valid 10 minutes); returned once
@@ -3433,6 +3866,7 @@ paths:
   /api/v1/automations/{id}/run:
     post:
       operationId: testAutomation
+      x-ostrom-status: planned
       tags:
       - automations
       summary: Test run, optionally dry
@@ -3454,11 +3888,17 @@ paths:
                   type: boolean
       responses:
         '200':
-          description: OK
+          description: 'A dry run (dryRun: true): nothing starts'
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/WorkflowRun'
+                $ref: '#/components/schemas/AutomationDryRun'
+        '202':
+          description: A test run, started with the saved definition (Idempotency-Key required)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AutomationRun'
         '400':
           $ref: '#/components/responses/Error'
         '401':
@@ -3472,15 +3912,28 @@ paths:
   /api/v1/automations/{id}/runs:
     get:
       operationId: listAutomationRuns
+      x-ostrom-status: planned
       tags:
       - automations
-      summary: Runs started by an automation
+      summary: The runs of an automation, newest first, kept 14 days
       parameters:
       - name: id
         in: path
         required: true
         schema:
           type: string
+      - name: before
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
       responses:
         '200':
           description: OK
@@ -3492,7 +3945,7 @@ paths:
                   items:
                     type: array
                     items:
-                      $ref: '#/components/schemas/WorkflowRun'
+                      $ref: '#/components/schemas/AutomationRun'
                   next:
                     type: string
                 required:
@@ -3510,6 +3963,7 @@ paths:
   /api/v1/automations/{id}/trigger:
     post:
       operationId: triggerAutomation
+      x-ostrom-status: planned
       tags:
       - automations
       summary: Signed webhook trigger (Ostrom-Timestamp, Ostrom-Signature v1=HMAC-SHA256, Ostrom-Delivery)
@@ -3535,17 +3989,27 @@ paths:
                 properties:
                   runId:
                     type: string
+                  status:
+                    type: string
+                    description: The run's status (started, failed, invalid_payload, skipped_overlap…)
                   deduplicated:
                     type: boolean
                 required:
                 - deduplicated
         '400':
           $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
         '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '429':
           $ref: '#/components/responses/Error'
   /api/v1/waits:
     get:
       operationId: listWaits
+      x-ostrom-status: planned
       tags:
       - waits
       summary: Waits; `mine` lists those for the caller
@@ -3598,6 +4062,7 @@ paths:
           $ref: '#/components/responses/Error'
     post:
       operationId: createWait
+      x-ostrom-status: planned
       tags:
       - waits
       summary: Ask a person (agent ask_human); Idempotency-Key header
@@ -3640,6 +4105,7 @@ paths:
   /api/v1/waits/{id}:
     get:
       operationId: getWait
+      x-ostrom-status: planned
       tags:
       - waits
       summary: A wait
@@ -3669,6 +4135,7 @@ paths:
   /api/v1/waits/{id}/answer:
     post:
       operationId: answerWait
+      x-ostrom-status: planned
       tags:
       - waits
       summary: Answer a wait; first answer wins (409 wait_closed)
@@ -3712,6 +4179,7 @@ paths:
   /api/v1/waits/{id}/cancel:
     post:
       operationId: cancelWait
+      x-ostrom-status: planned
       tags:
       - waits
       summary: Cancel a wait
@@ -3741,9 +4209,19 @@ paths:
   /api/v1/mcp/servers:
     get:
       operationId: listMcpServers
+      x-ostrom-status: planned
       tags:
       - mcp
       summary: MCP servers relayed by Ostrom
+      parameters:
+      - name: mine
+        in: query
+        required: false
+        description: Only the servers the caller reaches, with their tools and agent names (what `ostrom claude` connects).
+          A member, an agent session or an `mcp:use` token always gets this list, whatever `mine` says; the whole list,
+          with upstream URLs and secret names, is for an admin with `mcp:read` or a browser session
+        schema:
+          type: boolean
       responses:
         '200':
           description: OK
@@ -3772,6 +4250,7 @@ paths:
           $ref: '#/components/responses/Error'
     post:
       operationId: createMcpServer
+      x-ostrom-status: planned
       tags:
       - mcp
       summary: Add a relayed MCP server (credentials as secret names)
@@ -3801,6 +4280,7 @@ paths:
   /api/v1/mcp/servers/{name}:
     put:
       operationId: saveMcpServer
+      x-ostrom-status: planned
       tags:
       - mcp
       summary: Change a relayed MCP server
@@ -3835,6 +4315,7 @@ paths:
           $ref: '#/components/responses/Error'
     delete:
       operationId: deleteMcpServer
+      x-ostrom-status: planned
       tags:
       - mcp
       summary: Remove a relayed MCP server
@@ -3857,9 +4338,262 @@ paths:
           $ref: '#/components/responses/Error'
         '409':
           $ref: '#/components/responses/Error'
+  /api/v1/mcp/servers/{name}/assignments:
+    get:
+      operationId: listMcpAssignments
+      x-ostrom-status: planned
+      tags:
+      - mcp
+      summary: Who reaches a relayed server, with which tools (scope mcp:read)
+      parameters:
+      - name: name
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/McpAssignmentsPage'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+  /api/v1/mcp/servers/{name}/assignments/{member}:
+    put:
+      operationId: assignMcpServer
+      x-ostrom-status: planned
+      tags:
+      - mcp
+      summary: Give a member (or everyone) a relayed server, all tools or an allowlist (scope mcp:admin)
+      parameters:
+      - name: name
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: member
+        in: path
+        required: true
+        description: The member's id, or `all` for every member of the org
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/McpAssignmentRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/McpAssignment'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+    delete:
+      operationId: unassignMcpServer
+      x-ostrom-status: planned
+      tags:
+      - mcp
+      summary: Take a relayed server back from a member (scope mcp:admin)
+      parameters:
+      - name: name
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: member
+        in: path
+        required: true
+        description: The member's id, or `all` for every member of the org
+        schema:
+          type: string
+      responses:
+        '204':
+          description: Done
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+  /api/v1/mcp/servers/{name}/policies:
+    get:
+      operationId: listMcpArgumentPolicies
+      x-ostrom-status: planned
+      tags:
+      - mcp
+      summary: Argument policies of a relayed server (scope mcp:read)
+      parameters:
+      - name: name
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/McpArgumentPolicies'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+    post:
+      operationId: createMcpArgumentPolicy
+      x-ostrom-status: planned
+      tags:
+      - mcp
+      summary: Allow, deny or ask for approval of a tool call by its arguments (scope mcp:admin)
+      parameters:
+      - name: name
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/McpArgumentPolicyRequest'
+      responses:
+        '201':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/McpArgumentPolicy'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+  /api/v1/mcp/servers/{name}/policies/{policyId}:
+    delete:
+      operationId: deleteMcpArgumentPolicy
+      x-ostrom-status: planned
+      tags:
+      - mcp
+      summary: Remove an argument policy (scope mcp:admin)
+      parameters:
+      - name: name
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: policyId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '204':
+          description: Done
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+  /api/v1/mcp/settings:
+    get:
+      operationId: getMcpSettings
+      x-ostrom-status: planned
+      tags:
+      - mcp
+      summary: The prefix of relayed server names as agents see them (scope mcp:read)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/McpSettings'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+    put:
+      operationId: putMcpSettings
+      x-ostrom-status: planned
+      tags:
+      - mcp
+      summary: Change the prefix (scope mcp:admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/McpSettings'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/McpSettings'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
   /api/v1/mcp/{server}:
     post:
       operationId: relayMcp
+      x-ostrom-status: planned
       tags:
       - mcp
       summary: MCP Streamable HTTP endpoint of a relayed server (`ostrom` and `ostrom-workflow` are built in)
@@ -3893,6 +4627,7 @@ paths:
   /api/v1/mcp/calls:
     get:
       operationId: listMcpCalls
+      x-ostrom-status: planned
       tags:
       - mcp
       summary: Relayed calls
@@ -3941,6 +4676,7 @@ paths:
   /api/v1/mcp/usage:
     get:
       operationId: getMcpUsage
+      x-ostrom-status: planned
       tags:
       - mcp
       summary: Calls per server and tool
@@ -3976,6 +4712,7 @@ paths:
   /api/v1/secrets:
     get:
       operationId: listSecrets
+      x-ostrom-status: served
       tags:
       - secrets
       summary: Secrets (metadata only)
@@ -4007,6 +4744,7 @@ paths:
           $ref: '#/components/responses/Error'
     post:
       operationId: createSecret
+      x-ostrom-status: served
       tags:
       - secrets
       summary: Create a secret
@@ -4036,6 +4774,7 @@ paths:
   /api/v1/secrets/{name}:
     put:
       operationId: rotateSecret
+      x-ostrom-status: served
       tags:
       - secrets
       summary: Rotate a secret
@@ -4070,6 +4809,7 @@ paths:
           $ref: '#/components/responses/Error'
     delete:
       operationId: deleteSecret
+      x-ostrom-status: served
       tags:
       - secrets
       summary: Delete a secret
@@ -4092,9 +4832,47 @@ paths:
           $ref: '#/components/responses/Error'
         '409':
           $ref: '#/components/responses/Error'
+  /api/v1/import/teamcode:
+    post:
+      operationId: importTeamCode
+      x-ostrom-status: planned
+      tags:
+      - import
+      summary: Import a TeamCode team read by `ostrom import teamcode` (owners and admins; scope import:write); idempotent
+      parameters:
+      - name: dryRun
+        in: query
+        required: false
+        description: Report the plan without writing anything
+        schema:
+          type: boolean
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TeamCodeImportRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImportReport'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
   /api/v1/inference/v1/messages:
     post:
       operationId: inferenceMessages
+      x-ostrom-status: planned
       tags:
       - inference
       summary: Anthropic-compatible Messages endpoint, metered against budgets
@@ -4119,9 +4897,38 @@ paths:
           $ref: '#/components/responses/Error'
         '409':
           $ref: '#/components/responses/Error'
+  /api/v1/inference/v1/responses:
+    post:
+      operationId: inferenceResponses
+      x-ostrom-status: planned
+      tags:
+      - inference
+      summary: OpenAI-compatible Responses endpoint, metered against budgets
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {}
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
   /api/v1/inference/v1/chat/completions:
     post:
       operationId: inferenceChatCompletions
+      x-ostrom-status: planned
       tags:
       - inference
       summary: OpenAI-compatible chat completions endpoint
@@ -4149,6 +4956,7 @@ paths:
   /api/v1/inference/v1/models:
     get:
       operationId: inferenceModels
+      x-ostrom-status: planned
       tags:
       - inference
       summary: Models the caller may use
@@ -4177,9 +4985,63 @@ paths:
           $ref: '#/components/responses/Error'
         '409':
           $ref: '#/components/responses/Error'
+  /api/v1/inference/settings:
+    get:
+      operationId: getInferenceSettings
+      x-ostrom-status: planned
+      tags:
+      - inference
+      summary: The org's provider keys (named by their org secret, never sent) and whether shared accounts serve first
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InferenceSettings'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+    put:
+      operationId: setInferenceSettings
+      x-ostrom-status: planned
+      tags:
+      - inference
+      summary: Replace the org's inference settings (owners and admins, `inference:admin`)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InferenceSettings'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InferenceSettings'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
   /api/v1/policy/models:
     get:
       operationId: getModelPolicy
+      x-ostrom-status: planned
       tags:
       - inference
       summary: Model policy
@@ -4202,6 +5064,7 @@ paths:
           $ref: '#/components/responses/Error'
     put:
       operationId: setModelPolicy
+      x-ostrom-status: planned
       tags:
       - inference
       summary: Set the model policy
@@ -4231,6 +5094,7 @@ paths:
   /api/v1/routes:
     get:
       operationId: listInferenceRoutes
+      x-ostrom-status: planned
       tags:
       - inference
       summary: Inference routes
@@ -4262,6 +5126,7 @@ paths:
           $ref: '#/components/responses/Error'
     post:
       operationId: createInferenceRoute
+      x-ostrom-status: planned
       tags:
       - inference
       summary: Add a route
@@ -4291,6 +5156,7 @@ paths:
   /api/v1/routes/{id}:
     delete:
       operationId: deleteInferenceRoute
+      x-ostrom-status: planned
       tags:
       - inference
       summary: Remove a route
@@ -4316,6 +5182,7 @@ paths:
   /api/v1/budgets:
     get:
       operationId: listBudgets
+      x-ostrom-status: served
       tags:
       - budgets
       summary: Budgets
@@ -4333,8 +5200,20 @@ paths:
                       $ref: '#/components/schemas/Budget'
                   next:
                     type: string
+                  orgSpentUsd:
+                    type: number
+                    description: What the organization spent this month
+                  periodStart:
+                    type: string
+                    description: The start of this month (UTC, ISO 8601)
+                  resetsAt:
+                    type: string
+                    description: The start of next month (UTC, ISO 8601)
                 required:
                 - items
+                - orgSpentUsd
+                - periodStart
+                - resetsAt
         '400':
           $ref: '#/components/responses/Error'
         '401':
@@ -4347,6 +5226,7 @@ paths:
           $ref: '#/components/responses/Error'
     put:
       operationId: setBudget
+      x-ostrom-status: served
       tags:
       - budgets
       summary: Set a budget (organization, member, workflow)
@@ -4373,9 +5253,34 @@ paths:
           $ref: '#/components/responses/Error'
         '409':
           $ref: '#/components/responses/Error'
+  /api/v1/budgets/me:
+    get:
+      operationId: getMyBudget
+      x-ostrom-status: served
+      tags:
+      - budgets
+      summary: The caller's own budget this month, for any member and for an agent session
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MyBudget'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
   /api/v1/usage:
     get:
       operationId: getUsage
+      x-ostrom-status: served
       tags:
       - budgets
       summary: Spending over a period
@@ -4412,9 +5317,174 @@ paths:
           $ref: '#/components/responses/Error'
         '409':
           $ref: '#/components/responses/Error'
+  /api/v1/usage/summary:
+    get:
+      operationId: getUsageSummary
+      x-ostrom-status: served
+      tags:
+      - budgets
+      summary: Totals of the last days per group, most expensive first; an admin reads the organization, a member their own
+      parameters:
+      - name: days
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 90
+          default: 7
+      - name: groupBy
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - member
+          - kind
+          - model
+          - provider
+          - account
+          default: member
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UsageSummary'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+  /api/v1/usage/events:
+    get:
+      operationId: listUsageEvents
+      x-ostrom-status: served
+      tags:
+      - budgets
+      summary: The usage events, newest first
+      parameters:
+      - name: before
+        in: query
+        required: false
+        description: The `next` of the previous page, or an ISO 8601 time
+        schema:
+          type: string
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 200
+          default: 50
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  events:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/UsageEvent'
+                  next:
+                    type: string
+                required:
+                - events
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+    post:
+      operationId: recordUsageEvents
+      x-ostrom-status: served
+      tags:
+      - budgets
+      summary: 'Record the client''s events (skills, hooks, sessions, MCP calls); the organization, the member and the cost
+        always come from the server. At most 500 events'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                events:
+                  type: array
+                  maxItems: 500
+                  items:
+                    $ref: '#/components/schemas/UsageEventInput'
+              required:
+              - events
+      responses:
+        '202':
+          description: Recorded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accepted:
+                    type: integer
+                required:
+                - accepted
+        '413':
+          $ref: '#/components/responses/Error'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+  /api/v1/usage/live:
+    get:
+      operationId: streamUsage
+      x-ostrom-status: served
+      tags:
+      - budgets
+      summary: 'Server-sent events of the new usage events: `: connected` once subscribed, then one `data:` line per event
+        (a `UsageEvent` in JSON) and a `: heartbeat` comment at intervals. A stream ends after a while and the
+        EventSource reconnects, which checks the caller again'
+      responses:
+        '200':
+          description: The event stream
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
   /api/v1/usage/pending:
     get:
       operationId: listPendingUsage
+      x-ostrom-status: planned
       tags:
       - budgets
       summary: Reservations not yet reconciled
@@ -4457,6 +5527,7 @@ paths:
   /api/v1/usage/reconciliations:
     get:
       operationId: listUsageReconciliations
+      x-ostrom-status: planned
       tags:
       - budgets
       summary: Reconciliation history
@@ -4499,6 +5570,7 @@ paths:
   /api/v1/usage/reservations/{id}/reconcile:
     post:
       operationId: reconcileUsage
+      x-ostrom-status: planned
       tags:
       - budgets
       summary: Reconcile a reservation with the provider bill
@@ -4547,6 +5619,7 @@ paths:
   /api/v1/members/{login}/budget-overrides:
     get:
       operationId: listBudgetOverrides
+      x-ostrom-status: planned
       tags:
       - budgets
       summary: Budget overrides of a member
@@ -4584,6 +5657,7 @@ paths:
           $ref: '#/components/responses/Error'
     post:
       operationId: createBudgetOverride
+      x-ostrom-status: planned
       tags:
       - budgets
       summary: Grant a dated exception
@@ -4630,6 +5704,7 @@ paths:
   /api/v1/members/{login}/budget-overrides/{id}/revoke:
     post:
       operationId: revokeBudgetOverride
+      x-ostrom-status: planned
       tags:
       - budgets
       summary: Revoke an exception
@@ -4664,6 +5739,7 @@ paths:
   /api/v1/runners:
     get:
       operationId: listRunners
+      x-ostrom-status: planned
       tags:
       - runners
       summary: Runners
@@ -4695,6 +5771,7 @@ paths:
           $ref: '#/components/responses/Error'
     post:
       operationId: registerRunner
+      x-ostrom-status: planned
       tags:
       - runners
       summary: Register a runner (service key)
@@ -4736,6 +5813,7 @@ paths:
   /api/v1/runners/{id}:
     delete:
       operationId: deleteRunner
+      x-ostrom-status: planned
       tags:
       - runners
       summary: Remove a runner
@@ -4761,6 +5839,7 @@ paths:
   /api/v1/runners/{id}/heartbeat:
     post:
       operationId: runnerHeartbeat
+      x-ostrom-status: planned
       tags:
       - runners
       summary: Sign of life; returns the work assigned
@@ -4797,9 +5876,10 @@ paths:
   /api/v1/cloud/sessions:
     get:
       operationId: listCloudSessions
+      x-ostrom-status: served
       tags:
       - runners
-      summary: Cloud agent sessions
+      summary: The caller's cloud agent sessions, newest first
       parameters:
       - name: status
         in: query
@@ -4811,6 +5891,13 @@ paths:
         required: false
         schema:
           type: string
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 50
       responses:
         '200':
           description: OK
@@ -4839,6 +5926,7 @@ paths:
           $ref: '#/components/responses/Error'
     post:
       operationId: createCloudSession
+      x-ostrom-status: served
       tags:
       - runners
       summary: Start a cloud agent session
@@ -4855,13 +5943,17 @@ paths:
                   type: string
                 repo:
                   type: string
+                  description: https://github.com/<owner>/<name>, cloned through the organization's GitHub App
+                ref:
+                  type: string
+                  description: Branch, tag or commit; the default branch when absent
                 prompt:
                   type: string
+                  description: The agent's first message, up to 20,000 characters; an interactive agent when absent
                 name:
                   type: string
               required:
               - agent
-              - prompt
       responses:
         '201':
           description: OK
@@ -4882,6 +5974,7 @@ paths:
   /api/v1/cloud/sessions/{id}:
     get:
       operationId: getCloudSession
+      x-ostrom-status: served
       tags:
       - runners
       summary: A cloud session
@@ -4910,9 +6003,10 @@ paths:
           $ref: '#/components/responses/Error'
     delete:
       operationId: stopCloudSession
+      x-ostrom-status: served
       tags:
       - runners
-      summary: Stop a cloud session
+      summary: Terminate a cloud session; its workspace is deleted
       parameters:
       - name: id
         in: path
@@ -4920,8 +6014,198 @@ paths:
         schema:
           type: string
       responses:
-        '204':
-          description: Done
+        '202':
+          description: Accepted, the reconciler stops it
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CloudSession'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+  /api/v1/cloud/sessions/{id}/pause:
+    post:
+      operationId: pauseCloudSession
+      x-ostrom-status: served
+      tags:
+      - runners
+      summary: Pause a cloud session; the workspace is kept
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '202':
+          description: Accepted, the reconciler pauses it
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CloudSession'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+  /api/v1/cloud/sessions/{id}/resume:
+    post:
+      operationId: resumeCloudSession
+      x-ostrom-status: served
+      tags:
+      - runners
+      summary: Resume a paused cloud session, within the plan's running cap and hours
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '202':
+          description: Accepted, the reconciler starts a new execution
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CloudSession'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+  /api/v1/cloud/sessions/{id}/terminal/ticket:
+    post:
+      operationId: issueCloudTerminalTicket
+      x-ostrom-status: planned
+      tags:
+      - runners
+      summary: A single-use ticket to attach a browser to the session's terminal
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ticket:
+                    type: string
+                  expiresAt:
+                    type: string
+                required:
+                - ticket
+                - expiresAt
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+  /api/v1/cloud/sessions/{id}/terminal:
+    get:
+      operationId: attachCloudTerminal
+      x-ostrom-status: planned
+      tags:
+      - runners
+      summary: 'WebSocket: the session''s terminal. Bearer token on the upgrade, or ?ticket= from a browser. Binary frames
+        carry the terminal''s bytes; text frames are JSON controls: {"type":"resize","columns":c,"rows":r} from the
+        client, {"type":"runner","connected":b} from the server. Close codes 4000 + the HTTP status (4401, 4403, 4404,
+        4409)'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: ticket
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        '101':
+          description: Switching protocols
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+  /api/v1/cloud/runner/heartbeat:
+    post:
+      operationId: cloudRunnerHeartbeat
+      x-ostrom-status: served
+      tags:
+      - runners
+      summary: The runner in a session's pod reports; its bearer is the execution's runner token, not a member's
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                sessionId:
+                  type: string
+                epoch:
+                  type: integer
+                  format: int64
+                ready:
+                  type: boolean
+                stopped:
+                  type: boolean
+                lastModelRequestAt:
+                  type: string
+              required:
+              - sessionId
+              - epoch
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  instruction:
+                    type: string
+                    description: run or stop
+                  state:
+                    type: string
+                required:
+                - instruction
+                - state
         '400':
           $ref: '#/components/responses/Error'
         '401':
@@ -4935,6 +6219,7 @@ paths:
   /api/v1/cloud/sessions/{id}/messages:
     post:
       operationId: sendCloudMessage
+      x-ostrom-status: planned
       tags:
       - runners
       summary: Send a message to the agent
@@ -4980,6 +6265,7 @@ paths:
   /api/v1/cloud/sessions/{id}/events:
     get:
       operationId: streamCloudSession
+      x-ostrom-status: planned
       tags:
       - runners
       summary: Events of a cloud session
@@ -5009,9 +6295,25 @@ paths:
   /api/v1/artifacts:
     get:
       operationId: listArtifacts
+      x-ostrom-status: planned
       tags:
       - artifacts
-      summary: Artifacts the caller can read
+      summary: Artifacts the caller can read, newest first
+      parameters:
+      - name: before
+        in: query
+        required: false
+        description: The `next` of the previous page
+        schema:
+          type: string
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 20
       responses:
         '200':
           description: OK
@@ -5040,9 +6342,10 @@ paths:
           $ref: '#/components/responses/Error'
     post:
       operationId: publishArtifact
+      x-ostrom-status: planned
       tags:
       - artifacts
-      summary: Publish an artifact (multipart files)
+      summary: Publish an artifact
       requestBody:
         required: true
         content:
@@ -5053,16 +6356,13 @@ paths:
                 title:
                   type: string
                 access:
-                  type: string
+                  $ref: '#/components/schemas/ArtifactAccess'
                 files:
                   type: array
                   items:
-                    type: object
-                    additionalProperties:
-                      type: string
+                    $ref: '#/components/schemas/ArtifactFile'
               required:
               - title
-              - access
               - files
       responses:
         '201':
@@ -5084,6 +6384,7 @@ paths:
   /api/v1/artifacts/{id}:
     get:
       operationId: getArtifact
+      x-ostrom-status: planned
       tags:
       - artifacts
       summary: An artifact
@@ -5110,8 +6411,49 @@ paths:
           $ref: '#/components/responses/Error'
         '409':
           $ref: '#/components/responses/Error'
+    patch:
+      operationId: updateArtifact
+      x-ostrom-status: planned
+      tags:
+      - artifacts
+      summary: Change an artifact's title or access; absent fields stay as they are
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                access:
+                  $ref: '#/components/schemas/ArtifactAccess'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Artifact'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
     delete:
       operationId: deleteArtifact
+      x-ostrom-status: planned
       tags:
       - artifacts
       summary: Delete an artifact
@@ -5137,6 +6479,7 @@ paths:
   /api/v1/artifacts/{id}/versions:
     get:
       operationId: listArtifactVersions
+      x-ostrom-status: planned
       tags:
       - artifacts
       summary: Versions
@@ -5174,6 +6517,7 @@ paths:
           $ref: '#/components/responses/Error'
     post:
       operationId: publishArtifactVersion
+      x-ostrom-status: planned
       tags:
       - artifacts
       summary: Publish a new version
@@ -5193,9 +6537,7 @@ paths:
                 files:
                   type: array
                   items:
-                    type: object
-                    additionalProperties:
-                      type: string
+                    $ref: '#/components/schemas/ArtifactFile'
               required:
               - files
       responses:
@@ -5218,6 +6560,7 @@ paths:
   /api/v1/artifacts/{id}/versions/{number}/file:
     get:
       operationId: getArtifactFile
+      x-ostrom-status: planned
       tags:
       - artifacts
       summary: A file of a version
@@ -5258,9 +6601,10 @@ paths:
   /api/v1/artifacts/{id}/members:
     get:
       operationId: listArtifactMembers
+      x-ostrom-status: planned
       tags:
       - artifacts
-      summary: Who can read it
+      summary: The ids of the members it is shared with
       parameters:
       - name: id
         in: path
@@ -5277,6 +6621,7 @@ paths:
                 properties:
                   members:
                     type: array
+                    description: Member ids
                     items:
                       type: string
                 required:
@@ -5291,9 +6636,10 @@ paths:
           $ref: '#/components/responses/Error'
         '409':
           $ref: '#/components/responses/Error'
-  /api/v1/artifacts/{id}/members/{login}:
+  /api/v1/artifacts/{id}/members/{memberId}:
     put:
       operationId: shareArtifact
+      x-ostrom-status: planned
       tags:
       - artifacts
       summary: Share with a member
@@ -5303,9 +6649,10 @@ paths:
         required: true
         schema:
           type: string
-      - name: login
+      - name: memberId
         in: path
         required: true
+        description: The member's id (not a login)
         schema:
           type: string
       responses:
@@ -5323,6 +6670,7 @@ paths:
           $ref: '#/components/responses/Error'
     delete:
       operationId: unshareArtifact
+      x-ostrom-status: planned
       tags:
       - artifacts
       summary: Stop sharing with a member
@@ -5332,9 +6680,10 @@ paths:
         required: true
         schema:
           type: string
-      - name: login
+      - name: memberId
         in: path
         required: true
+        description: The member's id (not a login)
         schema:
           type: string
       responses:
@@ -5353,30 +6702,34 @@ paths:
   /api/v1/artifacts/{id}/tickets:
     post:
       operationId: createArtifactTicket
+      x-ostrom-status: planned
       tags:
       - artifacts
-      summary: A short-lived reading ticket
+      summary: 'A reading ticket: a signed address of the entry page on the content origin, valid one hour (rounded to
+        10 minutes). It stays valid until it expires, even after the artifact stops being shared'
       parameters:
       - name: id
         in: path
         required: true
         schema:
           type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                version:
+                  type: integer
+                  description: The version; the latest when absent
       responses:
         '200':
           description: OK
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  url:
-                    type: string
-                  expiresAt:
-                    type: string
-                required:
-                - url
-                - expiresAt
+                $ref: '#/components/schemas/ArtifactTicket'
         '400':
           $ref: '#/components/responses/Error'
         '401':
@@ -5390,6 +6743,7 @@ paths:
   /api/v1/accounts:
     get:
       operationId: listSharedAccounts
+      x-ostrom-status: planned
       tags:
       - sharing
       summary: Subscriptions shared with the caller or owned by them
@@ -5421,6 +6775,7 @@ paths:
           $ref: '#/components/responses/Error'
     post:
       operationId: enrollSharedAccount
+      x-ostrom-status: planned
       tags:
       - sharing
       summary: Enroll a personal subscription (credentials encrypted on the server)
@@ -5467,6 +6822,7 @@ paths:
   /api/v1/accounts/{id}:
     patch:
       operationId: updateSharedAccount
+      x-ostrom-status: planned
       tags:
       - sharing
       summary: Change sharing, allocation, pause
@@ -5510,6 +6866,7 @@ paths:
           $ref: '#/components/responses/Error'
     delete:
       operationId: removeSharedAccount
+      x-ostrom-status: planned
       tags:
       - sharing
       summary: Stop sharing and delete the credentials
@@ -5535,6 +6892,7 @@ paths:
   /api/v1/capacity:
     get:
       operationId: getCapacity
+      x-ostrom-status: planned
       tags:
       - sharing
       summary: Remaining capacity of shared subscriptions
@@ -5558,6 +6916,7 @@ paths:
   /api/v1/groups:
     get:
       operationId: listGroups
+      x-ostrom-status: planned
       tags:
       - sharing
       summary: Sharing groups
@@ -5589,6 +6948,7 @@ paths:
           $ref: '#/components/responses/Error'
     post:
       operationId: createGroup
+      x-ostrom-status: planned
       tags:
       - sharing
       summary: Create a group
@@ -5631,6 +6991,7 @@ paths:
   /api/v1/groups/{id}:
     get:
       operationId: getGroup
+      x-ostrom-status: planned
       tags:
       - sharing
       summary: A group
@@ -5659,6 +7020,7 @@ paths:
           $ref: '#/components/responses/Error'
     patch:
       operationId: updateGroup
+      x-ostrom-status: planned
       tags:
       - sharing
       summary: Change a group
@@ -5700,6 +7062,7 @@ paths:
           $ref: '#/components/responses/Error'
     delete:
       operationId: deleteGroup
+      x-ostrom-status: planned
       tags:
       - sharing
       summary: Delete a group
@@ -5725,6 +7088,7 @@ paths:
   /api/v1/groups/{id}/members/{login}:
     put:
       operationId: addGroupMember
+      x-ostrom-status: planned
       tags:
       - sharing
       summary: Add a member to a group
@@ -5754,6 +7118,7 @@ paths:
           $ref: '#/components/responses/Error'
     delete:
       operationId: removeGroupMember
+      x-ostrom-status: planned
       tags:
       - sharing
       summary: Remove a member from a group
@@ -5784,6 +7149,7 @@ paths:
   /api/v1/groups/{id}/members/{login}/pause:
     post:
       operationId: pauseGroupMember
+      x-ostrom-status: planned
       tags:
       - sharing
       summary: Pause a member in a group
@@ -5823,6 +7189,7 @@ paths:
   /api/v1/skills:
     get:
       operationId: listSkills
+      x-ostrom-status: planned
       tags:
       - delivery
       summary: Skills delivered to developers
@@ -5855,6 +7222,7 @@ paths:
   /api/v1/skills/{name}:
     put:
       operationId: publishSkill
+      x-ostrom-status: planned
       tags:
       - delivery
       summary: Publish a skill version
@@ -5903,6 +7271,7 @@ paths:
           $ref: '#/components/responses/Error'
     delete:
       operationId: deleteSkill
+      x-ostrom-status: planned
       tags:
       - delivery
       summary: Delete a skill
@@ -5928,6 +7297,7 @@ paths:
   /api/v1/skill-delivery:
     get:
       operationId: getSkillDelivery
+      x-ostrom-status: planned
       tags:
       - delivery
       summary: Skills to install on this workstation
@@ -5958,6 +7328,7 @@ paths:
   /api/v1/hooks:
     get:
       operationId: listHooks
+      x-ostrom-status: planned
       tags:
       - delivery
       summary: Hooks delivered to developers
@@ -5990,6 +7361,7 @@ paths:
   /api/v1/hook-delivery:
     get:
       operationId: getHookDelivery
+      x-ostrom-status: planned
       tags:
       - delivery
       summary: Hooks to install on this workstation
@@ -6020,6 +7392,7 @@ paths:
   /api/v1/webhooks:
     get:
       operationId: listWebhooks
+      x-ostrom-status: planned
       tags:
       - webhooks
       summary: Outgoing webhooks
@@ -6051,6 +7424,7 @@ paths:
           $ref: '#/components/responses/Error'
     post:
       operationId: createWebhook
+      x-ostrom-status: planned
       tags:
       - webhooks
       summary: Add an outgoing webhook; its secret is returned once
@@ -6090,6 +7464,7 @@ paths:
   /api/v1/webhooks/{id}:
     delete:
       operationId: deleteWebhook
+      x-ostrom-status: planned
       tags:
       - webhooks
       summary: Remove an outgoing webhook
@@ -6115,6 +7490,7 @@ paths:
   /api/v1/webhooks/{id}/deliveries:
     get:
       operationId: listWebhookDeliveries
+      x-ostrom-status: planned
       tags:
       - webhooks
       summary: Deliveries
@@ -6152,6 +7528,7 @@ paths:
   /api/v1/audit:
     get:
       operationId: listAudit
+      x-ostrom-status: planned
       tags:
       - audit
       summary: Audit log (admins)
@@ -6200,6 +7577,7 @@ paths:
   /api/v1/events:
     get:
       operationId: streamEvents
+      x-ostrom-status: planned
       tags:
       - events
       summary: Live events of the organization (SSE)
@@ -6223,6 +7601,7 @@ paths:
   /api/v1/events/history:
     get:
       operationId: listEvents
+      x-ostrom-status: planned
       tags:
       - events
       summary: Recent events, to catch up
@@ -6260,6 +7639,7 @@ paths:
   /api/v1/analysis/start:
     post:
       operationId: startAnalysis
+      x-ostrom-status: planned
       tags:
       - analysis
       summary: Analyse the organization (rules and workflows)
@@ -6288,6 +7668,7 @@ paths:
   /api/v1/analysis/restart:
     post:
       operationId: restartAnalysis
+      x-ostrom-status: planned
       tags:
       - analysis
       summary: Restart a failed analysis
@@ -6316,6 +7697,7 @@ paths:
   /api/v1/analysis/state:
     get:
       operationId: getAnalysisState
+      x-ostrom-status: planned
       tags:
       - analysis
       summary: Snapshot of the analysis
@@ -6339,6 +7721,7 @@ paths:
   /api/v1/analysis/replay:
     post:
       operationId: startReplay
+      x-ostrom-status: planned
       tags:
       - analysis
       summary: Replay the last 30 days of pull requests under the rules (simulation)
@@ -6366,6 +7749,7 @@ paths:
           $ref: '#/components/responses/Error'
     get:
       operationId: getReplay
+      x-ostrom-status: planned
       tags:
       - analysis
       summary: Replay results
@@ -6397,6 +7781,7 @@ paths:
   /api/v1/tasks:
     get:
       operationId: listTasks
+      x-ostrom-status: planned
       tags:
       - analysis
       summary: Tasks proposed by the analysis
@@ -6429,6 +7814,7 @@ paths:
   /api/v1/tasks/{id}/run:
     post:
       operationId: runTask
+      x-ostrom-status: planned
       tags:
       - analysis
       summary: Run a proposed task under the rules (nothing is pushed)
@@ -6455,12 +7841,282 @@ paths:
           $ref: '#/components/responses/Error'
         '409':
           $ref: '#/components/responses/Error'
+  /api/v1/orgs/{orgId}/billing:
+    get:
+      operationId: getBilling
+      x-ostrom-status: planned
+      tags:
+      - billing
+      summary: The organization's plan, limits, usage and payment state
+      description: 'Members only. Usage and alerts are for the current period: Stripe''s billing period while a subscription is live, the UTC calendar month otherwise. `purchasable` is false on a self-hosted instance (limits come from the license key).'
+      parameters:
+      - name: orgId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BillingOverview'
+        '401':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+  /api/v1/orgs/{orgId}/billing/checkout:
+    post:
+      operationId: startBillingCheckout
+      x-ostrom-status: planned
+      tags:
+      - billing
+      summary: Start buying a plan (Stripe Checkout)
+      description: 'Owners, admins and billing admins. Opens a Stripe Checkout session with automatic tax, tax ids and the billing address; the console redirects to `url`. Monthly plans are billed per active person in arrears; yearly plans are bought for the people active now (at least one). 409 while a subscription is running (change its plan instead), 400 for Free or Enterprise (sold on quote).'
+      parameters:
+      - name: orgId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BillingPlanRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BillingRedirect'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+  /api/v1/orgs/{orgId}/billing/portal:
+    post:
+      operationId: openBillingPortal
+      x-ostrom-status: planned
+      tags:
+      - billing
+      summary: Open the Stripe customer portal
+      description: 'Owners, admins and billing admins: payment methods, invoices and receipts, billing address and tax id, cancellation at the period end. 409 for an organization that never bought.'
+      parameters:
+      - name: orgId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BillingRedirect'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+  /api/v1/orgs/{orgId}/billing/plan:
+    post:
+      operationId: changeBillingPlan
+      x-ostrom-status: planned
+      tags:
+      - billing
+      summary: Change the plan or the interval of the subscription
+      description: 'Owners, admins and billing admins. An upgrade (Team to Business, monthly to yearly) is invoiced now, prorated; a downgrade is credited on the next invoice. Returns the billing after the change.'
+      parameters:
+      - name: orgId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BillingPlanRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BillingOverview'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+  /api/v1/orgs/{orgId}/billing/cancel:
+    post:
+      operationId: cancelBillingSubscription
+      x-ostrom-status: planned
+      tags:
+      - billing
+      summary: End the subscription at the end of the period
+      description: 'Owners, admins and billing admins. The plan stays until the period end; 409 if it already ends.'
+      parameters:
+      - name: orgId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BillingOverview'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+  /api/v1/orgs/{orgId}/billing/resume:
+    post:
+      operationId: resumeBillingSubscription
+      x-ostrom-status: planned
+      tags:
+      - billing
+      summary: Keep a subscription that was set to end
+      description: 'Owners, admins and billing admins. 409 if the subscription is not ending; a subscription already ended is bought again through checkout.'
+      parameters:
+      - name: orgId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BillingOverview'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+  /api/v1/orgs/{orgId}/billing/invoices:
+    get:
+      operationId: listBillingInvoices
+      x-ostrom-status: planned
+      tags:
+      - billing
+      summary: Invoices and receipts, newest first
+      description: 'Owners, admins and billing admins. Empty for an organization that never bought.'
+      parameters:
+      - name: orgId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 24
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BillingInvoiceList'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+  /webhooks/stripe:
+    post:
+      operationId: receiveStripeWebhook
+      x-ostrom-status: planned
+      tags:
+      - billing
+      summary: Stripe events (subscriptions, invoices, checkout)
+      description: 'Called by Stripe only, authenticated by the `Stripe-Signature` header (HMAC-SHA256 of the timestamp and
+        the body, 5 minutes of tolerance). Each event is applied once; a replay answers `duplicate`. Bodies over 256 KiB
+        are refused (413).'
+      security: []
+      parameters:
+      - name: Stripe-Signature
+        in: header
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: A Stripe event, as Stripe sends it
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BillingWebhookAck'
+        '400':
+          $ref: '#/components/responses/Error'
+        '413':
+          $ref: '#/components/responses/Error'
 components:
   securitySchemes:
     bearer:
       type: http
       scheme: bearer
-      description: An Ostrom token (CLI, browser session or service key)
+      description: An Ostrom token (CLI, app, device, runner or service key)
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: ostrom_session
+      description: 'The browser session of the console: HttpOnly, Secure, SameSite=Lax, Path=/. Set by a sign-in, never
+        carried in a body, a URL or a redirect. With it, every POST, PUT, PATCH and DELETE also sends the `X-CSRF-Token`
+        header, equal to the readable `ostrom_csrf` cookie set beside it; otherwise 403. Sign-out expires both cookies.'
   responses:
     Error:
       description: A refusal
@@ -6560,7 +8216,7 @@ components:
           $ref: '#/components/schemas/ApprovalAnswer'
         shownDigest:
           type: string
-        comment:
+        note:
           type: string
       required:
       - answer
@@ -6628,6 +8284,13 @@ components:
           type: boolean
         expiresAt:
           type: string
+        action:
+          $ref: '#/components/schemas/ApprovalAction'
+        diffStats:
+          $ref: '#/components/schemas/DiffStats'
+        diffTruncated:
+          type: boolean
+          description: The approver is not shown the whole diff; the app then refuses a mobile yes
       required:
       - id
       - title
@@ -6635,11 +8298,68 @@ components:
       - channel
       - status
       - shownDigest
+    ApprovalAction:
+      type: object
+      description: 'The action a yes lets through. With `commitDetails`, `checks`, `diffStats` and `diffTruncated`, it is
+        the proof an approver is shown (decision of 30/10 04:10)'
+      properties:
+        kind:
+          $ref: '#/components/schemas/ApprovalActionKind'
+        repo:
+          type: string
+        ref:
+          type: string
+        headSha:
+          type: string
+        baseSha:
+          type: string
+        risk:
+          $ref: '#/components/schemas/ApprovalActionRisk'
+      required:
+      - kind
+      - repo
+      - ref
+      - headSha
+      - risk
+    ApprovalActionKind:
+      type: string
+      description: The kind of action (clients keep an unknown kind as UNKNOWN)
+      enum:
+      - push
+      - merge
+      - deploy
+      - tool
+      - other
+    ApprovalActionRisk:
+      type: string
+      description: A high risk needs biometrics for a mobile yes
+      enum:
+      - low
+      - high
     ApprovalAnswer:
       type: string
       enum:
       - approve
       - reject
+    ApprovalCallerView:
+      type: object
+      description: What the caller may do with an approval
+      properties:
+        login:
+          type: string
+        self:
+          type: boolean
+        canApprove:
+          type: boolean
+        reason:
+          type: string
+        selfApproval:
+          type: boolean
+      required:
+      - login
+      - self
+      - canApprove
+      x-ostrom-kotlin: pending
     ApprovalCheck:
       type: object
       description: A CI check shown with an approval
@@ -6668,6 +8388,29 @@ components:
       required:
       - sha
       - title
+    ApprovalQueue:
+      type: object
+      description: The yes queue of the caller
+      properties:
+        operator:
+          type: string
+          description: Login a yes is signed as
+        you:
+          $ref: '#/components/schemas/ApprovalViewer'
+        pending:
+          type: array
+          items:
+            $ref: '#/components/schemas/ApprovalView'
+        recent:
+          type: array
+          items:
+            $ref: '#/components/schemas/ApprovalView'
+      required:
+      - operator
+      - you
+      - pending
+      - recent
+      x-ostrom-kotlin: pending
     ApprovalStatus:
       type: string
       enum:
@@ -6675,6 +8418,79 @@ components:
       - approved
       - rejected
       - expired
+    ApprovalView:
+      type: object
+      description: 'An approval as the console and the app show it: the request, the gate, the rules, the commits and checks
+        (in `approval`), the receipt once answered'
+      properties:
+        approval:
+          $ref: '#/components/schemas/Approval'
+        who:
+          type: object
+          properties:
+            dev:
+              type: string
+            agent:
+              type: string
+            model:
+              type: string
+            session:
+              type: string
+        what:
+          type: object
+          properties:
+            action:
+              type: string
+            command:
+              type: string
+            repo:
+              type: string
+            sessionRepo:
+              type: string
+            harness:
+              type: string
+        gate:
+          $ref: '#/components/schemas/GateRef'
+        rules:
+          type: array
+          items:
+            $ref: '#/components/schemas/Rule'
+        diff:
+          type: string
+        pr:
+          $ref: '#/components/schemas/GatePullRequest'
+        askedVia:
+          type: array
+          items:
+            type: string
+        note:
+          type: string
+          description: What the approver told the agent with the answer
+        receipt:
+          $ref: '#/components/schemas/Receipt'
+        verification:
+          $ref: '#/components/schemas/Verification'
+        you:
+          $ref: '#/components/schemas/ApprovalCallerView'
+      required:
+      - approval
+      - you
+      x-ostrom-kotlin: pending
+    ApprovalViewer:
+      type: object
+      description: Who is looking at the yes queue
+      properties:
+        login:
+          type: string
+        via:
+          type: string
+          description: '`console`, `app`, `cli`, `operator-account`'
+        name:
+          type: string
+      required:
+      - login
+      - via
+      x-ostrom-kotlin: pending
     Artifact:
       type: object
       description: A published page or file set, behind the login
@@ -6691,6 +8507,10 @@ components:
           type: integer
         url:
           type: string
+          description: The console's page for it
+        publicUrl:
+          type: string
+          description: Its public link, for `link` access on a server that serves pages
         createdAt:
           type: string
         updatedAt:
@@ -6704,6 +8524,56 @@ components:
       - url
       - createdAt
       - updatedAt
+      x-ostrom-kotlin: pending
+    ArtifactAccess:
+      type: string
+      description: Who reads it; `personal` when absent at publication
+      enum:
+      - personal
+      - team
+      - link
+      x-ostrom-kotlin: pending
+    ArtifactFile:
+      type: object
+      description: A file sent for publication
+      properties:
+        path:
+          type: string
+          description: Its path in the version (`index.html`, `img/a.png`)
+        content:
+          type: string
+        encoding:
+          type: string
+          description: '`utf8` when absent'
+          enum:
+          - utf8
+          - base64
+      required:
+      - path
+      - content
+      x-ostrom-kotlin: pending
+    ArtifactTicket:
+      type: object
+      description: A reading ticket
+      properties:
+        artifactId:
+          type: string
+        version:
+          type: integer
+        url:
+          type: string
+          description: The entry page's address on the content origin
+        contentUrl:
+          type: string
+          description: The same address, under TeamCode's name
+        expiresAt:
+          type: string
+      required:
+      - artifactId
+      - version
+      - url
+      - contentUrl
+      - expiresAt
       x-ostrom-kotlin: pending
     ArtifactType:
       type: string
@@ -6727,6 +8597,9 @@ components:
           type: array
           items:
             type: string
+        entry:
+          type: string
+          description: The page a reader opens first
         createdAt:
           type: string
         createdBy:
@@ -6734,6 +8607,7 @@ components:
       required:
       - number
       - files
+      - entry
       - createdAt
       - createdBy
       x-ostrom-kotlin: pending
@@ -6845,6 +8719,15 @@ components:
           type: string
         updatedAt:
           type: string
+        nextRunAt:
+          type: string
+          description: The next cron slot, while the automation is enabled
+        previousSecretValidUntil:
+          type: string
+          description: Until when the webhook's former secret is still accepted after a rotation
+        secret:
+          type: string
+          description: The webhook secret, only in the answer to its creation (whsec_…); never readable again
       required:
       - id
       - name
@@ -6871,6 +8754,100 @@ components:
           type: string
         maxRuntimeMinutes:
           type: integer
+    AutomationRun:
+      type: object
+      description: One trigger of an automation (cron, webhook or test) and the session it started, kept 14 days
+      properties:
+        id:
+          type: string
+        automationId:
+          type: string
+        source:
+          type: string
+          description: cron, webhook or test
+        status:
+          type: string
+          description: queued, started, failed, invalid_payload, skipped_overlap or skipped_budget
+        version:
+          type: integer
+          description: The automation's version that ran
+        sessionId:
+          type: [string, 'null']
+        reason:
+          type: [string, 'null']
+          description: A stable code when it failed (cloud_session_limit, cloud_hours_exhausted, owner_unavailable…)
+        problems:
+          type: array
+          items:
+            $ref: '#/components/schemas/AutomationPayloadProblem'
+        slotAt:
+          type: [string, 'null']
+          description: The cron slot it ran for
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required:
+      - id
+      - automationId
+      - source
+      - status
+      - version
+      - problems
+      - createdAt
+      - updatedAt
+      x-ostrom-kotlin: pending
+    AutomationPayloadProblem:
+      type: object
+      description: A webhook payload value that does not fit its variable
+      properties:
+        path:
+          type: string
+        rule:
+          type: string
+          description: required, type:<type>, enum, max_length or not_scalar
+      required:
+      - path
+      - rule
+      x-ostrom-kotlin: pending
+    AutomationDryRun:
+      type: object
+      description: What a run would do, without starting anything
+      properties:
+        renderedPrompt:
+          type: string
+        variables:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              value:
+                type: [string, 'null']
+                description: Masked (••••) when the variable is sensitive
+              sensitive:
+                type: boolean
+            required:
+            - name
+            - sensitive
+        problems:
+          type: array
+          items:
+            $ref: '#/components/schemas/AutomationPayloadProblem'
+        wouldSkip:
+          type: [string, 'null']
+          description: disabled, overlap or budget
+        nextRuns:
+          type: array
+          items:
+            type: string
+      required:
+      - renderedPrompt
+      - variables
+      - problems
+      - nextRuns
+      x-ostrom-kotlin: pending
     AutomationTrigger:
       type: object
       description: The trigger of an automation
@@ -6916,6 +8893,254 @@ components:
       - name
       - path
       - type
+    BillingInvoice:
+      type: object
+      description: An invoice or receipt. Amounts are in the currency's smallest unit (cents)
+      properties:
+        id:
+          type: string
+        number:
+          type: [string, 'null']
+        status:
+          type: string
+          description: Stripe's status (paid, open, void, uncollectible, draft)
+        total:
+          type: integer
+          format: int64
+          description: Amount including tax
+        tax:
+          type: integer
+          format: int64
+        currency:
+          type: string
+          description: ISO 4217, lowercase
+        created:
+          type: string
+          format: date-time
+        hostedInvoiceUrl:
+          type: [string, 'null']
+          description: Stripe's page of the invoice (pay it, download the receipt)
+        pdfUrl:
+          type: [string, 'null']
+      required:
+      - id
+      - number
+      - status
+      - total
+      - tax
+      - currency
+      - created
+      - hostedInvoiceUrl
+      - pdfUrl
+      x-ostrom-kotlin: pending
+    BillingInvoiceList:
+      type: object
+      description: Invoices and receipts, newest first
+      properties:
+        invoices:
+          type: array
+          items:
+            $ref: '#/components/schemas/BillingInvoice'
+      required:
+      - invoices
+      x-ostrom-kotlin: pending
+    BillingOverview:
+      type: object
+      description: 'What the console''s billing page shows: plan, period, limits, usage, alerts and payment state'
+      properties:
+        orgId:
+          type: string
+          format: uuid
+        plan:
+          type: string
+          enum: [free, team, business, enterprise]
+          description: The plan of the subscription (free without one)
+        effectivePlan:
+          type: string
+          enum: [free, team, business, enterprise]
+          description: The plan whose limits apply now (free once a subscription has ended or is unpaid past retries)
+        interval:
+          type: [string, 'null']
+          enum: [month, year, null]
+        status:
+          type: [string, 'null']
+          description: Stripe's subscription status (active, trialing, past_due, incomplete, canceled…), null without one
+        cancelAtPeriodEnd:
+          type: boolean
+        periodStart:
+          type: string
+          format: date-time
+        periodEnd:
+          type: string
+          format: date-time
+          description: First instant after the period (renewal, or reset of the Free hours)
+        activePeople:
+          type: integer
+          description: People who launched an agent or answered a gate this period (billed on Team and Business)
+        committedPeople:
+          type: integer
+          description: People paid in advance on a yearly plan (0 on a monthly plan)
+        limits:
+          $ref: '#/components/schemas/BillingPlanLimits'
+        usage:
+          $ref: '#/components/schemas/BillingUsage'
+        alerts:
+          type: array
+          description: Usage alerts raised this period, in percent of the agent hours (80, 100)
+          items:
+            type: integer
+        paymentIssue:
+          oneOf:
+          - $ref: '#/components/schemas/BillingPaymentIssue'
+          - type: 'null'
+        purchasable:
+          type: boolean
+          description: Whether plans can be bought on this instance (false when self-hosted)
+        prices:
+          type: array
+          items:
+            $ref: '#/components/schemas/BillingPrice'
+      required:
+      - orgId
+      - plan
+      - effectivePlan
+      - interval
+      - status
+      - cancelAtPeriodEnd
+      - periodStart
+      - periodEnd
+      - activePeople
+      - committedPeople
+      - limits
+      - usage
+      - alerts
+      - paymentIssue
+      - purchasable
+      - prices
+      x-ostrom-kotlin: pending
+    BillingPaymentIssue:
+      type: object
+      description: A payment waiting for the customer; the console shows a banner linking to Stripe's invoice page
+      properties:
+        kind:
+          type: string
+          enum: [payment_failed, action_required]
+          description: payment_failed (card declined, Stripe retries) or action_required (3-D Secure)
+        hostedInvoiceUrl:
+          type: [string, 'null']
+        at:
+          type: string
+          format: date-time
+      required:
+      - kind
+      - hostedInvoiceUrl
+      - at
+      x-ostrom-kotlin: pending
+    BillingPlanLimits:
+      type: object
+      description: 'The limits in force; null means unlimited. A request that would go past one (a member, a cloud agent, an agent hour, SSO, policies) is answered 402 `payment_required`, with a message naming the limit and where to upgrade.'
+      properties:
+        maxPeople:
+          type: [integer, 'null']
+        maxConcurrentCloudAgents:
+          type: [integer, 'null']
+        agentHoursPerPeriod:
+          type: [integer, 'null']
+        sso:
+          type: boolean
+        policies:
+          type: boolean
+        receiptRetentionDays:
+          type: [integer, 'null']
+      required:
+      - maxPeople
+      - maxConcurrentCloudAgents
+      - agentHoursPerPeriod
+      - sso
+      - policies
+      - receiptRetentionDays
+      x-ostrom-kotlin: pending
+    BillingPlanRequest:
+      type: object
+      description: A plan to buy or switch to
+      properties:
+        plan:
+          type: string
+          enum: [team, business]
+        interval:
+          type: string
+          enum: [month, year]
+      required:
+      - plan
+      - interval
+      x-ostrom-kotlin: pending
+    BillingPrice:
+      type: object
+      description: 'A price of the catalog: per active person per month (monthly), per person per year (yearly, 20 % off)'
+      properties:
+        plan:
+          type: string
+          enum: [team, business]
+        interval:
+          type: string
+          enum: [month, year]
+        unitAmount:
+          type: integer
+          format: int64
+          description: In cents, before tax
+        currency:
+          type: string
+      required:
+      - plan
+      - interval
+      - unitAmount
+      - currency
+      x-ostrom-kotlin: pending
+    BillingRedirect:
+      type: object
+      description: A Stripe page to send the browser to
+      properties:
+        url:
+          type: string
+          format: uri
+      required:
+      - url
+      x-ostrom-kotlin: pending
+    BillingUsage:
+      type: object
+      description: Cloud agent usage of the current period
+      properties:
+        agentSeconds:
+          type: integer
+          format: int64
+        agentHours:
+          type: integer
+          format: int64
+          description: Whole hours, rounded down
+        sessions:
+          type: integer
+          format: int64
+        percentOfHours:
+          type: [integer, 'null']
+          description: Share of the plan's agent hours used, null without an hour limit
+      required:
+      - agentSeconds
+      - agentHours
+      - sessions
+      - percentOfHours
+      x-ostrom-kotlin: pending
+    BillingWebhookAck:
+      type: object
+      properties:
+        received:
+          type: boolean
+        outcome:
+          type: string
+          enum: [processed, duplicate, ignored]
+      required:
+      - received
+      - outcome
+      x-ostrom-kotlin: pending
     Budget:
       type: object
       description: A spending limit
@@ -7048,7 +9273,7 @@ components:
       - skipped
     CloudSession:
       type: object
-      description: An agent session run on a runner
+      description: 'A cloud agent session: one pod (or local container) per execution, with a workspace kept across pauses'
       properties:
         id:
           type: string
@@ -7058,9 +9283,38 @@ components:
           type: string
         agent:
           type: string
+          description: claude, codex, opencode, gemini or shell
         model:
           type: string
+        repo:
+          type: string
+          description: The GitHub repository cloned at the first start, https://github.com/<owner>/<name>
+        ref:
+          type: string
         status:
+          type: string
+          description: creating, running, pausing, paused, resuming, terminated or failed
+        desiredStatus:
+          type: string
+          description: What the owner asked for, running, paused or terminated
+        phase:
+          type: string
+          description: An open label of the current step (scheduling, cloning, starting…)
+        epoch:
+          type: integer
+          format: int64
+          description: The execution number, raised at each start or resume
+        failure:
+          $ref: '#/components/schemas/CloudSessionFailure'
+        limits:
+          $ref: '#/components/schemas/CloudSessionLimits'
+        updatedAt:
+          type: string
+        readyAt:
+          type: string
+        lastActivityAt:
+          type: string
+        pausedAt:
           type: string
         runnerId:
           type: string
@@ -7078,6 +9332,36 @@ components:
       - agent
       - status
       - createdAt
+      x-ostrom-kotlin: pending
+    CloudSessionFailure:
+      type: object
+      description: Why a cloud session failed or paused on its own
+      properties:
+        code:
+          type: string
+          description: start_failed, execution_lost, idle_timeout, max_duration or hours_exhausted
+        message:
+          type: string
+      required:
+      - code
+      - message
+      x-ostrom-kotlin: pending
+    CloudSessionLimits:
+      type: object
+      description: The bounds a cloud session runs under, from its organization's plan
+      properties:
+        idleTimeoutMinutes:
+          type: integer
+          description: Minutes without a model request nor terminal input before it pauses
+        maxRunMinutes:
+          type: integer
+          description: Minutes an execution may run before it pauses
+        restrictedEgress:
+          type: boolean
+      required:
+      - idleTimeoutMinutes
+      - maxRunMinutes
+      - restrictedEgress
       x-ostrom-kotlin: pending
     CompiledHook:
       type: object
@@ -7362,6 +9646,20 @@ components:
       - interval
       - expiresIn
       x-ostrom-kotlin: pending
+    DiffStats:
+      type: object
+      description: The size of a change
+      properties:
+        files:
+          type: integer
+        additions:
+          type: integer
+        deletions:
+          type: integer
+      required:
+      - files
+      - additions
+      - deletions
     EndSessionRequest:
       type: object
       description: 'Ends a session (hook `SessionEnd` or the launcher): the server signs the segment''s receipt'
@@ -7686,6 +9984,23 @@ components:
       - members
       - accounts
       x-ostrom-kotlin: pending
+    Health:
+      type: object
+      description: Liveness and the result of each check
+      properties:
+        status:
+          type: string
+        version:
+          type: string
+        checks:
+          type: object
+          additionalProperties:
+            type: string
+      required:
+      - status
+      - version
+      - checks
+      x-ostrom-kotlin: pending
     Hook:
       type: object
       description: A hook delivered to developers outside session packages
@@ -7706,6 +10021,50 @@ components:
       - pinned
       - assignedTo
       x-ostrom-kotlin: pending
+    ImportItem:
+      type: object
+      description: One line of an import report
+      properties:
+        kind:
+          type: string
+          enum: [setting, secret, server, policy, assignment, account]
+          description: Clients keep an unknown kind as UNKNOWN
+        name:
+          type: string
+        action:
+          type: string
+          enum: [planned, created, updated, unchanged, skipped]
+        reason:
+          type: string
+          description: Why it was skipped
+      required:
+      - kind
+      - name
+      - action
+      x-ostrom-kotlin: pending
+    ImportReport:
+      type: object
+      description: What an import did; a second run reports everything unchanged
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ImportItem'
+        created:
+          type: integer
+        updated:
+          type: integer
+        unchanged:
+          type: integer
+        skipped:
+          type: integer
+      required:
+      - items
+      - created
+      - updated
+      - unchanged
+      - skipped
+      x-ostrom-kotlin: pending
     InferenceRoute:
       type: object
       description: Where a model is served from
@@ -7725,6 +10084,186 @@ components:
       - model
       - provider
       - priority
+      x-ostrom-kotlin: pending
+    Instance:
+      type: object
+      description: The instance as clients see it
+      properties:
+        id:
+          type: string
+        version:
+          type: string
+          description: The server version
+        createdAt:
+          type: string
+        signingKey:
+          $ref: '#/components/schemas/InstanceSigningKey'
+      required:
+      - id
+      - version
+      - createdAt
+      - signingKey
+      x-ostrom-kotlin: pending
+    InstanceSigningKey:
+      type: object
+      description: A key the instance signs with
+      properties:
+        keyId:
+          type: string
+        algorithm:
+          type: string
+          description: '`ed25519`'
+        publicKeyPem:
+          type: string
+          description: PEM (SPKI)
+        firstSeenAt:
+          type: string
+      required:
+      - keyId
+      - algorithm
+      - publicKeyPem
+      - firstSeenAt
+      x-ostrom-kotlin: pending
+    McpArgumentCondition:
+      type: object
+      description: One test on a tool call's arguments
+      properties:
+        path:
+          type: string
+          maxLength: 256
+          description: A dotted path into the arguments (`query`, `options.database`, `items.0.id`)
+        operator:
+          type: string
+          enum: [EQUALS, NOT_EQUALS, MATCHES, PREFIX, CONTAINS, EXISTS, ABSENT]
+          description: Answers carry these values; requests may use any case. MATCHES is a case-insensitive regular
+            expression that may not repeat a repeated group (`(a+)+`) nor refer back to a group, and an argument longer
+            than 8192 characters counts as matching (fail closed)
+        value:
+          type: string
+          maxLength: 1024
+          description: The operand, unused for EXISTS and ABSENT
+      required:
+      - path
+      - operator
+      x-ostrom-kotlin: pending
+    McpArgumentPolicies:
+      type: object
+      description: The argument policies of a relayed server, at most 64, so always one page
+      properties:
+        policies:
+          type: array
+          maxItems: 64
+          items:
+            $ref: '#/components/schemas/McpArgumentPolicy'
+        next:
+          type: string
+          description: Reserved for paging; always absent today
+      required:
+      - policies
+      x-ostrom-kotlin: pending
+    McpArgumentPolicy:
+      type: object
+      description: A rule on a tool's arguments, checked on every call before it reaches the upstream server
+      properties:
+        id:
+          type: string
+        tool:
+          type: string
+        conditions:
+          type: array
+          items:
+            $ref: '#/components/schemas/McpArgumentCondition'
+        effect:
+          type: string
+          enum: [DENY, REQUIRE_APPROVAL]
+          description: DENY refuses the call; REQUIRE_APPROVAL holds it until a human approves it
+        message:
+          type: string
+          description: What the agent is told
+        createdAt:
+          type: string
+          format: date-time
+      required:
+      - id
+      - tool
+      - conditions
+      - effect
+      - message
+      - createdAt
+      x-ostrom-kotlin: pending
+    McpArgumentPolicyRequest:
+      type: object
+      description: A new argument policy; every condition must hold (none means every call of the tool)
+      properties:
+        tool:
+          type: string
+        conditions:
+          type: array
+          items:
+            $ref: '#/components/schemas/McpArgumentCondition'
+        effect:
+          type: string
+          enum: [DENY, REQUIRE_APPROVAL]
+          description: Any case is accepted; answers carry the upper-case value
+        message:
+          type: string
+      required:
+      - tool
+      - effect
+      - message
+      x-ostrom-kotlin: pending
+    McpAssignment:
+      type: object
+      description: Who reaches a relayed server and which of its tools. A member's own assignment replaces the one for
+        every member (`all`) for that member, it never adds to it; removing `all` leaves members' own assignments
+      properties:
+        server:
+          type: string
+        member:
+          type: string
+          description: The member's id; absent for every member of the org
+        tools:
+          type: array
+          description: The allowlist; absent for every tool, empty for none
+          items:
+            type: string
+        credentialSecret:
+          type: string
+          description: The member's personal secret used as credential, for a per-member server
+        assignedAt:
+          type: string
+          format: date-time
+      required:
+      - server
+      - assignedAt
+      x-ostrom-kotlin: pending
+    McpAssignmentRequest:
+      type: object
+      description: An assignment; hiding a tool is not the boundary, every call is checked again
+      properties:
+        tools:
+          type: array
+          description: The allowlist; absent for every tool, empty for none (send `[]`, never drop it)
+          items:
+            type: string
+        credentialSecret:
+          type: string
+          description: The name of one of the member's personal secrets, only for a per-member server and one member (400
+            with `all`)
+      x-ostrom-kotlin: pending
+    McpAssignmentsPage:
+      type: object
+      description: The assignments of a server, one per member and one for `all` at most, so always one page
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/McpAssignment'
+        next:
+          type: string
+          description: Reserved for paging; always absent today
+      required:
+      - items
       x-ostrom-kotlin: pending
     McpCall:
       type: object
@@ -7760,14 +10299,21 @@ components:
       properties:
         name:
           type: string
+          pattern: ^[a-z0-9][a-z0-9._-]{0,63}$
+          description: 1 to 64 characters; `servers`, `settings`, `calls` and `usage` are reserved (they are paths of
+            this API)
         url:
           type: string
+          description: The upstream URL of an HTTP server; absent for a stdio server. In answers, a stdio server reads
+            `stdio:<launcher>:<package>`, and a member's list (`mine=true`) gives the relay path, never the upstream
         transport:
           type: string
+          description: http, sse or stdio
         secretNames:
           type: array
           items:
             type: string
+          description: The org secrets the server uses, in an admin's list only
         tools:
           type: array
           items:
@@ -7776,13 +10322,88 @@ components:
           type: boolean
         scope:
           type: string
+        agentName:
+          type: string
+          readOnly: true
+          description: The name the agent sees (`<agentPrefix>-<name>`), in a member's list
+        path:
+          type: string
+          readOnly: true
+          description: The relay endpoint, in a member's list
+        credentialHeader:
+          type: string
+          description: 'The header carrying the credential, when not `Authorization: Bearer`'
+        stdio:
+          $ref: '#/components/schemas/McpStdioSpec'
+        version:
+          type: integer
+          readOnly: true
+          description: Bumped at each change
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
       required:
       - name
-      - url
       - transport
-      - secretNames
       - enabled
       - scope
+      x-ostrom-kotlin: pending
+    InferenceSettings:
+      type: object
+      description: How the gateway reaches model providers for the org (bring your own key)
+      properties:
+        anthropicKeySecret:
+          type: string
+          description: Name of the org secret holding an Anthropic API key, used when no shared Claude account serves
+        openaiKeySecret:
+          type: string
+          description: Name of the org secret holding an OpenAI API key
+        openrouterKeySecret:
+          type: string
+          description: Name of the org secret holding an OpenRouter key (models named `vendor/model`)
+        useSharedAccounts:
+          type: boolean
+          default: true
+          description: Whether members' shared subscription accounts serve before the org's keys
+      x-ostrom-kotlin: pending
+    McpSettings:
+      type: object
+      description: How agents see relayed servers
+      properties:
+        agentPrefix:
+          type: string
+          pattern: ^[a-z0-9][a-z0-9_-]{0,31}$
+          description: 'Tools are `mcp__<agentPrefix>-<server>__<tool>`; 1 to 32 characters of a-z 0-9 _ -, default `ostrom`'
+      required:
+      - agentPrefix
+      x-ostrom-kotlin: pending
+    McpStdioSpec:
+      type: object
+      description: A server run by the MCP host from a pinned package
+      properties:
+        launcher:
+          type: string
+          enum: [npm, pypi]
+        packageName:
+          type: string
+          description: name@1.2.3 (npm) or name==1.2.3 (PyPI)
+        args:
+          type: array
+          items:
+            type: string
+        env:
+          type: object
+          additionalProperties:
+            type: string
+        secretEnv:
+          type: object
+          description: Variable name to the name of the org secret injected by the server
+          additionalProperties:
+            type: string
+      required:
+      - launcher
+      - packageName
       x-ostrom-kotlin: pending
     Me:
       type: object
@@ -7855,6 +10476,33 @@ components:
       required:
       - allowed
       - default
+      x-ostrom-kotlin: pending
+    MyBudget:
+      type: object
+      description: The caller's budget this month, in millionths of a US dollar
+      properties:
+        limitMicros:
+          type: integer
+          description: Absent when no limit applies
+        spentMicros:
+          type: integer
+        remainingMicros:
+          type: integer
+          description: Absent without a limit
+        resetsAt:
+          type: string
+        exhausted:
+          type: boolean
+          description: Model calls are refused now
+        exhaustedScope:
+          type: string
+          enum:
+          - org
+          - member
+      required:
+      - spentMicros
+      - resetsAt
+      - exhausted
       x-ostrom-kotlin: pending
     NodePosition:
       type: object
@@ -8737,6 +11385,12 @@ components:
           type: string
         updatedBy:
           type: string
+        version:
+          type: integer
+          description: Bumped at each rotation
+        owner:
+          type: string
+          description: The member a personal secret belongs to
         usedBy:
           type: array
           items:
@@ -8747,6 +11401,7 @@ components:
       - createdAt
       - updatedAt
       - updatedBy
+      - version
       x-ostrom-kotlin: pending
     SecretWrite:
       type: object
@@ -8761,6 +11416,21 @@ components:
       required:
       - name
       - value
+      x-ostrom-kotlin: pending
+    SelfApprovalRefused:
+      type: object
+      description: '403 self_approval_refused: the asker answered while another approver exists'
+      properties:
+        error:
+          $ref: '#/components/schemas/ErrorDetail'
+        others:
+          type: array
+          items:
+            type: string
+          description: Approvers who may answer instead
+      required:
+      - error
+      - others
       x-ostrom-kotlin: pending
     ServiceKey:
       type: object
@@ -8987,6 +11657,77 @@ components:
       - status
       - sharedWith
       - paused
+      x-ostrom-kotlin: pending
+    SignedGatePolicy:
+      type: object
+      description: 'A gate policy signed by the instance: `signature` (base64, Ed25519 by the key `kid` of
+        `/api/v1/instance/keys`) over the UTF-8 bytes of `payload`, the JSON text of a `SignedGatePolicyPayload`'
+      properties:
+        format:
+          type: string
+          enum:
+          - ostrom.gates/1
+        alg:
+          type: string
+        kid:
+          type: string
+        signature:
+          type: string
+        payload:
+          type: string
+      required:
+      - format
+      - alg
+      - kid
+      - signature
+      - payload
+      x-ostrom-kotlin: pending
+    SignedGatePolicyPayload:
+      type: object
+      description: 'What `SignedGatePolicy.payload` contains. The hooks refuse it after `expiresAt` (10 minutes after
+        `issuedAt`) or if it claims more than an hour'
+      properties:
+        repo:
+          type: string
+        issuedAt:
+          type: string
+        expiresAt:
+          type: string
+        failMode:
+          type: string
+          enum:
+          - closed
+        waitSeconds:
+          type: integer
+        gates:
+          type: array
+          items:
+            $ref: '#/components/schemas/GateRef'
+        actions:
+          type: array
+          items:
+            $ref: '#/components/schemas/GateAction'
+      required:
+      - repo
+      - issuedAt
+      - expiresAt
+      - failMode
+      - waitSeconds
+      - gates
+      - actions
+      x-ostrom-kotlin: pending
+    SignedIn:
+      type: object
+      description: A completed sign-in; the session itself is in the cookies
+      properties:
+        redirect:
+          type: string
+          description: The console path to go to
+        csrfToken:
+          type: string
+          description: The same value as the `ostrom_csrf` cookie, for the `X-CSRF-Token` header
+      required:
+      - redirect
       x-ostrom-kotlin: pending
     Skill:
       type: object
@@ -9218,6 +11959,156 @@ components:
       required:
       - slug
       - name
+    TeamCodeAccount:
+      type: object
+      description: A shared subscription account of TeamCode, tokens in clear (sent once, over TLS)
+      properties:
+        provider:
+          type: string
+          enum: [claude, codex]
+        providerAccountId:
+          type: string
+        label:
+          type: string
+        email:
+          type: string
+        accessToken:
+          type: string
+          writeOnly: true
+          format: password
+        refreshToken:
+          type: string
+          writeOnly: true
+          format: password
+        expiresAt:
+          type: string
+          format: date-time
+        disabled:
+          type: boolean
+      required:
+      - provider
+      - providerAccountId
+      - label
+      - accessToken
+      - refreshToken
+      - expiresAt
+      x-ostrom-kotlin: pending
+    TeamCodeAssignment:
+      type: object
+      description: A TeamCode member's assignment to an MCP variant
+      properties:
+        memberId:
+          type: string
+        serverId:
+          type: string
+          description: TeamCode's variant id
+        memberSecret:
+          type: string
+          writeOnly: true
+          format: password
+          description: The member's own credential, in clear
+      required:
+      - memberId
+      - serverId
+      x-ostrom-kotlin: pending
+    TeamCodeImportRequest:
+      type: object
+      description: What `ostrom import teamcode` read from TeamCode (read-only there), and its member map
+      properties:
+        members:
+          type: array
+          items:
+            $ref: '#/components/schemas/TeamCodeMember'
+        mcpServers:
+          type: array
+          items:
+            $ref: '#/components/schemas/TeamCodeMcpServer'
+        assignments:
+          type: array
+          items:
+            $ref: '#/components/schemas/TeamCodeAssignment'
+        accounts:
+          type: array
+          items:
+            $ref: '#/components/schemas/TeamCodeAccount'
+        memberMap:
+          type: object
+          description: TeamCode member id to Ostrom member id; unmapped members are skipped
+          additionalProperties:
+            type: string
+      x-ostrom-kotlin: pending
+    TeamCodeMcpServer:
+      type: object
+      description: An MCP variant of TeamCode; a slot's most assigned variant keeps the slot's name
+      properties:
+        id:
+          type: string
+        target:
+          type: string
+          description: The slot, the name agents see
+        variant:
+          type: string
+        perMember:
+          type: boolean
+        url:
+          type: string
+        credentialHeader:
+          type: string
+          description: Absent, or Authorization, for a Bearer credential
+        sharedSecret:
+          type: string
+          writeOnly: true
+          format: password
+          description: The shared credential, in clear
+        stdio:
+          $ref: '#/components/schemas/TeamCodeStdio'
+        toolMode:
+          type: string
+          enum: [allow, deny]
+          description: Absent for every tool
+        tools:
+          type: array
+          items:
+            type: string
+      required:
+      - id
+      - target
+      - variant
+      x-ostrom-kotlin: pending
+    TeamCodeMember:
+      type: object
+      properties:
+        id:
+          type: string
+        username:
+          type: string
+      required:
+      - id
+      - username
+      x-ostrom-kotlin: pending
+    TeamCodeStdio:
+      type: object
+      description: A command of TeamCode run by the MCP host
+      properties:
+        launcher:
+          type: string
+          enum: [npm, pypi]
+        packageName:
+          type: string
+        args:
+          type: array
+          items:
+            type: string
+        secretEnv:
+          type: object
+          description: Secret variables, values in clear; never returned nor logged
+          writeOnly: true
+          additionalProperties:
+            type: string
+      required:
+      - launcher
+      - packageName
+      x-ostrom-kotlin: pending
     Usage:
       type: object
       description: Spending over a period
@@ -9240,12 +12131,145 @@ components:
           type: object
           additionalProperties:
             type: number
+        cacheReadTokens:
+          type: integer
+        cacheWriteTokens:
+          type: integer
+        events:
+          type: integer
       required:
       - from
       - to
       - usd
       - tokensIn
       - tokensOut
+      - cacheReadTokens
+      - cacheWriteTokens
+      - events
+      x-ostrom-kotlin: pending
+    UsageEvent:
+      type: object
+      description: A usage event; costs in millionths of a US dollar
+      properties:
+        id:
+          type: string
+        memberId:
+          type: string
+        kind:
+          type: string
+          description: '`model`, `mcp`, `skill`, `hook` or `session`'
+        name:
+          type: string
+        provider:
+          type: string
+        accountId:
+          type: string
+        sessionId:
+          type: string
+        inputTokens:
+          type: integer
+        outputTokens:
+          type: integer
+        cacheReadTokens:
+          type: integer
+        cacheWriteTokens:
+          type: integer
+        costMicros:
+          type: integer
+        durationMillis:
+          type: integer
+        outcome:
+          type: string
+        at:
+          type: string
+      required:
+      - id
+      - kind
+      - name
+      - inputTokens
+      - outputTokens
+      - cacheReadTokens
+      - cacheWriteTokens
+      - costMicros
+      - durationMillis
+      - outcome
+      - at
+      x-ostrom-kotlin: pending
+    UsageEventInput:
+      type: object
+      description: An event a client declares
+      properties:
+        kind:
+          type: string
+          enum:
+          - skill
+          - hook
+          - session
+          - mcp
+        name:
+          type: string
+          description: The skill, the hook event, the session id or `server/tool`
+        sessionId:
+          type: string
+        durationMillis:
+          type: integer
+          default: 0
+        outcome:
+          type: string
+          description: '`ok` or a short error key'
+          default: ok
+        at:
+          type: string
+          description: ISO 8601; now when absent
+      required:
+      - kind
+      - name
+      x-ostrom-kotlin: pending
+    UsageSummary:
+      type: object
+      description: Totals per group since a date
+      properties:
+        since:
+          type: string
+        groupBy:
+          type: string
+        groups:
+          type: array
+          items:
+            $ref: '#/components/schemas/UsageTotal'
+        total:
+          $ref: '#/components/schemas/UsageTotal'
+      required:
+      - since
+      - groupBy
+      - groups
+      - total
+      x-ostrom-kotlin: pending
+    UsageTotal:
+      type: object
+      description: The totals of a group; `key` is absent for the total and for events without one
+      properties:
+        key:
+          type: string
+        events:
+          type: integer
+        inputTokens:
+          type: integer
+        outputTokens:
+          type: integer
+        cacheReadTokens:
+          type: integer
+        cacheWriteTokens:
+          type: integer
+        costMicros:
+          type: integer
+      required:
+      - events
+      - inputTokens
+      - outputTokens
+      - cacheReadTokens
+      - cacheWriteTokens
+      - costMicros
       x-ostrom-kotlin: pending
     Verification:
       type: object

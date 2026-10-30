@@ -35,6 +35,34 @@ export const zAgentEvent = z.enum([
     'SessionEnd'
 ]);
 
+/**
+ * The kind of action (clients keep an unknown kind as UNKNOWN)
+ */
+export const zApprovalActionKind = z.enum([
+    'push',
+    'merge',
+    'deploy',
+    'tool',
+    'other'
+]);
+
+/**
+ * A high risk needs biometrics for a mobile yes
+ */
+export const zApprovalActionRisk = z.enum(['low', 'high']);
+
+/**
+ * The action a yes lets through. With `commitDetails`, `checks`, `diffStats` and `diffTruncated`, it is the proof an approver is shown (decision of 30/10 04:10)
+ */
+export const zApprovalAction = z.object({
+    kind: zApprovalActionKind,
+    repo: z.string(),
+    ref: z.string(),
+    headSha: z.string(),
+    baseSha: z.string().optional(),
+    risk: zApprovalActionRisk
+});
+
 export const zApprovalAnswer = z.enum(['approve', 'reject']);
 
 /**
@@ -43,7 +71,18 @@ export const zApprovalAnswer = z.enum(['approve', 'reject']);
 export const zAnswerApprovalRequest = z.object({
     answer: zApprovalAnswer,
     shownDigest: z.string(),
-    comment: z.string().optional()
+    note: z.string().optional()
+});
+
+/**
+ * What the caller may do with an approval
+ */
+export const zApprovalCallerView = z.object({
+    login: z.string(),
+    self: z.boolean(),
+    canApprove: z.boolean(),
+    reason: z.string().optional(),
+    selfApproval: z.boolean().optional()
 });
 
 /**
@@ -64,6 +103,15 @@ export const zApprovalStatus = z.enum([
 ]);
 
 /**
+ * Who is looking at the yes queue
+ */
+export const zApprovalViewer = z.object({
+    login: z.string(),
+    via: z.string(),
+    name: z.string().optional()
+});
+
+/**
  * A published page or file set, behind the login
  */
 export const zArtifact = z.object({
@@ -73,8 +121,38 @@ export const zArtifact = z.object({
     access: z.string(),
     latestVersion: z.int(),
     url: z.string(),
+    publicUrl: z.string().optional(),
     createdAt: z.string(),
     updatedAt: z.string()
+});
+
+/**
+ * Who reads it; `personal` when absent at publication
+ */
+export const zArtifactAccess = z.enum([
+    'personal',
+    'team',
+    'link'
+]);
+
+/**
+ * A file sent for publication
+ */
+export const zArtifactFile = z.object({
+    path: z.string(),
+    content: z.string(),
+    encoding: z.enum(['utf8', 'base64']).optional()
+});
+
+/**
+ * A reading ticket
+ */
+export const zArtifactTicket = z.object({
+    artifactId: z.string(),
+    version: z.int(),
+    url: z.string(),
+    contentUrl: z.string(),
+    expiresAt: z.string()
 });
 
 export const zArtifactType = z.enum([
@@ -95,6 +173,7 @@ export const zArtifactType = z.enum([
 export const zArtifactVersion = z.object({
     number: z.int(),
     files: z.array(z.string()),
+    entry: z.string(),
     createdAt: z.string(),
     createdBy: z.string()
 });
@@ -153,6 +232,46 @@ export const zAutomationAction = z.object({
     maxRuntimeMinutes: z.int().optional()
 });
 
+/**
+ * A webhook payload value that does not fit its variable
+ */
+export const zAutomationPayloadProblem = z.object({
+    path: z.string(),
+    rule: z.string()
+});
+
+/**
+ * One trigger of an automation (cron, webhook or test) and the session it started, kept 14 days
+ */
+export const zAutomationRun = z.object({
+    id: z.string(),
+    automationId: z.string(),
+    source: z.string(),
+    status: z.string(),
+    version: z.int(),
+    sessionId: z.string().nullish(),
+    reason: z.string().nullish(),
+    problems: z.array(zAutomationPayloadProblem),
+    slotAt: z.string().nullish(),
+    createdAt: z.string(),
+    updatedAt: z.string()
+});
+
+/**
+ * What a run would do, without starting anything
+ */
+export const zAutomationDryRun = z.object({
+    renderedPrompt: z.string(),
+    variables: z.array(z.object({
+        name: z.string(),
+        value: z.string().nullish(),
+        sensitive: z.boolean()
+    })),
+    problems: z.array(zAutomationPayloadProblem),
+    wouldSkip: z.string().nullish(),
+    nextRuns: z.array(z.string())
+});
+
 export const zAutomationTriggerKind = z.enum(['cron', 'webhook']);
 
 /**
@@ -196,7 +315,129 @@ export const zAutomation = z.object({
     webhookUrl: z.string().optional(),
     version: z.int(),
     createdAt: z.string(),
-    updatedAt: z.string()
+    updatedAt: z.string(),
+    nextRunAt: z.string().optional(),
+    previousSecretValidUntil: z.string().optional(),
+    secret: z.string().optional()
+});
+
+/**
+ * An invoice or receipt. Amounts are in the currency's smallest unit (cents)
+ */
+export const zBillingInvoice = z.object({
+    id: z.string(),
+    number: z.string().nullable(),
+    status: z.string(),
+    total: z.coerce.bigint().min(BigInt('-9223372036854775808'), { error: 'Invalid value: Expected int64 to be >= -9223372036854775808' }).max(BigInt('9223372036854775807'), { error: 'Invalid value: Expected int64 to be <= 9223372036854775807' }),
+    tax: z.coerce.bigint().min(BigInt('-9223372036854775808'), { error: 'Invalid value: Expected int64 to be >= -9223372036854775808' }).max(BigInt('9223372036854775807'), { error: 'Invalid value: Expected int64 to be <= 9223372036854775807' }),
+    currency: z.string(),
+    created: z.iso.datetime(),
+    hostedInvoiceUrl: z.string().nullable(),
+    pdfUrl: z.string().nullable()
+});
+
+/**
+ * Invoices and receipts, newest first
+ */
+export const zBillingInvoiceList = z.object({
+    invoices: z.array(zBillingInvoice)
+});
+
+/**
+ * A payment waiting for the customer; the console shows a banner linking to Stripe's invoice page
+ */
+export const zBillingPaymentIssue = z.object({
+    kind: z.enum(['payment_failed', 'action_required']),
+    hostedInvoiceUrl: z.string().nullable(),
+    at: z.iso.datetime()
+});
+
+/**
+ * The limits in force; null means unlimited. A request that would go past one (a member, a cloud agent, an agent hour, SSO, policies) is answered 402 `payment_required`, with a message naming the limit and where to upgrade.
+ */
+export const zBillingPlanLimits = z.object({
+    maxPeople: z.int().nullable(),
+    maxConcurrentCloudAgents: z.int().nullable(),
+    agentHoursPerPeriod: z.int().nullable(),
+    sso: z.boolean(),
+    policies: z.boolean(),
+    receiptRetentionDays: z.int().nullable()
+});
+
+/**
+ * A plan to buy or switch to
+ */
+export const zBillingPlanRequest = z.object({
+    plan: z.enum(['team', 'business']),
+    interval: z.enum(['month', 'year'])
+});
+
+/**
+ * A price of the catalog: per active person per month (monthly), per person per year (yearly, 20 % off)
+ */
+export const zBillingPrice = z.object({
+    plan: z.enum(['team', 'business']),
+    interval: z.enum(['month', 'year']),
+    unitAmount: z.coerce.bigint().min(BigInt('-9223372036854775808'), { error: 'Invalid value: Expected int64 to be >= -9223372036854775808' }).max(BigInt('9223372036854775807'), { error: 'Invalid value: Expected int64 to be <= 9223372036854775807' }),
+    currency: z.string()
+});
+
+/**
+ * A Stripe page to send the browser to
+ */
+export const zBillingRedirect = z.object({
+    url: z.url()
+});
+
+/**
+ * Cloud agent usage of the current period
+ */
+export const zBillingUsage = z.object({
+    agentSeconds: z.coerce.bigint().min(BigInt('-9223372036854775808'), { error: 'Invalid value: Expected int64 to be >= -9223372036854775808' }).max(BigInt('9223372036854775807'), { error: 'Invalid value: Expected int64 to be <= 9223372036854775807' }),
+    agentHours: z.coerce.bigint().min(BigInt('-9223372036854775808'), { error: 'Invalid value: Expected int64 to be >= -9223372036854775808' }).max(BigInt('9223372036854775807'), { error: 'Invalid value: Expected int64 to be <= 9223372036854775807' }),
+    sessions: z.coerce.bigint().min(BigInt('-9223372036854775808'), { error: 'Invalid value: Expected int64 to be >= -9223372036854775808' }).max(BigInt('9223372036854775807'), { error: 'Invalid value: Expected int64 to be <= 9223372036854775807' }),
+    percentOfHours: z.int().nullable()
+});
+
+/**
+ * What the console's billing page shows: plan, period, limits, usage, alerts and payment state
+ */
+export const zBillingOverview = z.object({
+    orgId: z.uuid(),
+    plan: z.enum([
+        'free',
+        'team',
+        'business',
+        'enterprise'
+    ]),
+    effectivePlan: z.enum([
+        'free',
+        'team',
+        'business',
+        'enterprise'
+    ]),
+    interval: z.enum(['month', 'year']).nullable(),
+    status: z.string().nullable(),
+    cancelAtPeriodEnd: z.boolean(),
+    periodStart: z.iso.datetime(),
+    periodEnd: z.iso.datetime(),
+    activePeople: z.int(),
+    committedPeople: z.int(),
+    limits: zBillingPlanLimits,
+    usage: zBillingUsage,
+    alerts: z.array(z.int()),
+    paymentIssue: zBillingPaymentIssue.nullable(),
+    purchasable: z.boolean(),
+    prices: z.array(zBillingPrice)
+});
+
+export const zBillingWebhookAck = z.object({
+    received: z.boolean(),
+    outcome: z.enum([
+        'processed',
+        'duplicate',
+        'ignored'
+    ])
 });
 
 /**
@@ -256,7 +497,24 @@ export const zApprovalCheck = z.object({
 });
 
 /**
- * An agent session run on a runner
+ * Why a cloud session failed or paused on its own
+ */
+export const zCloudSessionFailure = z.object({
+    code: z.string(),
+    message: z.string()
+});
+
+/**
+ * The bounds a cloud session runs under, from its organization's plan
+ */
+export const zCloudSessionLimits = z.object({
+    idleTimeoutMinutes: z.int(),
+    maxRunMinutes: z.int(),
+    restrictedEgress: z.boolean()
+});
+
+/**
+ * A cloud agent session: one pod (or local container) per execution, with a workspace kept across pauses
  */
 export const zCloudSession = z.object({
     id: z.string(),
@@ -264,7 +522,18 @@ export const zCloudSession = z.object({
     owner: z.string(),
     agent: z.string(),
     model: z.string().optional(),
+    repo: z.string().optional(),
+    ref: z.string().optional(),
     status: z.string(),
+    desiredStatus: z.string().optional(),
+    phase: z.string().optional(),
+    epoch: z.coerce.bigint().min(BigInt('-9223372036854775808'), { error: 'Invalid value: Expected int64 to be >= -9223372036854775808' }).max(BigInt('9223372036854775807'), { error: 'Invalid value: Expected int64 to be <= 9223372036854775807' }).optional(),
+    failure: zCloudSessionFailure.optional(),
+    limits: zCloudSessionLimits.optional(),
+    updatedAt: z.string().optional(),
+    readyAt: z.string().optional(),
+    lastActivityAt: z.string().optional(),
+    pausedAt: z.string().optional(),
     runnerId: z.string().optional(),
     runId: z.string().optional(),
     automationId: z.string().optional(),
@@ -348,6 +617,15 @@ export const zDeviceCode = z.object({
 });
 
 /**
+ * The size of a change
+ */
+export const zDiffStats = z.object({
+    files: z.int(),
+    additions: z.int(),
+    deletions: z.int()
+});
+
+/**
  * Ends a session (hook `SessionEnd` or the launcher): the server signs the segment's receipt
  */
 export const zEndSessionRequest = z.object({
@@ -405,7 +683,10 @@ export const zApproval = z.object({
     shownDigest: z.string(),
     askedBy: z.array(z.string()).optional(),
     selfApproved: z.boolean().optional(),
-    expiresAt: z.string().optional()
+    expiresAt: z.string().optional(),
+    action: zApprovalAction.optional(),
+    diffStats: zDiffStats.optional(),
+    diffTruncated: z.boolean().optional()
 });
 
 /**
@@ -500,6 +781,15 @@ export const zGroup = z.object({
 });
 
 /**
+ * Liveness and the result of each check
+ */
+export const zHealth = z.object({
+    status: z.string(),
+    version: z.string(),
+    checks: z.record(z.string(), z.string())
+});
+
+/**
  * A hook delivered to developers outside session packages
  */
 export const zHook = z.object({
@@ -507,6 +797,40 @@ export const zHook = z.object({
     version: z.string(),
     pinned: z.boolean(),
     assignedTo: z.array(z.string())
+});
+
+/**
+ * One line of an import report
+ */
+export const zImportItem = z.object({
+    kind: z.enum([
+        'setting',
+        'secret',
+        'server',
+        'policy',
+        'assignment',
+        'account'
+    ]),
+    name: z.string(),
+    action: z.enum([
+        'planned',
+        'created',
+        'updated',
+        'unchanged',
+        'skipped'
+    ]),
+    reason: z.string().optional()
+});
+
+/**
+ * What an import did; a second run reports everything unchanged
+ */
+export const zImportReport = z.object({
+    items: z.array(zImportItem),
+    created: z.int(),
+    updated: z.int(),
+    unchanged: z.int(),
+    skipped: z.int()
 });
 
 /**
@@ -518,6 +842,100 @@ export const zInferenceRoute = z.object({
     provider: z.string(),
     account: z.string().optional(),
     priority: z.int()
+});
+
+/**
+ * A key the instance signs with
+ */
+export const zInstanceSigningKey = z.object({
+    keyId: z.string(),
+    algorithm: z.string(),
+    publicKeyPem: z.string(),
+    firstSeenAt: z.string()
+});
+
+/**
+ * The instance as clients see it
+ */
+export const zInstance = z.object({
+    id: z.string(),
+    version: z.string(),
+    createdAt: z.string(),
+    signingKey: zInstanceSigningKey
+});
+
+/**
+ * One test on a tool call's arguments
+ */
+export const zMcpArgumentCondition = z.object({
+    path: z.string().max(256),
+    operator: z.enum([
+        'EQUALS',
+        'NOT_EQUALS',
+        'MATCHES',
+        'PREFIX',
+        'CONTAINS',
+        'EXISTS',
+        'ABSENT'
+    ]),
+    value: z.string().max(1024).optional()
+});
+
+/**
+ * A rule on a tool's arguments, checked on every call before it reaches the upstream server
+ */
+export const zMcpArgumentPolicy = z.object({
+    id: z.string(),
+    tool: z.string(),
+    conditions: z.array(zMcpArgumentCondition),
+    effect: z.enum(['DENY', 'REQUIRE_APPROVAL']),
+    message: z.string(),
+    createdAt: z.iso.datetime()
+});
+
+/**
+ * The argument policies of a relayed server, at most 64, so always one page
+ */
+export const zMcpArgumentPolicies = z.object({
+    policies: z.array(zMcpArgumentPolicy).max(64),
+    next: z.string().optional()
+});
+
+/**
+ * A new argument policy; every condition must hold (none means every call of the tool)
+ */
+export const zMcpArgumentPolicyRequest = z.object({
+    tool: z.string(),
+    conditions: z.array(zMcpArgumentCondition).optional(),
+    effect: z.enum(['DENY', 'REQUIRE_APPROVAL']),
+    message: z.string()
+});
+
+/**
+ * Who reaches a relayed server and which of its tools. A member's own assignment replaces the one for every member (`all`) for that member, it never adds to it; removing `all` leaves members' own assignments
+ */
+export const zMcpAssignment = z.object({
+    server: z.string(),
+    member: z.string().optional(),
+    tools: z.array(z.string()).optional(),
+    credentialSecret: z.string().optional(),
+    assignedAt: z.iso.datetime()
+});
+
+/**
+ * An assignment; hiding a tool is not the boundary, every call is checked again
+ */
+export const zMcpAssignmentRequest = z.object({
+    tools: z.array(z.string()).optional(),
+    credentialSecret: z.string().optional()
+});
+
+/**
+ * The assignments of a server, one per member and one for `all` at most, so always one page
+ */
+export const zMcpAssignmentsPage = z.object({
+    items: z.array(zMcpAssignment),
+    next: z.string().optional()
 });
 
 /**
@@ -535,16 +953,50 @@ export const zMcpCall = z.object({
 });
 
 /**
+ * How the gateway reaches model providers for the org (bring your own key)
+ */
+export const zInferenceSettings = z.object({
+    anthropicKeySecret: z.string().optional(),
+    openaiKeySecret: z.string().optional(),
+    openrouterKeySecret: z.string().optional(),
+    useSharedAccounts: z.boolean().optional().default(true)
+});
+
+/**
+ * How agents see relayed servers
+ */
+export const zMcpSettings = z.object({
+    agentPrefix: z.string().regex(/^[a-z0-9][a-z0-9_-]{0,31}$/)
+});
+
+/**
+ * A server run by the MCP host from a pinned package
+ */
+export const zMcpStdioSpec = z.object({
+    launcher: z.enum(['npm', 'pypi']),
+    packageName: z.string(),
+    args: z.array(z.string()).optional(),
+    env: z.record(z.string(), z.string()).optional(),
+    secretEnv: z.record(z.string(), z.string()).optional()
+});
+
+/**
  * An MCP server relayed by Ostrom; its credentials stay on the server
  */
 export const zMcpServer = z.object({
-    name: z.string(),
-    url: z.string(),
+    name: z.string().regex(/^[a-z0-9][a-z0-9._-]{0,63}$/),
+    url: z.string().optional(),
     transport: z.string(),
-    secretNames: z.array(z.string()),
+    secretNames: z.array(z.string()).optional(),
     tools: z.array(z.string()).optional(),
     enabled: z.boolean(),
-    scope: z.string()
+    scope: z.string(),
+    agentName: z.string().readonly().optional(),
+    path: z.string().readonly().optional(),
+    credentialHeader: z.string().optional(),
+    stdio: zMcpStdioSpec.optional(),
+    version: z.int().readonly().optional(),
+    createdAt: z.iso.datetime().readonly().optional()
 });
 
 export const zMemberRole = z.enum([
@@ -576,6 +1028,18 @@ export const zModelPolicy = z.object({
     allowed: z.array(z.string()),
     default: z.string(),
     byMember: z.record(z.string(), z.array(z.string())).optional()
+});
+
+/**
+ * The caller's budget this month, in millionths of a US dollar
+ */
+export const zMyBudget = z.object({
+    limitMicros: z.int().optional(),
+    spentMicros: z.int(),
+    remainingMicros: z.int().optional(),
+    resetsAt: z.string(),
+    exhausted: z.boolean(),
+    exhaustedScope: z.enum(['org', 'member']).optional()
 });
 
 /**
@@ -1085,6 +1549,8 @@ export const zSecret = z.object({
     createdAt: z.string(),
     updatedAt: z.string(),
     updatedBy: z.string(),
+    version: z.int(),
+    owner: z.string().optional(),
     usedBy: z.array(z.string()).optional()
 });
 
@@ -1095,6 +1561,14 @@ export const zSecretWrite = z.object({
     name: z.string(),
     value: z.string(),
     scope: z.string().optional()
+});
+
+/**
+ * 403 self_approval_refused: the asker answered while another approver exists
+ */
+export const zSelfApprovalRefused = z.object({
+    error: zErrorDetail,
+    others: z.array(z.string())
 });
 
 /**
@@ -1177,6 +1651,25 @@ export const zSharedAccount = z.object({
     pool: z.string().optional(),
     dailyAllocationUsd: z.number().optional(),
     paused: z.boolean()
+});
+
+/**
+ * A gate policy signed by the instance: `signature` (base64, Ed25519 by the key `kid` of `/api/v1/instance/keys`) over the UTF-8 bytes of `payload`, the JSON text of a `SignedGatePolicyPayload`
+ */
+export const zSignedGatePolicy = z.object({
+    format: z.enum(['ostrom.gates/1']),
+    alg: z.string(),
+    kid: z.string(),
+    signature: z.string(),
+    payload: z.string()
+});
+
+/**
+ * A completed sign-in; the session itself is in the cookies
+ */
+export const zSignedIn = z.object({
+    redirect: z.string(),
+    csrfToken: z.string().optional()
 });
 
 /**
@@ -1322,6 +1815,66 @@ export const zTeam = z.object({
 });
 
 /**
+ * A shared subscription account of TeamCode, tokens in clear (sent once, over TLS)
+ */
+export const zTeamCodeAccount = z.object({
+    provider: z.enum(['claude', 'codex']),
+    providerAccountId: z.string(),
+    label: z.string(),
+    email: z.string().optional(),
+    expiresAt: z.iso.datetime(),
+    disabled: z.boolean().optional()
+});
+
+/**
+ * A TeamCode member's assignment to an MCP variant
+ */
+export const zTeamCodeAssignment = z.object({
+    memberId: z.string(),
+    serverId: z.string()
+});
+
+export const zTeamCodeMember = z.object({
+    id: z.string(),
+    username: z.string()
+});
+
+/**
+ * A command of TeamCode run by the MCP host
+ */
+export const zTeamCodeStdio = z.object({
+    launcher: z.enum(['npm', 'pypi']),
+    packageName: z.string(),
+    args: z.array(z.string()).optional()
+});
+
+/**
+ * An MCP variant of TeamCode; a slot's most assigned variant keeps the slot's name
+ */
+export const zTeamCodeMcpServer = z.object({
+    id: z.string(),
+    target: z.string(),
+    variant: z.string(),
+    perMember: z.boolean().optional(),
+    url: z.string().optional(),
+    credentialHeader: z.string().optional(),
+    stdio: zTeamCodeStdio.optional(),
+    toolMode: z.enum(['allow', 'deny']).optional(),
+    tools: z.array(z.string()).optional()
+});
+
+/**
+ * What `ostrom import teamcode` read from TeamCode (read-only there), and its member map
+ */
+export const zTeamCodeImportRequest = z.object({
+    members: z.array(zTeamCodeMember).optional(),
+    mcpServers: z.array(zTeamCodeMcpServer).optional(),
+    assignments: z.array(zTeamCodeAssignment).optional(),
+    accounts: z.array(zTeamCodeAccount).optional(),
+    memberMap: z.record(z.string(), z.string()).optional()
+});
+
+/**
  * Spending over a period
  */
 export const zUsage = z.object({
@@ -1331,7 +1884,71 @@ export const zUsage = z.object({
     tokensIn: z.int(),
     tokensOut: z.int(),
     byMember: z.record(z.string(), z.number()).optional(),
-    byModel: z.record(z.string(), z.number()).optional()
+    byModel: z.record(z.string(), z.number()).optional(),
+    cacheReadTokens: z.int(),
+    cacheWriteTokens: z.int(),
+    events: z.int()
+});
+
+/**
+ * A usage event; costs in millionths of a US dollar
+ */
+export const zUsageEvent = z.object({
+    id: z.string(),
+    memberId: z.string().optional(),
+    kind: z.string(),
+    name: z.string(),
+    provider: z.string().optional(),
+    accountId: z.string().optional(),
+    sessionId: z.string().optional(),
+    inputTokens: z.int(),
+    outputTokens: z.int(),
+    cacheReadTokens: z.int(),
+    cacheWriteTokens: z.int(),
+    costMicros: z.int(),
+    durationMillis: z.int(),
+    outcome: z.string(),
+    at: z.string()
+});
+
+/**
+ * An event a client declares
+ */
+export const zUsageEventInput = z.object({
+    kind: z.enum([
+        'skill',
+        'hook',
+        'session',
+        'mcp'
+    ]),
+    name: z.string(),
+    sessionId: z.string().optional(),
+    durationMillis: z.int().optional().default(0),
+    outcome: z.string().optional().default('ok'),
+    at: z.string().optional()
+});
+
+/**
+ * The totals of a group; `key` is absent for the total and for events without one
+ */
+export const zUsageTotal = z.object({
+    key: z.string().optional(),
+    events: z.int(),
+    inputTokens: z.int(),
+    outputTokens: z.int(),
+    cacheReadTokens: z.int(),
+    cacheWriteTokens: z.int(),
+    costMicros: z.int()
+});
+
+/**
+ * Totals per group since a date
+ */
+export const zUsageSummary = z.object({
+    since: z.string(),
+    groupBy: z.string(),
+    groups: z.array(zUsageTotal),
+    total: zUsageTotal
 });
 
 /**
@@ -1591,6 +2208,45 @@ export const zGateRef = z.object({
 });
 
 /**
+ * An approval as the console and the app show it: the request, the gate, the rules, the commits and checks (in `approval`), the receipt once answered
+ */
+export const zApprovalView = z.object({
+    approval: zApproval,
+    who: z.object({
+        dev: z.string().optional(),
+        agent: z.string().optional(),
+        model: z.string().optional(),
+        session: z.string().optional()
+    }).optional(),
+    what: z.object({
+        action: z.string().optional(),
+        command: z.string().optional(),
+        repo: z.string().optional(),
+        sessionRepo: z.string().optional(),
+        harness: z.string().optional()
+    }).optional(),
+    gate: zGateRef.optional(),
+    rules: z.array(zRule).optional(),
+    diff: z.string().optional(),
+    pr: zGatePullRequest.optional(),
+    askedVia: z.array(z.string()).optional(),
+    note: z.string().optional(),
+    receipt: zReceipt.optional(),
+    verification: zVerification.optional(),
+    you: zApprovalCallerView
+});
+
+/**
+ * The yes queue of the caller
+ */
+export const zApprovalQueue = z.object({
+    operator: z.string(),
+    you: zApprovalViewer,
+    pending: z.array(zApprovalView),
+    recent: z.array(zApprovalView)
+});
+
+/**
  * The gates of a repository and the action classes they cover
  */
 export const zGateCatalog = z.object({
@@ -1675,6 +2331,19 @@ export const zSessionPackage = z.object({
 });
 
 /**
+ * What `SignedGatePolicy.payload` contains. The hooks refuse it after `expiresAt` (10 minutes after `issuedAt`) or if it claims more than an hour
+ */
+export const zSignedGatePolicyPayload = z.object({
+    repo: z.string(),
+    issuedAt: z.string(),
+    expiresAt: z.string(),
+    failMode: z.enum(['closed']),
+    waitSeconds: z.int(),
+    gates: z.array(zGateRef),
+    actions: z.array(zGateAction)
+});
+
+/**
  * A workflow
  */
 export const zWorkflow = z.object({
@@ -1707,11 +2376,100 @@ export const zAnalysisState = z.object({
 });
 
 /**
+ * An MCP server relayed by Ostrom; its credentials stay on the server
+ */
+export const zMcpServerWritable = z.object({
+    name: z.string().regex(/^[a-z0-9][a-z0-9._-]{0,63}$/),
+    url: z.string().optional(),
+    transport: z.string(),
+    secretNames: z.array(z.string()).optional(),
+    tools: z.array(z.string()).optional(),
+    enabled: z.boolean(),
+    scope: z.string(),
+    credentialHeader: z.string().optional(),
+    stdio: zMcpStdioSpec.optional()
+});
+
+/**
+ * A shared subscription account of TeamCode, tokens in clear (sent once, over TLS)
+ */
+export const zTeamCodeAccountWritable = z.object({
+    provider: z.enum(['claude', 'codex']),
+    providerAccountId: z.string(),
+    label: z.string(),
+    email: z.string().optional(),
+    accessToken: z.string(),
+    refreshToken: z.string(),
+    expiresAt: z.iso.datetime(),
+    disabled: z.boolean().optional()
+});
+
+/**
+ * A TeamCode member's assignment to an MCP variant
+ */
+export const zTeamCodeAssignmentWritable = z.object({
+    memberId: z.string(),
+    serverId: z.string(),
+    memberSecret: z.string().optional()
+});
+
+/**
+ * A command of TeamCode run by the MCP host
+ */
+export const zTeamCodeStdioWritable = z.object({
+    launcher: z.enum(['npm', 'pypi']),
+    packageName: z.string(),
+    args: z.array(z.string()).optional(),
+    secretEnv: z.record(z.string(), z.string()).optional()
+});
+
+/**
+ * An MCP variant of TeamCode; a slot's most assigned variant keeps the slot's name
+ */
+export const zTeamCodeMcpServerWritable = z.object({
+    id: z.string(),
+    target: z.string(),
+    variant: z.string(),
+    perMember: z.boolean().optional(),
+    url: z.string().optional(),
+    credentialHeader: z.string().optional(),
+    sharedSecret: z.string().optional(),
+    stdio: zTeamCodeStdioWritable.optional(),
+    toolMode: z.enum(['allow', 'deny']).optional(),
+    tools: z.array(z.string()).optional()
+});
+
+/**
+ * What `ostrom import teamcode` read from TeamCode (read-only there), and its member map
+ */
+export const zTeamCodeImportRequestWritable = z.object({
+    members: z.array(zTeamCodeMember).optional(),
+    mcpServers: z.array(zTeamCodeMcpServerWritable).optional(),
+    assignments: z.array(zTeamCodeAssignmentWritable).optional(),
+    accounts: z.array(zTeamCodeAccountWritable).optional(),
+    memberMap: z.record(z.string(), z.string()).optional()
+});
+
+/**
  * OK
  */
-export const zHealthResponse = z.object({
-    status: z.string(),
-    version: z.string()
+export const zHealthRootResponse = zHealth;
+
+/**
+ * OK
+ */
+export const zHealthResponse = zHealth;
+
+/**
+ * OK
+ */
+export const zGetInstanceResponse = zInstance;
+
+/**
+ * OK
+ */
+export const zListInstanceKeysResponse = z.object({
+    keys: z.array(zInstanceSigningKey)
 });
 
 /**
@@ -1828,6 +2586,29 @@ export const zGetMeResponse = z.union([
     zMe,
     z.void()
 ]);
+
+export const zRequestSignInEmailBody = z.object({
+    email: z.string(),
+    redirect: z.string().optional()
+});
+
+export const zVerifySignInEmailBody = z.object({
+    token: z.string()
+});
+
+/**
+ * Signed in; the session is in the cookies, never in the body
+ */
+export const zVerifySignInEmailResponse = zSignedIn;
+
+export const zExchangeSignInLinkBody = z.object({
+    token: z.string()
+});
+
+/**
+ * Signed in; the session is in the cookies, never in the body
+ */
+export const zExchangeSignInLinkResponse = zSignedIn;
 
 /**
  * Done
@@ -1976,6 +2757,15 @@ export const zGithubWebhookBody = z.unknown();
  * Done
  */
 export const zGithubWebhookResponse = z.void();
+
+export const zReceiveSlackInteractionBody = z.object({
+    payload: z.string()
+});
+
+export const zReceiveSlackInteractionHeaders = z.object({
+    'X-Slack-Signature': z.string(),
+    'X-Slack-Request-Timestamp': z.string()
+});
 
 export const zGithubCheckBody = z.object({
     repo: z.string(),
@@ -2220,6 +3010,15 @@ export const zGetGateCatalogQuery = z.object({
  */
 export const zGetGateCatalogResponse = zGateCatalog;
 
+export const zGetSignedGatePolicyQuery = z.object({
+    repo: z.string()
+});
+
+/**
+ * OK
+ */
+export const zGetSignedGatePolicyResponse = zSignedGatePolicy;
+
 /**
  * OK
  */
@@ -2239,9 +3038,10 @@ export const zSetGatePolicyResponse = z.object({
 });
 
 export const zListApprovalsQuery = z.object({
-    status: z.string().optional(),
+    status: z.array(zApprovalStatus).optional(),
     mine: z.boolean().optional(),
-    before: z.string().optional()
+    before: z.string().optional(),
+    limit: z.int().gte(1).lte(200).optional().default(50)
 });
 
 /**
@@ -2252,6 +3052,11 @@ export const zListApprovalsResponse = z.object({
     next: z.string().optional()
 });
 
+/**
+ * OK
+ */
+export const zGetApprovalQueueResponse = zApprovalQueue;
+
 export const zGetApprovalPath = z.object({
     id: z.string()
 });
@@ -2261,6 +3066,15 @@ export const zGetApprovalPath = z.object({
  */
 export const zGetApprovalResponse = zApproval;
 
+export const zGetApprovalViewPath = z.object({
+    id: z.string()
+});
+
+/**
+ * OK
+ */
+export const zGetApprovalViewResponse = zApprovalView;
+
 export const zAnswerApprovalBody = zAnswerApprovalRequest;
 
 export const zAnswerApprovalPath = z.object({
@@ -2268,12 +3082,9 @@ export const zAnswerApprovalPath = z.object({
 });
 
 /**
- * OK
+ * The answered approval and its receipt
  */
-export const zAnswerApprovalResponse = z.object({
-    approval: zApproval,
-    receipt: zReceipt.optional()
-});
+export const zAnswerApprovalResponse = zApprovalView;
 
 export const zListDecisionsQuery = z.object({
     subjectKind: z.string().optional(),
@@ -2710,20 +3521,25 @@ export const zTestAutomationPath = z.object({
     id: z.string()
 });
 
-/**
- * OK
- */
-export const zTestAutomationResponse = zWorkflowRun;
+export const zTestAutomationResponse = z.union([
+    zAutomationDryRun,
+    zAutomationRun
+]);
 
 export const zListAutomationRunsPath = z.object({
     id: z.string()
+});
+
+export const zListAutomationRunsQuery = z.object({
+    before: z.string().optional(),
+    limit: z.int().gte(1).lte(100).optional()
 });
 
 /**
  * OK
  */
 export const zListAutomationRunsResponse = z.object({
-    items: z.array(zWorkflowRun),
+    items: z.array(zAutomationRun),
     next: z.string().optional()
 });
 
@@ -2738,6 +3554,7 @@ export const zTriggerAutomationPath = z.object({
  */
 export const zTriggerAutomationResponse = z.object({
     runId: z.string().optional(),
+    status: z.string().optional(),
     deduplicated: z.boolean()
 });
 
@@ -2801,6 +3618,10 @@ export const zCancelWaitPath = z.object({
  */
 export const zCancelWaitResponse = zWait;
 
+export const zListMcpServersQuery = z.object({
+    mine: z.boolean().optional()
+});
+
 /**
  * OK
  */
@@ -2809,7 +3630,7 @@ export const zListMcpServersResponse = z.object({
     next: z.string().optional()
 });
 
-export const zCreateMcpServerBody = zMcpServer;
+export const zCreateMcpServerBody = zMcpServerWritable;
 
 /**
  * OK
@@ -2825,7 +3646,7 @@ export const zDeleteMcpServerPath = z.object({
  */
 export const zDeleteMcpServerResponse = z.void();
 
-export const zSaveMcpServerBody = zMcpServer;
+export const zSaveMcpServerBody = zMcpServerWritable;
 
 export const zSaveMcpServerPath = z.object({
     name: z.string()
@@ -2835,6 +3656,79 @@ export const zSaveMcpServerPath = z.object({
  * OK
  */
 export const zSaveMcpServerResponse = zMcpServer;
+
+export const zListMcpAssignmentsPath = z.object({
+    name: z.string()
+});
+
+/**
+ * OK
+ */
+export const zListMcpAssignmentsResponse = zMcpAssignmentsPage;
+
+export const zUnassignMcpServerPath = z.object({
+    name: z.string(),
+    member: z.string()
+});
+
+/**
+ * Done
+ */
+export const zUnassignMcpServerResponse = z.void();
+
+export const zAssignMcpServerBody = zMcpAssignmentRequest;
+
+export const zAssignMcpServerPath = z.object({
+    name: z.string(),
+    member: z.string()
+});
+
+/**
+ * OK
+ */
+export const zAssignMcpServerResponse = zMcpAssignment;
+
+export const zListMcpArgumentPoliciesPath = z.object({
+    name: z.string()
+});
+
+/**
+ * OK
+ */
+export const zListMcpArgumentPoliciesResponse = zMcpArgumentPolicies;
+
+export const zCreateMcpArgumentPolicyBody = zMcpArgumentPolicyRequest;
+
+export const zCreateMcpArgumentPolicyPath = z.object({
+    name: z.string()
+});
+
+/**
+ * OK
+ */
+export const zCreateMcpArgumentPolicyResponse = zMcpArgumentPolicy;
+
+export const zDeleteMcpArgumentPolicyPath = z.object({
+    name: z.string(),
+    policyId: z.string()
+});
+
+/**
+ * Done
+ */
+export const zDeleteMcpArgumentPolicyResponse = z.void();
+
+/**
+ * OK
+ */
+export const zGetMcpSettingsResponse = zMcpSettings;
+
+export const zPutMcpSettingsBody = zMcpSettings;
+
+/**
+ * OK
+ */
+export const zPutMcpSettingsResponse = zMcpSettings;
 
 export const zRelayMcpBody = z.unknown();
 
@@ -2899,7 +3793,20 @@ export const zRotateSecretPath = z.object({
  */
 export const zRotateSecretResponse = zSecret;
 
+export const zImportTeamCodeBody = zTeamCodeImportRequestWritable;
+
+export const zImportTeamCodeQuery = z.object({
+    dryRun: z.boolean().optional()
+});
+
+/**
+ * OK
+ */
+export const zImportTeamCodeResponse = zImportReport;
+
 export const zInferenceMessagesBody = z.unknown();
+
+export const zInferenceResponsesBody = z.unknown();
 
 export const zInferenceChatCompletionsBody = z.unknown();
 
@@ -2909,6 +3816,18 @@ export const zInferenceChatCompletionsBody = z.unknown();
 export const zInferenceModelsResponse = z.object({
     data: z.array(z.record(z.string(), z.unknown()))
 });
+
+/**
+ * OK
+ */
+export const zGetInferenceSettingsResponse = zInferenceSettings;
+
+export const zSetInferenceSettingsBody = zInferenceSettings;
+
+/**
+ * OK
+ */
+export const zSetInferenceSettingsResponse = zInferenceSettings;
 
 /**
  * OK
@@ -2951,7 +3870,10 @@ export const zDeleteInferenceRouteResponse = z.void();
  */
 export const zListBudgetsResponse = z.object({
     items: z.array(zBudget),
-    next: z.string().optional()
+    next: z.string().optional(),
+    orgSpentUsd: z.number(),
+    periodStart: z.string(),
+    resetsAt: z.string()
 });
 
 export const zSetBudgetBody = zBudget;
@@ -2960,6 +3882,11 @@ export const zSetBudgetBody = zBudget;
  * OK
  */
 export const zSetBudgetResponse = zBudget;
+
+/**
+ * OK
+ */
+export const zGetMyBudgetResponse = zMyBudget;
 
 export const zGetUsageQuery = z.object({
     from: z.string().optional(),
@@ -2971,6 +3898,51 @@ export const zGetUsageQuery = z.object({
  * OK
  */
 export const zGetUsageResponse = zUsage;
+
+export const zGetUsageSummaryQuery = z.object({
+    days: z.int().gte(1).lte(90).optional().default(7),
+    groupBy: z.enum([
+        'member',
+        'kind',
+        'model',
+        'provider',
+        'account'
+    ]).optional().default('member')
+});
+
+/**
+ * OK
+ */
+export const zGetUsageSummaryResponse = zUsageSummary;
+
+export const zListUsageEventsQuery = z.object({
+    before: z.string().optional(),
+    limit: z.int().gte(1).lte(200).optional().default(50)
+});
+
+/**
+ * OK
+ */
+export const zListUsageEventsResponse = z.object({
+    events: z.array(zUsageEvent),
+    next: z.string().optional()
+});
+
+export const zRecordUsageEventsBody = z.object({
+    events: z.array(zUsageEventInput).max(500)
+});
+
+/**
+ * Recorded
+ */
+export const zRecordUsageEventsResponse = z.object({
+    accepted: z.int()
+});
+
+/**
+ * The event stream
+ */
+export const zStreamUsageResponse = z.string();
 
 export const zListPendingUsageQuery = z.object({
     member: z.string().optional(),
@@ -3090,7 +4062,8 @@ export const zRunnerHeartbeatResponse = z.object({
 
 export const zListCloudSessionsQuery = z.object({
     status: z.string().optional(),
-    before: z.string().optional()
+    before: z.string().optional(),
+    limit: z.int().gte(1).lte(50).optional()
 });
 
 /**
@@ -3105,7 +4078,8 @@ export const zCreateCloudSessionBody = z.object({
     agent: z.string(),
     model: z.string().optional(),
     repo: z.string().optional(),
-    prompt: z.string(),
+    ref: z.string().optional(),
+    prompt: z.string().optional(),
     name: z.string().optional()
 });
 
@@ -3119,9 +4093,9 @@ export const zStopCloudSessionPath = z.object({
 });
 
 /**
- * Done
+ * Accepted, the reconciler stops it
  */
-export const zStopCloudSessionResponse = z.void();
+export const zStopCloudSessionResponse = zCloudSession;
 
 export const zGetCloudSessionPath = z.object({
     id: z.string()
@@ -3131,6 +4105,60 @@ export const zGetCloudSessionPath = z.object({
  * OK
  */
 export const zGetCloudSessionResponse = zCloudSession;
+
+export const zPauseCloudSessionPath = z.object({
+    id: z.string()
+});
+
+/**
+ * Accepted, the reconciler pauses it
+ */
+export const zPauseCloudSessionResponse = zCloudSession;
+
+export const zResumeCloudSessionPath = z.object({
+    id: z.string()
+});
+
+/**
+ * Accepted, the reconciler starts a new execution
+ */
+export const zResumeCloudSessionResponse = zCloudSession;
+
+export const zIssueCloudTerminalTicketPath = z.object({
+    id: z.string()
+});
+
+/**
+ * OK
+ */
+export const zIssueCloudTerminalTicketResponse = z.object({
+    ticket: z.string(),
+    expiresAt: z.string()
+});
+
+export const zAttachCloudTerminalPath = z.object({
+    id: z.string()
+});
+
+export const zAttachCloudTerminalQuery = z.object({
+    ticket: z.string().optional()
+});
+
+export const zCloudRunnerHeartbeatBody = z.object({
+    sessionId: z.string(),
+    epoch: z.coerce.bigint().min(BigInt('-9223372036854775808'), { error: 'Invalid value: Expected int64 to be >= -9223372036854775808' }).max(BigInt('9223372036854775807'), { error: 'Invalid value: Expected int64 to be <= 9223372036854775807' }),
+    ready: z.boolean().optional(),
+    stopped: z.boolean().optional(),
+    lastModelRequestAt: z.string().optional()
+});
+
+/**
+ * OK
+ */
+export const zCloudRunnerHeartbeatResponse = z.object({
+    instruction: z.string(),
+    state: z.string()
+});
 
 export const zSendCloudMessageBody = z.object({
     text: z.string()
@@ -3156,6 +4184,11 @@ export const zStreamCloudSessionPath = z.object({
  */
 export const zStreamCloudSessionResponse = z.string();
 
+export const zListArtifactsQuery = z.object({
+    before: z.string().optional(),
+    limit: z.int().gte(1).lte(100).optional().default(20)
+});
+
 /**
  * OK
  */
@@ -3166,8 +4199,8 @@ export const zListArtifactsResponse = z.object({
 
 export const zPublishArtifactBody = z.object({
     title: z.string(),
-    access: z.string(),
-    files: z.array(z.record(z.string(), z.string()))
+    access: zArtifactAccess.optional(),
+    files: z.array(zArtifactFile)
 });
 
 /**
@@ -3193,6 +4226,20 @@ export const zGetArtifactPath = z.object({
  */
 export const zGetArtifactResponse = zArtifact;
 
+export const zUpdateArtifactBody = z.object({
+    title: z.string().optional(),
+    access: zArtifactAccess.optional()
+});
+
+export const zUpdateArtifactPath = z.object({
+    id: z.string()
+});
+
+/**
+ * OK
+ */
+export const zUpdateArtifactResponse = zArtifact;
+
 export const zListArtifactVersionsPath = z.object({
     id: z.string()
 });
@@ -3206,7 +4253,7 @@ export const zListArtifactVersionsResponse = z.object({
 });
 
 export const zPublishArtifactVersionBody = z.object({
-    files: z.array(z.record(z.string(), z.string()))
+    files: z.array(zArtifactFile)
 });
 
 export const zPublishArtifactVersionPath = z.object({
@@ -3245,7 +4292,7 @@ export const zListArtifactMembersResponse = z.object({
 
 export const zUnshareArtifactPath = z.object({
     id: z.string(),
-    login: z.string()
+    memberId: z.string()
 });
 
 /**
@@ -3255,13 +4302,17 @@ export const zUnshareArtifactResponse = z.void();
 
 export const zShareArtifactPath = z.object({
     id: z.string(),
-    login: z.string()
+    memberId: z.string()
 });
 
 /**
  * Done
  */
 export const zShareArtifactResponse = z.void();
+
+export const zCreateArtifactTicketBody = z.object({
+    version: z.int().optional()
+});
 
 export const zCreateArtifactTicketPath = z.object({
     id: z.string()
@@ -3270,10 +4321,7 @@ export const zCreateArtifactTicketPath = z.object({
 /**
  * OK
  */
-export const zCreateArtifactTicketResponse = z.object({
-    url: z.string(),
-    expiresAt: z.string()
-});
+export const zCreateArtifactTicketResponse = zArtifactTicket;
 
 /**
  * OK
@@ -3581,3 +4629,88 @@ export const zRunTaskPath = z.object({
  * OK
  */
 export const zRunTaskResponse = zTask;
+
+export const zGetBillingPath = z.object({
+    orgId: z.uuid()
+});
+
+/**
+ * OK
+ */
+export const zGetBillingResponse = zBillingOverview;
+
+export const zStartBillingCheckoutBody = zBillingPlanRequest;
+
+export const zStartBillingCheckoutPath = z.object({
+    orgId: z.uuid()
+});
+
+/**
+ * OK
+ */
+export const zStartBillingCheckoutResponse = zBillingRedirect;
+
+export const zOpenBillingPortalPath = z.object({
+    orgId: z.uuid()
+});
+
+/**
+ * OK
+ */
+export const zOpenBillingPortalResponse = zBillingRedirect;
+
+export const zChangeBillingPlanBody = zBillingPlanRequest;
+
+export const zChangeBillingPlanPath = z.object({
+    orgId: z.uuid()
+});
+
+/**
+ * OK
+ */
+export const zChangeBillingPlanResponse = zBillingOverview;
+
+export const zCancelBillingSubscriptionPath = z.object({
+    orgId: z.uuid()
+});
+
+/**
+ * OK
+ */
+export const zCancelBillingSubscriptionResponse = zBillingOverview;
+
+export const zResumeBillingSubscriptionPath = z.object({
+    orgId: z.uuid()
+});
+
+/**
+ * OK
+ */
+export const zResumeBillingSubscriptionResponse = zBillingOverview;
+
+export const zListBillingInvoicesPath = z.object({
+    orgId: z.uuid()
+});
+
+export const zListBillingInvoicesQuery = z.object({
+    limit: z.int().gte(1).lte(100).optional().default(24)
+});
+
+/**
+ * OK
+ */
+export const zListBillingInvoicesResponse = zBillingInvoiceList;
+
+/**
+ * A Stripe event, as Stripe sends it
+ */
+export const zReceiveStripeWebhookBody = z.record(z.string(), z.unknown());
+
+export const zReceiveStripeWebhookHeaders = z.object({
+    'Stripe-Signature': z.string()
+});
+
+/**
+ * OK
+ */
+export const zReceiveStripeWebhookResponse = zBillingWebhookAck;
