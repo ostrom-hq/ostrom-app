@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import {QueryClient, QueryClientProvider} from "@tanstack/react-query"
 import {render} from "@testing-library/react-native"
 import type {ReactElement} from "react"

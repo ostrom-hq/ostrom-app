@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import {hasText, isPresent} from "./presence"
 
 describe("presence", () => {

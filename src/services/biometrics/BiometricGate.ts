@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 /** The outcome of asking the person to prove it is them before a decision. */
 export type BiometricOutcome =
     | "confirmed"

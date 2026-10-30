@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import {base64Url, createPkce, pkceChallenge} from "./pkce"
 
 describe("PKCE", () => {

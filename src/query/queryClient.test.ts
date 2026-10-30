@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import {ApiError} from "@/api/http/ApiError"
 import {createQueryClient, isUnauthorized, shouldRetry} from "./queryClient"
 
