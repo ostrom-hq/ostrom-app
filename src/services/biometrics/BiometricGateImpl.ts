@@ -17,7 +17,12 @@ export class BiometricGateImpl implements BiometricGate {
         const level = await LocalAuthentication.getEnrolledLevelAsync()
         if (level === LocalAuthentication.SecurityLevel.NONE) return "unavailable"
         // The device passcode stays allowed as fallback: Face ID fails with a mask, gloves, a cracked sensor.
-        const result = await LocalAuthentication.authenticateAsync({promptMessage: prompt, disableDeviceFallback: false})
+        let result: LocalAuthentication.LocalAuthenticationResult
+        try {
+            result = await LocalAuthentication.authenticateAsync({promptMessage: prompt, disableDeviceFallback: false})
+        } catch {
+            return "failed"
+        }
         if (result.success) return "confirmed"
         if (CANCELLED.has(result.error)) return "cancelled"
         if (UNAVAILABLE.has(result.error)) return "unavailable"

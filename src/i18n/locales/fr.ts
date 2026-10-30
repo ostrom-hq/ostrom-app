@@ -11,6 +11,7 @@ export const fr: TranslationShape = {
         note: "Tu te connectes avec GitHub sur ton serveur Ostrom. Ton oui est signé à ton nom.",
         errors: {
             "invalid-url": "Saisis l'adresse de ton serveur Ostrom, en https://.",
+            unexpected: "La connexion n'a pas pu aboutir sur ce téléphone. Réessaie.",
             "state-mismatch": "Cette connexion ne vient pas de cette app. Réessaie.",
             denied: "GitHub ou le serveur a refusé la connexion.",
             "exchange-failed": "Le serveur n'a pas accepté la connexion. Vérifie l'adresse et réessaie.",
