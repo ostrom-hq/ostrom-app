@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type {TokenExchangeRequest} from "@/api/contract/account"
 import type {AccountRepository} from "@/repositories/AccountRepository"
 import {ApiError} from "@/api/http/ApiError"

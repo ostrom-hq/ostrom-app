@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import {useTranslation} from "react-i18next"
 import {StyleSheet, Text, View} from "react-native"
 import {SafeAreaView} from "react-native-safe-area-context"
