@@ -58,8 +58,11 @@ export function phoneMayApprove(approval: Approval): boolean {
 export const ApprovalPageSchema = zListApprovalsResponse.extend({items: z.array(ApprovalSchema)})
 export type ApprovalPage = z.output<typeof ApprovalPageSchema>
 
-/** `POST /api/v1/approvals/{id}/answer`: the answered request. Its receipt is read from the history, not here. */
-export const AnswerResultSchema = zAnswerApprovalResponse.omit({receipt: true}).extend({approval: ApprovalSchema})
+/**
+ * `POST /api/v1/approvals/{id}/answer`: since contract 0.1.129 the whole `ApprovalView` of the answered request. The
+ * app reads only the request (its receipt comes from the history), so only that part must be there to be read.
+ */
+export const AnswerResultSchema = zAnswerApprovalResponse.pick({approval: true}).extend({approval: ApprovalSchema})
 export type AnswerResult = z.output<typeof AnswerResultSchema>
 
 export type {AnswerApprovalRequest as AnswerRequest, ApprovalAnswer} from "@/api/gen"
