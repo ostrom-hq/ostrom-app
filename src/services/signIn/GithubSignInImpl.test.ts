@@ -12,7 +12,7 @@ function bytes(length: number): Uint8Array {
 
 /** A browser that answers with the callback the test builds from the start URL it was given. */
 function browser(answer: (start: URL) => AuthSessionResult): jest.Mock<Promise<AuthSessionResult>, [string, string]> {
-    return jest.fn((url: string) => Promise.resolve(answer(new URL(url))))
+    return jest.fn((url: string, _redirectUri: string) => Promise.resolve(answer(new URL(url))))
 }
 
 function account(exchange: AccountRepository["exchangeCode"] = jest.fn()): AccountRepository {
