@@ -2,7 +2,7 @@
 import {useTranslation} from "react-i18next"
 import {ActivityIndicator, Platform, ScrollView, StyleSheet, Text, View} from "react-native"
 import {SafeAreaView} from "react-native-safe-area-context"
-import {type ActionKind, type Approval, type CheckState} from "@/api/contract/approvals"
+import type {ActionKind, Approval, CheckState} from "@/api/contract/approvals"
 import {Button} from "@/ui/components/Button"
 import {Field, Section} from "@/ui/components/Section"
 import {StatusBadge} from "@/ui/components/StatusBadge"
