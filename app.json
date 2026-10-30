@@ -1,0 +1,23 @@
+{
+  "expo": {
+    "name": "Ostrom",
+    "slug": "ostrom",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "ostrom",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "bundleIdentifier": "run.ostrom.app",
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "run.ostrom.app",
+      "predictiveBackGestureEnabled": false
+    },
+    "plugins": ["expo-router", "expo-localization"],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    }
+  }
+}

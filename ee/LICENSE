@@ -1,0 +1,90 @@
+The Ostrom Enterprise License (the "Enterprise License")
+Copyright (c) 2026-present [OSTROM LEGAL ENTITY - TO BE FILLED BEFORE PUBLICATION]
+
+DRAFT - NOT YET REVIEWED BY A LAWYER. Adapted from the PostHog Enterprise
+license (https://github.com/PostHog/posthog/blob/master/ee/LICENSE) and the
+GitLab Enterprise Edition (EE) license
+(https://gitlab.com/gitlab-org/gitlab/-/blob/master/ee/LICENSE).
+
+With regard to the Ostrom Software:
+
+1. Scope. This Enterprise License applies to all content that resides under the
+"ee/" directory of the Ostrom repository, and to any file outside it whose
+header says "SPDX-License-Identifier: LicenseRef-Ostrom-Enterprise" (together,
+the "Software"). It does not apply to any other part of the Ostrom repository,
+which is licensed as stated in the "LICENSE" and "LICENSING.md" files at its
+root. "Ostrom", "we" and "us" mean the copyright holder named above.
+
+2. Production use requires a subscription. The Software may only be used in
+production if you (and any entity that you represent) have agreed to, and are
+in compliance with, the Ostrom Subscription Terms of Service, available at
+[URL OF THE SUBSCRIPTION TERMS - TO BE FILLED] (the "Enterprise Terms"), or
+another written agreement governing the use of the Software, as agreed by you
+and Ostrom, and otherwise have a valid Ostrom Enterprise subscription for the
+correct number of Active People. "Active People" has the meaning given in the
+Enterprise Terms. "Production" means any use other than Development and
+Testing, and includes any use where the Software governs real work: real
+approvals, real gates on real repositories, real receipts, or the analysis of
+a real organisation for its own benefit. A trial key or a development key
+issued by Ostrom counts as a valid subscription for the duration and the uses
+stated with it.
+
+3. License keys. The features of the Software are unlocked by a license key
+issued by Ostrom. You may not remove, disable, circumvent, tamper with or
+work around the license key check, the verification of its signature, or the
+gating of any feature of the Software, nor modify the Software or any other
+part of Ostrom so that a feature runs in production without a valid key that
+covers it. You may not share, publish, resell or reuse a license key beyond
+the subscription it was issued for. Publishing, distributing or offering any
+modification, patch, tool or instruction whose purpose or effect is to make
+the Software usable in production without a valid key is forbidden.
+
+4. What you may do without a subscription. Notwithstanding section 2, and
+subject to section 3:
+   (a) you may read and study the Software;
+   (b) you may copy and modify the Software for Development and Testing
+       purposes, without requiring a subscription. "Development and Testing"
+       means running the Software on a non-production instance, with test or
+       sample data, to develop, test, debug or review changes to Ostrom; it
+       does not include evaluating the Software for your organisation's own
+       use, for which Ostrom offers a trial key;
+   (c) you may publish patches to the Software, including by proposing them
+       as contributions to the Ostrom repository;
+   (d) you may keep and share copies of the Software as part of a copy of the
+       whole Ostrom repository (for example a fork on a code hosting service),
+       provided this Enterprise License stays attached to them. This grants no
+       right to use those copies in production.
+
+5. Modifications. You agree that Ostrom and/or its licensors (as applicable)
+retain all right, title and interest in and to all modifications of and
+patches to the Software, and that all such modifications and patches may only
+be used, copied, modified, displayed, distributed or otherwise exploited with
+a valid Ostrom Enterprise subscription for the correct number of Active
+People. Contributions to the Ostrom repository are also governed by its
+contribution terms.
+
+6. No other rights. You are not granted any other rights beyond what is
+expressly stated herein. Subject to the foregoing, it is forbidden to copy,
+merge, publish, distribute, sublicense, and/or sell the Software. No right is
+granted to use the "Ostrom" name or logo, except to state truthfully that a
+copy comes from the Ostrom repository.
+
+7. Termination. If you breach this Enterprise License, every right it grants
+you ends automatically, and you must stop using the Software in production.
+
+8. Third party components. For all third party components incorporated into
+the Software, those components are licensed under the original license
+provided by the owner of the applicable component.
+
+9. Full text. The full text of this Enterprise License shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+[GOVERNING LAW AND COURTS - TO BE FILLED WITH THE LAWYER]
