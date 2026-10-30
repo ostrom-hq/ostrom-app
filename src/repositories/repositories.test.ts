@@ -1,3 +1,4 @@
+import {http as httpMock, HttpResponse} from "msw"
 import {setupServer} from "msw/node"
 import {HttpClientImpl} from "@/api/http/HttpClientImpl"
 import {ApiError} from "@/api/http/ApiError"
@@ -80,13 +81,21 @@ describe("ReceiptsRepositoryImpl", () => {
     it("keeps each receipt raw next to its typed view", async () => {
         const list = await repository.list()
         expect(list).toHaveLength(receipts.length)
-        expect(list[0]?.raw).toEqual(receipts[0])
-        expect(list[0]?.view.signature).toMatch(/^ed25519;kid=/)
+        const [first] = list
+        expect(first?.raw).toEqual(receipts[0])
+        expect(first?.readable === true ? first.view.signature : "").toMatch(/^ed25519;kid=/)
+    })
+
+    it("keeps an unreadable receipt in the list instead of failing it", async () => {
+        server.use(httpMock.get(`${MOCK_BASE_URL}/api/receipts`, () => HttpResponse.json([receipts[0], {id: 1}])))
+        const list = await repository.list()
+        expect(list.map((item) => item.readable)).toEqual([true, false])
+        expect(list[1]?.readable === false ? list[1].detail : "").toContain("id")
     })
 
     it("reads one receipt and the instance key", async () => {
         const [first] = await repository.list()
-        if (first === undefined) throw new Error("no receipt")
+        if (first?.readable !== true) throw new Error("no readable receipt")
         await expect(repository.get(first.view.id)).resolves.toEqual(first)
         expect(await refusal(repository.get("nope"))).toBe("receipt_not_found")
         await expect(repository.publicKey()).resolves.toMatchObject({alg: "ed25519", kid: "b918e282a924dda0"})

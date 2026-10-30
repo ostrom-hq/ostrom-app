@@ -10,6 +10,6 @@ describe("contract", () => {
 
     it("reads unknown enum values of a newer server as their fallback", () => {
         expect(ActivityKindSchema.parse("agent.dreamed")).toBe("other")
-        expect(CheckStateSchema.parse("neutral")).toBe("pending")
+        expect(CheckStateSchema.parse("timed_out")).toBe("unknown")
     })
 })

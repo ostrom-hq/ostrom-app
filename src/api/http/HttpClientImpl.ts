@@ -9,10 +9,18 @@ export interface HttpClientConfig {
     /** The session token, read at each call so a sign-in or a sign-out takes effect at once. */
     readonly token: () => string | undefined
     readonly fetch?: typeof fetch
+    /** How long to wait for an answer (headers and body) before giving up with `timeout`. */
+    readonly timeoutMs?: number
 }
 
-/** Encodes one path segment (an id) for `HttpRequest.path`. */
+export const DEFAULT_TIMEOUT_MS = 15_000
+
+/**
+ * Encodes one path segment (an id) for `HttpRequest.path`.
+ * `.` and `..` are refused: URL parsing would resolve them and send the call (and the token) to another route.
+ */
 export function segment(value: string): string {
+    if (value === "" || value === "." || value === "..") throw new RangeError(`not a path segment: "${value}"`)
     return encodeURIComponent(value)
 }
 
@@ -20,9 +28,8 @@ export class HttpClientImpl implements HttpClient {
     constructor(private readonly config: HttpClientConfig) {}
 
     async send<S extends z.ZodType>(request: HttpRequest<S>): Promise<z.output<S>> {
-        const response = await this.call(request)
-        const body = await readJson(response)
-        if (!response.ok) throw problemOf(response.status, body)
+        const {status, ok, body} = await this.exchange(request)
+        if (!ok) throw problemOf(status, body)
         const parsed = request.response.safeParse(body)
         if (!parsed.success) {
             throw new ApiError({kind: "invalid-response", detail: z.prettifyError(parsed.error)}, {cause: parsed.error})
@@ -30,48 +37,57 @@ export class HttpClientImpl implements HttpClient {
         return parsed.data
     }
 
-    private async call<S extends z.ZodType>(request: HttpRequest<S>): Promise<Response> {
+    /** Sends the request and reads the whole answer, under one timeout; transport failures become `ApiError`. */
+    private async exchange<S extends z.ZodType>(
+        request: HttpRequest<S>,
+    ): Promise<{status: number; ok: boolean; body: unknown}> {
         const url = new URL(request.path, this.config.baseUrl)
         for (const [key, value] of Object.entries(request.query ?? {})) url.searchParams.set(key, value)
         const headers: Record<string, string> = {accept: "application/json"}
         const token = this.config.token()
         if (token !== undefined) headers["authorization"] = `Bearer ${token}`
-        const init: RequestInit = {method: request.method, headers}
+        const controller = new AbortController()
+        const init: RequestInit = {method: request.method, headers, signal: controller.signal}
         if (request.body !== undefined) {
             headers["content-type"] = "application/json"
             init.body = JSON.stringify(request.body)
         }
+        const timer = setTimeout(() => {
+            controller.abort()
+        }, this.config.timeoutMs ?? DEFAULT_TIMEOUT_MS)
         try {
-            return await this.fetch(url.toString(), init)
+            const response = await this.fetch(url.toString(), init)
+            return {status: response.status, ok: response.ok, body: parseJson(await response.text())}
         } catch (cause) {
-            throw new ApiError({kind: "network"}, {cause})
+            throw new ApiError(controller.signal.aborted ? {kind: "timeout"} : {kind: "network"}, {cause})
+        } finally {
+            clearTimeout(timer)
         }
     }
 
     /** The global `fetch` is read at each call, not at construction: polyfills and test interceptors replace it. */
     private fetch(input: string, init: RequestInit): Promise<Response> {
-        return this.config.fetch === undefined ? globalThis.fetch(input, init) : this.config.fetch(input, init)
+        const {fetch: custom} = this.config
+        return custom === undefined ? globalThis.fetch(input, init) : custom(input, init)
     }
 }
 
-const NO_BODY = Symbol("no body")
+const NOT_JSON = Symbol("not JSON")
 
-/** The JSON body, `undefined` when empty, `NO_BODY` when it is not JSON. */
-async function readJson(response: Response): Promise<unknown> {
-    const text = await response.text()
+/** The JSON body, `undefined` when empty, `NOT_JSON` when it is not JSON (no schema accepts a symbol). */
+function parseJson(text: string): unknown {
     if (text === "") return undefined
     try {
         return JSON.parse(text)
     } catch {
-        return NO_BODY
+        return NOT_JSON
     }
 }
 
 function problemOf(status: number, body: unknown): ApiError {
-    if (status === 401) return new ApiError({kind: "unauthorized"})
     const error = ErrorBodySchema.safeParse(body)
-    if (status < 500 && error.success) {
-        return new ApiError({kind: "refused", status, type: error.data.error.type, message: error.data.error.message})
-    }
-    return new ApiError({kind: "server", status})
+    if (status === 401) return new ApiError(error.success ? {kind: "unauthorized", type: error.data.error.type} : {kind: "unauthorized"})
+    if (status >= 500) return new ApiError({kind: "server", status})
+    if (!error.success) return new ApiError({kind: "unexpected-status", status})
+    return new ApiError({kind: "refused", status, type: error.data.error.type, message: error.data.error.message})
 }

@@ -32,7 +32,7 @@ module.exports = {
             displayName: "node",
             testEnvironment: "node",
             moduleNameMapper,
-            testMatch: nodeLayers.map((layer) => `<rootDir>/src/${layer}/**/*.test.ts`),
+            testMatch: nodeLayers.map((layer) => `<rootDir>/src/${layer}/**/*.test.{ts,tsx}`),
             // Some of them ship `.mjs` files (rettime): Babel transforms those too.
             transform: {"^.+\\.[cm]?[jt]sx?$": "babel-jest"},
             moduleFileExtensions: ["ts", "tsx", "js", "mjs", "cjs", "jsx", "json"],

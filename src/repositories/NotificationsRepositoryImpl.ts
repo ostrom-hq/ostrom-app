@@ -17,8 +17,9 @@ export class NotificationsRepositoryImpl implements NotificationsRepository {
         return this.http.send({method: "POST", path: "/api/devices", body: registration, response: DeviceSchema})
     }
 
+    /** Whatever the server answers with a success (empty, `{}`, `null`) means the device is gone. */
     async unregisterDevice(id: string): Promise<void> {
-        await this.http.send({method: "DELETE", path: `/api/devices/${segment(id)}`, response: z.undefined()})
+        await this.http.send({method: "DELETE", path: `/api/devices/${segment(id)}`, response: z.unknown()})
     }
 
     settings(): Promise<NotificationSettings> {

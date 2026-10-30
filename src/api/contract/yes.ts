@@ -20,7 +20,8 @@ export const CommitSchema = z.object({
 })
 export type Commit = z.output<typeof CommitSchema>
 
-export const CheckStateSchema = z.enum(["success", "failure", "pending", "skipped"]).catch("pending")
+/** A state this app does not know reads as `unknown`, never as a pass: the person approves on this evidence. */
+export const CheckStateSchema = z.enum(["success", "failure", "pending", "skipped", "unknown"]).catch("unknown")
 export type CheckState = z.output<typeof CheckStateSchema>
 
 /** Proposed addition to the prototype's Ask: the CI checks of the head the yes covers. */

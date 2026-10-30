@@ -38,6 +38,6 @@ export type NotificationSettings = z.output<typeof NotificationSettingsSchema>
 /** The data of an Ostrom push: which request to open. Anything else in a push is ignored. */
 export const PushDataSchema = z.object({
     kind: z.literal("ask"),
-    askId: z.string(),
+    askId: z.string().regex(/^[A-Za-z0-9_-]+$/),
 })
 export type PushData = z.output<typeof PushDataSchema>

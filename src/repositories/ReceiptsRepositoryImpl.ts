@@ -1,7 +1,8 @@
-import {z} from "zod"
 import {
     type ReceiptEnvelope,
     ReceiptEnvelopeSchema,
+    type ReceiptListItem,
+    ReceiptListSchema,
     type ReceiptPublicKey,
     ReceiptPublicKeySchema,
 } from "@/api/contract/receipts"
@@ -12,8 +13,8 @@ import type {ReceiptsRepository} from "./ReceiptsRepository"
 export class ReceiptsRepositoryImpl implements ReceiptsRepository {
     constructor(private readonly http: HttpClient) {}
 
-    list(): Promise<readonly ReceiptEnvelope[]> {
-        return this.http.send({method: "GET", path: "/api/receipts", response: z.array(ReceiptEnvelopeSchema)})
+    list(): Promise<readonly ReceiptListItem[]> {
+        return this.http.send({method: "GET", path: "/api/receipts", response: ReceiptListSchema})
     }
 
     get(id: string): Promise<ReceiptEnvelope> {

@@ -29,16 +29,35 @@ export type ReceiptView = z.output<typeof ReceiptViewSchema>
 
 /** A receipt as received: the untouched object, for the signature, and its typed view, for the screen. */
 export interface ReceiptEnvelope {
+    readonly readable: true
     readonly raw: unknown
     readonly view: ReceiptView
 }
 
-export const ReceiptEnvelopeSchema = z.unknown().transform((raw, context): ReceiptEnvelope => {
+/** A receipt the app cannot display (a newer shape): kept, so the list still shows it and can still verify it. */
+export interface UnreadableReceipt {
+    readonly readable: false
+    readonly raw: unknown
+    readonly detail: string
+}
+
+export type ReceiptListItem = ReceiptEnvelope | UnreadableReceipt
+
+function readReceipt(raw: unknown): ReceiptListItem {
     const view = ReceiptViewSchema.safeParse(raw)
-    if (view.success) return {raw, view: view.data}
-    context.issues.push({code: "custom", message: z.prettifyError(view.error), input: raw})
+    return view.success ? {readable: true, raw, view: view.data} : {readable: false, raw, detail: z.prettifyError(view.error)}
+}
+
+/** One receipt, which must be readable. */
+export const ReceiptEnvelopeSchema = z.unknown().transform((raw, context): ReceiptEnvelope => {
+    const item = readReceipt(raw)
+    if (item.readable) return item
+    context.issues.push({code: "custom", message: item.detail, input: raw})
     return z.NEVER
 })
+
+/** A list of receipts: one unreadable receipt never hides the others. */
+export const ReceiptListSchema = z.array(z.unknown()).transform((items) => items.map(readReceipt))
 
 /** `GET /api/receipts/pubkey`: the instance key that signs receipts. */
 export const ReceiptPublicKeySchema = z.object({
