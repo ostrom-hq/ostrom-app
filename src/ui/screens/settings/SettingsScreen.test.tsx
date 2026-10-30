@@ -64,8 +64,8 @@ describe("SettingsScreen", () => {
         await fireEvent.press(screen.getByRole("switch", {name: "Spending passes a budget threshold"}))
         await waitFor(() => {
             expect(saveSettings).toHaveBeenCalledWith({...initial, spending: true})
+            expect(screen.getByRole("switch", {name: "Spending passes a budget threshold"})).toBeChecked()
         })
-        expect(screen.getByRole("switch", {name: "Spending passes a budget threshold"})).toBeChecked()
     })
 
     it("turns quiet hours off, then on again in the phone's time zone", async () => {
@@ -73,8 +73,8 @@ describe("SettingsScreen", () => {
         await fireEvent.press(screen.getByRole("switch", {name: "Quiet hours"}))
         await waitFor(() => {
             expect(saveSettings).toHaveBeenLastCalledWith({...initial, quietHours: null})
+            expect(screen.queryByText(/No notification from/)).toBeNull()
         })
-        expect(screen.queryByText(/No notification from/)).toBeNull()
         await fireEvent.press(screen.getByRole("switch", {name: "Quiet hours"}))
         await waitFor(() => {
             expect(saveSettings).toHaveBeenLastCalledWith({...initial, quietHours: defaultQuietHours(phoneTimeZone())})
