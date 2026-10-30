@@ -3,6 +3,8 @@ import type {AppServices, Repositories} from "@/services/AppServices"
 import type {BiometricGate} from "@/services/biometrics/BiometricGate"
 import type {GithubSignIn} from "@/services/signIn/GithubSignIn"
 import type {SecureStorage} from "@/services/storage/SecureStorage"
+import {AskSchema, type Ask} from "@/api/contract/yes"
+import {decidedAsk, pendingAsk, selfAsk} from "@/api/mocks/fixtures"
 import {createSessionStore, type Session} from "@/stores/session"
 
 /** A secure storage in memory. */
@@ -66,4 +68,18 @@ export function fakeServices(options: FakeServicesOptions = {}): AppServices {
         biometrics: options.biometrics ?? {confirm: () => Promise.resolve("confirmed")},
         repositoriesFor: () => repositories,
     }
+}
+
+/** The mock requests, parsed as the repositories return them. */
+export const asks: {readonly pending: Ask; readonly self: Ask; readonly decided: Ask} = {
+    pending: AskSchema.parse(pendingAsk),
+    self: AskSchema.parse(selfAsk),
+    decided: AskSchema.parse(decidedAsk),
+}
+
+/** Services already signed in, as after a launch with a kept session. */
+export async function signedInServices(options: FakeServicesOptions = {}): Promise<AppServices> {
+    const services = fakeServices(options)
+    await services.sessionStore.getState().signIn(testSession)
+    return services
 }
