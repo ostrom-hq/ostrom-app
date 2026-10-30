@@ -2,7 +2,7 @@
 import {useTranslation} from "react-i18next"
 import {ActivityIndicator, Platform, ScrollView, StyleSheet, Text, View} from "react-native"
 import {SafeAreaView} from "react-native-safe-area-context"
-import {type ActionKind, type Approval, type CheckState, phoneMayApprove} from "@/api/contract/approvals"
+import {type ActionKind, type Approval, type CheckState} from "@/api/contract/approvals"
 import {Button} from "@/ui/components/Button"
 import {Field, Section} from "@/ui/components/Section"
 import {StatusBadge} from "@/ui/components/StatusBadge"
@@ -61,6 +61,7 @@ function Evidence({approval}: {approval: Approval}): React.JSX.Element {
     const checks = approval.checks ?? []
     const evidence = approval.evidence ?? []
     const {action, diffStats} = approval
+    const head = action?.headSha ?? approval.sha
     return (
         <>
             {askedBy.length === 0 ? null : (
@@ -70,8 +71,9 @@ function Evidence({approval}: {approval: Approval}): React.JSX.Element {
             )}
             <Section title={t("request.target")}>
                 {!hasText(approval.repo) ? null : <Field label={t("request.repository")} value={approval.repo} />}
-                {!hasText(approval.sha) ? null : <Field label={t("request.head")} value={approval.sha.slice(0, 7)} />}
-                {action === undefined ? null : <Field label={t("request.ref")} value={action.ref} />}
+                {/* The head is the commit the yes lets through when the contract names the action. */}
+                {!hasText(head) ? null : <Field label={t("request.head")} value={head.slice(0, 7)} />}
+                {action === undefined || !hasText(action.ref) ? null : <Field label={t("request.ref")} value={action.ref} />}
                 {diffStats === undefined ? null : (
                     <Field
                         label={t("request.change")}
@@ -133,6 +135,8 @@ function Outcome({approval}: {approval: Approval}): React.JSX.Element | null {
             : t("request.expired")
         return <Text style={[styles.body, {color: colors.textMuted}]}>{text}</Text>
     }
+    // A state from a newer server: said in clear, with where to answer, since the phone shows no button.
+    if (approval.status === "unknown") return <Text style={[styles.body, {color: colors.textMuted}]}>{t("request.unknownStatus")}</Text>
     if ((approval.status !== "approved" && approval.status !== "rejected") || !hasText(approval.decidedBy)) return null
     const who = approval.decidedBy
     const approved = approval.status === "approved"
@@ -151,9 +155,7 @@ function Outcome({approval}: {approval: Approval}): React.JSX.Element | null {
 function Actions({model, approval}: {model: RequestViewModel; approval: Approval}): React.JSX.Element {
     const {t} = useTranslation()
     const {colors} = useTheme()
-    const {askedByMe, sending, problem, changed, declining, reason} = model
-    // The whole change is not shown: no yes from the phone (decision of 30/10 02:55), a no stays possible.
-    const mayApprove = phoneMayApprove(approval)
+    const {askedByMe, mayApprove, sending, problem, changed, declining, reason} = model
     return (
         <View style={[styles.actions, {borderTopColor: colors.border}]}>
             {askedByMe ? <Text style={[styles.body, {color: colors.text}]}>{t("request.askedByMe")}</Text> : null}

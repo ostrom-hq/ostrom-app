@@ -120,9 +120,21 @@ describe("RequestScreen", () => {
         expect(screen.getByRole("button", {name: "Decline…"})).toBeEnabled()
     })
 
+    it("shows as head the commit the yes lets through, and no ref the server left empty", async () => {
+        await open({
+            ...approvals.pending,
+            sha: "1111111aaaa",
+            action: {kind: "merge", repo: "acme/acme-api", ref: "", headSha: "9f1e2d3bbbb", risk: "high"},
+        })
+        expect(screen.getByText("9f1e2d3")).toBeOnTheScreen()
+        expect(screen.queryByText("1111111")).toBeNull()
+        expect(screen.queryByText("Ref")).toBeNull()
+    })
+
     it("shows a request in a status this app does not know, without an outcome or a button", async () => {
         await open({...approvals.pending, status: "unknown", decidedBy: "rev-b"})
         expect(screen.getByText("Unknown")).toBeOnTheScreen()
+        expect(screen.getByText("This app does not know this request's state: answer it from the console.")).toBeOnTheScreen()
         expect(screen.queryByText(/by rev-b/)).toBeNull()
         expect(screen.queryByRole("button", {name: "Decline…"})).toBeNull()
     })

@@ -17,6 +17,11 @@ export interface RequestViewModel {
     readonly open: boolean
     /** The person asked for this themselves: said in clear, the server takes their yes only as sole approver. */
     readonly askedByMe: boolean
+    /**
+     * The phone may take a yes: false when the whole change is not shown (decision of 30/10 02:55). The screen hides
+     * Approve and `approve` sends nothing; a no stays possible.
+     */
+    readonly mayApprove: boolean
     /** The answer being confirmed or sent, to show which button is busy. */
     readonly sending: ApprovalAnswer | undefined
     readonly problem: DecisionProblem | undefined
@@ -56,12 +61,13 @@ export function useRequestViewModel(id: string): RequestViewModel {
     const login = session.status === "signed-in" ? session.session.user.login : undefined
     const askedByMe = login !== undefined && approval?.askedBy?.includes(login) === true
     const open = approval?.status === "pending"
+    const mayApprove = approval !== undefined && phoneMayApprove(approval)
     const {refetch} = query
 
     const send = useCallback(
         (answer: ApprovalAnswer, note?: string) => {
             if (approval === undefined || !open || pinned === undefined || changed) return
-            if (answer === "approve" && !phoneMayApprove(approval)) return
+            if (answer === "approve" && !mayApprove) return
             setSending(answer)
             setProblem(undefined)
             void (async () => {
@@ -86,7 +92,7 @@ export function useRequestViewModel(id: string): RequestViewModel {
                 setSending(undefined)
             })()
         },
-        [approval, open, pinned, changed, biometrics, t, mutateAsync, askedByMe],
+        [approval, open, mayApprove, pinned, changed, biometrics, t, mutateAsync, askedByMe],
     )
 
     const state: RequestScreenState =
@@ -104,6 +110,7 @@ export function useRequestViewModel(id: string): RequestViewModel {
         state,
         open,
         askedByMe,
+        mayApprove,
         sending,
         problem: changed ? "changed" : problem,
         changed,

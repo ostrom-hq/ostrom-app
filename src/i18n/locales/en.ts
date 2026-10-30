@@ -125,6 +125,7 @@ export const en = {
         diffStats_one: "{{count}} file · +{{additions}} −{{deletions}}",
         diffStats_other: "{{count}} files · +{{additions}} −{{deletions}}",
         truncated: "The whole change is not shown on the phone: approve it from the console.",
+        unknownStatus: "This app does not know this request's state: answer it from the console.",
         approvedBy: "Approved by {{who}}",
         approvedByAt: "Approved by {{who}} · {{at}}",
         declinedBy: "Declined by {{who}}",

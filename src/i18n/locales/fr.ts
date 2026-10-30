@@ -126,6 +126,7 @@ export const fr: TranslationShape = {
         diffStats_one: "{{count}} fichier · +{{additions}} −{{deletions}}",
         diffStats_other: "{{count}} fichiers · +{{additions}} −{{deletions}}",
         truncated: "Le changement n'est pas montré en entier sur le téléphone : approuve-le depuis la console.",
+        unknownStatus: "L'app ne connaît pas l'état de cette demande : réponds-y depuis la console.",
         approvedBy: "Approuvée par {{who}}",
         approvedByAt: "Approuvée par {{who}} · {{at}}",
         declinedBy: "Refusée par {{who}}",
