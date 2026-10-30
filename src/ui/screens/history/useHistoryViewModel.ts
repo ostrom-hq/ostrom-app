@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type {ReceiptListItem} from "@/api/contract/receipts"
 import {useReceiptKey, useReceipts} from "@/query/receipts"
 import {checkReceipt, type ReceiptCheck} from "./receiptCheck"

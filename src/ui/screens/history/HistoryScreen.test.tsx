@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import {fireEvent, screen} from "@testing-library/react-native"
 import {type ReceiptListItem, ReceiptListSchema, type ReceiptPublicKey, ReceiptPublicKeySchema, type ReceiptView} from "@/api/contract/receipts"
 import {ApiError} from "@/api/http/ApiError"
