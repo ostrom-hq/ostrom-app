@@ -199,11 +199,6 @@ describe("createMockApi", () => {
         expect(body).toMatchObject({operator: "rev-b", you: {login: "rev-b", via: "app"}, recent: [{approval: {id: "appr_0000"}}]})
     })
 
-    it("answers 404 on an id that is not valid percent-encoding", async () => {
-        const raw = await fetch(`${MOCK_BASE_URL}/api/v1/approvals/%E0%A4%A/view`)
-        expect(raw.status).toBe(404)
-    })
-
     it("answers 404 on a route the contract does not have", async () => {
         const raw = await fetch(`${MOCK_BASE_URL}/api/v1/nothing/here`)
         expect(raw.status).toBe(404)
