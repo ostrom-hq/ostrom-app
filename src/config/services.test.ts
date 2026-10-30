@@ -2,7 +2,7 @@ import * as Crypto from "expo-crypto"
 import * as WebBrowser from "expo-web-browser"
 import {ApprovalsRepositoryImpl} from "@/repositories/ApprovalsRepositoryImpl"
 import {GithubSignInImpl} from "@/services/signIn/GithubSignInImpl"
-import {createAppServices, repositoriesFor} from "./services"
+import {createAppServices, easProjectId, repositoriesFor} from "./services"
 
 // 16 zero bytes in base64url: the state the sign-in draws with the mocked random source.
 const ZERO_STATE = "AAAAAAAAAAAAAAAAAAAAAA"
@@ -12,6 +12,7 @@ jest.mock("expo-web-browser", () => ({
         Promise.resolve({type: "success", url: "ostrom://auth/callback?code=c&state=AAAAAAAAAAAAAAAAAAAAAA"}),
     ),
 }))
+jest.mock("expo-notifications", () => ({setNotificationHandler: jest.fn()}))
 jest.mock("expo-crypto", () => ({getRandomBytes: jest.fn((length: number) => new Uint8Array(length))}))
 
 describe("createAppServices", () => {
@@ -45,5 +46,13 @@ describe("createAppServices", () => {
         const [url, init] = fetch.mock.calls[0] ?? []
         expect(url).toBe("https://ostrom.test/api/me")
         expect(init?.headers).toMatchObject({authorization: "Bearer ost_1"})
+    })
+})
+
+describe("easProjectId", () => {
+    it("reads the EAS project id, and nothing before the project exists", () => {
+        expect(easProjectId({eas: {projectId: "p-1"}})).toBe("p-1")
+        expect(easProjectId(undefined)).toBeUndefined()
+        expect(easProjectId({eas: {}})).toBeUndefined()
     })
 })

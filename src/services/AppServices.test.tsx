@@ -1,7 +1,7 @@
 import {renderHook} from "@testing-library/react-native"
 import type {ReactNode} from "react"
 import {fakeServices, testSession} from "@/test/fakeServices"
-import {ServicesProvider, useRepositories, useServices} from "./AppServices"
+import {ServicesProvider, SIGNED_OUT_REPOSITORIES, useRepositories, useServices} from "./AppServices"
 
 describe("AppServices", () => {
     it("refuses to be used outside its provider", async () => {
@@ -13,7 +13,9 @@ describe("AppServices", () => {
         const wrapper = ({children}: {children: ReactNode}): React.JSX.Element => (
             <ServicesProvider services={services}>{children}</ServicesProvider>
         )
-        await expect(renderHook(() => useRepositories(), {wrapper})).rejects.toThrow("useRepositories while signed out")
+        const signedOut = await renderHook(() => useRepositories(), {wrapper})
+        expect(signedOut.result.current).toBe(SIGNED_OUT_REPOSITORIES)
+        await expect(signedOut.result.current.approvals.queue()).rejects.toMatchObject({problem: {kind: "unauthorized"}})
         await services.sessionStore.getState().signIn(testSession)
         const {result} = await renderHook(() => useRepositories(), {wrapper})
         expect(result.current).toBe(services.repositoriesFor(testSession))
