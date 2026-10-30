@@ -55,9 +55,9 @@ export class PushServiceImpl implements PushService {
     }
 
     /** The notification that launched the app, given once: it is cleared, so a remount does not open it again. */
-    async launchData(): Promise<unknown> {
-        const response = await Notifications.getLastNotificationResponseAsync()
+    launchData(): Promise<unknown> {
+        const response = Notifications.getLastNotificationResponse()
         if (response !== null) Notifications.clearLastNotificationResponse()
-        return dataOf(response)
+        return Promise.resolve(dataOf(response))
     }
 }

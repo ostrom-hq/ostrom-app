@@ -3,9 +3,9 @@ name: CI
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
+  # No tag trigger: this job publishes nothing, and a release-like trigger makes the npm cache a poisoning risk (zizmor).
   push:
     branches: [main]
-    tags: ["[0-9]*"]
   workflow_dispatch:
 
 # One run per workflow and ref; a new push cancels the previous run, except on main (JOURNAL 03:10).

@@ -9,7 +9,7 @@ jest.mock("expo-notifications", () => ({
     requestPermissionsAsync: jest.fn(),
     getExpoPushTokenAsync: jest.fn(),
     addNotificationResponseReceivedListener: jest.fn(),
-    getLastNotificationResponseAsync: jest.fn(),
+    getLastNotificationResponse: jest.fn(),
     clearLastNotificationResponse: jest.fn(),
     setNotificationChannelAsync: jest.fn(() => Promise.resolve(null)),
     AndroidImportance: {HIGH: 6},
@@ -96,10 +96,10 @@ describe("PushServiceImpl", () => {
         unsubscribe()
         expect(remove).toHaveBeenCalled()
 
-        mocked.getLastNotificationResponseAsync.mockResolvedValue(response({kind: "approval", approvalId: "appr_0002"}))
+        mocked.getLastNotificationResponse.mockReturnValue(response({kind: "approval", approvalId: "appr_0002"}))
         await expect(push.launchData()).resolves.toEqual({kind: "approval", approvalId: "appr_0002"})
         expect(mocked.clearLastNotificationResponse).toHaveBeenCalledTimes(1)
-        mocked.getLastNotificationResponseAsync.mockResolvedValue(null)
+        mocked.getLastNotificationResponse.mockReturnValue(null)
         await expect(push.launchData()).resolves.toBeUndefined()
         expect(mocked.clearLastNotificationResponse).toHaveBeenCalledTimes(1)
     })
