@@ -1,35 +1,48 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import {fireEvent, screen, waitFor} from "@testing-library/react-native"
-import type {AnswerResult, Approval, ApprovalAnswer} from "@/api/contract/approvals"
+import type {Approval, ApprovalAnswer, ApprovalView} from "@/api/contract/approvals"
 import {ApiError} from "@/api/http/ApiError"
 import type {ApprovalsRepository} from "@/repositories/ApprovalsRepository"
 import type {BiometricOutcome} from "@/services/biometrics/BiometricGate"
-import {approvals, fakeRepositories, signedInServices} from "@/test/fakeServices"
+import {approvals, fakeRepositories, signedInServices, viewOf} from "@/test/fakeServices"
 import {renderWithServices} from "@/test/renderWithServices"
 import {RequestScreen} from "./RequestScreen"
 
 interface Harness {
     readonly approval: jest.Mock<Promise<Approval>, [string]>
-    readonly answer: jest.Mock<Promise<AnswerResult>, Parameters<ApprovalsRepository["answer"]>>
+    readonly answer: jest.Mock<Promise<ApprovalView>, Parameters<ApprovalsRepository["answer"]>>
     readonly confirm: jest.Mock<Promise<BiometricOutcome>, [string]>
 }
 
-/** A server holding one request, which an answer changes, and a phone whose biometrics answer `outcome`. */
+/** What the view adds to the request: who asks, the command, the gate, the note. */
+type ViewExtras = Omit<ApprovalView, "approval" | "you">
+
+/**
+ * A server holding one request, which an answer changes, shown to `rev-b` with `you` and `extras`, and a phone whose
+ * biometrics answer `outcome`.
+ */
 async function open(
     initial: Approval,
-    {outcome = "confirmed", refuse}: {outcome?: BiometricOutcome; refuse?: ApiError} = {},
+    {
+        outcome = "confirmed",
+        refuse,
+        you = {},
+        extras = {},
+    }: {outcome?: BiometricOutcome; refuse?: ApiError; you?: Partial<ApprovalView["you"]>; extras?: ViewExtras} = {},
 ): Promise<Harness> {
     let current = initial
     const approval = jest.fn((_id: string) => Promise.resolve(current))
-    const answer = jest.fn((_id: string, given: ApprovalAnswer, _shownDigest: string, _note?: string): Promise<AnswerResult> => {
+    const show = (request: Approval): ApprovalView => ({...extras, ...viewOf(request, you)})
+    const view = async (id: string): Promise<ApprovalView> => show(await approval(id))
+    const answer = jest.fn((_id: string, given: ApprovalAnswer, _shownDigest: string, _note?: string): Promise<ApprovalView> => {
         if (refuse !== undefined) return Promise.reject(refuse)
         current = {...current, status: given === "approve" ? "approved" : "rejected", decidedBy: "rev-b"}
-        return Promise.resolve({approval: current})
+        return Promise.resolve(show(current))
     })
     const confirm = jest.fn((_prompt: string) => Promise.resolve(outcome))
     const services = await signedInServices({
         biometrics: {confirm},
-        repositories: fakeRepositories({approvals: {waiting: jest.fn(), approval, answer}}),
+        repositories: fakeRepositories({approvals: {queue: jest.fn(), view, answer}}),
     })
     await renderWithServices(<RequestScreen id={initial.id} />, services)
     await screen.findByRole("header", {name: initial.title})
@@ -175,14 +188,15 @@ describe("RequestScreen", () => {
     it("asks for a new reading when the request changed under the screen, then binds the answer to it", async () => {
         let current: Approval = approvals.pending
         const approval = jest.fn((_id: string) => Promise.resolve(current))
-        const answer = jest.fn((_id: string, _given: ApprovalAnswer, shownDigest: string, _note?: string): Promise<AnswerResult> => {
+        const answer = jest.fn((_id: string, _given: ApprovalAnswer, shownDigest: string, _note?: string): Promise<ApprovalView> => {
             if (shownDigest !== current.shownDigest) return Promise.reject(refused(409, "shown_digest_mismatch"))
             current = {...current, status: "approved", decidedBy: "rev-b"}
-            return Promise.resolve({approval: current})
+            return Promise.resolve(viewOf(current))
         })
+        const view = async (id: string): Promise<ApprovalView> => viewOf(await approval(id))
         const services = await signedInServices({
             biometrics: {confirm: () => Promise.resolve<BiometricOutcome>("confirmed")},
-            repositories: fakeRepositories({approvals: {waiting: jest.fn(), approval, answer}}),
+            repositories: fakeRepositories({approvals: {queue: jest.fn(), view, answer}}),
         })
         await renderWithServices(<RequestScreen id="appr_0001" />, services)
         await screen.findByRole("header", {name: "Merge PR #6 into main"})
@@ -196,6 +210,48 @@ describe("RequestScreen", () => {
         await fireEvent.press(screen.getByRole("button", {name: "Approve"}))
         expect(await screen.findByText("Approved by rev-b")).toBeOnTheScreen()
         expect(answer).toHaveBeenLastCalledWith("appr_0001", "approve", "d-after-push", undefined)
+    })
+
+    it("says who asks through which gate, and the command the yes lets run", async () => {
+        await open(approvals.pending, {
+            extras: {
+                who: {agent: "claude-code", model: "claude-opus-5-5"},
+                what: {command: "git push origin main"},
+                gate: {workflowName: "Release", label: "Merge to main"},
+            },
+        })
+        expect(screen.getByText("claude-code · claude-opus-5-5")).toBeOnTheScreen()
+        expect(screen.getByText("Release · Merge to main")).toBeOnTheScreen()
+        expect(screen.getByText("git push origin main")).toBeOnTheScreen()
+    })
+
+    it("names only the agent when the server gives no model, and leaves out an empty command", async () => {
+        await open({...bare, askedBy: []}, {extras: {who: {agent: "codex"}, what: {command: ""}}})
+        expect(screen.getByText("codex")).toBeOnTheScreen()
+        expect(screen.queryByText("Command")).toBeNull()
+        expect(screen.queryByText("People")).toBeNull()
+    })
+
+    it("hides Approve when the server does not take my yes, with its reason or in plain words, and keeps the no", async () => {
+        await open(approvals.pending, {you: {canApprove: false, reason: "Only a maintainer of acme-api approves a deploy"}})
+        expect(screen.getByText("Only a maintainer of acme-api approves a deploy")).toBeOnTheScreen()
+        expect(screen.queryByTestId("request-approve")).toBeNull()
+        expect(screen.getByRole("button", {name: "Decline…"})).toBeEnabled()
+    })
+
+    it("says my yes is not taken when the server gives no reason", async () => {
+        await open(approvals.pending, {you: {canApprove: false}})
+        expect(screen.getByText("Your yes is not taken on this request.")).toBeOnTheScreen()
+    })
+
+    it("shows what the approver told the agent, once answered", async () => {
+        await open({...approvals.decided, status: "rejected"}, {extras: {note: "Wait for the migration PR"}})
+        expect(screen.getByText("Note to the agent: Wait for the migration PR")).toBeOnTheScreen()
+    })
+
+    it("keeps a note off a request that still waits", async () => {
+        await open(approvals.pending, {extras: {note: "draft"}})
+        expect(screen.queryByText(/Note to the agent/)).toBeNull()
     })
 
     it("says in clear that the request is mine, and why the server refused my yes", async () => {
@@ -273,12 +329,12 @@ describe("RequestScreen", () => {
     })
 
     it("offers to try again when the request cannot be loaded", async () => {
-        const approval = jest
-            .fn<Promise<Approval>, [string]>()
+        const view = jest
+            .fn<Promise<ApprovalView>, [string]>()
             .mockRejectedValueOnce(new ApiError({kind: "network"}))
-            .mockResolvedValue(approvals.pending)
+            .mockResolvedValue(viewOf(approvals.pending))
         const services = await signedInServices({
-            repositories: fakeRepositories({approvals: {waiting: jest.fn(), approval, answer: jest.fn()}}),
+            repositories: fakeRepositories({approvals: {queue: jest.fn(), view, answer: jest.fn()}}),
         })
         await renderWithServices(<RequestScreen id="appr_0001" />, services)
         await fireEvent.press(await screen.findByRole("button", {name: "Try again"}))

@@ -4,7 +4,7 @@ import type {BiometricGate} from "@/services/biometrics/BiometricGate"
 import type {PushService} from "@/services/push/PushService"
 import type {GithubSignIn} from "@/services/signIn/GithubSignIn"
 import type {SecureStorage} from "@/services/storage/SecureStorage"
-import {type Approval, ApprovalSchema} from "@/api/contract/approvals"
+import {type Approval, ApprovalSchema, type ApprovalView} from "@/api/contract/approvals"
 import {decidedApproval, pendingApproval, selfApproval} from "@/api/mocks/fixtures"
 import {createSessionStore, type Session} from "@/stores/session"
 
@@ -41,8 +41,8 @@ export function fakeRepositories(overrides: Partial<Repositories> = {}): Reposit
         account: {me: unexpected("account.me"), exchangeCode: unexpected("account.exchangeCode"), logout: unexpected("account.logout")},
         activity: {page: unexpected("activity.page")},
         approvals: {
-            waiting: unexpected("approvals.waiting"),
-            approval: unexpected("approvals.approval"),
+            queue: unexpected("approvals.queue"),
+            view: unexpected("approvals.view"),
             answer: unexpected("approvals.answer"),
         },
         notifications: {
@@ -86,6 +86,15 @@ export const approvals: {readonly pending: Approval; readonly self: Approval; re
     pending: ApprovalSchema.parse(pendingApproval),
     self: ApprovalSchema.parse(selfApproval),
     decided: ApprovalSchema.parse(decidedApproval),
+}
+
+/**
+ * A request as the server shows it to `rev-b`: theirs when they asked for it, and theirs to approve unless `you`
+ * says otherwise.
+ */
+export function viewOf(approval: Approval, you: Partial<ApprovalView["you"]> = {}): ApprovalView {
+    const self = approval.askedBy?.includes(testSession.user.login) === true
+    return {approval, you: {login: testSession.user.login, self, canApprove: true, ...you}}
 }
 
 /** Services already signed in, as after a launch with a kept session. */

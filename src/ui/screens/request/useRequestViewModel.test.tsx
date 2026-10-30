@@ -2,11 +2,11 @@
 import {QueryClientProvider} from "@tanstack/react-query"
 import {act, renderHook, waitFor} from "@testing-library/react-native"
 import type {ReactNode} from "react"
-import type {AnswerResult, Approval} from "@/api/contract/approvals"
+import type {Approval, ApprovalView} from "@/api/contract/approvals"
 import type {ApprovalsRepository} from "@/repositories/ApprovalsRepository"
 import type {AppServices} from "@/services/AppServices"
 import {ServicesProvider} from "@/services/AppServices"
-import {approvals, fakeRepositories, fakeServices, signedInServices} from "@/test/fakeServices"
+import {approvals, fakeRepositories, signedInServices, viewOf} from "@/test/fakeServices"
 import {testQueryClient} from "@/test/renderWithServices"
 import {useRequestViewModel} from "./useRequestViewModel"
 
@@ -18,14 +18,17 @@ function wrapperOf(services: AppServices, client = testQueryClient()): (props: {
     )
 }
 
+/** A server that shows `approval` to `rev-b` (with `you` as it says), and a phone whose biometrics are `confirm`. */
 async function servicesFor(
     approval: () => Promise<Approval>,
     confirm: jest.Mock,
-    answer = jest.fn<Promise<AnswerResult>, Parameters<ApprovalsRepository["answer"]>>(),
+    answer = jest.fn<Promise<ApprovalView>, Parameters<ApprovalsRepository["answer"]>>(),
+    you: Partial<ApprovalView["you"]> = {},
 ): Promise<AppServices> {
+    const view = async (_id: string): Promise<ApprovalView> => viewOf(await approval(), you)
     return signedInServices({
         biometrics: {confirm},
-        repositories: fakeRepositories({approvals: {waiting: jest.fn(), approval, answer}}),
+        repositories: fakeRepositories({approvals: {queue: jest.fn(), view, answer}}),
     })
 }
 
@@ -58,7 +61,7 @@ describe("useRequestViewModel", () => {
 
     it("takes no yes on a diff the phone does not show in full", async () => {
         const confirm = jest.fn()
-        const answer = jest.fn<Promise<AnswerResult>, Parameters<ApprovalsRepository["answer"]>>()
+        const answer = jest.fn<Promise<ApprovalView>, Parameters<ApprovalsRepository["answer"]>>()
         const services = await servicesFor(() => Promise.resolve({...approvals.pending, diffTruncated: true}), confirm, answer)
         const {result} = await renderHook(() => useRequestViewModel("appr_0001"), {wrapper: wrapperOf(services)})
         await waitFor(() => {
@@ -75,8 +78,8 @@ describe("useRequestViewModel", () => {
 
     it("sends no decline without a reason, and trims the reason it sends", async () => {
         const confirm = jest.fn(() => Promise.resolve("confirmed"))
-        const answer = jest.fn<Promise<AnswerResult>, Parameters<ApprovalsRepository["answer"]>>(() =>
-            Promise.resolve({approval: {...approvals.pending, status: "rejected"}}),
+        const answer = jest.fn<Promise<ApprovalView>, Parameters<ApprovalsRepository["answer"]>>(() =>
+            Promise.resolve(viewOf({...approvals.pending, status: "rejected"})),
         )
         const services = await servicesFor(() => Promise.resolve(approvals.pending), confirm, answer)
         const {result} = await renderHook(() => useRequestViewModel("appr_0001"), {wrapper: wrapperOf(services)})
@@ -109,8 +112,8 @@ describe("useRequestViewModel", () => {
     it("binds the answer to what the person first read, never to data a refetch swapped in", async () => {
         let current: Approval = approvals.pending
         const confirm = jest.fn(() => Promise.resolve("confirmed"))
-        const answer = jest.fn<Promise<AnswerResult>, Parameters<ApprovalsRepository["answer"]>>(() =>
-            Promise.resolve({approval: {...current, status: "approved"}}),
+        const answer = jest.fn<Promise<ApprovalView>, Parameters<ApprovalsRepository["answer"]>>(() =>
+            Promise.resolve(viewOf({...current, status: "approved"})),
         )
         const services = await servicesFor(() => Promise.resolve(current), confirm, answer)
         const client = testQueryClient()
@@ -143,12 +146,27 @@ describe("useRequestViewModel", () => {
         })
     })
 
-    it("is not mine when signed out", async () => {
-        const services = fakeServices({
-            repositories: fakeRepositories({approvals: {waiting: jest.fn(), approval: () => Promise.resolve(approvals.self), answer: jest.fn()}}),
+    it("takes no yes the server refuses, says its reason, and asks no Face ID for it", async () => {
+        const confirm = jest.fn()
+        const answer = jest.fn<Promise<ApprovalView>, Parameters<ApprovalsRepository["answer"]>>()
+        const reason = "Only a maintainer of acme-api approves a deploy"
+        const services = await servicesFor(() => Promise.resolve(approvals.pending), confirm, answer, {canApprove: false, reason})
+        const {result} = await renderHook(() => useRequestViewModel("appr_0001"), {wrapper: wrapperOf(services)})
+        await waitFor(() => {
+            expect(result.current.state.kind).toBe("ready")
         })
-        await services.sessionStore.getState().hydrate()
-        const {result} = await renderHook(() => useRequestViewModel("appr_0002"), {wrapper: wrapperOf(services)})
-        expect(result.current.askedByMe).toBe(false)
+        expect(result.current.mayApprove).toBe(false)
+        expect(result.current.noApprove).toEqual({kind: "refused", reason})
+        result.current.approve()
+        expect(confirm).not.toHaveBeenCalled()
+        expect(answer).not.toHaveBeenCalled()
+    })
+
+    it("is mine when the server says the request is mine", async () => {
+        const services = await servicesFor(() => Promise.resolve(approvals.pending), jest.fn(), undefined, {self: true})
+        const {result} = await renderHook(() => useRequestViewModel("appr_0001"), {wrapper: wrapperOf(services)})
+        await waitFor(() => {
+            expect(result.current.askedByMe).toBe(true)
+        })
     })
 })

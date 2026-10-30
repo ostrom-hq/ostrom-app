@@ -1,5 +1,5 @@
 import {activityKind} from "./activity"
-import {ApprovalSchema, needsBiometrics, phoneMayApprove} from "./approvals"
+import {ApprovalSchema, ApprovalViewSchema, needsBiometrics, phoneMayApprove} from "./approvals"
 import {PushDataSchema} from "./notifications"
 import {ReceiptEnvelopeSchema, ReceiptPageSchema} from "./receipts"
 
@@ -26,6 +26,18 @@ describe("contract", () => {
         const parsed = ApprovalSchema.parse({...approval, status: "withdrawn", action})
         expect(parsed.status).toBe("unknown")
         expect(parsed.action).toMatchObject({kind: "unknown", risk: "high"})
+    })
+
+    it("shows a request whose rules, receipt or gate status have a shape this app does not read", () => {
+        const view = ApprovalViewSchema.parse({
+            approval,
+            gate: {workflowName: "Release", label: "Merge to main", status: "archived-later", approvers: 3},
+            rules: [{id: "r1", strength: "absolute"}],
+            receipt: {anything: true},
+            you: {login: "rev-b", self: false, canApprove: true},
+        })
+        expect(view.gate).toEqual({workflowName: "Release", label: "Merge to main"})
+        expect(view.approval.id).toBe("appr_1")
     })
 
     it("asks for biometrics unless the action is low risk, and takes no yes on a truncated diff", () => {

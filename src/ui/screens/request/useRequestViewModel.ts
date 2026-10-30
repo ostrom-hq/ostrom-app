@@ -1,27 +1,32 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import {useCallback, useState} from "react"
 import {useTranslation} from "react-i18next"
-import {type Approval, type ApprovalAnswer, needsBiometrics, phoneMayApprove} from "@/api/contract/approvals"
-import {useAnswer, useApproval} from "@/query/approvals"
-import {useServices, useSessionState} from "@/services/AppServices"
+import {type Approval, type ApprovalAnswer, type ApprovalView, needsBiometrics, phoneMayApprove} from "@/api/contract/approvals"
+import {useAnswer, useApprovalView} from "@/query/approvals"
+import {useServices} from "@/services/AppServices"
 import {biometricProblem, type DecisionProblem, decisionProblem} from "./decisionProblem"
 
 export type RequestScreenState =
     | {readonly kind: "loading"}
     | {readonly kind: "error"; readonly retry: () => void}
-    | {readonly kind: "ready"; readonly approval: Approval}
+    | {readonly kind: "ready"; readonly approval: Approval; readonly view: ApprovalView}
+
+/** The whole change is not on the phone, or the server refuses the person's yes (with its reason when it gives one). */
+export type NoApprove = {readonly kind: "truncated"} | {readonly kind: "refused"; readonly reason: string | undefined}
 
 export interface RequestViewModel {
     readonly state: RequestScreenState
     /** The request waits for an answer: the buttons are shown, after the evidence. */
     readonly open: boolean
-    /** The person asked for this themselves: said in clear, the server takes their yes only as sole approver. */
+    /** The person asked for this themselves (the server says so): their yes is taken only as sole approver. */
     readonly askedByMe: boolean
     /**
-     * The phone may take a yes: false when the whole change is not shown (decision of 30/10 02:55). The screen hides
-     * Approve and `approve` sends nothing; a no stays possible.
+     * The phone may take a yes: not when the whole change is not shown (decision of 30/10 02:55), nor when the server
+     * says the person may not approve. The screen hides Approve and `approve` sends nothing; a no stays possible.
      */
     readonly mayApprove: boolean
+    /** Why there is no Approve, said under the buttons. */
+    readonly noApprove: NoApprove | undefined
     /** The answer being confirmed or sent, to show which button is busy. */
     readonly sending: ApprovalAnswer | undefined
     readonly problem: DecisionProblem | undefined
@@ -42,26 +47,32 @@ export interface RequestViewModel {
     readonly decline: () => void
 }
 
+/** Why the phone takes no yes on this request, if it takes none: the server's word first, then the change not shown. */
+function noApproveOf(view: ApprovalView): NoApprove | undefined {
+    if (!view.you.canApprove) return {kind: "refused", reason: view.you.reason}
+    return phoneMayApprove(view.approval) ? undefined : {kind: "truncated"}
+}
+
 export function useRequestViewModel(id: string): RequestViewModel {
     const {t} = useTranslation()
     const {biometrics} = useServices()
-    const session = useSessionState()
-    const query = useApproval(id)
+    const query = useApprovalView(id)
     const {mutateAsync} = useAnswer(id)
     const [sending, setSending] = useState<ApprovalAnswer>()
     const [problem, setProblem] = useState<DecisionProblem>()
     const [declining, setDeclining] = useState(false)
     const [reason, setReason] = useState("")
-    const approval = query.data
+    const view = query.data
+    const approval = view?.approval
     // The digest of the request as the person first read it: the answer is bound to it, never to data that a
     // refetch swapped in under their eyes (the server then refuses, and the screen asks for a new reading).
     const [pinned, setPinned] = useState<string>()
     if (approval !== undefined && pinned === undefined) setPinned(approval.shownDigest)
     const changed = approval !== undefined && pinned !== undefined && approval.shownDigest !== pinned
-    const login = session.status === "signed-in" ? session.session.user.login : undefined
-    const askedByMe = login !== undefined && approval?.askedBy?.includes(login) === true
+    const askedByMe = view?.you.self === true
     const open = approval?.status === "pending"
-    const mayApprove = approval !== undefined && phoneMayApprove(approval)
+    const noApprove = view === undefined ? undefined : noApproveOf(view)
+    const mayApprove = view !== undefined && noApprove === undefined
     const {refetch} = query
 
     const send = useCallback(
@@ -96,8 +107,8 @@ export function useRequestViewModel(id: string): RequestViewModel {
     )
 
     const state: RequestScreenState =
-        approval !== undefined
-            ? {kind: "ready", approval}
+        view !== undefined
+            ? {kind: "ready", approval: view.approval, view}
             : query.isError
               ? {
                     kind: "error",
@@ -111,6 +122,7 @@ export function useRequestViewModel(id: string): RequestViewModel {
         open,
         askedByMe,
         mayApprove,
+        noApprove,
         sending,
         problem: changed ? "changed" : problem,
         changed,
