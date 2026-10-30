@@ -15,9 +15,9 @@ describe("detectLanguage", () => {
 describe("translations", () => {
     it("serves French when asked", async () => {
         await i18next.changeLanguage("fr")
-        expect(i18next.t("home.title")).toBe("En attente de toi")
+        expect(i18next.t("inbox.title")).toBe("En attente de toi")
         await i18next.changeLanguage("en")
-        expect(i18next.t("home.title")).toBe("Waiting for you")
+        expect(i18next.t("inbox.title")).toBe("Waiting for you")
     })
 })
 

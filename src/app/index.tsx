@@ -1,3 +1,3 @@
-import {HomeScreen} from "@/ui/screens/home/HomeScreen"
+import {InboxScreen} from "@/ui/screens/inbox/InboxScreen"
 
-export default HomeScreen
+export default InboxScreen
