@@ -1,14 +1,16 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import {screen} from "@testing-library/react-native"
 import {renderRouter} from "expo-router/testing-library"
-import RootLayout from "./_layout"
-import AskById from "./ask/[id]"
-import Tabs from "./(tabs)/_layout"
-import Activity from "./(tabs)/activity"
-import History from "./(tabs)/history"
-import Index from "./(tabs)/index"
-import Settings from "./(tabs)/settings"
-import Spending from "./(tabs)/spending"
-import Login from "./login"
+// Kept out of src/app/: Expo Router bundles every file of that folder as a route, tests included.
+import RootLayout from "@/app/_layout"
+import AskById from "@/app/ask/[id]"
+import Tabs from "@/app/(tabs)/_layout"
+import Activity from "@/app/(tabs)/activity"
+import History from "@/app/(tabs)/history"
+import Index from "@/app/(tabs)/index"
+import Settings from "@/app/(tabs)/settings"
+import Spending from "@/app/(tabs)/spending"
+import Login from "@/app/login"
 
 jest.mock("expo-notifications", () => ({setNotificationHandler: jest.fn()}))
 jest.mock("expo-secure-store", () => ({

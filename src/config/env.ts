@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import {normalizeServerUrl} from "@/ui/screens/login/serverUrl"
 
 // Expo inlines `process.env.EXPO_PUBLIC_*` at build time; only this exact expression is replaced. The declaration is
