@@ -52,6 +52,14 @@ describe("LoginScreen", () => {
         expect(screen.queryByText("Enter the address of your Ostrom server, starting with https://.")).toBeNull()
     })
 
+    it("recovers when the browser or the keychain fails", async () => {
+        const services = fakeServices({signIn: {signIn: () => Promise.reject(new Error("no browser"))}})
+        await renderLogin(services)
+        await fireEvent.press(screen.getByRole("button", {name: "Continue with GitHub"}))
+        expect(await screen.findByText("The sign-in could not finish on this phone. Try again.")).toBeOnTheScreen()
+        expect(screen.getByRole("button", {name: "Continue with GitHub"})).toBeEnabled()
+    })
+
     it("says why the sign-in failed", async () => {
         const {services} = setup({kind: "failed", reason: "exchange-failed"})
         await renderLogin(services)

@@ -1,6 +1,7 @@
 import {createContext, type ReactNode, use, useMemo} from "react"
 import type {StoreApi} from "zustand/vanilla"
 import {useStore} from "zustand"
+import {ApiError} from "@/api/http/ApiError"
 import type {AccountRepository} from "@/repositories/AccountRepository"
 import type {ActivityRepository} from "@/repositories/ActivityRepository"
 import type {ApprovalsRepository} from "@/repositories/ApprovalsRepository"
@@ -45,15 +46,27 @@ export function useSessionState(): SessionState {
     return useStore(useServices().sessionStore, (store) => store.state)
 }
 
-/** The repositories of the signed-in session; only screens behind the sign-in guard call it. */
+function refuse(): Promise<never> {
+    return Promise.reject(new ApiError({kind: "unauthorized"}))
+}
+
+/**
+ * What a screen still mounted after sign-out talks to: every call is refused as unauthorized,
+ * so nothing reaches the server without a session and the screen goes away with the guard.
+ */
+export const SIGNED_OUT_REPOSITORIES: Repositories = {
+    account: {me: refuse, exchangeCode: refuse},
+    activity: {page: refuse},
+    approvals: {queue: refuse, ask: refuse, decide: refuse},
+    notifications: {registerDevice: refuse, unregisterDevice: refuse, settings: refuse, saveSettings: refuse},
+    receipts: {list: refuse, get: refuse, publicKey: refuse},
+    spending: {report: refuse},
+}
+
+/** The repositories of the signed-in session; after sign-out, ones that refuse every call. */
 export function useRepositories(): Repositories {
     const {repositoriesFor} = useServices()
     const state = useSessionState()
     const session = state.status === "signed-in" ? state.session : undefined
-    const repositories = useMemo(
-        () => (session === undefined ? undefined : repositoriesFor(session)),
-        [repositoriesFor, session],
-    )
-    if (repositories === undefined) throw new Error("useRepositories while signed out")
-    return repositories
+    return useMemo(() => (session === undefined ? SIGNED_OUT_REPOSITORIES : repositoriesFor(session)), [repositoriesFor, session])
 }

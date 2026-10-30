@@ -41,8 +41,16 @@ export function createSessionStore(storage: SecureStorage): StoreApi<SessionStor
     return createStore<SessionStore>()((set) => ({
         state: {status: "loading"},
         hydrate: async () => {
-            const session = parseStored(await storage.get(SESSION_KEY))
-            if (session === undefined) await storage.remove(SESSION_KEY)
+            let stored: string | undefined
+            try {
+                stored = await storage.get(SESSION_KEY)
+            } catch {
+                // The keychain cannot be read (a launch while the phone is locked): sign in again rather than stay blank.
+                set({state: {status: "signed-out"}})
+                return
+            }
+            const session = parseStored(stored)
+            if (session === undefined) await storage.remove(SESSION_KEY).catch(() => undefined)
             set({state: session === undefined ? {status: "signed-out"} : {status: "signed-in", session}})
         },
         signIn: async (session) => {

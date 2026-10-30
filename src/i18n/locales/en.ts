@@ -10,6 +10,7 @@ export const en = {
         note: "You sign in with GitHub on your Ostrom server. Your yes is signed in your name.",
         errors: {
             "invalid-url": "Enter the address of your Ostrom server, starting with https://.",
+            unexpected: "The sign-in could not finish on this phone. Try again.",
             "state-mismatch": "This sign-in did not come from this app. Try again.",
             denied: "GitHub or the server refused the sign-in.",
             "exchange-failed": "The server did not accept the sign-in. Check the address and try again.",
