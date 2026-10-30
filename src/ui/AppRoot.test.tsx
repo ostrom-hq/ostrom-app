@@ -5,7 +5,9 @@ import {ApiError} from "@/api/http/ApiError"
 import {SESSION_KEY} from "@/stores/session"
 import {asks, fakeRepositories, fakeServices, MemoryStorage, testSession} from "@/test/fakeServices"
 import {testQueryClient} from "@/test/renderWithServices"
+import {TabsLayout} from "@/ui/navigation/TabsLayout"
 import {AskRoute} from "@/ui/screens/ask/AskRoute"
+import {HistoryScreen} from "@/ui/screens/history/HistoryScreen"
 import {InboxScreen} from "@/ui/screens/inbox/InboxScreen"
 import {LoginScreen} from "@/ui/screens/login/LoginScreen"
 import {AppRoot} from "./AppRoot"
@@ -23,7 +25,14 @@ async function launch(
     })
     const root = withTestClient ? <AppRoot services={services} queryClient={testQueryClient()} /> : <AppRoot services={services} />
     await renderRouter(
-        {_layout: (): React.JSX.Element => root, index: InboxScreen, login: LoginScreen, "ask/[id]": AskRoute},
+        {
+            _layout: (): React.JSX.Element => root,
+            "(tabs)/_layout": TabsLayout,
+            "(tabs)/index": InboxScreen,
+            "(tabs)/history": HistoryScreen,
+            login: LoginScreen,
+            "ask/[id]": AskRoute,
+        },
         {initialUrl: "/"},
     )
 }
@@ -63,7 +72,9 @@ async function openUrl(url: string): Promise<void> {
     await renderRouter(
         {
             _layout: (): React.JSX.Element => <AppRoot services={services} queryClient={testQueryClient()} />,
-            index: InboxScreen,
+            "(tabs)/_layout": TabsLayout,
+            "(tabs)/index": InboxScreen,
+            "(tabs)/history": HistoryScreen,
             login: LoginScreen,
             "ask/[id]": AskRoute,
         },
