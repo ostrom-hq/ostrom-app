@@ -1,12 +1,10 @@
 import {
     type AnswerRequest,
-    type AnswerResult,
-    AnswerResultSchema,
-    type Approval,
     type ApprovalAnswer,
-    type ApprovalPage,
-    ApprovalPageSchema,
-    ApprovalSchema,
+    type ApprovalQueue,
+    ApprovalQueueSchema,
+    type ApprovalView,
+    ApprovalViewSchema,
 } from "@/api/contract/approvals"
 import type {HttpClient} from "@/api/http/HttpClient"
 import {segment} from "@/api/http/HttpClientImpl"
@@ -15,21 +13,16 @@ import type {ApprovalsRepository} from "./ApprovalsRepository"
 export class ApprovalsRepositoryImpl implements ApprovalsRepository {
     constructor(private readonly http: HttpClient) {}
 
-    waiting(): Promise<ApprovalPage> {
-        return this.http.send({
-            method: "GET",
-            path: "/api/v1/approvals",
-            query: {mine: "true", status: "pending"},
-            response: ApprovalPageSchema,
-        })
+    queue(): Promise<ApprovalQueue> {
+        return this.http.send({method: "GET", path: "/api/v1/approvals/queue", response: ApprovalQueueSchema})
     }
 
-    approval(id: string): Promise<Approval> {
-        return this.http.send({method: "GET", path: `/api/v1/approvals/${segment(id)}`, response: ApprovalSchema})
+    view(id: string): Promise<ApprovalView> {
+        return this.http.send({method: "GET", path: `/api/v1/approvals/${segment(id)}/view`, response: ApprovalViewSchema})
     }
 
-    answer(id: string, answer: ApprovalAnswer, shownDigest: string, note?: string): Promise<AnswerResult> {
+    answer(id: string, answer: ApprovalAnswer, shownDigest: string, note?: string): Promise<ApprovalView> {
         const body: AnswerRequest = note === undefined ? {answer, shownDigest} : {answer, shownDigest, note}
-        return this.http.send({method: "POST", path: `/api/v1/approvals/${segment(id)}/answer`, body, response: AnswerResultSchema})
+        return this.http.send({method: "POST", path: `/api/v1/approvals/${segment(id)}/answer`, body, response: ApprovalViewSchema})
     }
 }

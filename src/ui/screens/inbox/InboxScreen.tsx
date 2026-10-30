@@ -77,6 +77,19 @@ export function InboxScreen(): React.JSX.Element {
                         </View>
                     }
                     ListEmptyComponent={<Text style={[styles.body, {color: colors.textMuted}]}>{t("inbox.empty")}</Text>}
+                    // What was answered lately comes after what waits, under its own heading: it only opens.
+                    ListFooterComponent={
+                        state.recent.length === 0 ? undefined : (
+                            <View style={styles.recent}>
+                                <Text accessibilityRole="header" style={[styles.recentTitle, {color: colors.textMuted}]}>
+                                    {t("inbox.recent")}
+                                </Text>
+                                {state.recent.map((row) => (
+                                    <RequestRow key={row.id} row={row} onOpen={open} />
+                                ))}
+                            </View>
+                        )
+                    }
                     renderItem={({item}) => <RequestRow row={item} onOpen={open} />}
                 />
             )
@@ -92,6 +105,8 @@ const styles = StyleSheet.create({
     message: {padding: space[4], gap: space[3]},
     list: {padding: space[4], gap: space[3]},
     header: {gap: space[2]},
+    recent: {gap: space[3], marginTop: space[3]},
+    recentTitle: {fontSize: fontSize[14], fontWeight: "700"},
     stale: {fontSize: fontSize[14]},
     body: {fontSize: fontSize[16]},
     row: {borderWidth: 1, borderLeftWidth: 4, borderRadius: radius.lg, padding: space[3], gap: space[2]},

@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import {screen} from "@testing-library/react-native"
 import {renderRouter} from "expo-router/testing-library"
-import type {ApprovalPage} from "@/api/contract/approvals"
+import type {ApprovalQueue} from "@/api/contract/approvals"
 import {ApiError} from "@/api/http/ApiError"
 import {SESSION_KEY} from "@/stores/session"
-import {approvals, fakeRepositories, fakeServices, MemoryStorage, testSession} from "@/test/fakeServices"
+import {approvals, fakeRepositories, fakeServices, MemoryStorage, testSession, viewOf} from "@/test/fakeServices"
 import {testQueryClient} from "@/test/renderWithServices"
 import {TabsLayout} from "@/ui/navigation/TabsLayout"
 import {ActivityScreen} from "@/ui/screens/activity/ActivityScreen"
@@ -16,16 +16,16 @@ import {SettingsScreen} from "@/ui/screens/settings/SettingsScreen"
 import {SpendingScreen} from "@/ui/screens/spending/SpendingScreen"
 import {AppRoot} from "./AppRoot"
 
-const EMPTY: ApprovalPage = {items: []}
+const EMPTY: ApprovalQueue = {operator: "rev-b", you: {login: "rev-b", via: "app"}, pending: [], recent: []}
 
 async function launch(
     storage: MemoryStorage,
-    waiting: () => Promise<ApprovalPage> = () => Promise.resolve(EMPTY),
+    queue: () => Promise<ApprovalQueue> = () => Promise.resolve(EMPTY),
     withTestClient = true,
 ): Promise<void> {
     const services = fakeServices({
         storage,
-        repositories: fakeRepositories({approvals: {waiting, approval: jest.fn(), answer: jest.fn()}}),
+        repositories: fakeRepositories({approvals: {queue, view: jest.fn(), answer: jest.fn()}}),
     })
     const root = withTestClient ? <AppRoot services={services} queryClient={testQueryClient()} /> : <AppRoot services={services} />
     await renderRouter(
@@ -73,7 +73,7 @@ async function openUrl(url: string): Promise<void> {
     const services = fakeServices({
         storage: keptSession(),
         repositories: fakeRepositories({
-            approvals: {waiting: () => Promise.resolve(EMPTY), approval: () => Promise.resolve(approvals.pending), answer: jest.fn()},
+            approvals: {queue: () => Promise.resolve(EMPTY), view: () => Promise.resolve(viewOf(approvals.pending)), answer: jest.fn()},
         }),
     })
     await renderRouter(

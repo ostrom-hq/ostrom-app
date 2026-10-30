@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import * as Crypto from "expo-crypto"
+import * as Linking from "expo-linking"
 import * as WebBrowser from "expo-web-browser"
 import {ApprovalsRepositoryImpl} from "@/repositories/ApprovalsRepositoryImpl"
 import {GithubSignInImpl} from "@/services/signIn/GithubSignInImpl"
@@ -14,6 +15,7 @@ jest.mock("expo-web-browser", () => ({
     ),
 }))
 jest.mock("expo-notifications", () => ({setNotificationHandler: jest.fn()}))
+jest.mock("expo-linking", () => ({openURL: jest.fn(() => Promise.resolve(true))}))
 jest.mock("expo-crypto", () => ({getRandomBytes: jest.fn((length: number) => new Uint8Array(length))}))
 
 describe("createAppServices", () => {
@@ -34,6 +36,11 @@ describe("createAppServices", () => {
         expect(jest.mocked(WebBrowser.openAuthSessionAsync).mock.calls[0]?.[0]).toContain(`state=${ZERO_STATE}`)
         expect(Crypto.getRandomBytes).toHaveBeenCalledWith(32)
         expect(fetch).toHaveBeenCalledWith("https://ostrom.test/api/v1/auth/mobile/token", expect.anything())
+    })
+
+    it("opens a link of the console outside the app, as a universal link", async () => {
+        await expect(createAppServices().openUrl("https://ostrom.test/yes/appr_1")).resolves.toBeUndefined()
+        expect(Linking.openURL).toHaveBeenCalledWith("https://ostrom.test/yes/appr_1")
     })
 
     it("gives each session its repositories, with the session token", async () => {

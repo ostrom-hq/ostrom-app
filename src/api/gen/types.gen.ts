@@ -206,6 +206,59 @@ export type ApprovalViewer = {
 };
 
 /**
+ * A gate seen from its approvers, with the actions it covers
+ */
+export type ApproverGate = {
+    workflowId: string;
+    workflowName: string;
+    /**
+     * The gate node
+     */
+    nodeId: string;
+    label: string;
+    /**
+     * False while the workflow is only proposed
+     */
+    enforce: boolean;
+    /**
+     * The action classes it covers (`push-main`, `deploy`…), sorted
+     */
+    actions: Array<string>;
+};
+
+/**
+ * One approver and the gates they answer
+ */
+export type ApproverLine = {
+    /**
+     * The approver, as the workflow names them
+     */
+    approver: string;
+    /**
+     * Their gates, by workflow then node
+     */
+    gates: Array<ApproverGate>;
+};
+
+/**
+ * Who approves what in a repository, the gates catalogue seen from the approvers' side
+ */
+export type ApproversGraph = {
+    /**
+     * Every approver, sorted by name
+     */
+    approvers: Array<ApproverLine>;
+    /**
+     * The gates that name no approver; their actions can never run
+     */
+    unanswered: Array<ApproverGate>;
+    /**
+     * The action classes no gate covers, sorted
+     */
+    ungated: Array<string>;
+};
+
+/**
  * A published page or file set, behind the login
  */
 export type Artifact = {
@@ -1225,7 +1278,7 @@ export type McpArgumentPolicyRequest = {
 export type McpAssignment = {
     server: string;
     /**
-     * The member's id; absent for every member of the org
+     * The member's id (`Member.id`); absent for every member of the org
      */
     member?: string;
     /**
@@ -1388,6 +1441,10 @@ export type Me = {
  * A member of an organization
  */
 export type Member = {
+    /**
+     * The member's id, stable across their tokens and sessions. Routes that take a member id (`memberId` of `/api/v1/artifacts/{id}/members/{memberId}`, `member` of the relayed servers, `memberMap` of the TeamCode import) take this one; routes under `/api/v1/members/{login}` take the login
+     */
+    id: string;
     login: string;
     name?: string;
     avatarUrl: string;
@@ -1396,6 +1453,24 @@ export type Member = {
     role: MemberRole;
     slackUserId?: string;
     discordUserId?: string;
+};
+
+/**
+ * One person to invite into the organization
+ */
+export type MemberInvite = {
+    /**
+     * Their GitHub login
+     */
+    login: string;
+    /**
+     * Their role once they join; `member` when absent. `owner` and `invited` are refused
+     */
+    role?: MemberRole;
+    /**
+     * The slug of a team they join; none when absent
+     */
+    team?: string;
 };
 
 export type MemberRole = 'owner' | 'admin' | 'member' | 'approver' | 'invited';
@@ -2136,6 +2211,13 @@ export type StartSessionRequest = {
 };
 
 /**
+ * 403 step_up_required: a yes needs a sign-in less than 5 minutes old (a sign-in of unknown age is refused too); sign in again, then answer. A no never needs it
+ */
+export type StepUpRequired = {
+    error: ErrorDetail;
+};
+
+/**
  * A list of strings suggested by the analysis, with what proves it
  */
 export type StringListSuggestion = {
@@ -2224,7 +2306,7 @@ export type TeamCodeImportRequest = {
     assignments?: Array<TeamCodeAssignment>;
     accounts?: Array<TeamCodeAccount>;
     /**
-     * TeamCode member id to Ostrom member id; unmapped members are skipped
+     * TeamCode member id to Ostrom member id (`Member.id`); unmapped members are skipped
      */
     memberMap?: {
         [key: string]: string;
@@ -2622,7 +2704,7 @@ export type TeamCodeImportRequestWritable = {
     assignments?: Array<TeamCodeAssignmentWritable>;
     accounts?: Array<TeamCodeAccountWritable>;
     /**
-     * TeamCode member id to Ostrom member id; unmapped members are skipped
+     * TeamCode member id to Ostrom member id (`Member.id`); unmapped members are skipped
      */
     memberMap?: {
         [key: string]: string;
@@ -4278,6 +4360,49 @@ export type ListMembersResponses = {
 
 export type ListMembersResponse = ListMembersResponses[keyof ListMembersResponses];
 
+export type RemoveMemberData = {
+    body?: never;
+    path: {
+        login: string;
+    };
+    query?: never;
+    url: '/api/v1/members/{login}';
+};
+
+export type RemoveMemberErrors = {
+    /**
+     * A refusal
+     */
+    400: ApiError;
+    /**
+     * A refusal
+     */
+    401: ApiError;
+    /**
+     * A refusal
+     */
+    403: ApiError;
+    /**
+     * A refusal
+     */
+    404: ApiError;
+    /**
+     * A refusal
+     */
+    409: ApiError;
+};
+
+export type RemoveMemberError = RemoveMemberErrors[keyof RemoveMemberErrors];
+
+export type RemoveMemberResponses = {
+    /**
+     * Done
+     */
+    204: void;
+};
+
+export type RemoveMemberResponse = RemoveMemberResponses[keyof RemoveMemberResponses];
+
 export type GetMemberData = {
     body?: never;
     path: {
@@ -4370,9 +4495,7 @@ export type UpdateMemberResponse = UpdateMemberResponses[keyof UpdateMemberRespo
 
 export type InviteMembersData = {
     body: {
-        invites: Array<{
-            [key: string]: string;
-        }>;
+        invites: Array<MemberInvite>;
     };
     path?: never;
     query?: never;
@@ -5126,6 +5249,52 @@ export type ConsumeGateResponses = {
 
 export type ConsumeGateResponse = ConsumeGateResponses[keyof ConsumeGateResponses];
 
+export type GetApproversGraphData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * The repository; the organization's catalogue when absent
+         */
+        repo?: string;
+    };
+    url: '/api/v1/gates/approvers';
+};
+
+export type GetApproversGraphErrors = {
+    /**
+     * A refusal
+     */
+    400: ApiError;
+    /**
+     * A refusal
+     */
+    401: ApiError;
+    /**
+     * A refusal
+     */
+    403: ApiError;
+    /**
+     * A refusal
+     */
+    404: ApiError;
+    /**
+     * A refusal
+     */
+    409: ApiError;
+};
+
+export type GetApproversGraphError = GetApproversGraphErrors[keyof GetApproversGraphErrors];
+
+export type GetApproversGraphResponses = {
+    /**
+     * OK
+     */
+    200: ApproversGraph;
+};
+
+export type GetApproversGraphResponse = GetApproversGraphResponses[keyof GetApproversGraphResponses];
+
 export type GetGateCatalogData = {
     body?: never;
     path?: never;
@@ -5501,9 +5670,9 @@ export type AnswerApprovalErrors = {
      */
     401: ApiError;
     /**
-     * self_approval_refused, or not an approver
+     * self_approval_refused, step_up_required, or not an approver (the key is `error.type`)
      */
-    403: SelfApprovalRefused;
+    403: SelfApprovalRefused | StepUpRequired;
     /**
      * A refusal
      */
@@ -7898,7 +8067,7 @@ export type UnassignMcpServerData = {
     path: {
         name: string;
         /**
-         * The member's id, or `all` for every member of the org
+         * The member's id (`Member.id`), or `all` for every member of the org
          */
         member: string;
     };
@@ -7945,7 +8114,7 @@ export type AssignMcpServerData = {
     path: {
         name: string;
         /**
-         * The member's id, or `all` for every member of the org
+         * The member's id (`Member.id`), or `all` for every member of the org
          */
         member: string;
     };
@@ -10738,7 +10907,7 @@ export type ListArtifactMembersResponses = {
      */
     200: {
         /**
-         * Member ids
+         * Member ids (`Member.id`)
          */
         members: Array<string>;
     };
@@ -10751,7 +10920,7 @@ export type UnshareArtifactData = {
     path: {
         id: string;
         /**
-         * The member's id (not a login)
+         * The member's id (`Member.id`, also `Me.member.id` for the caller), not a login
          */
         memberId: string;
     };
@@ -10798,7 +10967,7 @@ export type ShareArtifactData = {
     path: {
         id: string;
         /**
-         * The member's id (not a login)
+         * The member's id (`Member.id`, also `Me.member.id` for the caller), not a login
          */
         memberId: string;
     };
@@ -12654,3 +12823,40 @@ export type ReceiveStripeWebhookResponses = {
 };
 
 export type ReceiveStripeWebhookResponse = ReceiveStripeWebhookResponses[keyof ReceiveStripeWebhookResponses];
+
+export type ReceiveStripeWebhookAliasData = {
+    /**
+     * A Stripe event, as Stripe sends it
+     */
+    body: {
+        [key: string]: unknown;
+    };
+    headers: {
+        'Stripe-Signature': string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/v1/billing/stripe/webhook';
+};
+
+export type ReceiveStripeWebhookAliasErrors = {
+    /**
+     * A refusal
+     */
+    400: ApiError;
+    /**
+     * A refusal
+     */
+    413: ApiError;
+};
+
+export type ReceiveStripeWebhookAliasError = ReceiveStripeWebhookAliasErrors[keyof ReceiveStripeWebhookAliasErrors];
+
+export type ReceiveStripeWebhookAliasResponses = {
+    /**
+     * OK
+     */
+    200: BillingWebhookAck;
+};
+
+export type ReceiveStripeWebhookAliasResponse = ReceiveStripeWebhookAliasResponses[keyof ReceiveStripeWebhookAliasResponses];

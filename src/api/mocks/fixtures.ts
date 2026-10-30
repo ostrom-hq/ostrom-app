@@ -11,7 +11,7 @@ export const MOCK_BASE_URL = "https://ostrom.test"
 
 export const me: z.input<typeof MeSchema> = {
     dev: {login: "rev-b", verified: true, via: "github"},
-    member: {login: "rev-b", name: "Reviewer B", avatarUrl: "https://avatars.test/rev-b", role: "member"},
+    member: {id: "6f1c2a4e-8b3d-4c5e-9f70-1a2b3c4d5e6f", login: "rev-b", name: "Reviewer B", avatarUrl: "https://avatars.test/rev-b", role: "member"},
     capabilities: ["approvals.answer"],
 }
 
@@ -50,6 +50,16 @@ export const selfApproval: z.input<typeof ApprovalSchema> = {
     repo: "acme/acme-web",
     shownDigest: "0a9f8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b5c1b3f4a9d2e7c8b6a5f4e3d2c1b",
     askedBy: ["rev-b"],
+}
+
+/** A low-risk deploy that names its action (contract 0.1.129): Approve says what it lets through, without Face ID. */
+export const deployApproval: z.input<typeof ApprovalSchema> = {
+    ...pendingApproval,
+    id: "appr_0003",
+    title: "Deploy acme-api to staging",
+    shownDigest: "7e6d5c4b3a2f1e0d9c8b7a6f5e4d3c2b1a0f9e8d7c6b5a4f3e2d1c0b9a8f7e6d",
+    action: {kind: "deploy", repo: "acme/acme-api", ref: "main", headSha: "c60f859a1b2c3d4e5f60718293a4b5c6d7e8f901", risk: "low"},
+    diffStats: {files: 2, additions: 41, deletions: 7},
 }
 
 export const decidedApproval: z.input<typeof ApprovalSchema> = {

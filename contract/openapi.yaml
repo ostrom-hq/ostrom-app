@@ -1475,6 +1475,32 @@ paths:
           $ref: '#/components/responses/Error'
         '409':
           $ref: '#/components/responses/Error'
+    delete:
+      operationId: removeMember
+      x-ostrom-status: planned
+      tags:
+      - organization
+      summary: Remove a member from the organization (or cancel an invitation); the receipts they signed keep naming
+        them
+      parameters:
+      - name: login
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '204':
+          description: Done
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
   /api/v1/members/invites:
     post:
       operationId: inviteMembers
@@ -1492,9 +1518,7 @@ paths:
                 invites:
                   type: array
                   items:
-                    type: object
-                    additionalProperties:
-                      type: string
+                    $ref: '#/components/schemas/MemberInvite'
               required:
               - invites
       responses:
@@ -2111,6 +2135,39 @@ paths:
           $ref: '#/components/responses/Error'
         '409':
           $ref: '#/components/responses/Error'
+  /api/v1/gates/approvers:
+    get:
+      operationId: getApproversGraph
+      x-ostrom-status: served
+      tags:
+      - gates
+      summary: 'Who approves what in a repository (scope `packages:read`, `workflows:read`, an agent session or a browser
+        session): every approver with the gates they answer, the gates that name nobody, and the actions no gate
+        covers. Read from the same catalogue the gates decide on'
+      parameters:
+      - name: repo
+        in: query
+        required: false
+        description: The repository; the organization's catalogue when absent
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApproversGraph'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
   /api/v1/gates/catalog:
     get:
       operationId: getGateCatalog
@@ -2396,7 +2453,8 @@ paths:
       - approvals
       summary: Say yes or no, as the caller. 409 shown_digest_mismatch when the shown digest differs, 409 approval_closed
         when already answered (a signed answer never changes); 403 self_approval_refused when the asker answers while another
-        approver exists
+        approver exists; 403 step_up_required when a yes comes from a sign-in more than 5 minutes old (sign in again, then
+        answer)
       parameters:
       - name: id
         in: path
@@ -2421,11 +2479,13 @@ paths:
         '401':
           $ref: '#/components/responses/Error'
         '403':
-          description: self_approval_refused, or not an approver
+          description: self_approval_refused, step_up_required, or not an approver (the key is `error.type`)
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SelfApprovalRefused'
+                oneOf:
+                - $ref: '#/components/schemas/SelfApprovalRefused'
+                - $ref: '#/components/schemas/StepUpRequired'
         '404':
           $ref: '#/components/responses/Error'
         '409':
@@ -4384,7 +4444,7 @@ paths:
       - name: member
         in: path
         required: true
-        description: The member's id, or `all` for every member of the org
+        description: The member's id (`Member.id`), or `all` for every member of the org
         schema:
           type: string
       requestBody:
@@ -4425,7 +4485,7 @@ paths:
       - name: member
         in: path
         required: true
-        description: The member's id, or `all` for every member of the org
+        description: The member's id (`Member.id`), or `all` for every member of the org
         schema:
           type: string
       responses:
@@ -6621,7 +6681,7 @@ paths:
                 properties:
                   members:
                     type: array
-                    description: Member ids
+                    description: Member ids (`Member.id`)
                     items:
                       type: string
                 required:
@@ -6643,6 +6703,11 @@ paths:
       tags:
       - artifacts
       summary: Share with a member
+      description: Works on every access, `personal` included. A `personal` artifact stays `personal`, which already
+        means its owner, the members it is shared with and the organization's administrators; sharing never changes
+        `access` (`ArtifactAccess` has no `members` value). A `team` or `link` artifact is already readable by every
+        member, so sharing it only adds the member to the list. The console shows a `personal` artifact shared with
+        members as "shared with N members", N being the length of `listArtifactMembers`
       parameters:
       - name: id
         in: path
@@ -6652,7 +6717,7 @@ paths:
       - name: memberId
         in: path
         required: true
-        description: The member's id (not a login)
+        description: The member's id (`Member.id`, also `Me.member.id` for the caller), not a login
         schema:
           type: string
       responses:
@@ -6683,7 +6748,7 @@ paths:
       - name: memberId
         in: path
         required: true
-        description: The member's id (not a login)
+        description: The member's id (`Member.id`, also `Me.member.id` for the caller), not a login
         schema:
           type: string
       responses:
@@ -8072,10 +8137,47 @@ paths:
   /webhooks/stripe:
     post:
       operationId: receiveStripeWebhook
-      x-ostrom-status: planned
+      x-ostrom-status: served
       tags:
       - billing
       summary: Stripe events (subscriptions, invoices, checkout)
+      description: 'Called by Stripe only, authenticated by the `Stripe-Signature` header (HMAC-SHA256 of the timestamp and
+        the body, 5 minutes of tolerance). Each event is applied once; a replay answers `duplicate`. Bodies over 256 KiB
+        are refused (413).'
+      security: []
+      parameters:
+      - name: Stripe-Signature
+        in: header
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: A Stripe event, as Stripe sends it
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BillingWebhookAck'
+        '400':
+          $ref: '#/components/responses/Error'
+        '413':
+          $ref: '#/components/responses/Error'
+  /api/v1/billing/stripe/webhook:
+    post:
+      operationId: receiveStripeWebhookAlias
+      deprecated: true
+      x-ostrom-status: served
+      tags:
+      - billing
+      summary: 'Deprecated alias of `POST /webhooks/stripe`, the path the webhook was first served at: same signature,
+        same answers. Removed after the public release; point the Stripe endpoint at `/webhooks/stripe`'
       description: 'Called by Stripe only, authenticated by the `Stripe-Signature` header (HMAC-SHA256 of the timestamp and
         the body, 5 minutes of tolerance). Each event is applied once; a replay answers `duplicate`. Bodies over 256 KiB
         are refused (413).'
@@ -8491,6 +8593,72 @@ components:
       - login
       - via
       x-ostrom-kotlin: pending
+    ApproverGate:
+      type: object
+      description: A gate seen from its approvers, with the actions it covers
+      properties:
+        workflowId:
+          type: string
+        workflowName:
+          type: string
+        nodeId:
+          type: string
+          description: The gate node
+        label:
+          type: string
+        enforce:
+          type: boolean
+          description: False while the workflow is only proposed
+        actions:
+          type: array
+          description: The action classes it covers (`push-main`, `deploy`…), sorted
+          items:
+            type: string
+      required:
+      - workflowId
+      - workflowName
+      - nodeId
+      - label
+      - enforce
+      - actions
+    ApproverLine:
+      type: object
+      description: One approver and the gates they answer
+      properties:
+        approver:
+          type: string
+          description: The approver, as the workflow names them
+        gates:
+          type: array
+          description: Their gates, by workflow then node
+          items:
+            $ref: '#/components/schemas/ApproverGate'
+      required:
+      - approver
+      - gates
+    ApproversGraph:
+      type: object
+      description: Who approves what in a repository, the gates catalogue seen from the approvers' side
+      properties:
+        approvers:
+          type: array
+          description: Every approver, sorted by name
+          items:
+            $ref: '#/components/schemas/ApproverLine'
+        unanswered:
+          type: array
+          description: The gates that name no approver; their actions can never run
+          items:
+            $ref: '#/components/schemas/ApproverGate'
+        ungated:
+          type: array
+          description: The action classes no gate covers, sorted
+          items:
+            type: string
+      required:
+      - approvers
+      - unanswered
+      - ungated
     Artifact:
       type: object
       description: A published page or file set, behind the login
@@ -10221,7 +10389,7 @@ components:
           type: string
         member:
           type: string
-          description: The member's id; absent for every member of the org
+          description: The member's id (`Member.id`); absent for every member of the org
         tools:
           type: array
           description: The allowlist; absent for every tool, empty for none
@@ -10427,6 +10595,12 @@ components:
       type: object
       description: A member of an organization
       properties:
+        id:
+          type: string
+          format: uuid
+          description: The member's id, stable across their tokens and sessions. Routes that take a member id (`memberId`
+            of `/api/v1/artifacts/{id}/members/{memberId}`, `member` of the relayed servers, `memberMap` of the TeamCode
+            import) take this one; routes under `/api/v1/members/{login}` take the login
         login:
           type: string
         name:
@@ -10446,9 +10620,25 @@ components:
         discordUserId:
           type: string
       required:
+      - id
       - login
       - avatarUrl
       - role
+    MemberInvite:
+      type: object
+      description: One person to invite into the organization
+      properties:
+        login:
+          type: string
+          description: Their GitHub login
+        role:
+          $ref: '#/components/schemas/MemberRole'
+          description: Their role once they join; `member` when absent. `owner` and `invited` are refused
+        team:
+          type: string
+          description: The slug of a team they join; none when absent
+      required:
+      - login
     MemberRole:
       type: string
       enum:
@@ -11848,6 +12038,16 @@ components:
       required:
       - id
       - agent
+    StepUpRequired:
+      type: object
+      description: '403 step_up_required: a yes needs a sign-in less than 5 minutes old (a sign-in of unknown age is
+        refused too); sign in again, then answer. A no never needs it'
+      properties:
+        error:
+          $ref: '#/components/schemas/ErrorDetail'
+      required:
+      - error
+      x-ostrom-kotlin: pending
     StringListSuggestion:
       type: object
       description: A list of strings suggested by the analysis, with what proves it
@@ -12033,7 +12233,7 @@ components:
             $ref: '#/components/schemas/TeamCodeAccount'
         memberMap:
           type: object
-          description: TeamCode member id to Ostrom member id; unmapped members are skipped
+          description: TeamCode member id to Ostrom member id (`Member.id`); unmapped members are skipped
           additionalProperties:
             type: string
       x-ostrom-kotlin: pending

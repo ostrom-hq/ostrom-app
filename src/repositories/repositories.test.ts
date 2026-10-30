@@ -37,20 +37,27 @@ async function refusal(call: Promise<unknown>): Promise<string> {
 describe("ApprovalsRepositoryImpl", () => {
     const approvals = new ApprovalsRepositoryImpl(http)
 
-    it("reads what waits for my answer", async () => {
-        const page = await approvals.waiting()
-        expect(page.items.map((approval) => approval.id)).toEqual(["appr_0001", "appr_0002"])
+    it("reads the yes queue: what waits for my answer, then what was answered lately", async () => {
+        const queue = await approvals.queue()
+        expect(queue.operator).toBe("rev-b")
+        expect(queue.pending.map((view) => view.approval.id)).toEqual(["appr_0001", "appr_0002", "appr_0003"])
+        expect(queue.recent.map((view) => view.approval.id)).toEqual(["appr_0000"])
+        // My own request is mine, and not mine to approve: the server says why.
+        expect(queue.pending[1]?.you).toMatchObject({self: true, canApprove: false})
+        expect(queue.pending[1]?.you.reason).toMatch(/another approver/)
     })
 
-    it("reads one request with its evidence, commits and checks", async () => {
-        const approval = await approvals.approval("appr_0001")
-        expect(approval.commitDetails).toHaveLength(2)
-        expect(approval.checks?.map((check) => check.state)).toEqual(["success", "success", "pending"])
-        expect(await refusal(approvals.approval("nope"))).toBe("not_found")
+    it("reads one request with its evidence, commits and checks, and who asks through which gate", async () => {
+        const view = await approvals.view("appr_0001")
+        expect(view.approval.commitDetails).toHaveLength(2)
+        expect(view.approval.checks?.map((check) => check.state)).toEqual(["success", "success", "pending"])
+        expect(view).toMatchObject({who: {agent: "claude-code"}, gate: {label: "Merge to main"}, you: {canApprove: true}})
+        expect(await refusal(approvals.view("nope"))).toBe("not_found")
     })
 
     it("approves a request bound to what was shown", async () => {
         const {approval} = await approvals.answer("appr_0001", "approve", pendingApproval.shownDigest)
+        expect(await approvals.view("appr_0001")).toMatchObject({approval: {status: "approved"}})
         expect(approval).toMatchObject({status: "approved", decidedBy: "rev-b"})
         expect(await refusal(approvals.answer("appr_0001", "reject", pendingApproval.shownDigest, "Too late"))).toBe("conflict")
     })
@@ -64,7 +71,7 @@ describe("ApprovalsRepositoryImpl", () => {
         server.use(
             httpMock.post(`${MOCK_BASE_URL}/api/v1/approvals/:id/answer`, async ({request}) => {
                 sent = await request.json()
-                return HttpResponse.json({approval: {...pendingApproval, status: "rejected"}})
+                return HttpResponse.json({approval: {...pendingApproval, status: "rejected"}, you: {login: "rev-b", self: false, canApprove: false}})
             }),
         )
         await approvals.answer("appr_0001", "reject", "d", "Wait for the migration PR")
@@ -179,10 +186,10 @@ describe("SpendingRepositoryImpl", () => {
 })
 
 describe("createMockApi", () => {
-    it("lists every request when no status is asked", async () => {
-        const raw = await fetch(`${MOCK_BASE_URL}/api/v1/approvals`)
+    it("serves the yes queue as the contract shapes it", async () => {
+        const raw = await fetch(`${MOCK_BASE_URL}/api/v1/approvals/queue`)
         const body: unknown = await raw.json()
-        expect(body).toMatchObject({items: [{id: "appr_0001"}, {id: "appr_0002"}, {id: "appr_0000"}]})
+        expect(body).toMatchObject({operator: "rev-b", you: {login: "rev-b", via: "app"}, recent: [{approval: {id: "appr_0000"}}]})
     })
 
     it("serves another origin when asked", async () => {

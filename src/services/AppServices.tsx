@@ -31,6 +31,8 @@ export interface AppServices {
     readonly biometrics: BiometricGate
     readonly push: PushService
     readonly repositoriesFor: (session: Session) => Repositories
+    /** Opens a link outside the app: a link of the console opens the console (browser, or its app when installed). */
+    readonly openUrl: (url: string) => Promise<void>
 }
 
 const ServicesContext = createContext<AppServices | undefined>(undefined)
@@ -60,7 +62,7 @@ function refuse(): Promise<never> {
 export const SIGNED_OUT_REPOSITORIES: Repositories = {
     account: {me: refuse, exchangeCode: refuse, logout: refuse},
     activity: {page: refuse},
-    approvals: {waiting: refuse, approval: refuse, answer: refuse},
+    approvals: {queue: refuse, view: refuse, answer: refuse},
     notifications: {registerDevice: refuse, unregisterDevice: refuse, settings: refuse, saveSettings: refuse},
     receipts: {list: refuse, get: refuse, keys: refuse},
     spending: {report: refuse},

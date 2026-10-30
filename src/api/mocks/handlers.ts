@@ -1,6 +1,6 @@
 import {http, HttpResponse, type HttpHandler} from "msw"
 import type {z} from "zod"
-import type {ApprovalSchema} from "@/api/contract/approvals"
+import type {ApprovalSchema, ApprovalViewSchema} from "@/api/contract/approvals"
 import {
     zAnswerApprovalBody,
     zMobileTokenBody,
@@ -24,11 +24,27 @@ function refusal(status: number, type: string, message: string): Response {
  */
 export function createMockApi(baseUrl: string = fixtures.MOCK_BASE_URL): {handlers: HttpHandler[]} {
     const approvals = new Map<string, ApprovalInput>(
-        [fixtures.pendingApproval, fixtures.selfApproval, fixtures.decidedApproval].map((approval) => [approval.id, approval]),
+        [fixtures.pendingApproval, fixtures.selfApproval, fixtures.deployApproval, fixtures.decidedApproval].map((approval) => [
+            approval.id,
+            approval,
+        ]),
     )
     let settings = fixtures.notificationSettings
     const url = (path: string): string => `${baseUrl}${path}`
     const caller = fixtures.me.dev.login
+    /** A request as the console and the app show it: the caller's own request is theirs, and not theirs to approve. */
+    const view = (approval: ApprovalInput): z.input<typeof ApprovalViewSchema> => {
+        const self = approval.askedBy?.includes(caller) === true
+        return {
+            approval,
+            who: {agent: "claude-code", model: "claude-opus-5-5"},
+            what: {command: "gh pr merge 6 --squash"},
+            gate: {workflowName: "Release", label: "Merge to main"},
+            you: self
+                ? {login: caller, self, canApprove: false, reason: "You asked for this action: another approver must say yes"}
+                : {login: caller, self, canApprove: true},
+        }
+    }
 
     const handlers = [
         http.get(url("/api/v1/auth/me"), () => HttpResponse.json(fixtures.me)),
@@ -38,14 +54,18 @@ export function createMockApi(baseUrl: string = fixtures.MOCK_BASE_URL): {handle
             return HttpResponse.json({token: "ost_mock_token", user: {login: caller}})
         }),
         http.post(url("/api/v1/auth/logout"), () => new HttpResponse(null, {status: 204})),
-        http.get(url("/api/v1/approvals"), ({request}) => {
-            const status = new URL(request.url).searchParams.get("status")
-            const items = [...approvals.values()].filter((approval) => status === null || approval.status === status)
-            return HttpResponse.json({items})
+        http.get(url("/api/v1/approvals/queue"), () => {
+            const all = [...approvals.values()]
+            return HttpResponse.json({
+                operator: caller,
+                you: {login: caller, via: "app"},
+                pending: all.filter((approval) => approval.status === "pending").map(view),
+                recent: all.filter((approval) => approval.status !== "pending").map(view),
+            })
         }),
-        http.get<{id: string}>(url("/api/v1/approvals/:id"), ({params}) => {
+        http.get<{id: string}>(url("/api/v1/approvals/:id/view"), ({params}) => {
             const approval = approvals.get(params.id)
-            return approval === undefined ? refusal(404, "not_found", "No such request") : HttpResponse.json(approval)
+            return approval === undefined ? refusal(404, "not_found", "No such request") : HttpResponse.json(view(approval))
         }),
         http.post<{id: string}>(url("/api/v1/approvals/:id/answer"), async ({params, request}) => {
             const approval = approvals.get(params.id)
@@ -66,7 +86,7 @@ export function createMockApi(baseUrl: string = fixtures.MOCK_BASE_URL): {handle
                 decidedAt: new Date().toISOString(),
             }
             approvals.set(approval.id, answered)
-            return HttpResponse.json({approval: answered})
+            return HttpResponse.json(view(answered))
         }),
         http.get(url("/api/v1/receipts/keys"), () => HttpResponse.json({keys: [fixtures.receiptKey]})),
         http.get(url("/api/v1/receipts"), () => HttpResponse.json({items: fixtures.receipts})),
