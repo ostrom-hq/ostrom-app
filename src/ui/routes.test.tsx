@@ -1,14 +1,15 @@
 import {screen} from "@testing-library/react-native"
 import {renderRouter} from "expo-router/testing-library"
-import RootLayout, {unstable_settings} from "./_layout"
-import RequestById from "./request/[id]"
-import Tabs from "./(tabs)/_layout"
-import Activity from "./(tabs)/activity"
-import History from "./(tabs)/history"
-import Index from "./(tabs)/index"
-import Settings from "./(tabs)/settings"
-import Spending from "./(tabs)/spending"
-import Login from "./login"
+// Kept out of src/app/: Expo Router bundles every file of that folder as a route, tests included.
+import RootLayout, {unstable_settings} from "@/app/_layout"
+import RequestById from "@/app/request/[id]"
+import Tabs from "@/app/(tabs)/_layout"
+import Activity from "@/app/(tabs)/activity"
+import History from "@/app/(tabs)/history"
+import Index from "@/app/(tabs)/index"
+import Settings from "@/app/(tabs)/settings"
+import Spending from "@/app/(tabs)/spending"
+import Login from "@/app/login"
 
 jest.mock("expo-notifications", () => ({setNotificationHandler: jest.fn()}))
 jest.mock("expo-secure-store", () => ({
