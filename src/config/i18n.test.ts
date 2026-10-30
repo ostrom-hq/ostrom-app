@@ -1,3 +1,4 @@
+import type * as I18nModule from "./i18n"
 import i18next, {detectLanguage} from "./i18n"
 
 describe("detectLanguage", () => {
@@ -17,5 +18,32 @@ describe("translations", () => {
         expect(i18next.t("home.title")).toBe("En attente de toi")
         await i18next.changeLanguage("en")
         expect(i18next.t("home.title")).toBe("Waiting for you")
+    })
+})
+
+describe("device language", () => {
+    afterEach(() => {
+        jest.resetModules()
+        jest.dontMock("expo-localization")
+    })
+
+    it("starts in the device language", () => {
+        jest.doMock("expo-localization", () => ({getLocales: () => [{languageCode: "fr"}]}))
+        jest.isolateModules(() => {
+            const isolated = jest.requireActual<typeof I18nModule>("./i18n")
+            expect(isolated.default.language).toBe("fr")
+        })
+    })
+
+    it("starts in English when the device locales cannot be read", () => {
+        jest.doMock("expo-localization", () => ({
+            getLocales: () => {
+                throw new Error("native module missing")
+            },
+        }))
+        jest.isolateModules(() => {
+            const isolated = jest.requireActual<typeof I18nModule>("./i18n")
+            expect(isolated.default.language).toBe("en")
+        })
     })
 })
