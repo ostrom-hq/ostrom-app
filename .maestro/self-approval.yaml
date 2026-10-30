@@ -23,6 +23,11 @@ appId: run.ostrom.app
     id: "request-reason"
 - inputText: "Someone else reviews this one"
 - hideKeyboard
+# The send button comes under the reason field, below the fold.
+- scrollUntilVisible:
+    element:
+      id: "request-send-decline"
+    direction: DOWN
 - tapOn:
     id: "request-send-decline"
 # The decision shows under the title, at the top of the request.
