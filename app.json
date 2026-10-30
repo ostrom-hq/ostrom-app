@@ -24,6 +24,12 @@
         {
           "faceIDPermission": "Ostrom uses Face ID to confirm that you are the one saying yes or no."
         }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#8E1B3A"
+        }
       ]
     ],
     "experiments": {

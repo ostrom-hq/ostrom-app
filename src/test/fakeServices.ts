@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type {AppServices, Repositories} from "@/services/AppServices"
 import type {BiometricGate} from "@/services/biometrics/BiometricGate"
+import type {PushService} from "@/services/push/PushService"
 import type {GithubSignIn} from "@/services/signIn/GithubSignIn"
 import type {SecureStorage} from "@/services/storage/SecureStorage"
 import {AskSchema, type Ask} from "@/api/contract/yes"
@@ -56,6 +57,7 @@ export interface FakeServicesOptions {
     readonly storage?: SecureStorage
     readonly signIn?: GithubSignIn
     readonly biometrics?: BiometricGate
+    readonly push?: PushService
     readonly repositories?: Repositories
 }
 
@@ -66,6 +68,11 @@ export function fakeServices(options: FakeServicesOptions = {}): AppServices {
         sessionStore: createSessionStore(options.storage ?? new MemoryStorage()),
         signIn: options.signIn ?? {signIn: () => Promise.resolve({kind: "cancelled"})},
         biometrics: options.biometrics ?? {confirm: () => Promise.resolve("confirmed")},
+        push: options.push ?? {
+            register: () => Promise.resolve({kind: "unavailable"}),
+            onOpen: () => () => undefined,
+            launchData: () => Promise.resolve(undefined),
+        },
         repositoriesFor: () => repositories,
     }
 }

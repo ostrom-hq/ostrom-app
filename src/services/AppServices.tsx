@@ -11,6 +11,7 @@ import type {ReceiptsRepository} from "@/repositories/ReceiptsRepository"
 import type {SpendingRepository} from "@/repositories/SpendingRepository"
 import type {Session, SessionState, SessionStore} from "@/stores/session"
 import type {BiometricGate} from "./biometrics/BiometricGate"
+import type {PushService} from "./push/PushService"
 import type {GithubSignIn} from "./signIn/GithubSignIn"
 
 /** The repositories of one signed-in session. */
@@ -28,6 +29,7 @@ export interface AppServices {
     readonly sessionStore: StoreApi<SessionStore>
     readonly signIn: GithubSignIn
     readonly biometrics: BiometricGate
+    readonly push: PushService
     readonly repositoriesFor: (session: Session) => Repositories
 }
 
