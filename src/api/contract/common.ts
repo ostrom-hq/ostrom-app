@@ -4,7 +4,8 @@
  * it does, the app reads the server with the schemas of this folder, written from the prototype's routes
  * (mvp/server/src/yes/routes.ts, shared/src/types.ts) and, for what the prototype never had (mobile sign-in, devices,
  * activity, spending, notification settings), from the proposal in ostrom-hq/.coord/QUESTIONS.md.
- * Only `src/api/` and `src/repositories/` import this folder: swapping it for `@ostrom-hq/core` touches nothing else.
+ * Only `src/api/`, `src/repositories/`, `src/services/` and `src/stores/` import this folder, so swapping it for the
+ * generated package stays a change of imports in a few files.
  * Optional fields are `.nullish()`: a Kotlin server may send `null` or omit the field.
  */
 import {z} from "zod"

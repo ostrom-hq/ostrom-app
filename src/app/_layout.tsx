@@ -1,15 +1,9 @@
 import "@/config/i18n"
-import {Stack, ThemeProvider} from "expo-router"
-import {StatusBar} from "expo-status-bar"
-import {navigationThemeFor} from "@/ui/theme/navigationTheme"
-import {useTheme} from "@/ui/theme/useTheme"
+import {createAppServices} from "@/config/services"
+import {AppRoot} from "@/ui/AppRoot"
+
+const services = createAppServices()
 
 export default function RootLayout(): React.JSX.Element {
-    const {navigation, statusBar} = navigationThemeFor(useTheme())
-    return (
-        <ThemeProvider value={navigation}>
-            <StatusBar style={statusBar} />
-            <Stack screenOptions={{headerShown: false}} />
-        </ThemeProvider>
-    )
+    return <AppRoot services={services} />
 }
