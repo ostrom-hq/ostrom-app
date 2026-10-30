@@ -422,7 +422,7 @@ describe("RequestScreen", () => {
         await waitFor(() => {
             expect(screen.queryByText("https://ostrom.test/yes/appr_0001")).toBeNull()
         })
-        expect(screen.getByText("You are a member of several organizations, and Ostrom needs to know which one this is for. The app cannot choose yet: use the console for now.")).toBeOnTheScreen()
+        expect(await screen.findByText("You are a member of several organizations, and Ostrom needs to know which one this is for. The app cannot choose yet: use the console for now.")).toBeOnTheScreen()
     })
 
     it("says clearly when an answer needs the organization named, and offers the console", async () => {
