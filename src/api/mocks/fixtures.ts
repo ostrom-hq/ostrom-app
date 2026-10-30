@@ -62,6 +62,15 @@ export const deployApproval: z.input<typeof ApprovalSchema> = {
     diffStats: {files: 2, additions: 41, deletions: 7},
 }
 
+/** A production deploy whose yes needs a fresh sign-in: the server answers 403 `step_up_required` (contract 0.1.140). */
+export const stepUpApproval: z.input<typeof ApprovalSchema> = {
+    ...deployApproval,
+    id: "appr_0004",
+    title: "Deploy acme-api to production",
+    shownDigest: "1b2c3d4e5f60718293a4b5c6d7e8f9010a9f8e7d6c5b4a3f2e1d0c9b8a7f6e5d",
+    action: {kind: "deploy", repo: "acme/acme-api", ref: "v2.4.0", headSha: "c60f859a1b2c3d4e5f60718293a4b5c6d7e8f901", risk: "low"},
+}
+
 export const decidedApproval: z.input<typeof ApprovalSchema> = {
     ...pendingApproval,
     id: "appr_0000",

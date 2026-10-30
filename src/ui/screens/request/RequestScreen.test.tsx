@@ -258,11 +258,14 @@ describe("RequestScreen", () => {
         expect(screen.queryByText(/Note to the agent/)).toBeNull()
     })
 
-    it("opens the console on the request when the server wants a fresh sign-in for the yes, without a raw error", async () => {
+    it("explains a yes that needs a fresh sign-in, then offers the console, without a raw error", async () => {
         const openUrl = jest.fn((_url: string) => Promise.resolve())
         await open(approvals.pending, {refuse: refused(403, "step_up_required"), openUrl})
+        expect(screen.queryByRole("button", {name: "Open the console"})).toBeNull()
         await fireEvent.press(screen.getByRole("button", {name: "Approve"}))
-        expect(await screen.findByText("Ostrom wants a fresh sign-in for this yes: confirm it in the console, which just opened.")).toBeOnTheScreen()
+        expect(await screen.findByText("Ostrom wants a fresh sign-in for this yes: confirm it in the console.")).toBeOnTheScreen()
+        expect(openUrl).not.toHaveBeenCalled()
+        await fireEvent.press(screen.getByRole("button", {name: "Open the console"}))
         expect(openUrl).toHaveBeenCalledWith("https://ostrom.test/yes/appr_0001")
         expect(screen.queryByText(/step_up_required/)).toBeNull()
     })

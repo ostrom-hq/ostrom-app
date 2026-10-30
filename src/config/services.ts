@@ -5,6 +5,7 @@ import * as Linking from "expo-linking"
 import * as WebBrowser from "expo-web-browser"
 import {Platform} from "react-native"
 import {z} from "zod"
+import type {HttpClient} from "@/api/http/HttpClient"
 import {HttpClientImpl} from "@/api/http/HttpClientImpl"
 import {AccountRepositoryImpl} from "@/repositories/AccountRepositoryImpl"
 import {ActivityRepositoryImpl} from "@/repositories/ActivityRepositoryImpl"
@@ -29,7 +30,11 @@ export function easProjectId(extra: unknown): string | undefined {
 
 /** The repositories of a session: every call carries its token. */
 export function repositoriesFor(session: Session): Repositories {
-    const http = new HttpClientImpl({baseUrl: session.serverUrl, token: () => session.token})
+    return repositoriesOver(new HttpClientImpl({baseUrl: session.serverUrl, token: () => session.token}))
+}
+
+/** The repositories over one HTTP client. */
+export function repositoriesOver(http: HttpClient): Repositories {
     return {
         account: new AccountRepositoryImpl(http),
         activity: new ActivityRepositoryImpl(http),

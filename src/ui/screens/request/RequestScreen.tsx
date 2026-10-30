@@ -171,6 +171,10 @@ function Actions({model, approval}: {model: RequestViewModel; approval: Approval
                     {t(`request.problems.${problem}`)}
                 </Text>
             )}
+            {/* A yes that needs a fresh sign-in is given in the console: the person opens it from here. */}
+            {problem === "step-up" ? (
+                <Button label={t("request.openConsole")} variant="signal" onPress={model.openConsole} testID="request-open-console" />
+            ) : null}
             {noApprove === undefined ? null : (
                 <Text style={[styles.body, {color: colors.text}]}>
                     {noApprove.kind === "truncated" ? t("request.truncated") : t("request.cannotApprove")}

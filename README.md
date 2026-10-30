@@ -80,6 +80,24 @@ npm run check      # typecheck + lint + tests, what CI runs
 npm run test:ci    # tests with the 100 % coverage gate
 ```
 
+## End-to-end tests
+
+Maestro flows in [`.maestro/`](.maestro), run by the `E2E` workflow on an Android emulator against the release build
+(about 30 minutes: on `main`, by hand, and on a pull request labelled `full-ci`). No Ostrom server runs on the runner:
+the E2E build (`EXPO_PUBLIC_OSTROM_MOCK=1`) answers from the in-memory server of `src/api/mocks/mockServer.ts`, the
+same one the unit tests use, through the real HTTP client, repositories and screens. Only the GitHub sign-in, the
+fingerprint and push are replaced, since the emulator has none of them.
+
+| Flow | What it proves | Status |
+| --- | --- | --- |
+| `login.yaml` | Signed out on a new phone: the login screen, and an address that is not `https://` is refused before anything is sent | Green |
+| `step-up.yaml` | A yes the server answers with 403 `step_up_required` (production deploy): the explanation, no raw error, then a button that opens the console on this request | Green |
+| `self-approval.yaml` | A request the person asked for (`canApprove: false`, `self_approval_refused`): Approve is not offered, and the no still goes through with its reason | Green |
+| Approve a request | A yes on someone else's request is sent with the shown digest and the request shows as approved | Missing |
+| Changed request | The request changes while it is shown (409 `shown_digest_mismatch`): the app asks to read it again | Missing |
+| Organization isolation | Another organization's data never shows (CONVENTIONS.md section 16) | Missing: needs a second organization on a real server |
+| Receipts, history, activity, spending | Each screen opens and reads its data | Missing |
+
 ## Layout
 
 | Path | What lives there |

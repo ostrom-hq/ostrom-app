@@ -48,6 +48,11 @@ export interface RequestViewModel {
     readonly approve: () => void
     /** Sends the no with its reason; nothing happens without one. */
     readonly decline: () => void
+    /**
+     * Opens the console on this request (its universal link), where a yes that needs a fresh sign-in is given; on the
+     * server of the session as it is now, and nothing after a sign-out.
+     */
+    readonly openConsole: () => void
 }
 
 /**
@@ -108,14 +113,7 @@ export function useRequestViewModel(id: string): RequestViewModel {
                         setDeclining(false)
                     } catch (error) {
                         // The answer's own invalidation reads the request again (`useAnswer`).
-                        const found = decisionProblem(error, askedByMe)
-                        // A yes that needs a fresh sign-in is given in the console: it opens on this request, on the
-                        // server of the session as it is now (nothing opens after a sign-out during the answer).
-                        const session = sessionStore.getState().state
-                        if (found === "step-up" && session.status === "signed-in") {
-                            void openUrl(`${session.session.serverUrl}/yes/${encodeURIComponent(approval.id)}`)
-                        }
-                        setProblem(found)
+                        setProblem(decisionProblem(error, askedByMe))
                     }
                 } else if (outcome !== "cancelled") {
                     setProblem(biometricProblem(outcome))
@@ -123,7 +121,7 @@ export function useRequestViewModel(id: string): RequestViewModel {
                 setSending(undefined)
             })()
         },
-        [approval, open, mayApprove, pinned, changed, biometrics, t, mutateAsync, askedByMe, openUrl, sessionStore],
+        [approval, open, mayApprove, pinned, changed, biometrics, t, mutateAsync, askedByMe],
     )
 
     const state: RequestScreenState =
@@ -161,6 +159,10 @@ export function useRequestViewModel(id: string): RequestViewModel {
         },
         approve: () => {
             send("approve")
+        },
+        openConsole: () => {
+            const session = sessionStore.getState().state
+            if (session.status === "signed-in") void openUrl(`${session.session.serverUrl}/yes/${encodeURIComponent(id)}`)
         },
         decline: () => {
             const note = reason.trim()

@@ -4,6 +4,8 @@ import * as Linking from "expo-linking"
 import * as WebBrowser from "expo-web-browser"
 import {ApprovalsRepositoryImpl} from "@/repositories/ApprovalsRepositoryImpl"
 import {GithubSignInImpl} from "@/services/signIn/GithubSignInImpl"
+import {servicesForBuild} from "./buildServices"
+import {createMockAppServices} from "./mockServices"
 import {createAppServices, easProjectId, repositoriesFor} from "./services"
 
 // 16 zero bytes in base64url: the state the sign-in draws with the mocked random source.
@@ -62,5 +64,32 @@ describe("easProjectId", () => {
         expect(easProjectId({eas: {projectId: "p-1"}})).toBe("p-1")
         expect(easProjectId(undefined)).toBeUndefined()
         expect(easProjectId({eas: {}})).toBeUndefined()
+    })
+})
+
+describe("createMockAppServices", () => {
+    it("signs in on the address typed, without GitHub, and talks to the in-memory server", async () => {
+        const services = createMockAppServices()
+        const outcome = await services.signIn.signIn("https://ostrom.e2e")
+        expect(outcome).toEqual({kind: "signed-in", session: {serverUrl: "https://ostrom.e2e", token: "ost_mock_token", user: {login: "rev-b"}}})
+        if (outcome.kind !== "signed-in") throw new Error("not signed in")
+        const queue = await services.repositoriesFor(outcome.session).approvals.queue()
+        expect(queue.pending.map((view) => view.approval.id)).toContain("appr_0004")
+    })
+
+    it("confirms without a finger and has no push, as on the emulator", async () => {
+        const services = createMockAppServices()
+        expect(await services.biometrics.confirm("Approve")).toBe("confirmed")
+        expect(await services.push.register()).toEqual({kind: "unavailable"})
+        expect(await services.push.launchData()).toBeUndefined()
+        const unsubscribe = services.push.onOpen(jest.fn())
+        expect(unsubscribe()).toBeUndefined()
+    })
+})
+
+describe("servicesForBuild", () => {
+    it("gives the real services, or the in-memory server's for the E2E build", async () => {
+        expect(servicesForBuild(false).signIn).toBeInstanceOf(GithubSignInImpl)
+        expect(await servicesForBuild(true).signIn.signIn("https://ostrom.e2e")).toMatchObject({kind: "signed-in"})
     })
 })

@@ -1,0 +1,24 @@
+# A yes on the production deploy needs a fresh sign-in: the server answers 403 step_up_required. The app explains it,
+# shows no raw error, and offers to open the console on this request.
+appId: run.ostrom.app
+---
+- runFlow: common/sign-in.yaml
+- scrollUntilVisible:
+    element:
+      id: "request-appr_0004"
+    direction: DOWN
+- tapOn:
+    id: "request-appr_0004"
+- assertNotVisible:
+    id: "request-open-console"
+- tapOn:
+    id: "request-approve"
+- extendedWaitUntil:
+    visible: "Ostrom wants a fresh sign-in for this yes: confirm it in the console."
+    timeout: 15000
+- assertNotVisible: ".*step_up_required.*"
+- assertVisible:
+    id: "request-open-console"
+- takeScreenshot: step-up
+- tapOn:
+    id: "request-open-console"

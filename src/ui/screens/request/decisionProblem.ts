@@ -37,6 +37,7 @@ export function decisionProblem(error: unknown, askedByMe: boolean): DecisionPro
             if (problem.type === "shown_digest_mismatch") return "changed"
             if (problem.status === 409) return "already-decided"
             if (problem.status === 403 && problem.type === "step_up_required") return "step-up"
+            if (problem.status === 403 && problem.type === "self_approval_refused") return "self-approval"
             if (problem.status === 403) return askedByMe ? "self-approval" : "forbidden"
             return "failed"
         case "network":

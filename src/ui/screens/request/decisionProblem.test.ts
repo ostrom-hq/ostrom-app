@@ -9,6 +9,7 @@ const CASES: readonly (readonly [ApiProblem, boolean, DecisionProblem])[] = [
     [refused(409, "conflict"), false, "already-decided"],
     [refused(403, "step_up_required"), false, "step-up"],
     [refused(403, "step_up_required"), true, "step-up"],
+    [refused(403, "self_approval_refused"), false, "self-approval"],
     [refused(403, "forbidden"), true, "self-approval"],
     [refused(403, "forbidden"), false, "forbidden"],
     [refused(400, "invalid_request"), false, "failed"],

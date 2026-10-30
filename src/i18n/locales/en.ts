@@ -131,6 +131,7 @@ export const en = {
         truncated: "The whole change is not shown on the phone: approve it from the console.",
         unknownStatus: "This app does not know this request's state: answer it from the console.",
         cannotApprove: "Your yes is not taken on this request.",
+        openConsole: "Open the console",
         note: "Note to the agent: {{note}}",
         approvedBy: "Approved by {{who}}",
         approvedByAt: "Approved by {{who}} · {{at}}",
@@ -165,7 +166,7 @@ export const en = {
         problems: {
             "biometrics-unavailable": "Set up Face ID, a fingerprint or a passcode on this phone to answer from it.",
             "biometrics-failed": "Your identity could not be confirmed. Nothing was sent.",
-            "step-up": "Ostrom wants a fresh sign-in for this yes: confirm it in the console, which just opened.",
+            "step-up": "Ostrom wants a fresh sign-in for this yes: confirm it in the console.",
             "self-approval": "Someone else can approve this request, so your own yes is not taken.",
             changed: "The request changed after you opened it. Read it again before answering.",
             "already-decided": "Someone already answered this request.",
