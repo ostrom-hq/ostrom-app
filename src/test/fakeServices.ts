@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type {AppServices, Repositories} from "@/services/AppServices"
 import type {BiometricGate} from "@/services/biometrics/BiometricGate"
 import type {GithubSignIn} from "@/services/signIn/GithubSignIn"

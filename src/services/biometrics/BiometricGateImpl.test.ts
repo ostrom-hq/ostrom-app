@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import * as LocalAuthentication from "expo-local-authentication"
 import type {BiometricOutcome} from "./BiometricGate"
 import {BiometricGateImpl} from "./BiometricGateImpl"

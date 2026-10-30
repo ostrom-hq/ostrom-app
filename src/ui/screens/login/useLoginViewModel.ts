@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import {useCallback, useState} from "react"
 import {useServices} from "@/services/AppServices"
 import type {SignInFailure} from "@/services/signIn/GithubSignIn"

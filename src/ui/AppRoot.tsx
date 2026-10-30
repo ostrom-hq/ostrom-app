@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import {Stack, ThemeProvider} from "expo-router"
 import {StatusBar} from "expo-status-bar"
 import {useEffect} from "react"
