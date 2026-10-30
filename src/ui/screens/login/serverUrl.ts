@@ -6,7 +6,9 @@ const LOCAL_HOSTS: ReadonlySet<string> = new Set(["localhost", "127.0.0.1", "10.
  */
 export function normalizeServerUrl(input: string): string | undefined {
     const text = input.trim()
-    const withScheme = /^[a-z]+:\/\//i.test(text) ? text : `https://${text}`
+    // Without a scheme: http for a server on this computer, https for everything else.
+    const onThisComputer = /^(localhost|127\.0\.0\.1|10\.0\.2\.2)(:\d+)?(\/|$)/i.test(text)
+    const withScheme = /^[a-z]+:\/\//i.test(text) ? text : `${onThisComputer ? "http" : "https"}://${text}`
     let url: URL
     try {
         url = new URL(withScheme)

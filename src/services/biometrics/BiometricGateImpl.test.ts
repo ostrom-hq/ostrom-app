@@ -36,6 +36,12 @@ describe("BiometricGateImpl", () => {
         expect(authenticate).toHaveBeenCalledWith({promptMessage: "Approve", disableDeviceFallback: false})
     })
 
+    it("fails closed when the system prompt itself fails", async () => {
+        level.mockResolvedValue(LocalAuthentication.SecurityLevel.BIOMETRIC_STRONG)
+        authenticate.mockRejectedValue(new Error("no activity"))
+        await expect(gate.confirm("Approve")).resolves.toBe("failed")
+    })
+
     it.each(FAILURES)("maps %s to %s", async (error, outcome) => {
         level.mockResolvedValue(LocalAuthentication.SecurityLevel.SECRET)
         authenticate.mockResolvedValue({success: false, error})
