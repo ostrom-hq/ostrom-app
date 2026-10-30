@@ -8,6 +8,8 @@ export type TranslationShape = DeepString<typeof en>
 export const SUPPORTED_LANGUAGES = ["en", "fr"] as const
 export type SupportedLanguage = (typeof SUPPORTED_LANGUAGES)[number]
 
+const supported: ReadonlySet<string> = new Set(SUPPORTED_LANGUAGES)
+
 export function isSupportedLanguage(value: string): value is SupportedLanguage {
-    return (SUPPORTED_LANGUAGES as readonly string[]).includes(value)
+    return supported.has(value)
 }
