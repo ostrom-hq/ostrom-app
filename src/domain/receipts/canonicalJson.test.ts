@@ -11,6 +11,7 @@ describe("canonicalJson (golden vectors of the prototype)", () => {
     })
 
     it("omits undefined fields and writes undefined array items as null", () => {
-        expect(canonicalJson({a: 1, b: undefined, c: [1, undefined]})).toBe(canonicalVectors.codeOnly[0]!.canonical)
+        const [undefinedOmitted] = canonicalVectors.codeOnly
+        expect(canonicalJson({a: 1, b: undefined, c: [1, undefined]})).toBe(undefinedOmitted?.canonical)
     })
 })

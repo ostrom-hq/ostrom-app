@@ -4,8 +4,11 @@ import {verifyReceipt} from "./verifyReceipt"
 
 const key = parseEd25519PublicKeyPem(vectors.key.publicKeySpkiPem)
 
+const [firstVector] = vectors.receipts
+
 function signedCopy(): Record<string, unknown> {
-    return {...vectors.receipts[0]!.receipt}
+    if (firstVector === undefined) throw new Error("the vectors have no receipt")
+    return {...firstVector.receipt}
 }
 
 describe("verifyReceipt (receipts signed by the prototype)", () => {
