@@ -45,7 +45,7 @@ export class PushServiceImpl implements PushService {
         }
     }
 
-    async launchData(): Promise<unknown> {
-        return dataOf(await Notifications.getLastNotificationResponseAsync())
+    launchData(): Promise<unknown> {
+        return Promise.resolve(dataOf(Notifications.getLastNotificationResponse()))
     }
 }

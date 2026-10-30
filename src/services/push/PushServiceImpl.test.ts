@@ -9,7 +9,7 @@ jest.mock("expo-notifications", () => ({
     requestPermissionsAsync: jest.fn(),
     getExpoPushTokenAsync: jest.fn(),
     addNotificationResponseReceivedListener: jest.fn(),
-    getLastNotificationResponseAsync: jest.fn(),
+    getLastNotificationResponse: jest.fn(),
 }))
 
 const mocked = jest.mocked(Notifications)
@@ -91,9 +91,9 @@ describe("PushServiceImpl", () => {
         unsubscribe()
         expect(remove).toHaveBeenCalled()
 
-        mocked.getLastNotificationResponseAsync.mockResolvedValue(response({kind: "ask", askId: "appr_0002"}))
+        mocked.getLastNotificationResponse.mockReturnValue(response({kind: "ask", askId: "appr_0002"}))
         await expect(push.launchData()).resolves.toEqual({kind: "ask", askId: "appr_0002"})
-        mocked.getLastNotificationResponseAsync.mockResolvedValue(null)
+        mocked.getLastNotificationResponse.mockReturnValue(null)
         await expect(push.launchData()).resolves.toBeUndefined()
     })
 })

@@ -25,7 +25,7 @@ describe("createQueryClient", () => {
         const onUnauthorized = jest.fn()
         const client = createQueryClient({onUnauthorized})
         await client
-            .fetchQuery({queryKey: ["a"], queryFn: () => Promise.reject(new ApiError({kind: "unauthorized"})), retry: false})
+            .query({queryKey: ["a"], queryFn: () => Promise.reject(new ApiError({kind: "unauthorized"})), retry: false})
             .catch(() => undefined)
         expect(onUnauthorized).toHaveBeenCalledTimes(1)
         await client
@@ -35,7 +35,7 @@ describe("createQueryClient", () => {
             .catch(() => undefined)
         expect(onUnauthorized).toHaveBeenCalledTimes(2)
         await client
-            .fetchQuery({queryKey: ["b"], queryFn: () => Promise.reject(new ApiError({kind: "network"})), retry: false})
+            .query({queryKey: ["b"], queryFn: () => Promise.reject(new ApiError({kind: "network"})), retry: false})
             .catch(() => undefined)
         expect(onUnauthorized).toHaveBeenCalledTimes(2)
         expect(isUnauthorized(new Error("x"))).toBe(false)
