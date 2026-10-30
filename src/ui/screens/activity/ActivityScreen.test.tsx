@@ -4,6 +4,7 @@ import {renderRouter} from "expo-router/testing-library"
 import type {ReactNode} from "react"
 import {type ActivityPage, ActivityPageSchema} from "@/api/contract/activity"
 import {ApiError} from "@/api/http/ApiError"
+import type {ActivityRepository} from "@/repositories/ActivityRepository"
 import {activity, olderActivity} from "@/api/mocks/fixtures"
 import {ServicesProvider} from "@/services/AppServices"
 import {fakeRepositories, signedInServices} from "@/test/fakeServices"
@@ -13,7 +14,7 @@ import {ActivityScreen} from "./ActivityScreen"
 const first = ActivityPageSchema.parse(activity)
 const older = ActivityPageSchema.parse(olderActivity)
 
-async function launch(page: jest.Mock<Promise<ActivityPage>, [string?]>): Promise<ReturnType<typeof renderRouter>> {
+async function launch(page: ActivityRepository["page"]): Promise<ReturnType<typeof renderRouter>> {
     const services = await signedInServices({repositories: fakeRepositories({activity: {page}})})
     const client = testQueryClient()
     const wrapper = ({children}: {children: ReactNode}): React.JSX.Element => (
@@ -51,7 +52,7 @@ describe("ActivityScreen", () => {
 
     it("says when nothing happened yet, and offers to try again after a failure", async () => {
         const page = jest
-            .fn<Promise<ActivityPage>, [string?]>()
+            .fn<Promise<ActivityPage>, Parameters<ActivityRepository["page"]>>()
             .mockRejectedValueOnce(new ApiError({kind: "network"}))
             .mockResolvedValue({items: [], nextCursor: null})
         await launch(page)

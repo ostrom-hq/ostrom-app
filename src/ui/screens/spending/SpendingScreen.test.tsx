@@ -2,13 +2,14 @@ import {fireEvent, screen} from "@testing-library/react-native"
 import {type SpendPeriod, type SpendReport, SpendReportSchema} from "@/api/contract/spending"
 import {ApiError} from "@/api/http/ApiError"
 import {spending} from "@/api/mocks/fixtures"
+import type {SpendingRepository} from "@/repositories/SpendingRepository"
 import {fakeRepositories, signedInServices} from "@/test/fakeServices"
 import {renderWithServices} from "@/test/renderWithServices"
 import {SpendingScreen} from "./SpendingScreen"
 
 const month = SpendReportSchema.parse(spending)
 
-async function show(report: jest.Mock<Promise<SpendReport>, [SpendPeriod]>): Promise<void> {
+async function show(report: SpendingRepository["report"]): Promise<void> {
     const services = await signedInServices({repositories: fakeRepositories({spending: {report}})})
     await renderWithServices(<SpendingScreen />, services)
 }

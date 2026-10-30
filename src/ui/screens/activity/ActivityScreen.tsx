@@ -78,7 +78,7 @@ export function ActivityScreen(): React.JSX.Element {
                     ListFooterComponent={
                         state.hasMore ? (
                             <Button label={t("activity.more")} onPress={loadMore} busy={state.loadingMore} />
-                        ) : null
+                        ) : undefined
                     }
                     renderItem={({item}) => <ActivityRow item={item} onOpen={open} />}
                 />
