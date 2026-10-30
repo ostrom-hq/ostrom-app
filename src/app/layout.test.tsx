@@ -2,7 +2,9 @@ import {screen} from "@testing-library/react-native"
 import {renderRouter} from "expo-router/testing-library"
 import RootLayout from "./_layout"
 import AskById from "./ask/[id]"
-import Index from "./index"
+import Tabs from "./(tabs)/_layout"
+import History from "./(tabs)/history"
+import Index from "./(tabs)/index"
 import Login from "./login"
 
 jest.mock("expo-secure-store", () => ({
@@ -14,7 +16,17 @@ jest.mock("expo-secure-store", () => ({
 
 describe("RootLayout", () => {
     it("starts signed out on a new phone, on the login screen", async () => {
-        await renderRouter({_layout: RootLayout, index: Index, login: Login, "ask/[id]": AskById}, {initialUrl: "/"})
+        await renderRouter(
+            {
+                _layout: RootLayout,
+                "(tabs)/_layout": Tabs,
+                "(tabs)/index": Index,
+                "(tabs)/history": History,
+                login: Login,
+                "ask/[id]": AskById,
+            },
+            {initialUrl: "/"},
+        )
         expect(await screen.findByRole("button", {name: "Continue with GitHub"})).toBeOnTheScreen()
     })
 })
