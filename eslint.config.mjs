@@ -13,10 +13,13 @@ export default tseslint.config(
             "dist/**",
             "ios/**",
             "android/**",
+            // Generated from contract/openapi.yaml by `npm run gen:api`; `gen:check` in the CI keeps it equal to the copy.
+            "src/api/gen/**",
             "expo-env.d.ts",
             "*.config.js",
             "*.config.mjs",
             "jest.setup.ts",
+            "openapi-ts.config.ts",
         ],
     },
     {

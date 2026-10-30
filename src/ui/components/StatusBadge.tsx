@@ -1,12 +1,12 @@
 import {useTranslation} from "react-i18next"
 import {StyleSheet, Text, View} from "react-native"
-import type {AskStatus} from "@/api/contract/yes"
+import type {ApprovalStatus} from "@/api/contract/approvals"
 import type {ThemeColors} from "@/ui/theme/theme"
 import {fontSize, radius, space} from "@/ui/theme/tokens"
 import {useTheme} from "@/ui/theme/useTheme"
 
 /** Garnet only while a human is awaited (brand rule); the outcome colours after. */
-function colorsOf(status: AskStatus, colors: ThemeColors): {text: string; background: string} {
+function colorsOf(status: ApprovalStatus, colors: ThemeColors): {text: string; background: string} {
     switch (status) {
         case "pending":
             return {text: colors.signalText, background: colors.signalTint}
@@ -19,7 +19,7 @@ function colorsOf(status: AskStatus, colors: ThemeColors): {text: string; backgr
     }
 }
 
-export function StatusBadge({status}: {status: AskStatus}): React.JSX.Element {
+export function StatusBadge({status}: {status: ApprovalStatus}): React.JSX.Element {
     const {t} = useTranslation()
     const {colors} = useTheme()
     const palette = colorsOf(status, colors)

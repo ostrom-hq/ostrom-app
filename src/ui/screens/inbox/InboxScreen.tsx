@@ -1,29 +1,16 @@
 import {useRouter} from "expo-router"
 import {useTranslation} from "react-i18next"
-import {
-    ActivityIndicator,
-    Pressable,
-    RefreshControl,
-    SectionList,
-    type SectionListData,
-    StyleSheet,
-    Text,
-    View,
-} from "react-native"
+import {ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, View} from "react-native"
 import {SafeAreaView} from "react-native-safe-area-context"
 import {Button} from "@/ui/components/Button"
 import {ScreenTitle} from "@/ui/components/ScreenTitle"
 import {StatusBadge} from "@/ui/components/StatusBadge"
+import {TAB_EDGES} from "@/ui/navigation/tabEdges"
 import {fontSize, radius, space} from "@/ui/theme/tokens"
 import {useTheme} from "@/ui/theme/useTheme"
-import {type AskRowModel, useInboxViewModel} from "./useInboxViewModel"
+import {type RequestRowModel, useInboxViewModel} from "./useInboxViewModel"
 
-interface InboxSection {
-    readonly key: "pending" | "recent"
-    readonly title: string
-}
-
-function AskRow({row, onOpen}: {row: AskRowModel; onOpen: (id: string) => void}): React.JSX.Element {
+function RequestRow({row, onOpen}: {row: RequestRowModel; onOpen: (id: string) => void}): React.JSX.Element {
     const {t} = useTranslation()
     const {colors} = useTheme()
     // A pending request waits for a human: its edge is garnet, the only accent of the list.
@@ -36,7 +23,7 @@ function AskRow({row, onOpen}: {row: AskRowModel; onOpen: (id: string) => void})
                 onOpen(row.id)
             }}
             style={[styles.row, {backgroundColor: colors.surface, borderColor: colors.border, borderLeftColor: accent}]}
-            testID={`ask-${row.id}`}
+            testID={`request-${row.id}`}
         >
             <View style={styles.rowHead}>
                 <StatusBadge status={row.status} />
@@ -54,7 +41,7 @@ export function InboxScreen(): React.JSX.Element {
     const router = useRouter()
     const {state, refreshing, refresh} = useInboxViewModel()
     const open = (id: string): void => {
-        router.push(`/ask/${encodeURIComponent(id)}`)
+        router.push(`/request/${encodeURIComponent(id)}`)
     }
 
     let body: React.JSX.Element
@@ -70,41 +57,32 @@ export function InboxScreen(): React.JSX.Element {
                 </View>
             )
             break
-        case "ready": {
-            const sections: readonly SectionListData<AskRowModel, InboxSection>[] = [
-                {key: "pending", title: t("inbox.title"), data: state.pending},
-                ...(state.recent.length > 0 ? [{key: "recent", title: t("inbox.recent"), data: state.recent}] : []),
-            ]
+        case "ready":
             body = (
-                <SectionList<AskRowModel, InboxSection>
-                    sections={sections}
+                <FlatList
+                    data={state.rows}
                     testID="inbox-list"
                     keyExtractor={(row) => row.id}
                     contentContainerStyle={styles.list}
                     refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.signal} />}
-                    renderSectionHeader={({section}) =>
-                        section.key === "pending" ? (
-                            <View style={styles.header}>
-                                <ScreenTitle>{section.title}</ScreenTitle>
-                                {state.pending.length === 0 ? (
-                                    <Text style={[styles.body, {color: colors.textMuted}]}>{t("inbox.empty")}</Text>
-                                ) : null}
-                            </View>
-                        ) : (
-                            <Text accessibilityRole="header" style={[styles.sectionTitle, {color: colors.textMuted}]}>
-                                {section.title}
-                            </Text>
-                        )
+                    ListHeaderComponent={
+                        <View style={styles.header}>
+                            <ScreenTitle>{t("inbox.title")}</ScreenTitle>
+                            {state.stale ? (
+                                <Text accessibilityRole="alert" style={[styles.stale, {color: colors.danger}]}>
+                                    {t("inbox.stale")}
+                                </Text>
+                            ) : null}
+                        </View>
                     }
-                    renderItem={({item}) => <AskRow row={item} onOpen={open} />}
-                    stickySectionHeadersEnabled={false}
+                    ListEmptyComponent={<Text style={[styles.body, {color: colors.textMuted}]}>{t("inbox.empty")}</Text>}
+                    renderItem={({item}) => <RequestRow row={item} onOpen={open} />}
                 />
             )
             break
-        }
     }
 
-    return <SafeAreaView style={[styles.container, {backgroundColor: colors.bg}]}>{body}</SafeAreaView>
+    return <SafeAreaView edges={TAB_EDGES} style={[styles.container, {backgroundColor: colors.bg}]}>{body}</SafeAreaView>
 }
 
 const styles = StyleSheet.create({
@@ -112,9 +90,9 @@ const styles = StyleSheet.create({
     center: {flex: 1},
     message: {padding: space[4], gap: space[3]},
     list: {padding: space[4], gap: space[3]},
-    header: {gap: space[2], marginBottom: space[2]},
+    header: {gap: space[2]},
+    stale: {fontSize: fontSize[14]},
     body: {fontSize: fontSize[16]},
-    sectionTitle: {fontSize: fontSize[12], fontWeight: "700", letterSpacing: 0.96, textTransform: "uppercase", marginTop: space[4]},
     row: {borderWidth: 1, borderLeftWidth: 4, borderRadius: radius.lg, padding: space[3], gap: space[2]},
     rowHead: {flexDirection: "row", alignItems: "center", gap: space[2]},
     yours: {fontSize: fontSize[12]},

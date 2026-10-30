@@ -58,8 +58,10 @@ export function createSessionStore(storage: SecureStorage): StoreApi<SessionStor
             set({state: {status: "signed-in", session}})
         },
         signOut: async () => {
-            await storage.remove(SESSION_KEY)
+            // Signed out at once, whatever the keychain says. If the token cannot be removed, it is blanked: the next
+            // launch reads an unreadable session, which is signed out too.
             set({state: {status: "signed-out"}})
+            await storage.remove(SESSION_KEY).catch(() => storage.set(SESSION_KEY, "").catch(() => undefined))
         },
     }))
 }

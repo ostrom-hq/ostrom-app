@@ -33,7 +33,7 @@ export interface SettingsViewModel {
 export function useSettingsViewModel(locale: string, timeZone: string): SettingsViewModel {
     const session = useSessionState()
     const {sessionStore} = useServices()
-    const {notifications} = useRepositories()
+    const {account, notifications} = useRepositories()
     const query = useNotificationSettings()
     const save = useSaveNotificationSettings()
     const [signingOut, setSigningOut] = useState(false)
@@ -49,18 +49,23 @@ export function useSettingsViewModel(locale: string, timeZone: string): Settings
     )
     const setQuietHours = useCallback(
         (on: boolean) => {
-            if (settings !== undefined) mutate({...settings, quietHours: on ? defaultQuietHours(timeZone) : null})
+            if (settings === undefined) return
+            const {requests, decisions, spending} = settings
+            // Off is the field left out: the contract has no `null` for it.
+            mutate(on ? {requests, decisions, spending, quietHours: defaultQuietHours(timeZone)} : {requests, decisions, spending})
         },
         [settings, mutate, timeZone],
     )
     const signOut = useCallback(() => {
         setSigningOut(true)
+        // Best effort, never waited for: this phone stops taking push, then the token is revoked on the server (in this
+        // order, the revocation would refuse the first). The keychain is cleared at once, reachable server or not.
         void (async () => {
-            // Best effort: a phone that cannot reach the server still signs out, and stops showing its pushes.
             if (isPresent(device)) await notifications.unregisterDevice(device.id).catch(() => undefined)
-            await sessionStore.getState().signOut()
+            await account.logout().catch(() => undefined)
         })()
-    }, [device, notifications, sessionStore])
+        void sessionStore.getState().signOut()
+    }, [device, notifications, account, sessionStore])
 
     const signedIn = session.status === "signed-in" ? session.session : undefined
     const state: SettingsState =

@@ -8,7 +8,7 @@ export class ActivityRepositoryImpl implements ActivityRepository {
     page(cursor?: string): Promise<ActivityPage> {
         return this.http.send({
             method: "GET",
-            path: "/api/activity",
+            path: "/api/v1/activity",
             ...(cursor === undefined ? {} : {query: {before: cursor}}),
             response: ActivityPageSchema,
         })

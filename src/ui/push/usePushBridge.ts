@@ -7,7 +7,7 @@ import {useServices} from "@/services/AppServices"
 
 /**
  * While signed in: registers this phone for push, and opens the request of a tapped notification.
- * Only an Ostrom payload (`{kind: "ask", askId}`) opens anything; any other data in a push is ignored.
+ * Only an Ostrom payload (`{kind: "approval", approvalId}`) opens anything; any other data in a push is ignored.
  */
 export function usePushBridge(): void {
     const {push} = useServices()
@@ -17,9 +17,20 @@ export function usePushBridge(): void {
     useEffect(() => {
         const open = (data: unknown): void => {
             const parsed = PushDataSchema.safeParse(data)
-            if (parsed.success) router.push(`/ask/${parsed.data.askId}`)
+            if (parsed.success) router.push(`/request/${parsed.data.approvalId}`)
         }
-        void push.launchData().then(open)
-        return push.onOpen(open)
+        let mounted = true
+        // A launch read that fails opens nothing; one that answers after unmount opens nothing either.
+        push
+            .launchData()
+            .then((data) => {
+                if (mounted) open(data)
+            })
+            .catch(() => undefined)
+        const unsubscribe = push.onOpen(open)
+        return () => {
+            mounted = false
+            unsubscribe()
+        }
     }, [push, router])
 }

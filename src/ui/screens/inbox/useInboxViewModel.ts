@@ -1,20 +1,27 @@
-import type {Ask} from "@/api/contract/yes"
-import {useYesQueue} from "@/query/approvals"
+import type {Approval} from "@/api/contract/approvals"
+import {useWaitingApprovals} from "@/query/approvals"
+import {useSessionState} from "@/services/AppServices"
 
-/** One line of the inbox: what is asked, where, by whom. */
-export interface AskRowModel {
+/** One line of the inbox: what is asked, where, by whom. It only opens the request: no answer from a list. */
+export interface RequestRowModel {
     readonly id: string
     readonly title: string
-    readonly status: Ask["status"]
+    readonly status: Approval["status"]
     /** Repository and asker, when known, for the second line. */
     readonly detail: string
+    /** The person asked for it themselves. */
     readonly yours: boolean
 }
 
 export type InboxState =
     | {readonly kind: "loading"}
     | {readonly kind: "error"}
-    | {readonly kind: "ready"; readonly pending: readonly AskRowModel[]; readonly recent: readonly AskRowModel[]}
+    | {
+          readonly kind: "ready"
+          readonly rows: readonly RequestRowModel[]
+          /** The last refresh failed: the rows are the last list read, perhaps out of date. */
+          readonly stale: boolean
+      }
 
 export interface InboxViewModel {
     readonly state: InboxState
@@ -22,24 +29,24 @@ export interface InboxViewModel {
     readonly refresh: () => void
 }
 
-export function toRow(ask: Ask): AskRowModel {
-    const repo = ask.what.repo ?? ask.what.sessionRepo
-    const asker = ask.who.dev ?? ask.askedBy[0]
+export function toRow(approval: Approval, login: string | undefined): RequestRowModel {
+    const askedBy = approval.askedBy ?? []
     return {
-        id: ask.id,
-        title: ask.title,
-        status: ask.status,
-        detail: [repo, asker].filter((part): part is string => typeof part === "string" && part !== "").join(" · "),
-        yours: ask.you?.self === true,
+        id: approval.id,
+        title: approval.title,
+        status: approval.status,
+        detail: [approval.repo, askedBy[0]].filter((part): part is string => part !== undefined && part !== "").join(" · "),
+        yours: login !== undefined && askedBy.includes(login),
     }
 }
 
 export function useInboxViewModel(): InboxViewModel {
-    const query = useYesQueue()
-    const {data, isError, isRefetching, refetch} = query
+    const session = useSessionState()
+    const login = session.status === "signed-in" ? session.session.user.login : undefined
+    const {data, isError, isRefetching, refetch} = useWaitingApprovals()
     const state: InboxState =
         data !== undefined
-            ? {kind: "ready", pending: data.pending.map(toRow), recent: data.recent.map(toRow)}
+            ? {kind: "ready", rows: data.items.map((approval) => toRow(approval, login)), stale: isError}
             : isError
               ? {kind: "error"}
               : {kind: "loading"}

@@ -23,7 +23,8 @@ export function useActivityViewModel(): ActivityViewModel {
               : {kind: "loading"}
     return {
         state,
-        refreshing: isRefetching,
+        // Loading an older page is not a refresh: the pull spinner stays for a pull.
+        refreshing: isRefetching && !isFetchingNextPage,
         refresh: () => {
             void refetch()
         },

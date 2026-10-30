@@ -1,7 +1,9 @@
+# One job, `ci`, for a pull request (rule of 30/10, 03:10): the required check. A draft runs nothing.
 name: CI
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches: [main]
 
@@ -13,22 +15,40 @@ permissions:
   contents: read
 
 jobs:
-  check:
-    name: Typecheck, lint, test
+  ci:
+    name: ci
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+      - name: Read the pinned ostrom-core commit
+        id: core
+        run: echo "sha=$(tr -d '[:space:]' < contract/CORE_SHA)" >> "$GITHUB_OUTPUT"
+      - name: Check out ostrom-core at that commit
+        uses: actions/checkout@v4
+        with:
+          repository: ostrom-hq/ostrom-core
+          ref: ${{ steps.core.outputs.sha }}
+          ssh-key: ${{ secrets.DEPLOY_KEY_CORE }}
+          path: .core
+          sparse-checkout: api/openapi.yaml
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+      - name: The contract copy is ostrom-core's, byte for byte
+        run: cmp contract/openapi.yaml .core/api/openapi.yaml
       - uses: actions/setup-node@v4
         with:
           node-version: 24
           cache: npm
       - run: npm ci
+      - name: The generated types are those of the copy
+        run: npm run gen:check
       - name: Typecheck
         run: npm run typecheck
       - name: Lint
         run: npm run lint
-      - name: Test
+      - name: Test, 100 % coverage
         run: npm run test:ci
       - name: Expo config is valid
         run: npx expo config --type public > /dev/null

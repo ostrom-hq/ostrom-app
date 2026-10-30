@@ -1,4 +1,4 @@
-import {fireEvent, screen, waitFor} from "@testing-library/react-native"
+import {act, fireEvent, screen, waitFor} from "@testing-library/react-native"
 import {type Device, type DeviceRegistration, type NotificationSettings, NotificationSettingsSchema} from "@/api/contract/notifications"
 import {ApiError} from "@/api/http/ApiError"
 import {notificationSettings} from "@/api/mocks/fixtures"
@@ -16,27 +16,42 @@ interface Harness {
     readonly saveSettings: jest.Mock<Promise<NotificationSettings>, [NotificationSettings]>
     readonly registerDevice: jest.Mock<Promise<Device>, [DeviceRegistration]>
     readonly unregisterDevice: jest.Mock<Promise<void>, [string]>
+    readonly logout: jest.Mock<Promise<void>, []>
 }
 
 async function open({
     permission = {kind: "unavailable"},
     refuseSave = false,
+    save,
     unregister = () => Promise.resolve(),
-}: {permission?: PushPermission; refuseSave?: boolean; unregister?: (id: string) => Promise<void>} = {}): Promise<Harness> {
-    const saveSettings = jest.fn((settings: NotificationSettings) =>
-        refuseSave ? Promise.reject(new ApiError({kind: "server", status: 500})) : Promise.resolve(settings),
+    revoke = () => Promise.resolve(),
+}: {
+    permission?: PushPermission
+    refuseSave?: boolean
+    save?: (settings: NotificationSettings) => Promise<NotificationSettings>
+    unregister?: (id: string) => Promise<void>
+    revoke?: () => Promise<void>
+} = {}): Promise<Harness> {
+    const saveSettings = jest.fn(
+        save ??
+            ((settings: NotificationSettings) =>
+                refuseSave ? Promise.reject(new ApiError({kind: "server", status: 500})) : Promise.resolve(settings)),
     )
-    const registerDevice = jest.fn((_registration: DeviceRegistration) => Promise.resolve({id: "dev_1"}))
+    const registerDevice = jest.fn((_registration: DeviceRegistration) =>
+        Promise.resolve({id: "dev_1", provider: "expo", platform: "ios", createdAt: "2026-10-30T08:00:00.000Z"}),
+    )
     const unregisterDevice = jest.fn(unregister)
+    const logout = jest.fn(revoke)
     const services = await signedInServices({
         push: {register: () => Promise.resolve(permission), onOpen: () => () => undefined, launchData: () => Promise.resolve(undefined)},
         repositories: fakeRepositories({
+            account: {me: jest.fn(), exchangeCode: jest.fn(), logout},
             notifications: {registerDevice, unregisterDevice, settings: () => Promise.resolve(initial), saveSettings},
         }),
     })
     await renderWithServices(<SettingsScreen />, services)
     await screen.findByRole("switch", {name: "A request waits for my yes"})
-    return {services, saveSettings, registerDevice, unregisterDevice}
+    return {services, saveSettings, registerDevice, unregisterDevice, logout}
 }
 
 const granted: PushPermission = {kind: "granted", address: {pushToken: "ExponentPushToken[abc]", platform: "ios"}}
@@ -71,13 +86,43 @@ describe("SettingsScreen", () => {
         const {saveSettings} = await open()
         await fireEvent.press(screen.getByRole("switch", {name: "Quiet hours"}))
         await waitFor(() => {
-            expect(saveSettings).toHaveBeenLastCalledWith({...initial, quietHours: null})
+            expect(saveSettings).toHaveBeenLastCalledWith({requests: true, decisions: true, spending: false})
         })
         expect(screen.queryByText(/No notification from/)).toBeNull()
         await fireEvent.press(screen.getByRole("switch", {name: "Quiet hours"}))
         await waitFor(() => {
             expect(saveSettings).toHaveBeenLastCalledWith({...initial, quietHours: defaultQuietHours(phoneTimeZone())})
         })
+    })
+
+    it.each([true, false])("never flips a second switch back with the answer to the first (first saved: %s)", async (firstSaved) => {
+        const answers: (() => void)[] = []
+        await open({
+            save: (settings) =>
+                new Promise<NotificationSettings>((resolve, reject) => {
+                    const first = answers.length === 0
+                    answers.push(() => {
+                        if (!first || firstSaved) resolve(settings)
+                        else reject(new ApiError({kind: "server", status: 500}))
+                    })
+                }),
+        })
+        await fireEvent.press(screen.getByRole("switch", {name: "Spending passes a budget threshold"}))
+        await fireEvent.press(screen.getByRole("switch", {name: "A request waits for my yes"}))
+        await waitFor(() => {
+            expect(answers).toHaveLength(2)
+        })
+        await act(async () => {
+            answers[0]?.()
+            await Promise.resolve()
+        })
+        expect(screen.getByRole("switch", {name: "A request waits for my yes"})).not.toBeChecked()
+        expect(screen.getByRole("switch", {name: "Spending passes a budget threshold"})).toBeChecked()
+        await act(async () => {
+            answers[1]?.()
+            await Promise.resolve()
+        })
+        expect(screen.getByRole("switch", {name: "A request waits for my yes"})).not.toBeChecked()
     })
 
     it("puts a setting back when the server refuses it", async () => {
@@ -87,22 +132,41 @@ describe("SettingsScreen", () => {
         expect(screen.getByRole("switch", {name: "A request waits for my yes"})).toBeChecked()
     })
 
-    it("signs out, and tells the server this phone no longer takes push", async () => {
-        const {services, unregisterDevice} = await open({permission: granted})
+    it("signs out, stops push on this phone, then revokes the token on the server", async () => {
+        const {services, unregisterDevice, logout} = await open({permission: granted})
         await screen.findByText("This phone receives Ostrom notifications.")
         await fireEvent.press(screen.getByRole("button", {name: "Sign out"}))
         await waitFor(() => {
             expect(services.sessionStore.getState().state).toEqual({status: "signed-out"})
         })
+        await waitFor(() => {
+            expect(logout).toHaveBeenCalledTimes(1)
+        })
         expect(unregisterDevice).toHaveBeenCalledWith("dev_1")
+        expect(unregisterDevice.mock.invocationCallOrder[0]).toBeLessThan(logout.mock.invocationCallOrder[0] ?? 0)
     })
 
-    it("signs out even when the server cannot be reached", async () => {
-        const {services} = await open({permission: granted, unregister: () => Promise.reject(new ApiError({kind: "network"}))})
+    it("signs out at once, without waiting for the server", async () => {
+        const never = (): Promise<void> => new Promise(() => undefined)
+        const {services, logout} = await open({unregister: never, revoke: never})
+        await fireEvent.press(screen.getByRole("button", {name: "Sign out"}))
+        await waitFor(() => {
+            expect(services.sessionStore.getState().state).toEqual({status: "signed-out"})
+        })
+        // No push device on this phone: the revocation goes alone.
+        expect(logout).toHaveBeenCalledTimes(1)
+    })
+
+    it("signs out even when the server refuses both calls", async () => {
+        const offline = (): Promise<void> => Promise.reject(new ApiError({kind: "network"}))
+        const {services, logout} = await open({permission: granted, unregister: offline, revoke: offline})
         await screen.findByText("This phone receives Ostrom notifications.")
         await fireEvent.press(screen.getByRole("button", {name: "Sign out"}))
         await waitFor(() => {
             expect(services.sessionStore.getState().state).toEqual({status: "signed-out"})
+        })
+        await waitFor(() => {
+            expect(logout).toHaveBeenCalledTimes(1)
         })
     })
 

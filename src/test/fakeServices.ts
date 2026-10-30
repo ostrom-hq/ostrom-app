@@ -3,8 +3,8 @@ import type {BiometricGate} from "@/services/biometrics/BiometricGate"
 import type {PushService} from "@/services/push/PushService"
 import type {GithubSignIn} from "@/services/signIn/GithubSignIn"
 import type {SecureStorage} from "@/services/storage/SecureStorage"
-import {AskSchema, type Ask} from "@/api/contract/yes"
-import {decidedAsk, pendingAsk, selfAsk} from "@/api/mocks/fixtures"
+import {type Approval, ApprovalSchema} from "@/api/contract/approvals"
+import {decidedApproval, pendingApproval, selfApproval} from "@/api/mocks/fixtures"
 import {createSessionStore, type Session} from "@/stores/session"
 
 /** A secure storage in memory. */
@@ -37,16 +37,20 @@ function unexpected(name: string): () => never {
 /** Repositories whose every method fails the test unless the test overrides it. */
 export function fakeRepositories(overrides: Partial<Repositories> = {}): Repositories {
     return {
-        account: {me: unexpected("account.me"), exchangeCode: unexpected("account.exchangeCode")},
+        account: {me: unexpected("account.me"), exchangeCode: unexpected("account.exchangeCode"), logout: unexpected("account.logout")},
         activity: {page: unexpected("activity.page")},
-        approvals: {queue: unexpected("approvals.queue"), ask: unexpected("approvals.ask"), decide: unexpected("approvals.decide")},
+        approvals: {
+            waiting: unexpected("approvals.waiting"),
+            approval: unexpected("approvals.approval"),
+            answer: unexpected("approvals.answer"),
+        },
         notifications: {
             registerDevice: unexpected("notifications.registerDevice"),
             unregisterDevice: unexpected("notifications.unregisterDevice"),
             settings: unexpected("notifications.settings"),
             saveSettings: unexpected("notifications.saveSettings"),
         },
-        receipts: {list: unexpected("receipts.list"), get: unexpected("receipts.get"), publicKey: unexpected("receipts.publicKey")},
+        receipts: {list: unexpected("receipts.list"), get: unexpected("receipts.get"), keys: unexpected("receipts.keys")},
         spending: {report: unexpected("spending.report")},
         ...overrides,
     }
@@ -77,10 +81,10 @@ export function fakeServices(options: FakeServicesOptions = {}): AppServices {
 }
 
 /** The mock requests, parsed as the repositories return them. */
-export const asks: {readonly pending: Ask; readonly self: Ask; readonly decided: Ask} = {
-    pending: AskSchema.parse(pendingAsk),
-    self: AskSchema.parse(selfAsk),
-    decided: AskSchema.parse(decidedAsk),
+export const approvals: {readonly pending: Approval; readonly self: Approval; readonly decided: Approval} = {
+    pending: ApprovalSchema.parse(pendingApproval),
+    self: ApprovalSchema.parse(selfApproval),
+    decided: ApprovalSchema.parse(decidedApproval),
 }
 
 /** Services already signed in, as after a launch with a kept session. */

@@ -1,7 +1,7 @@
 import {screen} from "@testing-library/react-native"
 import {renderRouter} from "expo-router/testing-library"
-import RootLayout from "./_layout"
-import AskById from "./ask/[id]"
+import RootLayout, {unstable_settings} from "./_layout"
+import RequestById from "./request/[id]"
 import Tabs from "./(tabs)/_layout"
 import Activity from "./(tabs)/activity"
 import History from "./(tabs)/history"
@@ -30,10 +30,14 @@ describe("RootLayout", () => {
                 "(tabs)/spending": Spending,
                 "(tabs)/settings": Settings,
                 login: Login,
-                "ask/[id]": AskById,
+                "request/[id]": RequestById,
             },
             {initialUrl: "/"},
         )
         expect(await screen.findByRole("button", {name: "Continue with GitHub"})).toBeOnTheScreen()
+    })
+
+    it("puts a deep-linked request on top of the tabs", () => {
+        expect(unstable_settings).toEqual({anchor: "(tabs)"})
     })
 })

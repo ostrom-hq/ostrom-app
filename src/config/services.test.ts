@@ -27,24 +27,24 @@ describe("createAppServices", () => {
 
         expect(outcome).toEqual({kind: "failed", reason: "exchange-failed"})
         expect(WebBrowser.openAuthSessionAsync).toHaveBeenCalledWith(
-            expect.stringContaining(`https://ostrom.test/api/auth/github/start?redirect_uri=`),
+            expect.stringContaining(`https://ostrom.test/api/v1/auth/github/start?redirect_uri=`),
             "ostrom://auth/callback",
         )
         expect(jest.mocked(WebBrowser.openAuthSessionAsync).mock.calls[0]?.[0]).toContain(`state=${ZERO_STATE}`)
         expect(Crypto.getRandomBytes).toHaveBeenCalledWith(32)
-        expect(fetch).toHaveBeenCalledWith("https://ostrom.test/api/auth/mobile/token", expect.anything())
+        expect(fetch).toHaveBeenCalledWith("https://ostrom.test/api/v1/auth/mobile/token", expect.anything())
     })
 
     it("gives each session its repositories, with the session token", async () => {
         const fetch = jest.fn((_input: string, _init?: RequestInit) =>
-            Promise.resolve({status: 200, ok: true, text: () => Promise.resolve(JSON.stringify({login: "rev-b"}))}),
+            Promise.resolve({status: 200, ok: true, text: () => Promise.resolve(JSON.stringify({dev: {login: "rev-b", verified: true, via: "github"}, capabilities: []}))}),
         )
         Object.defineProperty(globalThis, "fetch", {value: fetch, configurable: true, writable: true})
         const repositories = repositoriesFor({serverUrl: "https://ostrom.test", token: "ost_1", user: {login: "rev-b"}})
         expect(repositories.approvals).toBeInstanceOf(ApprovalsRepositoryImpl)
-        await expect(repositories.account.me()).resolves.toMatchObject({login: "rev-b"})
+        await expect(repositories.account.me()).resolves.toMatchObject({dev: {login: "rev-b"}})
         const [url, init] = fetch.mock.calls[0] ?? []
-        expect(url).toBe("https://ostrom.test/api/me")
+        expect(url).toBe("https://ostrom.test/api/v1/auth/me")
         expect(init?.headers).toMatchObject({authorization: "Bearer ost_1"})
     })
 })

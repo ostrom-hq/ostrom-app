@@ -1,4 +1,4 @@
-import {type UseQueryResult, useQuery} from "@tanstack/react-query"
+import {keepPreviousData, type UseQueryResult, useQuery} from "@tanstack/react-query"
 import type {SpendPeriod, SpendReport} from "@/api/contract/spending"
 import {useRepositories} from "@/services/AppServices"
 
@@ -6,5 +6,6 @@ export const spendingKeys = {report: (period: SpendPeriod) => ["spending", perio
 
 export function useSpending(period: SpendPeriod): UseQueryResult<SpendReport> {
     const {spending} = useRepositories()
-    return useQuery({queryKey: spendingKeys.report(period), queryFn: () => spending.report(period)})
+    // The other period keeps showing while the new one loads: no spinner, no lost scroll, on each switch.
+    return useQuery({queryKey: spendingKeys.report(period), queryFn: () => spending.report(period), placeholderData: keepPreviousData})
 }

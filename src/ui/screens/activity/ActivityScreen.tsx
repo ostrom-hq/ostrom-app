@@ -8,20 +8,22 @@ import {ScreenTitle} from "@/ui/components/ScreenTitle"
 import {formatDateTime} from "@/ui/format/dateTime"
 import {formatUsd} from "@/ui/format/money"
 import {hasText, isPresent} from "@/ui/format/presence"
+import {TAB_EDGES} from "@/ui/navigation/tabEdges"
 import {fontSize, radius, space} from "@/ui/theme/tokens"
 import {useTheme} from "@/ui/theme/useTheme"
 import {useActivityViewModel} from "./useActivityViewModel"
 
-function ActivityRow({item, onOpen}: {item: ActivityItem; onOpen: (askId: string) => void}): React.JSX.Element {
+function ActivityRow({item, onOpen}: {item: ActivityItem; onOpen: (approvalId: string) => void}): React.JSX.Element {
     const {t, i18n} = useTranslation()
     const {colors} = useTheme()
     const details = [
-        t(`activity.actor.${item.actor.kind}`, {name: item.actor.name}),
+        // An agent is named as one; a person (or a kind this app does not know) by their name.
+        item.actor.kind === "agent" ? t("activity.actor.agent", {name: item.actor.name}) : item.actor.name,
         hasText(item.repo) ? item.repo : undefined,
         isPresent(item.costUsd) ? formatUsd(item.costUsd, i18n.language) : undefined,
         formatDateTime(item.at, i18n.language),
     ].filter((part) => part !== undefined)
-    const {askId} = item
+    const {approvalId} = item
     const content = (
         <>
             <Text style={[styles.summary, {color: colors.text}]}>{item.summary}</Text>
@@ -29,13 +31,13 @@ function ActivityRow({item, onOpen}: {item: ActivityItem; onOpen: (askId: string
         </>
     )
     const style = [styles.row, {backgroundColor: colors.surface, borderColor: colors.border}]
-    if (!hasText(askId)) return <View style={style}>{content}</View>
+    if (!hasText(approvalId)) return <View style={style}>{content}</View>
     return (
         <Pressable
             accessibilityRole="button"
             accessibilityLabel={item.summary}
             onPress={() => {
-                onOpen(askId)
+                onOpen(approvalId)
             }}
             style={style}
         >
@@ -49,8 +51,8 @@ export function ActivityScreen(): React.JSX.Element {
     const {colors} = useTheme()
     const router = useRouter()
     const {state, refreshing, refresh, loadMore} = useActivityViewModel()
-    const open = (askId: string): void => {
-        router.push(`/ask/${encodeURIComponent(askId)}`)
+    const open = (approvalId: string): void => {
+        router.push(`/request/${encodeURIComponent(approvalId)}`)
     }
 
     let body: React.JSX.Element
@@ -78,14 +80,14 @@ export function ActivityScreen(): React.JSX.Element {
                     ListFooterComponent={
                         state.hasMore ? (
                             <Button label={t("activity.more")} onPress={loadMore} busy={state.loadingMore} />
-                        ) : null
+                        ) : undefined
                     }
                     renderItem={({item}) => <ActivityRow item={item} onOpen={open} />}
                 />
             )
             break
     }
-    return <SafeAreaView style={[styles.container, {backgroundColor: colors.bg}]}>{body}</SafeAreaView>
+    return <SafeAreaView edges={TAB_EDGES} style={[styles.container, {backgroundColor: colors.bg}]}>{body}</SafeAreaView>
 }
 
 const styles = StyleSheet.create({

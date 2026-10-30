@@ -30,7 +30,7 @@ export class GithubSignInImpl implements GithubSignIn {
     async signIn(serverUrl: string): Promise<SignInOutcome> {
         const pkce = createPkce(this.dependencies.randomBytes)
         const state = base64Url(this.dependencies.randomBytes(16))
-        const start = new URL("/api/auth/github/start", serverUrl)
+        const start = new URL("/api/v1/auth/github/start", serverUrl)
         start.searchParams.set("redirect_uri", REDIRECT_URI)
         start.searchParams.set("state", state)
         start.searchParams.set("code_challenge", pkce.challenge)

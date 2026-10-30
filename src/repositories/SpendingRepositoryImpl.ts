@@ -6,6 +6,6 @@ export class SpendingRepositoryImpl implements SpendingRepository {
     constructor(private readonly http: HttpClient) {}
 
     report(period: SpendPeriod): Promise<SpendReport> {
-        return this.http.send({method: "GET", path: "/api/spending", query: {period}, response: SpendReportSchema})
+        return this.http.send({method: "GET", path: "/api/v1/spending", query: {period}, response: SpendReportSchema})
     }
 }

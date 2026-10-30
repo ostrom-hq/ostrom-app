@@ -4,6 +4,7 @@ import {renderRouter} from "expo-router/testing-library"
 import type {ReactNode} from "react"
 import {type ActivityPage, ActivityPageSchema} from "@/api/contract/activity"
 import {ApiError} from "@/api/http/ApiError"
+import type {ActivityRepository} from "@/repositories/ActivityRepository"
 import {activity, olderActivity} from "@/api/mocks/fixtures"
 import {ServicesProvider} from "@/services/AppServices"
 import {fakeRepositories, signedInServices} from "@/test/fakeServices"
@@ -13,7 +14,7 @@ import {ActivityScreen} from "./ActivityScreen"
 const first = ActivityPageSchema.parse(activity)
 const older = ActivityPageSchema.parse(olderActivity)
 
-async function launch(page: jest.Mock<Promise<ActivityPage>, [string?]>): Promise<ReturnType<typeof renderRouter>> {
+async function launch(page: ActivityRepository["page"]): Promise<ReturnType<typeof renderRouter>> {
     const services = await signedInServices({repositories: fakeRepositories({activity: {page}})})
     const client = testQueryClient()
     const wrapper = ({children}: {children: ReactNode}): React.JSX.Element => (
@@ -21,7 +22,7 @@ async function launch(page: jest.Mock<Promise<ActivityPage>, [string?]>): Promis
             <QueryClientProvider client={client}>{children}</QueryClientProvider>
         </ServicesProvider>
     )
-    return renderRouter({index: ActivityScreen, "ask/[id]": (): React.JSX.Element => <></>}, {initialUrl: "/", wrapper})
+    return renderRouter({index: ActivityScreen, "request/[id]": (): React.JSX.Element => <></>}, {initialUrl: "/", wrapper})
 }
 
 describe("ActivityScreen", () => {
@@ -39,21 +40,22 @@ describe("ActivityScreen", () => {
     it("opens the request an activity is about", async () => {
         const router = await launch(jest.fn(() => Promise.resolve(first)))
         await fireEvent.press(await screen.findByRole("button", {name: "claude-code asks to merge PR #6"}))
-        expect(router.getPathname()).toBe("/ask/appr_0001")
+        expect(router.getPathname()).toBe("/request/appr_0001")
     })
 
     it("lists an activity without repository", async () => {
         const [item] = first.items
         if (item === undefined) throw new Error("no activity in the fixture")
-        await launch(jest.fn(() => Promise.resolve({items: [{...item, repo: null, actor: {kind: "person", name: "rev-b"}}], nextCursor: null})))
+        const bare = {id: item.id, at: item.at, kind: item.kind, summary: item.summary, actor: {kind: "robot", name: "rev-b"}}
+        await launch(jest.fn(() => Promise.resolve({items: [bare]})))
         expect(await screen.findByText(/^rev-b · /)).toBeOnTheScreen()
     })
 
     it("says when nothing happened yet, and offers to try again after a failure", async () => {
         const page = jest
-            .fn<Promise<ActivityPage>, [string?]>()
+            .fn<Promise<ActivityPage>, Parameters<ActivityRepository["page"]>>()
             .mockRejectedValueOnce(new ApiError({kind: "network"}))
-            .mockResolvedValue({items: [], nextCursor: null})
+            .mockResolvedValue({items: []})
         await launch(page)
         await fireEvent.press(await screen.findByRole("button", {name: "Try again"}))
         expect(await screen.findByText("No activity yet.")).toBeOnTheScreen()

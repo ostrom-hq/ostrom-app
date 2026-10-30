@@ -7,11 +7,14 @@ export interface PushServiceConfig {
     readonly platform: string
 }
 
-/** A request waits for a human: shown even while the app is open. */
+/** A request waits for a human: shown even while the app is open. No badge: nothing in the app would clear it. */
 Notifications.setNotificationHandler({
     handleNotification: () =>
-        Promise.resolve({shouldShowBanner: true, shouldShowList: true, shouldPlaySound: true, shouldSetBadge: true}),
+        Promise.resolve({shouldShowBanner: true, shouldShowList: true, shouldPlaySound: true, shouldSetBadge: false}),
 })
+
+/** Android 13+ shows the permission prompt only once a channel exists, and shows nothing without one. */
+const ANDROID_CHANNEL = "requests"
 
 function dataOf(response: Notifications.NotificationResponse | null): unknown {
     return response?.notification.request.content.data
@@ -23,6 +26,12 @@ export class PushServiceImpl implements PushService {
     async register(): Promise<PushPermission> {
         const {projectId, platform} = this.config
         if (projectId === undefined || (platform !== "ios" && platform !== "android")) return {kind: "unavailable"}
+        if (platform === "android") {
+            await Notifications.setNotificationChannelAsync(ANDROID_CHANNEL, {
+                name: "Requests",
+                importance: Notifications.AndroidImportance.HIGH,
+            })
+        }
         const current = await Notifications.getPermissionsAsync()
         const status = current.granted || !current.canAskAgain ? current : await Notifications.requestPermissionsAsync()
         if (!status.granted) return {kind: "denied"}
@@ -44,7 +53,10 @@ export class PushServiceImpl implements PushService {
         }
     }
 
+    /** The notification that launched the app, given once: it is cleared, so a remount does not open it again. */
     async launchData(): Promise<unknown> {
-        return dataOf(await Notifications.getLastNotificationResponseAsync())
+        const response = await Notifications.getLastNotificationResponseAsync()
+        if (response !== null) Notifications.clearLastNotificationResponse()
+        return dataOf(response)
     }
 }

@@ -11,7 +11,9 @@ const esmOnly = ["@noble", "msw", "@mswjs", "until-async", "rettime", "@open-dra
 
 module.exports = {
     // src/test/ holds test doubles (fakes, fixtures for tests), not product code: measured through the tests that use them.
-    collectCoverageFrom: ["src/**/*.{ts,tsx}", "!src/**/*.test.{ts,tsx}", "!src/**/*.d.ts", "!src/test/**"],
+    // src/api/gen/ is generated from contract/openapi.yaml (`npm run gen:api`, checked by `gen:check` in the CI): not
+    // written here, measured through the contract tests that parse with it.
+    collectCoverageFrom: ["src/**/*.{ts,tsx}", "!src/**/*.test.{ts,tsx}", "!src/**/*.d.ts", "!src/test/**", "!src/api/gen/**"],
     // Lyes, 30/10: 100 % of lines, branches, functions and statements, enforced by the CI.
     coverageThreshold: {global: {lines: 100, branches: 100, functions: 100, statements: 100}},
     projects: [

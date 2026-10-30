@@ -11,6 +11,6 @@ export function useActivity(): UseInfiniteQueryResult<InfiniteData<ActivityPage,
         queryKey: activityKeys.all,
         queryFn: ({pageParam}) => activity.page(pageParam),
         initialPageParam: undefined,
-        getNextPageParam: (last) => last.nextCursor ?? undefined,
+        getNextPageParam: (last) => last.next,
     })
 }

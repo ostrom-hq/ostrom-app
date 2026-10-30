@@ -1,43 +1,28 @@
 import {z} from "zod"
+import {zNotificationPreferences, zPushDevice, zRegisterPushDeviceBody} from "@/api/gen/zod.gen"
 
-export const PlatformSchema = z.enum(["ios", "android"])
-export type DevicePlatform = z.output<typeof PlatformSchema>
+export type DevicePlatform = "ios" | "android"
 
-/** `POST /api/devices`: the push token of this phone, so the server can say "a request waits for you". */
-export const DeviceRegistrationSchema = z.object({
-    pushToken: z.string(),
-    provider: z.literal("expo"),
-    platform: PlatformSchema,
-    locale: z.string(),
-})
-export type DeviceRegistration = z.output<typeof DeviceRegistrationSchema>
+/** `POST /api/v1/push-devices`: this phone's Expo push token, so the server can say "a request waits for you". */
+export type DeviceRegistration = z.output<typeof zRegisterPushDeviceBody> & {
+    readonly provider: "expo"
+    readonly platform: DevicePlatform
+}
 
-export const DeviceSchema = z.object({id: z.string()})
-export type Device = z.output<typeof DeviceSchema>
+export const DeviceSchema = zPushDevice
+export type Device = z.output<typeof zPushDevice>
 
-/** A daily window without push, in the person's time zone (`22:00` to `07:00`). */
-export const QuietHoursSchema = z.object({
-    start: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
-    end: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
-    timeZone: z.string(),
-})
-export type QuietHours = z.output<typeof QuietHoursSchema>
+/** `GET` and `PUT /api/v1/me/notifications`: what this person is told on their phone. */
+export const NotificationSettingsSchema = zNotificationPreferences
+export type NotificationSettings = z.output<typeof zNotificationPreferences>
+export type QuietHours = NonNullable<NotificationSettings["quietHours"]>
 
-/** `GET` and `PUT /api/me/notifications`. */
-export const NotificationSettingsSchema = z.object({
-    /** A request waits for my yes. */
-    requests: z.boolean(),
-    /** Someone decided a request I asked for. */
-    decisions: z.boolean(),
-    /** The spending of the month passed a budget threshold. */
-    spending: z.boolean(),
-    quietHours: QuietHoursSchema.nullish(),
-})
-export type NotificationSettings = z.output<typeof NotificationSettingsSchema>
-
-/** The data of an Ostrom push: which request to open. Anything else in a push is ignored. */
+/**
+ * The data of an Ostrom push (`registerPushDevice` in the contract: `{kind: "approval", approvalId}`): which request
+ * to open. The id has the alphabet of a route segment, so a push cannot smuggle a path. Anything else is ignored.
+ */
 export const PushDataSchema = z.object({
-    kind: z.literal("ask"),
-    askId: z.string().regex(/^[A-Za-z0-9_-]+$/),
+    kind: z.literal("approval"),
+    approvalId: z.string().regex(/^[A-Za-z0-9_-]+$/),
 })
 export type PushData = z.output<typeof PushDataSchema>

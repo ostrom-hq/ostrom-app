@@ -4,6 +4,7 @@ import {SafeAreaView} from "react-native-safe-area-context"
 import {Button} from "@/ui/components/Button"
 import {ScreenTitle} from "@/ui/components/ScreenTitle"
 import {formatDateTime} from "@/ui/format/dateTime"
+import {TAB_EDGES} from "@/ui/navigation/tabEdges"
 import type {ThemeColors} from "@/ui/theme/theme"
 import {fontSize, radius, space} from "@/ui/theme/tokens"
 import {useTheme} from "@/ui/theme/useTheme"
@@ -31,19 +32,29 @@ function lineOf(check: ReceiptCheck, t: ReturnType<typeof useTranslation>["t"], 
 function ReceiptRow({row}: {row: ReceiptRowModel}): React.JSX.Element {
     const {t, i18n} = useTranslation()
     const {colors} = useTheme()
-    const result = row.result === "approved" || row.result === "rejected" ? t(`status.${row.result}`) : row.result
-    const title = !row.readable
-        ? t("history.unreadable")
-        : result === undefined
-          ? t("history.signed", {who: row.by})
-          : t("history.decided", {result, who: row.by})
+    const style = [styles.row, {backgroundColor: colors.surface, borderColor: colors.border}]
+    if (!row.readable) {
+        return (
+            <View style={style} testID={`receipt-${row.key}`}>
+                <Text style={[styles.rowTitle, {color: colors.text}]}>{t("history.unreadable")}</Text>
+                <CheckLine check={row.check} />
+            </View>
+        )
+    }
+    // A result this app does not know is never shown raw inside a translated sentence.
+    const title =
+        row.result === undefined
+            ? t("history.signed", {who: row.by})
+            : row.result === "approved" || row.result === "rejected"
+              ? t("history.decided", {result: t(`status.${row.result}`), who: row.by})
+              : t("history.decidedOther", {who: row.by})
     return (
-        <View style={[styles.row, {backgroundColor: colors.surface, borderColor: colors.border}]} testID={`receipt-${row.key}`}>
-            <Text style={[styles.rowTitle, {color: colors.text}]}>{title}</Text>
-            {row.subject === undefined ? null : <Text style={[styles.detail, {color: colors.textMuted}]}>{row.subject}</Text>}
-            {row.at === undefined ? null : (
-                <Text style={[styles.detail, {color: colors.textMuted}]}>{formatDateTime(row.at, i18n.language)}</Text>
-            )}
+        <View style={style} testID={`receipt-${row.key}`}>
+            <Text style={[styles.rowTitle, {color: colors.text}]}>
+                {row.selfApproved ? `${title} · ${t("history.selfApproved")}` : title}
+            </Text>
+            <Text style={[styles.detail, {color: colors.textMuted}]}>{row.subject}</Text>
+            <Text style={[styles.detail, {color: colors.textMuted}]}>{formatDateTime(row.at, i18n.language)}</Text>
             <CheckLine check={row.check} />
         </View>
     )
@@ -71,13 +82,19 @@ export function HistoryScreen(): React.JSX.Element {
             body = (
                 <FlatList
                     data={state.rows}
-                    keyExtractor={(row) => row.key}
+                    // Index first: two receipts with the same id (a server bug) still get a row each.
+                    keyExtractor={(row, index) => `${String(index)}:${row.key}`}
                     contentContainerStyle={styles.list}
                     refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.signal} />}
                     ListHeaderComponent={
                         <View style={styles.header}>
                             <ScreenTitle>{t("history.title")}</ScreenTitle>
                             <Text style={[styles.body, {color: colors.textMuted}]}>{t("history.intro")}</Text>
+                            {state.stale ? (
+                                <Text accessibilityRole="alert" style={[styles.body, {color: colors.danger}]}>
+                                    {t("history.stale")}
+                                </Text>
+                            ) : null}
                         </View>
                     }
                     ListEmptyComponent={<Text style={[styles.body, {color: colors.textMuted}]}>{t("history.empty")}</Text>}
@@ -86,7 +103,7 @@ export function HistoryScreen(): React.JSX.Element {
             )
             break
     }
-    return <SafeAreaView style={[styles.container, {backgroundColor: colors.bg}]}>{body}</SafeAreaView>
+    return <SafeAreaView edges={TAB_EDGES} style={[styles.container, {backgroundColor: colors.bg}]}>{body}</SafeAreaView>
 }
 
 const styles = StyleSheet.create({

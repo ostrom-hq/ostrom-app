@@ -12,7 +12,7 @@ describe("budgetOf", () => {
     })
 
     it("has no budget when none is set", () => {
-        expect(budgetOf({...report, budgetUsd: null})).toBeUndefined()
+        expect(budgetOf(SpendReportSchema.parse({...spending, budgetUsd: undefined}))).toBeUndefined()
         expect(budgetOf({...report, budgetUsd: 0})).toBeUndefined()
     })
 })

@@ -15,7 +15,7 @@ describe("AppServices", () => {
         )
         const signedOut = await renderHook(() => useRepositories(), {wrapper})
         expect(signedOut.result.current).toBe(SIGNED_OUT_REPOSITORIES)
-        await expect(signedOut.result.current.approvals.queue()).rejects.toMatchObject({problem: {kind: "unauthorized"}})
+        await expect(signedOut.result.current.approvals.waiting()).rejects.toMatchObject({problem: {kind: "unauthorized"}})
         await services.sessionStore.getState().signIn(testSession)
         const {result} = await renderHook(() => useRepositories(), {wrapper})
         expect(result.current).toBe(services.repositoriesFor(testSession))

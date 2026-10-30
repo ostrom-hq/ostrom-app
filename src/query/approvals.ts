@@ -1,40 +1,48 @@
 import {type UseMutationResult, type UseQueryResult, useMutation, useQuery, useQueryClient} from "@tanstack/react-query"
-import type {Ask, Decision, YesQueue} from "@/api/contract/yes"
+import type {AnswerResult, Approval, ApprovalAnswer, ApprovalPage} from "@/api/contract/approvals"
+import {receiptKeys} from "@/query/receipts"
 import {useRepositories} from "@/services/AppServices"
 
 export const approvalKeys = {
-    all: ["yes"] as const,
-    queue: () => [...approvalKeys.all, "queue"] as const,
-    ask: (id: string) => [...approvalKeys.all, "ask", id] as const,
+    all: ["approvals"] as const,
+    waiting: () => [...approvalKeys.all, "waiting"] as const,
+    detail: (id: string) => [...approvalKeys.all, "detail", id] as const,
 }
 
-/** What waits for the person, and the last decided. */
-export function useYesQueue(): UseQueryResult<YesQueue> {
+/** The requests waiting for the person's answer. */
+export function useWaitingApprovals(): UseQueryResult<ApprovalPage> {
     const {approvals} = useRepositories()
-    return useQuery({queryKey: approvalKeys.queue(), queryFn: () => approvals.queue()})
+    return useQuery({queryKey: approvalKeys.waiting(), queryFn: () => approvals.waiting()})
 }
 
 /** One request with all its evidence. */
-export function useAsk(id: string): UseQueryResult<Ask> {
+export function useApproval(id: string): UseQueryResult<Approval> {
     const {approvals} = useRepositories()
-    return useQuery({queryKey: approvalKeys.ask(id), queryFn: () => approvals.ask(id)})
+    return useQuery({queryKey: approvalKeys.detail(id), queryFn: () => approvals.approval(id)})
 }
 
-export interface DecideVariables {
-    readonly decision: Decision
+export interface AnswerVariables {
+    readonly answer: ApprovalAnswer
     /** The digest of the request as the screen showed it: the server refuses if it changed since. */
     readonly shownDigest: string
+    /** The reason of a no, for the agent. */
+    readonly comment?: string
 }
 
-/** Sends a yes or a no, once; the request and the queue are then read again from the answer and the server. */
-export function useDecide(id: string): UseMutationResult<Ask, Error, DecideVariables> {
+/** Sends a yes or a no, once; the request and the waiting list are then read again from the answer and the server. */
+export function useAnswer(id: string): UseMutationResult<AnswerResult, Error, AnswerVariables> {
     const {approvals} = useRepositories()
     const queryClient = useQueryClient()
     return useMutation({
-        mutationFn: ({decision, shownDigest}: DecideVariables) => approvals.decide(id, decision, shownDigest),
-        onSuccess: (ask) => {
-            queryClient.setQueryData(approvalKeys.ask(id), ask)
+        mutationFn: ({answer, shownDigest, comment}: AnswerVariables) => approvals.answer(id, answer, shownDigest, comment),
+        onSuccess: (result) => {
+            queryClient.setQueryData(approvalKeys.detail(id), result.approval)
         },
-        onSettled: () => queryClient.invalidateQueries({queryKey: approvalKeys.all}),
+        // The request, the waiting list and the history (an answer signs a receipt) are read again.
+        onSettled: () =>
+            Promise.all([
+                queryClient.invalidateQueries({queryKey: approvalKeys.all}),
+                queryClient.invalidateQueries({queryKey: receiptKeys.all}),
+            ]),
     })
 }

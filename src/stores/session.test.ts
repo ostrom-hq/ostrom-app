@@ -22,6 +22,18 @@ describe("session store", () => {
         expect(storage.items.has(SESSION_KEY)).toBe(false)
     })
 
+    it("signs out even when the keychain refuses to remove the token, and blanks it instead", async () => {
+        const storage = new MemoryStorage()
+        const store = createSessionStore(storage)
+        await store.getState().signIn(session)
+        storage.remove = (): Promise<void> => Promise.reject(new Error("locked"))
+        await store.getState().signOut()
+        expect(store.getState().state).toEqual({status: "signed-out"})
+        expect(storage.items.get(SESSION_KEY)).toBe("")
+        storage.set = (): Promise<void> => Promise.reject(new Error("locked"))
+        await expect(store.getState().signOut()).resolves.toBeUndefined()
+    })
+
     it("opens signed out when the keychain cannot be read", async () => {
         const storage = new MemoryStorage()
         storage.get = (): Promise<string | undefined> => Promise.reject(new Error("locked"))
