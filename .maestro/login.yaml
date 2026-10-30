@@ -8,7 +8,8 @@ appId: run.ostrom.app
 - assertVisible: "Agents propose. People decide."
 - tapOn:
     id: "login-server"
-- eraseText: 60
+# More than any prefilled address, whatever the build was configured with.
+- eraseText: 200
 - inputText: "http://ostrom.acme.dev"
 - hideKeyboard
 - tapOn:
