@@ -165,6 +165,7 @@ export const en = {
         problems: {
             "biometrics-unavailable": "Set up Face ID, a fingerprint or a passcode on this phone to answer from it.",
             "biometrics-failed": "Your identity could not be confirmed. Nothing was sent.",
+            "step-up": "Ostrom wants a fresh sign-in for this yes: confirm it in the console, which just opened.",
             "self-approval": "Someone else can approve this request, so your own yes is not taken.",
             changed: "The request changed after you opened it. Read it again before answering.",
             "already-decided": "Someone already answered this request.",

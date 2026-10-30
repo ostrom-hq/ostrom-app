@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import Constants from "expo-constants"
 import * as Crypto from "expo-crypto"
+import * as Linking from "expo-linking"
 import * as WebBrowser from "expo-web-browser"
 import {Platform} from "react-native"
 import {z} from "zod"
@@ -52,5 +53,8 @@ export function createAppServices(): AppServices {
                 new AccountRepositoryImpl(new HttpClientImpl({baseUrl: serverUrl, token: () => undefined})),
         }),
         repositoriesFor,
+        openUrl: async (url) => {
+            await Linking.openURL(url)
+        },
     }
 }

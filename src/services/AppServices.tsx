@@ -31,6 +31,8 @@ export interface AppServices {
     readonly biometrics: BiometricGate
     readonly push: PushService
     readonly repositoriesFor: (session: Session) => Repositories
+    /** Opens a link outside the app: a link of the console opens the console (browser, or its app when installed). */
+    readonly openUrl: (url: string) => Promise<void>
 }
 
 const ServicesContext = createContext<AppServices | undefined>(undefined)

@@ -28,7 +28,14 @@ async function open(
         refuse,
         you = {},
         extras = {},
-    }: {outcome?: BiometricOutcome; refuse?: ApiError; you?: Partial<ApprovalView["you"]>; extras?: ViewExtras} = {},
+        openUrl,
+    }: {
+        outcome?: BiometricOutcome
+        refuse?: ApiError
+        you?: Partial<ApprovalView["you"]>
+        extras?: ViewExtras
+        openUrl?: (url: string) => Promise<void>
+    } = {},
 ): Promise<Harness> {
     let current = initial
     const approval = jest.fn((_id: string) => Promise.resolve(current))
@@ -43,6 +50,7 @@ async function open(
     const services = await signedInServices({
         biometrics: {confirm},
         repositories: fakeRepositories({approvals: {queue: jest.fn(), view, answer}}),
+        ...(openUrl === undefined ? {} : {openUrl}),
     })
     await renderWithServices(<RequestScreen id={initial.id} />, services)
     await screen.findByRole("header", {name: initial.title})
@@ -248,6 +256,15 @@ describe("RequestScreen", () => {
     it("keeps a note off a request that still waits", async () => {
         await open(approvals.pending, {extras: {note: "draft"}})
         expect(screen.queryByText(/Note to the agent/)).toBeNull()
+    })
+
+    it("opens the console on the request when the server wants a fresh sign-in for the yes, without a raw error", async () => {
+        const openUrl = jest.fn((_url: string) => Promise.resolve())
+        await open(approvals.pending, {refuse: refused(403, "step_up_required"), openUrl})
+        await fireEvent.press(screen.getByRole("button", {name: "Approve"}))
+        expect(await screen.findByText("Ostrom wants a fresh sign-in for this yes: confirm it in the console, which just opened.")).toBeOnTheScreen()
+        expect(openUrl).toHaveBeenCalledWith("https://ostrom.test/yes/appr_0001")
+        expect(screen.queryByText(/step_up_required/)).toBeNull()
     })
 
     it("says in clear that the request is mine, and why the server refused my yes", async () => {

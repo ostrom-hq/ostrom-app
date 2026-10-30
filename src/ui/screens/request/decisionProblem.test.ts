@@ -7,6 +7,8 @@ const refused = (status: number, type: string): ApiProblem => ({kind: "refused",
 const CASES: readonly (readonly [ApiProblem, boolean, DecisionProblem])[] = [
     [refused(409, "shown_digest_mismatch"), false, "changed"],
     [refused(409, "conflict"), false, "already-decided"],
+    [refused(403, "step_up_required"), false, "step-up"],
+    [refused(403, "step_up_required"), true, "step-up"],
     [refused(403, "forbidden"), true, "self-approval"],
     [refused(403, "forbidden"), false, "forbidden"],
     [refused(400, "invalid_request"), false, "failed"],

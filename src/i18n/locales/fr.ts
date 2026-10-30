@@ -166,6 +166,7 @@ export const fr: TranslationShape = {
         problems: {
             "biometrics-unavailable": "Active Face ID, une empreinte ou un code sur ce téléphone pour répondre depuis lui.",
             "biometrics-failed": "Ton identité n'a pas pu être confirmée. Rien n'est parti.",
+            "step-up": "Ostrom veut une connexion récente pour ce oui : confirme-le dans la console, qui vient de s'ouvrir.",
             "self-approval": "Quelqu'un d'autre peut approuver cette demande : ton propre oui n'est pas pris.",
             changed: "La demande a changé depuis que tu l'as ouverte. Relis-la avant de répondre.",
             "already-decided": "Quelqu'un a déjà répondu à cette demande.",

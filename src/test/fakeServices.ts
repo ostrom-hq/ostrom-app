@@ -63,6 +63,7 @@ export interface FakeServicesOptions {
     readonly biometrics?: BiometricGate
     readonly push?: PushService
     readonly repositories?: Repositories
+    readonly openUrl?: (url: string) => Promise<void>
 }
 
 /** App services for tests: memory storage, scripted sign-in and biometrics, fake repositories. */
@@ -78,6 +79,7 @@ export function fakeServices(options: FakeServicesOptions = {}): AppServices {
             launchData: () => Promise.resolve(undefined),
         },
         repositoriesFor: () => repositories,
+        openUrl: options.openUrl ?? (() => Promise.resolve()),
     }
 }
 

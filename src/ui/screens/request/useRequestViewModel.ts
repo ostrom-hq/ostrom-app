@@ -66,7 +66,7 @@ function noApproveOf(view: ApprovalView): NoApprove | undefined {
 
 export function useRequestViewModel(id: string): RequestViewModel {
     const {t} = useTranslation()
-    const {biometrics} = useServices()
+    const {biometrics, openUrl, sessionStore} = useServices()
     const query = useApprovalView(id)
     const {mutateAsync} = useAnswer(id)
     const [sending, setSending] = useState<ApprovalAnswer>()
@@ -108,7 +108,14 @@ export function useRequestViewModel(id: string): RequestViewModel {
                         setDeclining(false)
                     } catch (error) {
                         // The answer's own invalidation reads the request again (`useAnswer`).
-                        setProblem(decisionProblem(error, askedByMe))
+                        const found = decisionProblem(error, askedByMe)
+                        // A yes that needs a fresh sign-in is given in the console: it opens on this request, on the
+                        // server of the session as it is now (nothing opens after a sign-out during the answer).
+                        const session = sessionStore.getState().state
+                        if (found === "step-up" && session.status === "signed-in") {
+                            void openUrl(`${session.session.serverUrl}/yes/${encodeURIComponent(approval.id)}`)
+                        }
+                        setProblem(found)
                     }
                 } else if (outcome !== "cancelled") {
                     setProblem(biometricProblem(outcome))
@@ -116,7 +123,7 @@ export function useRequestViewModel(id: string): RequestViewModel {
                 setSending(undefined)
             })()
         },
-        [approval, open, mayApprove, pinned, changed, biometrics, t, mutateAsync, askedByMe],
+        [approval, open, mayApprove, pinned, changed, biometrics, t, mutateAsync, askedByMe, openUrl, sessionStore],
     )
 
     const state: RequestScreenState =

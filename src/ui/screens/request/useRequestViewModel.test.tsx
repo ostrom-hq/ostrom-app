@@ -3,8 +3,10 @@ import {QueryClientProvider} from "@tanstack/react-query"
 import {act, renderHook, waitFor} from "@testing-library/react-native"
 import type {ReactNode} from "react"
 import type {Approval, ApprovalView} from "@/api/contract/approvals"
+import {ApiError} from "@/api/http/ApiError"
 import type {ApprovalsRepository} from "@/repositories/ApprovalsRepository"
 import type {AppServices} from "@/services/AppServices"
+import type {BiometricOutcome} from "@/services/biometrics/BiometricGate"
 import {ServicesProvider} from "@/services/AppServices"
 import {approvals, fakeRepositories, signedInServices, viewOf} from "@/test/fakeServices"
 import {testQueryClient} from "@/test/renderWithServices"
@@ -187,6 +189,40 @@ describe("useRequestViewModel", () => {
             await Promise.resolve()
         })
         expect(result.current.changed).toBe(false)
+    })
+
+    it("opens nothing on a fresh sign-in asked after the session ended during the answer", async () => {
+        const openUrl = jest.fn((_url: string) => Promise.resolve())
+        let refuse: (error: unknown) => void = () => undefined
+        const answer = jest.fn<Promise<ApprovalView>, Parameters<ApprovalsRepository["answer"]>>(
+            () =>
+                new Promise<ApprovalView>((_resolve, reject) => {
+                    refuse = reject
+                }),
+        )
+        const view = (_id: string): Promise<ApprovalView> => Promise.resolve(viewOf(approvals.pending))
+        const services = await signedInServices({
+            biometrics: {confirm: () => Promise.resolve<BiometricOutcome>("confirmed")},
+            repositories: fakeRepositories({approvals: {queue: jest.fn(), view, answer}}),
+            openUrl,
+        })
+        const {result} = await renderHook(() => useRequestViewModel("appr_0001"), {wrapper: wrapperOf(services)})
+        await waitFor(() => {
+            expect(result.current.state.kind).toBe("ready")
+        })
+        result.current.approve()
+        await waitFor(() => {
+            expect(answer).toHaveBeenCalled()
+        })
+        await act(async () => {
+            await services.sessionStore.getState().signOut()
+            refuse(new ApiError({kind: "refused", status: 403, type: "step_up_required", message: ""}))
+            await Promise.resolve()
+        })
+        await waitFor(() => {
+            expect(result.current.problem).toBe("step-up")
+        })
+        expect(openUrl).not.toHaveBeenCalled()
     })
 
     it("is mine when the server says the request is mine", async () => {
