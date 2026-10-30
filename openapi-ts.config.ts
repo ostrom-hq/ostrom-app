@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 /**
  * The API types and their zod schemas, generated from ostrom-core's `api/openapi.yaml`.
  * `contract/openapi.yaml` is that file at the commit pinned in `contract/CORE_SHA`; the CI checks the copy against

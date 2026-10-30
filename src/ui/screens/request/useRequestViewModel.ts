@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import {useCallback, useState} from "react"
 import {useTranslation} from "react-i18next"
 import type {Approval, ApprovalAnswer} from "@/api/contract/approvals"

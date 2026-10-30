@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import {keepPreviousData, type UseQueryResult, useQuery} from "@tanstack/react-query"
 import type {SpendPeriod, SpendReport} from "@/api/contract/spending"
 import {useRepositories} from "@/services/AppServices"

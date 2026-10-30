@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import {useMemo} from "react"
 import type {ReceiptListItem} from "@/api/contract/receipts"
 import type {ReceiptKey} from "@/domain/receipts/publicKey"

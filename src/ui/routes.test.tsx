@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import {screen} from "@testing-library/react-native"
 import {renderRouter} from "expo-router/testing-library"
 // Kept out of src/app/: Expo Router bundles every file of that folder as a route, tests included.

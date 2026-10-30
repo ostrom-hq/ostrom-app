@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import {focusManager} from "@tanstack/react-query"
 import {AppState, type AppStateStatus} from "react-native"
 import {ApiError} from "@/api/http/ApiError"

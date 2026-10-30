@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 /**
  * The requests for a yes (`Approval`), as the app reads them. The shapes are the contract's, generated from
  * ostrom-core's `api/openapi.yaml` into `@/api/gen`; this file only narrows what a phone must tolerate.

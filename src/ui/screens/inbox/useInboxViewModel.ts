@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type {Approval} from "@/api/contract/approvals"
 import {useWaitingApprovals} from "@/query/approvals"
 import {useSessionState} from "@/services/AppServices"

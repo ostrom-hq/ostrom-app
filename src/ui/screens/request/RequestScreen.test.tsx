@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import {fireEvent, screen, waitFor} from "@testing-library/react-native"
 import type {AnswerResult, Approval, ApprovalAnswer} from "@/api/contract/approvals"
 import {ApiError} from "@/api/http/ApiError"
