@@ -90,14 +90,16 @@ fingerprint and push are replaced, since the emulator has none of them. `metro.c
 that build, and the `ci` job proves it: `scripts/check-store-bundle.sh` exports the production bundles as a store build
 makes them and fails on any trace of the mock (msw, the build flag, the mock's names and strings), then requires those
 strings in the E2E bundle, so that the search is known to see them. `scripts/run-maestro.sh` runs the flows one at a
-time once the emulator has booted; a flow that fails is run once more from a clean state, with a warning in the run
-(the CI emulator sometimes goes offline for a moment), and a flow that fails twice fails the job.
+time. The CI emulator sometimes goes offline for a moment, mostly just after boot: before the first flow it waits for
+adb, the end of the boot and the package manager, then runs a warm-up flow that does not count
+(`.maestro/common/warm-up.yaml`). A flow that fails is run once more after `adb reconnect`, with a warning in the run,
+and a flow that fails twice fails the job.
 
 | Flow | What it proves | Status |
 | --- | --- | --- |
-| `login.yaml` | Signed out on a new phone: the login screen, and an address that is not `https://` is refused before anything is sent | Green |
-| `step-up.yaml` | A yes the server answers with 403 `step_up_required` (production deploy): the explanation, no raw error, then a button that opens the console on this request (when the console cannot open, its address to select and copy: unit tests) | Green |
-| `self-approval.yaml` | A request the person asked for (`canApprove: false`, `self_approval_refused`): Approve is not offered, and the no still goes through with its reason | Green |
+| `login.yaml` | Signed out on a new phone: the login screen, and an address that is not `https://` is refused before anything is sent | Green ([run 41026295995](https://github.com/ostrom-hq/ostrom-app/actions/runs/41026295995)) |
+| `step-up.yaml` | A yes the server answers with 403 `step_up_required` (production deploy): the explanation, no raw error, then a button that opens the console on this request (when the console cannot open, its address to select and copy: unit tests) | Green ([run 41041831225](https://github.com/ostrom-hq/ostrom-app/actions/runs/41041831225)) |
+| `self-approval.yaml` | A request the person asked for (`canApprove: false`, `self_approval_refused`): Approve is not offered, and the no still goes through with its reason | Green ([run 41041831225](https://github.com/ostrom-hq/ostrom-app/actions/runs/41041831225)) |
 | Organization required | A member of several organizations without `Ostrom-Org` (409 `org_required`): the inbox and the request say it clearly. The header is sent on every call and the mock server checks it like the real one (unit tests) | Missing |
 | Approve a request | A yes on someone else's request is sent with the shown digest and the request shows as approved | Missing |
 | Changed request | The request changes while it is shown (409 `shown_digest_mismatch`): the app asks to read it again | Missing |

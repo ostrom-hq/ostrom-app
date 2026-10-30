@@ -1,0 +1,9 @@
+# Warm-up before the flows, not a test: the app starts and shows its first screen once the emulator is steady.
+appId: run.ostrom.app
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible:
+      id: "login-github"
+    timeout: 30000
