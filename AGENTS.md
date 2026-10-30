@@ -10,7 +10,7 @@ All repository content (code, comments, docs, commits, pull requests) is in Engl
 
 ## Specific to this repository
 
-API types and Zod schemas come from `@ostrom-hq/core` (generated from ostrom-core by Zodable): never hand-write an API entity type. Maestro end-to-end tests run on an Android emulator in CI.
+API types and Zod schemas come from `@ostrom-hq/core` (generated from ostrom-core by Zodable): never hand-write an API entity type. Maestro end-to-end tests run on an Android emulator in CI. Every org-scoped screen has an end-to-end test that another organization's data never shows (CONVENTIONS.md section 16).
 
 ## The 15 rules that matter most
 
