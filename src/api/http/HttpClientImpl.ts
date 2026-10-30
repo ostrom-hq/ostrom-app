@@ -17,11 +17,7 @@ export function segment(value: string): string {
 }
 
 export class HttpClientImpl implements HttpClient {
-    private readonly fetch: typeof fetch
-
-    constructor(private readonly config: HttpClientConfig) {
-        this.fetch = config.fetch ?? globalThis.fetch.bind(globalThis)
-    }
+    constructor(private readonly config: HttpClientConfig) {}
 
     async send<S extends z.ZodType>(request: HttpRequest<S>): Promise<z.output<S>> {
         const response = await this.call(request)
@@ -50,6 +46,11 @@ export class HttpClientImpl implements HttpClient {
         } catch (cause) {
             throw new ApiError({kind: "network"}, {cause})
         }
+    }
+
+    /** The global `fetch` is read at each call, not at construction: polyfills and test interceptors replace it. */
+    private fetch(input: string, init: RequestInit): Promise<Response> {
+        return this.config.fetch === undefined ? globalThis.fetch(input, init) : this.config.fetch(input, init)
     }
 }
 
