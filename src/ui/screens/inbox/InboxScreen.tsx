@@ -71,7 +71,7 @@ export function InboxScreen(): React.JSX.Element {
                             <ScreenTitle>{t("inbox.title")}</ScreenTitle>
                             {state.stale ? (
                                 <Text accessibilityRole="alert" style={[styles.stale, {color: colors.danger}]}>
-                                    {t("inbox.stale")}
+                                    {state.orgRequired ? t("common.orgRequired") : t("inbox.stale")}
                                 </Text>
                             ) : null}
                         </View>

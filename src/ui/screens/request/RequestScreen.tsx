@@ -171,12 +171,12 @@ function Actions({model, approval}: {model: RequestViewModel; approval: Approval
                     {t(`request.problems.${problem}`)}
                 </Text>
             )}
-            {/* A yes that needs a fresh sign-in is given in the console: the person opens it from here. */}
-            {problem === "step-up" ? (
+            {/* A yes that needs a fresh sign-in, or an organization the app cannot name, is given in the console. */}
+            {problem === "step-up" || problem === "org-required" ? (
                 <Button label={t("request.openConsole")} variant="signal" onPress={model.openConsole} testID="request-open-console" />
             ) : null}
             {/* The console did not open: its address, to open by hand. */}
-            {problem === "step-up" && model.consoleLink !== undefined ? (
+            {model.consoleLink !== undefined ? (
                 <>
                     <Text style={[styles.body, {color: colors.text}]}>{t("request.consoleNotOpened")}</Text>
                     <Text selectable style={[styles.body, {color: colors.text}]} testID="request-console-url">

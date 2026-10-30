@@ -39,6 +39,10 @@ describe("createMockServer and Ostrom-Org", () => {
         expect(server.handle(get("/api/v1/approvals/queue", "org_beta")).status).toBe(200)
     })
 
+    it("answers 404 to a person in no organization, never org_required", () => {
+        expect(createMockServer({memberships: []}).handle(get("/api/v1/approvals/queue")).status).toBe(404)
+    })
+
     it("asks nothing on a route outside the organization", () => {
         const server = createMockServer({memberships: ["org_acme", "org_beta"]})
         expect(server.handle(get("/api/v1/receipts/keys")).status).toBe(200)

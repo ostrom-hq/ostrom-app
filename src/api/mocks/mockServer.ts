@@ -61,7 +61,7 @@ interface Route {
 }
 
 /** The routes of the app that act in the caller's organization (contract 0.1.142); the others take no header. */
-const IN_ORG = /^\/api\/v1\/(auth\/me|push-devices|activity|spending|approvals|receipts(?!\/keys))/
+const IN_ORG = /^\/api\/v1\/(auth\/me|push-devices|activity|spending|approvals|receipts(?!\/keys))(?=\/|$)/
 
 /** A route of the contract; `:id` is one path segment. */
 function route(method: string, pattern: string, respond: Route["respond"]): Route {
@@ -135,6 +135,7 @@ export function createMockServer({memberships = [fixtures.acme.id]}: MockServerO
 
     /** The server's `MembershipOrgResolver`, reduced to the header and the memberships. */
     const orgRefusal = (org: string | undefined): MockResponse | undefined => {
+        if (memberships.length === 0) return refusal(404, "not_found", "No organization")
         if (org === undefined) {
             return memberships.length === 1
                 ? undefined

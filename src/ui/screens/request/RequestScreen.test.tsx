@@ -284,6 +284,25 @@ describe("RequestScreen", () => {
         await fireEvent.press(screen.getByRole("button", {name: "Copy the address"}))
         expect(copyText).toHaveBeenCalledWith("https://ostrom.test/yes/appr_0001")
         expect(await screen.findByRole("button", {name: "Address copied"})).toBeOnTheScreen()
+        // Answering again starts over: the address goes until the console fails to open again.
+        await fireEvent.press(screen.getByRole("button", {name: "Approve"}))
+        expect(await screen.findByRole("button", {name: "Open the console"})).toBeOnTheScreen()
+        expect(screen.queryByTestId("request-console-url")).toBeNull()
+    })
+
+    it("drops the address once the console opens", async () => {
+        const openUrl = jest
+            .fn<Promise<void>, [string]>()
+            .mockRejectedValueOnce(new Error("no browser"))
+            .mockResolvedValue(undefined)
+        await open(approvals.pending, {refuse: refused(403, "step_up_required"), openUrl})
+        await fireEvent.press(screen.getByRole("button", {name: "Approve"}))
+        await fireEvent.press(await screen.findByRole("button", {name: "Open the console"}))
+        expect(await screen.findByTestId("request-console-url")).toBeOnTheScreen()
+        await fireEvent.press(screen.getByRole("button", {name: "Open the console"}))
+        await waitFor(() => {
+            expect(screen.queryByTestId("request-console-url")).toBeNull()
+        })
     })
 
     it("keeps the copy button when the clipboard refuses", async () => {
@@ -395,9 +414,12 @@ describe("RequestScreen", () => {
         expect(await screen.findByText("You are a member of several organizations, and Ostrom needs to know which one this is for. The app cannot choose yet: use the console for now.")).toBeOnTheScreen()
     })
 
-    it("says clearly when an answer needs the organization named", async () => {
-        await open(approvals.pending, {refuse: refused(409, "org_required")})
+    it("says clearly when an answer needs the organization named, and offers the console", async () => {
+        const openUrl = jest.fn((_url: string) => Promise.resolve())
+        await open(approvals.pending, {refuse: refused(409, "org_required"), openUrl})
         await fireEvent.press(screen.getByRole("button", {name: "Approve"}))
+        await fireEvent.press(await screen.findByRole("button", {name: "Open the console"}))
+        expect(openUrl).toHaveBeenCalledWith("https://ostrom.test/yes/appr_0001")
         expect(
             await screen.findByText(
                 "You are a member of several organizations, and Ostrom needs to know which one this answer is for. The app cannot choose yet: answer in the console.",

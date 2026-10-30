@@ -14,8 +14,9 @@ strings=("ost_mock_token" "No such route" "Name the organization with the Ostrom
 # Names and words that must not appear either, whether or not the minifier keeps them.
 words=("msw" "EXPO_PUBLIC_OSTROM_MOCK" "createMockServer" "createMockApi" "createMockAppServices" "mockFetch")
 
+# Only the JavaScript bundles (Hermes bytecode or JS): the fonts and images next to them could hold "msw" by chance.
 traces() {
-    local dir="$1" found=0
+    local dir="$1/_expo/static/js" found=0
     for text in "${strings[@]}"; do
         if grep -rqaF -- "$text" "$dir"; then echo "  found: $text"; found=1; fi
     done
@@ -26,7 +27,9 @@ traces() {
 }
 
 echo "Store build (production, Android and iOS):"
+# The bundles must exist where the search looks, or it would find nothing for the wrong reason.
 env -u EXPO_PUBLIC_OSTROM_MOCK npx expo export --platform android --platform ios --output-dir "$out/store" > /dev/null
+test -n "$(find "$out/store/_expo/static/js" -type f -print -quit)"
 if ! traces "$out/store"; then
     echo "::error::The store bundle carries the in-memory server of src/api/mocks"
     exit 1
@@ -36,7 +39,7 @@ echo "  no trace of the mock server"
 echo "E2E build (EXPO_PUBLIC_OSTROM_MOCK=1, Android), the control:"
 EXPO_PUBLIC_OSTROM_MOCK=1 npx expo export --platform android --output-dir "$out/e2e" > /dev/null
 for text in "${strings[@]}"; do
-    if ! grep -rqaF -- "$text" "$out/e2e"; then
+    if ! grep -rqaF -- "$text" "$out/e2e/_expo/static/js"; then
         echo "::error::The control found no \"$text\" in the E2E bundle: the search proves nothing"
         exit 1
     fi

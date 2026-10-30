@@ -26,6 +26,8 @@ export type InboxState =
           readonly recent: readonly RequestRowModel[]
           /** The last refresh failed: the rows are the last list read, perhaps out of date. */
           readonly stale: boolean
+          /** The failed refresh wants the organization named: said instead of "out of date". */
+          readonly orgRequired: boolean
       }
 
 export interface InboxViewModel {
@@ -49,7 +51,13 @@ export function useInboxViewModel(): InboxViewModel {
     const {data, error, isError, isRefetching, refetch} = useApprovalQueue()
     const state: InboxState =
         data !== undefined
-            ? {kind: "ready", rows: data.pending.map(toRow), recent: data.recent.map(toRow), stale: isError}
+            ? {
+                  kind: "ready",
+                  rows: data.pending.map(toRow),
+                  recent: data.recent.map(toRow),
+                  stale: isError,
+                  orgRequired: isError && isOrgRequired(error),
+              }
             : isError
               ? {kind: "error", orgRequired: isOrgRequired(error)}
               : {kind: "loading"}

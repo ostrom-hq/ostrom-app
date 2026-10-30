@@ -82,6 +82,20 @@ describe("InboxScreen", () => {
         expect(screen.getByText("Merge PR #6 into main")).toBeOnTheScreen()
     })
 
+    it("says why a refresh failed when the server wants the organization named", async () => {
+        const queue = jest
+            .fn<Promise<ApprovalQueue>, []>()
+            .mockResolvedValueOnce(queueOf([approvals.pending]))
+            .mockRejectedValue(new ApiError({kind: "refused", status: 409, type: "org_required", message: ""}))
+        const client = testQueryClient()
+        await launch(queue, true, client)
+        expect(await screen.findByText("Merge PR #6 into main")).toBeOnTheScreen()
+        await act(async () => {
+            await client.invalidateQueries()
+        })
+        expect(await screen.findByRole("alert")).toHaveTextContent(/several organizations/)
+    })
+
     it("says clearly when the server wants the organization named, instead of a plain failure", async () => {
         await launch(() => Promise.reject(new ApiError({kind: "refused", status: 409, type: "org_required", message: ""})))
         expect(await screen.findByText("You are a member of several organizations, and Ostrom needs to know which one this is for. The app cannot choose yet: use the console for now.")).toBeOnTheScreen()

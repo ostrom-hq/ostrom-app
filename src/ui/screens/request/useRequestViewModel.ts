@@ -51,8 +51,9 @@ export interface RequestViewModel {
     /** Sends the no with its reason; nothing happens without one. */
     readonly decline: () => void
     /**
-     * Opens the console on this request (its universal link), where a yes that needs a fresh sign-in is given; on the
-     * server of the session as it is now, and nothing after a sign-out.
+     * Opens the console on this request (its universal link), where a yes that needs a fresh sign-in, or the
+     * organization the app cannot name, is dealt with; on the server of the session as it is now, nothing after a
+     * sign-out.
      */
     readonly openConsole: () => void
     /**
@@ -107,6 +108,7 @@ export function useRequestViewModel(id: string): RequestViewModel {
             if (answer === "approve" && !mayApprove) return
             setSending(answer)
             setProblem(undefined)
+            setConsoleLink(undefined)
             void (async () => {
                 // Biometrics unless the contract says the action is low risk (`needsBiometrics`).
                 const outcome = needsBiometrics(approval)
@@ -157,6 +159,7 @@ export function useRequestViewModel(id: string): RequestViewModel {
         reread: () => {
             if (reading !== undefined) setPinned(reading)
             setProblem(undefined)
+            setConsoleLink(undefined)
         },
         declining,
         reason,
@@ -174,9 +177,14 @@ export function useRequestViewModel(id: string): RequestViewModel {
             const session = sessionStore.getState().state
             if (session.status !== "signed-in") return
             const url = `${session.session.serverUrl}/yes/${encodeURIComponent(id)}`
-            void openUrl(url).catch(() => {
-                setConsoleLink({url, copied: false})
-            })
+            void openUrl(url).then(
+                () => {
+                    setConsoleLink(undefined)
+                },
+                () => {
+                    setConsoleLink({url, copied: false})
+                },
+            )
         },
         consoleLink,
         copyConsoleLink: () => {

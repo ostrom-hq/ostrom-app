@@ -23,7 +23,8 @@ jobs:
     # A draft pull request runs no CI: mark it ready when you want it.
     if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # Three production bundle exports (store check) come on top of the tests.
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
       - name: Read the pinned ostrom-core commit
