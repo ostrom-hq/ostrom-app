@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import {DEFAULT_HOST} from "./analytics"
 import {buildAnalyticsConfig, readAnalyticsConfig} from "./config"
 

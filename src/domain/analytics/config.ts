@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import {DEFAULT_HOST} from "./analytics"
 
 // Expo inlines `process.env.EXPO_PUBLIC_*` at build time, and only as a literal member access: never read it through

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 /**
  * Product analytics of the app, **opt-in**: off until the person turns it on (the toggle shown once after sign-in, and
  * in the settings), and nothing is stored or sent before that. No key configured (a self-hosted build) means no
