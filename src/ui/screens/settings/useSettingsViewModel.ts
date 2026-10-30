@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import {useCallback, useState} from "react"
 import type {NotificationSettings, QuietHours} from "@/api/contract/notifications"
-import {useDeviceRegistration, useNotificationSettings, useSaveNotificationSettings} from "@/query/notifications"
+import {useDeviceRegistration, useNotificationSettings, useNotificationSettingsEditor} from "@/query/notifications"
 import {useRepositories, useServices, useSessionState} from "@/services/AppServices"
 import {isPresent} from "@/ui/format/presence"
 
@@ -36,26 +36,28 @@ export function useSettingsViewModel(locale: string, timeZone: string): Settings
     const {sessionStore} = useServices()
     const {account, notifications} = useRepositories()
     const query = useNotificationSettings()
-    const save = useSaveNotificationSettings()
+    const editor = useNotificationSettingsEditor()
     const [signingOut, setSigningOut] = useState(false)
     const device = useDeviceRegistration(locale).data
     const settings = query.data
-    const {mutate} = save
+    const {change} = editor
 
     const toggle = useCallback(
         (key: Toggle, value: boolean) => {
-            if (settings !== undefined) mutate({...settings, [key]: value})
+            change((current) => ({...current, [key]: value}))
         },
-        [settings, mutate],
+        [change],
     )
     const setQuietHours = useCallback(
         (on: boolean) => {
-            if (settings === undefined) return
-            const {requests, decisions, spending} = settings
             // Off is the field left out: the contract has no `null` for it.
-            mutate(on ? {requests, decisions, spending, quietHours: defaultQuietHours(timeZone)} : {requests, decisions, spending})
+            change(({requests, decisions, spending}) =>
+                on
+                    ? {requests, decisions, spending, quietHours: defaultQuietHours(timeZone)}
+                    : {requests, decisions, spending},
+            )
         },
-        [settings, mutate, timeZone],
+        [change, timeZone],
     )
     const signOut = useCallback(() => {
         setSigningOut(true)
@@ -76,7 +78,7 @@ export function useSettingsViewModel(locale: string, timeZone: string): Settings
         serverUrl: signedIn?.serverUrl,
         pushOn: device === undefined ? undefined : device !== null,
         state,
-        saveFailed: save.isError,
+        saveFailed: editor.failed,
         toggle,
         setQuietHours,
         retry: () => {

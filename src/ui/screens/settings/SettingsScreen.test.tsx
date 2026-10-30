@@ -79,8 +79,8 @@ describe("SettingsScreen", () => {
         await fireEvent.press(screen.getByRole("switch", {name: "Spending passes a budget threshold"}))
         await waitFor(() => {
             expect(saveSettings).toHaveBeenCalledWith({...initial, spending: true})
+            expect(screen.getByRole("switch", {name: "Spending passes a budget threshold"})).toBeChecked()
         })
-        expect(screen.getByRole("switch", {name: "Spending passes a budget threshold"})).toBeChecked()
     })
 
     it("turns quiet hours off, then on again in the phone's time zone", async () => {
@@ -88,11 +88,12 @@ describe("SettingsScreen", () => {
         await fireEvent.press(screen.getByRole("switch", {name: "Quiet hours"}))
         await waitFor(() => {
             expect(saveSettings).toHaveBeenLastCalledWith({requests: true, decisions: true, spending: false})
+            expect(screen.queryByText(/No notification from/)).toBeNull()
         })
-        expect(screen.queryByText(/No notification from/)).toBeNull()
         await fireEvent.press(screen.getByRole("switch", {name: "Quiet hours"}))
         await waitFor(() => {
             expect(saveSettings).toHaveBeenLastCalledWith({...initial, quietHours: defaultQuietHours(phoneTimeZone())})
+            expect(screen.getByText(/No notification from 22:00 to 07:00/)).toBeOnTheScreen()
         })
     })
 
@@ -110,20 +111,26 @@ describe("SettingsScreen", () => {
         })
         await fireEvent.press(screen.getByRole("switch", {name: "Spending passes a budget threshold"}))
         await fireEvent.press(screen.getByRole("switch", {name: "A request waits for my yes"}))
+        const bothOn = (): void => {
+            expect(screen.getByRole("switch", {name: "A request waits for my yes"})).not.toBeChecked()
+            expect(screen.getByRole("switch", {name: "Spending passes a budget threshold"})).toBeChecked()
+        }
         await waitFor(() => {
             expect(answers).toHaveLength(2)
+            bothOn()
         })
+        // The answer settles, then a real tick lets a write reach the screen, if there were one.
         await act(async () => {
             answers[0]?.()
-            await Promise.resolve()
+            await new Promise((resolve) => setTimeout(resolve, 20))
         })
-        expect(screen.getByRole("switch", {name: "A request waits for my yes"})).not.toBeChecked()
-        expect(screen.getByRole("switch", {name: "Spending passes a budget threshold"})).toBeChecked()
+        bothOn()
         await act(async () => {
             answers[1]?.()
-            await Promise.resolve()
+            await new Promise((resolve) => setTimeout(resolve, 20))
         })
-        expect(screen.getByRole("switch", {name: "A request waits for my yes"})).not.toBeChecked()
+        bothOn()
+        expect(answers).toHaveLength(2)
     })
 
     it("puts a setting back when the server refuses it", async () => {

@@ -41,9 +41,10 @@ describe("InboxScreen", () => {
     })
 
     it("calls nothing mine once the session is gone", async () => {
-        await launch(() => Promise.resolve({items: [approvals.self]}), false)
-        expect(await screen.findByText("Push to main on acme-web")).toBeOnTheScreen()
-        expect(screen.queryByText("Your request")).toBeNull()
+        const waiting = jest.fn<Promise<ApprovalPage>, []>(() => Promise.resolve({items: [approvals.self]}))
+        await launch(waiting, false)
+        expect(await screen.findByRole("button", {name: "Try again"})).toBeOnTheScreen()
+        expect(waiting).not.toHaveBeenCalled()
     })
 
     it("says when nothing waits", async () => {

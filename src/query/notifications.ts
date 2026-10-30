@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import {type UseMutationResult, type UseQueryResult, useMutation, useQuery, useQueryClient} from "@tanstack/react-query"
+import {type UseQueryResult, useMutation, useQuery, useQueryClient} from "@tanstack/react-query"
+import {useCallback} from "react"
 import type {Device, NotificationSettings} from "@/api/contract/notifications"
 import {useRepositories, useServices} from "@/services/AppServices"
 
@@ -36,21 +37,27 @@ export function useNotificationSettings(): UseQueryResult<NotificationSettings> 
 
 const SAVE_KEY = ["notifications", "save"] as const
 
+export interface NotificationSettingsEditor {
+    /**
+     * Applies a change to the settings as they stand in the cache, on screen at once, then saves them. Two quick
+     * switches compose: the second applies to the first, never to the settings of an older render.
+     */
+    readonly change: (edit: (current: NotificationSettings) => NotificationSettings) => void
+    /** The last save was refused: the settings are read again from the server. */
+    readonly failed: boolean
+}
+
 /**
- * Saves at once on screen. Two quick switches send two saves: only the last one to settle writes the screen, so the
- * answer of the first never flips the second back. A refusal reads the settings again from the server.
+ * Saves at once on screen. Only the last save to settle writes the screen, so the answer of a first save never flips a
+ * second back.
  */
-export function useSaveNotificationSettings(): UseMutationResult<NotificationSettings, Error, NotificationSettings> {
+export function useNotificationSettingsEditor(): NotificationSettingsEditor {
     const {notifications} = useRepositories()
     const queryClient = useQueryClient()
     const last = (): boolean => queryClient.isMutating({mutationKey: SAVE_KEY}) === 1
-    return useMutation({
+    const {mutate, isError} = useMutation({
         mutationKey: SAVE_KEY,
         mutationFn: (settings: NotificationSettings) => notifications.saveSettings(settings),
-        onMutate: async (settings) => {
-            await queryClient.cancelQueries({queryKey: notificationKeys.settings})
-            queryClient.setQueryData(notificationKeys.settings, settings)
-        },
         onError: () => {
             if (last()) void queryClient.invalidateQueries({queryKey: notificationKeys.settings})
         },
@@ -58,4 +65,19 @@ export function useSaveNotificationSettings(): UseMutationResult<NotificationSet
             if (last()) queryClient.setQueryData(notificationKeys.settings, saved)
         },
     })
+    const change = useCallback(
+        (edit: (current: NotificationSettings) => NotificationSettings) => {
+            void (async () => {
+                // A read still on its way would land after the change and put the old settings back.
+                await queryClient.cancelQueries({queryKey: notificationKeys.settings})
+                const current = queryClient.getQueryData<NotificationSettings>(notificationKeys.settings)
+                if (current === undefined) return
+                const next = edit(current)
+                queryClient.setQueryData(notificationKeys.settings, next)
+                mutate(next)
+            })()
+        },
+        [queryClient, mutate],
+    )
+    return {change, failed: isError}
 }
