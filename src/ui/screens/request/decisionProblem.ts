@@ -11,6 +11,8 @@ export type DecisionProblem =
     | "step-up"
     /** The person asked for this, and someone else can approve it: the server never takes that yes. */
     | "self-approval"
+    /** The person is in several organizations and this session names none (409 `org_required`). */
+    | "org-required"
     /** The request changed after the screen showed it: read it again before deciding. */
     | "changed"
     | "already-decided"
@@ -35,6 +37,7 @@ export function decisionProblem(error: unknown, askedByMe: boolean): DecisionPro
     switch (problem.kind) {
         case "refused":
             if (problem.type === "shown_digest_mismatch") return "changed"
+            if (problem.type === "org_required") return "org-required"
             if (problem.status === 409) return "already-decided"
             if (problem.status === 403 && problem.type === "step_up_required") return "step-up"
             if (problem.status === 403 && problem.type === "self_approval_refused") return "self-approval"

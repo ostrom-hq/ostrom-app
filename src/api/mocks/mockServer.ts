@@ -17,6 +17,13 @@ export interface MockRequest {
     readonly path: string
     readonly query: Readonly<Record<string, string>>
     readonly body: unknown
+    /** The `Ostrom-Org` header, when the call has one. */
+    readonly org?: string | undefined
+}
+
+export interface MockServerOptions {
+    /** The caller's active memberships: one by default (`acme`), so the header may be left out. */
+    readonly memberships?: readonly string[]
 }
 
 /** The answer: a status and a JSON body, or none (204). */
@@ -48,12 +55,17 @@ function idOf(segment: string): string | undefined {
 interface Route {
     readonly method: string
     readonly path: RegExp
+    /** It acts in the caller's organization: the contract gives it the `Ostrom-Org` header. */
+    readonly inOrg: boolean
     readonly respond: (request: MockRequest, id: string) => MockResponse
 }
 
+/** The routes of the app that act in the caller's organization (contract 0.1.142); the others take no header. */
+const IN_ORG = /^\/api\/v1\/(auth\/me|push-devices|activity|spending|approvals|receipts(?!\/keys))/
+
 /** A route of the contract; `:id` is one path segment. */
 function route(method: string, pattern: string, respond: Route["respond"]): Route {
-    return {method, path: new RegExp(`^${pattern.replace(":id", "([^/]+)")}$`), respond}
+    return {method, path: new RegExp(`^${pattern.replace(":id", "([^/]+)")}$`), inOrg: IN_ORG.test(pattern), respond}
 }
 
 /**
@@ -61,9 +73,10 @@ function route(method: string, pattern: string, respond: Route["respond"]): Rout
  * build (through an in-memory `fetch`). Each call gives a fresh state, so an answer never leaks into another test.
  * The caller is `rev-b`. Their yes on a request they asked for is refused (`self_approval_refused`), as the server does
  * when someone else can approve, and their no is always taken. A yes on the production deploy needs a fresh sign-in
- * (`step_up_required`).
+ * (`step_up_required`). A route of the caller's organization reads `Ostrom-Org` as the server does: without it, the
+ * one membership, or 409 `org_required` when there are several; an organization the caller is not in, 404.
  */
-export function createMockServer(): MockServer {
+export function createMockServer({memberships = [fixtures.acme.id]}: MockServerOptions = {}): MockServer {
     const approvals = new Map<string, ApprovalInput>(
         [
             fixtures.pendingApproval,
@@ -118,6 +131,16 @@ export function createMockServer(): MockServer {
         }
         approvals.set(approval.id, answered)
         return ok(view(answered))
+    }
+
+    /** The server's `MembershipOrgResolver`, reduced to the header and the memberships. */
+    const orgRefusal = (org: string | undefined): MockResponse | undefined => {
+        if (org === undefined) {
+            return memberships.length === 1
+                ? undefined
+                : refusal(409, "org_required", "Name the organization with the Ostrom-Org header")
+        }
+        return memberships.includes(org) ? undefined : refusal(404, "not_found", "No such organization")
     }
 
     const routes: readonly Route[] = [
@@ -198,9 +221,11 @@ export function createMockServer(): MockServer {
 
     return {
         handle(request) {
-            for (const {method, path, respond} of routes) {
+            for (const {method, path, inOrg, respond} of routes) {
                 const match = method === request.method ? path.exec(request.path) : null
                 if (match === null) continue
+                const refused = inOrg ? orgRefusal(request.org) : undefined
+                if (refused !== undefined) return refused
                 // Routes without an id have no group: their id is empty, and unused.
                 const id = idOf(match[1] ?? "")
                 return id === undefined ? refusal(404, "not_found", "No such request") : respond(request, id)

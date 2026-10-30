@@ -29,6 +29,11 @@ describe("mockFetch", () => {
         expect(older.status).toBe(200)
     })
 
+    it("reads the Ostrom-Org header", async () => {
+        const response = await fetch(`${MOCK_BASE_URL}/api/v1/auth/me`, {headers: {"ostrom-org": "org_other"}})
+        expect(response.status).toBe(404)
+    })
+
     it("answers 204 without a body", async () => {
         const response = await fetch(`${MOCK_BASE_URL}/api/v1/auth/logout`, {method: "POST"})
         expect(response.status).toBe(204)

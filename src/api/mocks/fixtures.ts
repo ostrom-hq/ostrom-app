@@ -9,8 +9,12 @@ import receiptVectors from "@/domain/receipts/__fixtures__/receipts.json"
 /** Example data shaped like the server's answers. Names are neutral (`acme`, `dev-a`, `rev-b`), as in the vectors. */
 export const MOCK_BASE_URL = "https://ostrom.test"
 
+/** The organization of the mock server's caller. */
+export const acme = {id: "org_acme", name: "acme", avatarUrl: "https://avatars.test/acme", connectedVia: "github-app"} as const
+
 export const me: z.input<typeof MeSchema> = {
     dev: {login: "rev-b", verified: true, via: "github"},
+    organization: acme,
     member: {id: "6f1c2a4e-8b3d-4c5e-9f70-1a2b3c4d5e6f", login: "rev-b", name: "Reviewer B", avatarUrl: "https://avatars.test/rev-b", role: "member"},
     capabilities: ["approvals.answer"],
 }

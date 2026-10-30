@@ -18,6 +18,8 @@ export const en = {
     },
     common: {
         retry: "Try again",
+        orgRequired:
+            "You are a member of several organizations, and Ostrom needs to know which one this is for. The app cannot choose yet: use the console for now.",
     },
     status: {
         pending: "Waiting",
@@ -132,6 +134,9 @@ export const en = {
         unknownStatus: "This app does not know this request's state: answer it from the console.",
         cannotApprove: "Your yes is not taken on this request.",
         openConsole: "Open the console",
+        consoleNotOpened: "The console could not be opened from here. Open this address in a browser:",
+        copyLink: "Copy the address",
+        copied: "Address copied",
         note: "Note to the agent: {{note}}",
         approvedBy: "Approved by {{who}}",
         approvedByAt: "Approved by {{who}} · {{at}}",
@@ -167,6 +172,8 @@ export const en = {
             "biometrics-unavailable": "Set up Face ID, a fingerprint or a passcode on this phone to answer from it.",
             "biometrics-failed": "Your identity could not be confirmed. Nothing was sent.",
             "step-up": "Ostrom wants a fresh sign-in for this yes: confirm it in the console.",
+            "org-required":
+                "You are a member of several organizations, and Ostrom needs to know which one this answer is for. The app cannot choose yet: answer in the console.",
             "self-approval": "Someone else can approve this request, so your own yes is not taken.",
             changed: "The request changed after you opened it. Read it again before answering.",
             "already-decided": "Someone already answered this request.",

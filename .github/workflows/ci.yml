@@ -56,3 +56,5 @@ jobs:
         run: npm run test:ci
       - name: Expo config is valid
         run: npx expo config --type public > /dev/null
+      - name: No store bundle carries the in-memory server
+        run: scripts/check-store-bundle.sh

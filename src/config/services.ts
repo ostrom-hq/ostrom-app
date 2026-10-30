@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import Constants from "expo-constants"
+import * as Clipboard from "expo-clipboard"
 import * as Crypto from "expo-crypto"
 import * as Linking from "expo-linking"
 import * as WebBrowser from "expo-web-browser"
@@ -28,9 +29,9 @@ export function easProjectId(extra: unknown): string | undefined {
     return parsed.success ? parsed.data.eas.projectId : undefined
 }
 
-/** The repositories of a session: every call carries its token. */
+/** The repositories of a session: every call carries its token, and its organization when the server named one. */
 export function repositoriesFor(session: Session): Repositories {
-    return repositoriesOver(new HttpClientImpl({baseUrl: session.serverUrl, token: () => session.token}))
+    return repositoriesOver(new HttpClientImpl({baseUrl: session.serverUrl, token: () => session.token, org: () => session.orgId}))
 }
 
 /** The repositories over one HTTP client. */
@@ -50,6 +51,11 @@ export async function openOutside(url: string): Promise<void> {
     await Linking.openURL(url)
 }
 
+/** Puts text on the system clipboard. */
+export async function copyToClipboard(text: string): Promise<void> {
+    await Clipboard.setStringAsync(text)
+}
+
 /** The composition root: the only place that picks the implementations. */
 export function createAppServices(): AppServices {
     return {
@@ -59,10 +65,10 @@ export function createAppServices(): AppServices {
         signIn: new GithubSignInImpl({
             openAuthSession: (url, redirectUri) => WebBrowser.openAuthSessionAsync(url, redirectUri),
             randomBytes: (length) => Crypto.getRandomBytes(length),
-            accountOf: (serverUrl) =>
-                new AccountRepositoryImpl(new HttpClientImpl({baseUrl: serverUrl, token: () => undefined})),
+            accountOf: (serverUrl, token) => new AccountRepositoryImpl(new HttpClientImpl({baseUrl: serverUrl, token: () => token})),
         }),
         repositoriesFor,
         openUrl: openOutside,
+        copyText: copyToClipboard,
     }
 }

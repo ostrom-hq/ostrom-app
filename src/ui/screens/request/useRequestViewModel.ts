@@ -2,13 +2,15 @@
 import {useCallback, useState} from "react"
 import {useTranslation} from "react-i18next"
 import {type Approval, type ApprovalAnswer, type ApprovalView, needsBiometrics, phoneMayApprove} from "@/api/contract/approvals"
+import {isOrgRequired} from "@/api/http/ApiError"
 import {useAnswer, useApprovalView} from "@/query/approvals"
 import {useServices} from "@/services/AppServices"
 import {biometricProblem, type DecisionProblem, decisionProblem} from "./decisionProblem"
 
 export type RequestScreenState =
     | {readonly kind: "loading"}
-    | {readonly kind: "error"; readonly retry: () => void}
+    /** `orgRequired`: the server wants the organization named, which the app cannot do yet. */
+    | {readonly kind: "error"; readonly orgRequired: boolean; readonly retry: () => void}
     | {readonly kind: "ready"; readonly approval: Approval; readonly view: ApprovalView}
 
 /**
@@ -53,6 +55,12 @@ export interface RequestViewModel {
      * server of the session as it is now, and nothing after a sign-out.
      */
     readonly openConsole: () => void
+    /**
+     * The console's address, once opening it failed (no browser, a refused link): shown as selectable text, to copy.
+     * `copied` once it is on the clipboard.
+     */
+    readonly consoleLink: {readonly url: string; readonly copied: boolean} | undefined
+    readonly copyConsoleLink: () => void
 }
 
 /**
@@ -71,7 +79,8 @@ function noApproveOf(view: ApprovalView): NoApprove | undefined {
 
 export function useRequestViewModel(id: string): RequestViewModel {
     const {t} = useTranslation()
-    const {biometrics, openUrl, sessionStore} = useServices()
+    const {biometrics, openUrl, copyText, sessionStore} = useServices()
+    const [consoleLink, setConsoleLink] = useState<{readonly url: string; readonly copied: boolean}>()
     const query = useApprovalView(id)
     const {mutateAsync} = useAnswer(id)
     const [sending, setSending] = useState<ApprovalAnswer>()
@@ -130,6 +139,7 @@ export function useRequestViewModel(id: string): RequestViewModel {
             : query.isError
               ? {
                     kind: "error",
+                    orgRequired: isOrgRequired(query.error),
                     retry: () => {
                         void refetch()
                     },
@@ -162,7 +172,24 @@ export function useRequestViewModel(id: string): RequestViewModel {
         },
         openConsole: () => {
             const session = sessionStore.getState().state
-            if (session.status === "signed-in") void openUrl(`${session.session.serverUrl}/yes/${encodeURIComponent(id)}`)
+            if (session.status !== "signed-in") return
+            const url = `${session.session.serverUrl}/yes/${encodeURIComponent(id)}`
+            void openUrl(url).catch(() => {
+                setConsoleLink({url, copied: false})
+            })
+        },
+        consoleLink,
+        copyConsoleLink: () => {
+            if (consoleLink === undefined) return
+            const {url} = consoleLink
+            void copyText(url).then(
+                () => {
+                    setConsoleLink({url, copied: true})
+                },
+                () => {
+                    setConsoleLink({url, copied: false})
+                },
+            )
         },
         decline: () => {
             const note = reason.trim()

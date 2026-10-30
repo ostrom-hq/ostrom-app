@@ -19,6 +19,7 @@ export function mockFetch(server: MockServer): typeof fetch {
             path: url.pathname,
             query: Object.fromEntries(url.searchParams),
             body: jsonOf(await request.text()),
+            org: request.headers.get("ostrom-org") ?? undefined,
         })
         return answer.status === 204
             ? new Response(null, {status: 204})

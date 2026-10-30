@@ -53,7 +53,7 @@ export function InboxScreen(): React.JSX.Element {
         case "error":
             body = (
                 <View style={styles.message}>
-                    <Text style={[styles.body, {color: colors.textMuted}]}>{t("inbox.error")}</Text>
+                    <Text style={[styles.body, {color: colors.textMuted}]}>{state.orgRequired ? t("common.orgRequired") : t("inbox.error")}</Text>
                     <Button label={t("common.retry")} onPress={refresh} />
                 </View>
             )

@@ -4,11 +4,15 @@ import {createStore, type StoreApi} from "zustand/vanilla"
 import {UserSchema} from "@/api/contract/account"
 import type {SecureStorage} from "@/services/storage/SecureStorage"
 
-/** What the app keeps between launches: the server, the token, who it belongs to. */
+/**
+ * What the app keeps between launches: the server, the token, who it belongs to, and the organization the calls act
+ * in (`Ostrom-Org`), when the server named one at sign-in. A session kept before it existed has none.
+ */
 export const SessionSchema = z.object({
     serverUrl: z.url(),
     token: z.string().min(1),
     user: UserSchema,
+    orgId: z.string().min(1).optional(),
 })
 export type Session = z.output<typeof SessionSchema>
 

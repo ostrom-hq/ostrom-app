@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+import * as Clipboard from "expo-clipboard"
 import * as Crypto from "expo-crypto"
 import * as Linking from "expo-linking"
 import * as WebBrowser from "expo-web-browser"
@@ -19,6 +20,7 @@ jest.mock("expo-web-browser", () => ({
 }))
 jest.mock("expo-notifications", () => ({setNotificationHandler: jest.fn()}))
 jest.mock("expo-linking", () => ({openURL: jest.fn(() => Promise.resolve(true))}))
+jest.mock("expo-clipboard", () => ({setStringAsync: jest.fn(() => Promise.resolve(true))}))
 jest.mock("expo-crypto", () => ({getRandomBytes: jest.fn((length: number) => new Uint8Array(length))}))
 
 describe("createAppServices", () => {
@@ -46,17 +48,22 @@ describe("createAppServices", () => {
         expect(Linking.openURL).toHaveBeenCalledWith("https://ostrom.test/yes/appr_1")
     })
 
-    it("gives each session its repositories, with the session token", async () => {
+    it("copies text to the system clipboard", async () => {
+        await expect(createAppServices().copyText("https://ostrom.test/yes/appr_1")).resolves.toBeUndefined()
+        expect(Clipboard.setStringAsync).toHaveBeenCalledWith("https://ostrom.test/yes/appr_1")
+    })
+
+    it("gives each session its repositories, with the session token and organization", async () => {
         const fetch = jest.fn((_input: string, _init?: RequestInit) =>
             Promise.resolve({status: 200, ok: true, text: () => Promise.resolve(JSON.stringify({dev: {login: "rev-b", verified: true, via: "github"}, capabilities: []}))}),
         )
         Object.defineProperty(globalThis, "fetch", {value: fetch, configurable: true, writable: true})
-        const repositories = repositoriesFor({serverUrl: "https://ostrom.test", token: "ost_1", user: {login: "rev-b"}})
+        const repositories = repositoriesFor({serverUrl: "https://ostrom.test", token: "ost_1", user: {login: "rev-b"}, orgId: "org_acme"})
         expect(repositories.approvals).toBeInstanceOf(ApprovalsRepositoryImpl)
         await expect(repositories.account.me()).resolves.toMatchObject({dev: {login: "rev-b"}})
         const [url, init] = fetch.mock.calls[0] ?? []
         expect(url).toBe("https://ostrom.test/api/v1/auth/me")
-        expect(init?.headers).toMatchObject({authorization: "Bearer ost_1"})
+        expect(init?.headers).toMatchObject({authorization: "Bearer ost_1", "ostrom-org": "org_acme"})
     })
 })
 
@@ -72,7 +79,10 @@ describe("createMockAppServices", () => {
     it("signs in on the address typed, without GitHub, and talks to the in-memory server", async () => {
         const services = createMockAppServices()
         const outcome = await services.signIn.signIn("https://ostrom.e2e")
-        expect(outcome).toEqual({kind: "signed-in", session: {serverUrl: "https://ostrom.e2e", token: "ost_mock_token", user: {login: "rev-b"}}})
+        expect(outcome).toEqual({
+            kind: "signed-in",
+            session: {serverUrl: "https://ostrom.e2e", token: "ost_mock_token", user: {login: "rev-b"}, orgId: "org_acme"},
+        })
         if (outcome.kind !== "signed-in") throw new Error("not signed in")
         const queue = await services.repositoriesFor(outcome.session).approvals.queue()
         expect(queue.pending.map((view) => view.approval.id)).toContain("appr_0004")

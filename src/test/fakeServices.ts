@@ -64,6 +64,7 @@ export interface FakeServicesOptions {
     readonly push?: PushService
     readonly repositories?: Repositories
     readonly openUrl?: (url: string) => Promise<void>
+    readonly copyText?: (text: string) => Promise<void>
 }
 
 /** App services for tests: memory storage, scripted sign-in and biometrics, fake repositories. */
@@ -80,6 +81,7 @@ export function fakeServices(options: FakeServicesOptions = {}): AppServices {
         },
         repositoriesFor: () => repositories,
         openUrl: options.openUrl ?? (() => Promise.resolve()),
+        copyText: options.copyText ?? (() => Promise.resolve()),
     }
 }
 

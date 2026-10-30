@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type {Approval, ApprovalView} from "@/api/contract/approvals"
+import {isOrgRequired} from "@/api/http/ApiError"
 import {useApprovalQueue} from "@/query/approvals"
 
 /** One line of the inbox: what is asked, where, by whom. It only opens the request: no answer from a list. */
@@ -15,7 +16,8 @@ export interface RequestRowModel {
 
 export type InboxState =
     | {readonly kind: "loading"}
-    | {readonly kind: "error"}
+    /** `orgRequired`: the server wants the organization named, which the app cannot do yet. */
+    | {readonly kind: "error"; readonly orgRequired: boolean}
     | {
           readonly kind: "ready"
           /** What waits for the person's answer. */
@@ -44,12 +46,12 @@ export function toRow({approval, you}: ApprovalView): RequestRowModel {
 }
 
 export function useInboxViewModel(): InboxViewModel {
-    const {data, isError, isRefetching, refetch} = useApprovalQueue()
+    const {data, error, isError, isRefetching, refetch} = useApprovalQueue()
     const state: InboxState =
         data !== undefined
             ? {kind: "ready", rows: data.pending.map(toRow), recent: data.recent.map(toRow), stale: isError}
             : isError
-              ? {kind: "error"}
+              ? {kind: "error", orgRequired: isOrgRequired(error)}
               : {kind: "loading"}
     return {
         state,

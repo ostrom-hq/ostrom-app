@@ -237,6 +237,8 @@ describe("useRequestViewModel", () => {
         expect(openUrl).not.toHaveBeenCalled()
         result.current.openConsole()
         expect(openUrl).not.toHaveBeenCalled()
+        result.current.copyConsoleLink()
+        expect(result.current.consoleLink).toBeUndefined()
     })
 
     it("is mine when the server says the request is mine", async () => {

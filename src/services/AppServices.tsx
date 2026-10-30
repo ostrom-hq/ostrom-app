@@ -33,6 +33,8 @@ export interface AppServices {
     readonly repositoriesFor: (session: Session) => Repositories
     /** Opens a link outside the app: a link of the console opens the console (browser, or its app when installed). */
     readonly openUrl: (url: string) => Promise<void>
+    /** Puts text on the clipboard (a link to open by hand when it could not be opened). */
+    readonly copyText: (text: string) => Promise<void>
 }
 
 const ServicesContext = createContext<AppServices | undefined>(undefined)
