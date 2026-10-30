@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import Constants from "expo-constants"
 import * as Crypto from "expo-crypto"
 import * as WebBrowser from "expo-web-browser"

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 /** This phone's push address, as the server needs it to say "a request waits for you". */
 export interface PushAddress {
     readonly pushToken: string

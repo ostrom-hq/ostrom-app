@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import {type QueryClient, QueryClientProvider, useQueryClient} from "@tanstack/react-query"
 import {Stack, ThemeProvider} from "expo-router"
 import {StatusBar} from "expo-status-bar"

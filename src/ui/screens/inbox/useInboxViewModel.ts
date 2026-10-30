@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type {Ask} from "@/api/contract/yes"
 import {useYesQueue} from "@/query/approvals"
 

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import {fireEvent, render, screen, waitFor} from "@testing-library/react-native"
 import {ServicesProvider} from "@/services/AppServices"
 import type {SignInOutcome} from "@/services/signIn/GithubSignIn"
