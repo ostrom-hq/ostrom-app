@@ -1,0 +1,176 @@
+# Maestro on an Android emulator against the REAL Ostrom server (the `edge` image of ostrom-server main), next to the
+# E2E workflow that runs against the in-memory server. Same triggers: main, by hand, and a pull request with `full-ci`.
+# Until the image can be pulled from this repository (Actions access of the package, GESTES-LYES « Ajouts 12:45 »), the
+# flows are skipped with a warning and a line in the summary; with the repository variable
+# OSTROM_APP_REQUIRE_REAL_SERVER=true, a skip fails the job.
+name: E2E real server
+
+on:
+  pull_request:
+    types: [labeled, synchronize]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: e2e-real-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+permissions:
+  contents: read
+  # The real server's image, ghcr.io/ostrom-hq/ostrom-server (private).
+  packages: read
+
+jobs:
+  e2e-real-android:
+    name: e2e-real-android
+    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'full-ci')
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      HAS_SERVER_KEY: ${{ secrets.DEPLOY_KEY_SERVER != '' }}
+    # The real server's database and Stripe stand-in, as in the console's CI (ostrom-web).
+    services:
+      postgres:
+        image: postgres:18
+        env: { POSTGRES_USER: ostrom, POSTGRES_PASSWORD: ostrom, POSTGRES_DB: ostrom_ci }
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U ostrom -d ostrom_ci" --health-interval 5s --health-timeout 5s --health-retries 20
+      stripe-mock:
+        image: stripe/stripe-mock@sha256:aeb96b83e87a893d2ac005e363ac01ffa6e59a5ad85b49c155dfc9129de02e78 # as ostrom-server
+        ports: ['12111:12111']
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: ostrom-server main (its database roles)
+        if: env.HAS_SERVER_KEY == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ostrom-hq/ostrom-server
+          ref: main
+          ssh-key: ${{ secrets.DEPLOY_KEY_SERVER }}
+          path: .ostrom/server
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Real server image (edge of ostrom-server main)
+        id: server
+        env:
+          IMAGE: ghcr.io/ostrom-hq/ostrom-server:edge
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REQUIRED: ${{ vars.OSTROM_APP_REQUIRE_REAL_SERVER == 'true' }}
+        run: |
+          skip() {
+            echo "::warning title=Flows against the real server skipped::$1"
+            echo "Maestro flows against the real server **skipped**: $1" >> "$GITHUB_STEP_SUMMARY"
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            [ "$REQUIRED" = "true" ] && exit 1
+            exit 0
+          }
+          [ "$HAS_SERVER_KEY" = "true" ] || skip "no deploy key for ostrom-server."
+          printf '%s' "$GHCR_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          docker pull --quiet "$IMAGE" || skip "$IMAGE cannot be pulled from this repository (package Actions access)."
+          revision=$(docker inspect -f '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$IMAGE")
+          [ -n "$revision" ] || skip "$IMAGE carries no org.opencontainers.image.revision label."
+          git -C .ostrom/server cat-file -e "${revision}^{commit}" 2>/dev/null \
+            || skip "edge is ostrom-server@${revision:0:7}, a commit that is not in the history of main."
+          git -C .ostrom/server show "${revision}:ci/database-roles.sql" > "$RUNNER_TEMP/database-roles.sql"
+          echo "Server image built from ostrom-server@${revision:0:7}." >> "$GITHUB_STEP_SUMMARY"
+          echo "ready=true" >> "$GITHUB_OUTPUT"
+      - name: Start the real server (roles, migrate, serve as ostrom_app)
+        if: steps.server.outputs.ready == 'true'
+        env:
+          IMAGE: ghcr.io/ostrom-hq/ostrom-server:edge
+          PGPASSWORD: ostrom
+          OWNER_URL: postgresql://ostrom_owner:ostrom_owner@localhost:5432/ostrom
+          APP_URL: postgresql://ostrom_app:ostrom_app@localhost:5432/ostrom
+        run: |
+          psql -h localhost -U ostrom -d ostrom_ci -v ON_ERROR_STOP=1 -f "$RUNNER_TEMP/database-roles.sql"
+          docker run --rm --network host -e OSTROM_DATABASE_MIGRATION_URL="$OWNER_URL" "$IMAGE" migrate
+          mkdir -p "$RUNNER_TEMP/ostrom-mail" && chmod 0777 "$RUNNER_TEMP/ostrom-mail"
+          # Test values only: Stripe is stripe-mock, sign-in mails are written to a directory.
+          docker run -d --name ostrom-server --network host \
+            -v "$RUNNER_TEMP/ostrom-mail:/var/lib/ostrom/mail" \
+            -e OSTROM_DATABASE_URL="$APP_URL" -e OSTROM_PORT=4600 \
+            -e OSTROM_MAIL_DIR=/var/lib/ostrom/mail \
+            -e OSTROM_PUBLIC_URL=http://localhost:4600 -e OSTROM_CONSOLE_URL=http://localhost:4600 \
+            -e OSTROM_STRIPE_SECRET_KEY=sk_test_app_e2e -e OSTROM_STRIPE_WEBHOOK_SECRET=whsec_app_e2e \
+            -e OSTROM_STRIPE_API_BASE=http://127.0.0.1:12111 \
+            "$IMAGE"
+          for i in $(seq 1 60); do curl -fsS localhost:4600/ready >/dev/null 2>&1 && exit 0; sleep 1; done
+          docker logs ostrom-server; exit 1
+      - name: A person, an organization and a token on the real server
+        id: session
+        if: steps.server.outputs.ready == 'true'
+        run: scripts/real-server-session.sh http://127.0.0.1:4600 "$RUNNER_TEMP/ostrom-mail" >> "$GITHUB_OUTPUT"
+      - name: Free disk space on the runner
+        if: steps.server.outputs.ready == 'true'
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/local/share/boost /usr/share/swift \
+            /opt/hostedtoolcache/CodeQL /opt/microsoft /opt/google/chrome \
+            /usr/local/share/powershell /usr/local/share/chromium
+          free_kib=$(df --output=avail -k / | tail -n 1)
+          echo "Free on / after the cleanup: $((free_kib / 1024 / 1024)) GiB"
+          if [ "$free_kib" -lt $((8 * 1024 * 1024)) ]; then
+            echo "::error::Less than 8 GiB free after the cleanup: the build and the emulator would not fit"
+            exit 1
+          fi
+      - name: Enable KVM
+        if: steps.server.outputs.ready == 'true'
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules && sudo udevadm trigger --name-match=kvm
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        if: steps.server.outputs.ready == 'true'
+        with: { distribution: temurin, java-version: 21 }
+      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+        if: steps.server.outputs.ready == 'true'
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        if: steps.server.outputs.ready == 'true'
+        with: { node-version: 24, cache: npm }
+      - if: steps.server.outputs.ready == 'true'
+        run: npm ci
+      # The emulator reaches the runner at 10.0.2.2, over plain HTTP: allowed in this build only, never in a store build.
+      - name: Build the Android app against the real server (release, x86_64)
+        if: steps.server.outputs.ready == 'true'
+        env:
+          EXPO_PUBLIC_OSTROM_REAL_E2E: "1"
+          EXPO_PUBLIC_OSTROM_E2E_SERVER: http://10.0.2.2:4600
+          EXPO_PUBLIC_OSTROM_E2E_TOKEN: ${{ steps.session.outputs.token }}
+          EXPO_PUBLIC_OSTROM_E2E_LOGIN: ${{ steps.session.outputs.login }}
+        run: |
+          npx expo prebuild --platform android --no-install
+          sed -i 's/<application /<application android:usesCleartextTraffic="true" /' android/app/src/main/AndroidManifest.xml
+          grep -q 'usesCleartextTraffic="true"' android/app/src/main/AndroidManifest.xml
+          cd android && ./gradlew assembleRelease -PreactNativeArchitectures=x86_64 --no-daemon
+      - name: Install Maestro (pinned)
+        if: steps.server.outputs.ready == 'true'
+        env:
+          MAESTRO_VERSION: 2.12.0
+        run: |
+          curl -fsSL "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+      - name: Maestro flows against the real server
+        if: steps.server.outputs.ready == 'true'
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
+        env:
+          OSTROM_E2E_LOGIN: ${{ steps.session.outputs.login }}
+        with:
+          api-level: 35
+          arch: x86_64
+          target: google_apis
+          disable-animations: true
+          disk-size: 4096M
+          script: |
+            adb install android/app/build/outputs/apk/release/app-release.apk
+            maestro test --format junit --output maestro-report-real.xml --test-output-dir maestro-output-real -e OSTROM_E2E_LOGIN="$OSTROM_E2E_LOGIN" .maestro/real/
+      - name: Real server logs
+        if: always() && steps.server.outputs.ready == 'true'
+        run: docker logs ostrom-server 2>&1 | tail -n 200
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always() && steps.server.outputs.ready == 'true'
+        with:
+          name: maestro-report-real
+          path: |
+            maestro-report-real.xml
+            maestro-output-real/
+          if-no-files-found: ignore

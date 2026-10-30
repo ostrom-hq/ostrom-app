@@ -105,6 +105,17 @@ emulator (device offline, `DeviceServerDiedException`), never on a failed assert
 | Organization isolation | Another organization's data never shows (CONVENTIONS.md section 16) | Missing: needs a second organization on a real server |
 | Receipts, history, activity, spending | Each screen opens and reads its data | Missing |
 
+Against the real server, the workflow `E2E real server` (`.github/workflows/e2e-real.yml`) starts the `edge` image of
+ostrom-server with PostgreSQL, signs a new person in by e-mail, gives them an organization and a personal token
+(`scripts/real-server-session.sh`), and builds the app with `EXPO_PUBLIC_OSTROM_REAL_E2E=1`: the real services, signed in
+with that token (`src/config/realServices.ts`). It runs the flows of `.maestro/real/`. Until the image can be pulled from
+this repository (Actions access of the package), they are skipped with a warning; the repository variable
+`OSTROM_APP_REQUIRE_REAL_SERVER=true` makes a skip fail.
+
+| Flow (real server) | What it proves | Status |
+|---|---|---|
+| `real/history.yaml` | Signed in on the real server: the History reads its receipts and keys (none yet), Settings shows the login | Skipped until the package access |
+
 ## Layout
 
 | Path | What lives there |
