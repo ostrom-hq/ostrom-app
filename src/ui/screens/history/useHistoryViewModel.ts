@@ -2,17 +2,25 @@ import type {ReceiptListItem} from "@/api/contract/receipts"
 import {useReceiptKey, useReceipts} from "@/query/receipts"
 import {checkReceipt, type ReceiptCheck} from "./receiptCheck"
 
-export interface ReceiptRowModel {
-    /** The receipt id, or its position when the app cannot read it. */
-    readonly key: string
-    readonly readable: boolean
-    /** `approved`, `rejected`… from the last decision, when there is one. */
-    readonly result: string | undefined
-    readonly by: string | undefined
-    readonly subject: string | undefined
-    readonly at: string | undefined
-    readonly check: ReceiptCheck
-}
+/** One receipt of the history: what it says when the app can read it, and always what the phone found of its signature. */
+export type ReceiptRowModel =
+    | {
+          /** Its position: the app cannot read it, so it has no id to show. */
+          readonly key: string
+          readonly readable: false
+          readonly check: ReceiptCheck
+      }
+    | {
+          readonly key: string
+          readonly readable: true
+          /** `approved`, `rejected`… from the last decision, when there is one. */
+          readonly result: string | undefined
+          /** Who decided last, or who started the work when nobody decided yet. */
+          readonly by: string
+          readonly subject: string
+          readonly at: string
+          readonly check: ReceiptCheck
+      }
 
 export type HistoryState =
     | {readonly kind: "loading"}
@@ -27,7 +35,7 @@ export interface HistoryViewModel {
 
 export function toReceiptRow(item: ReceiptListItem, index: number, check: ReceiptCheck): ReceiptRowModel {
     if (!item.readable) {
-        return {key: `unreadable-${String(index)}`, readable: false, result: undefined, by: undefined, subject: undefined, at: undefined, check}
+        return {key: `unreadable-${String(index)}`, readable: false, check}
     }
     const {view} = item
     const decision = view.decisions.at(-1)
