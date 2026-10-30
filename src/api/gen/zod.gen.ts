@@ -2497,6 +2497,11 @@ export const zTeamCodeImportRequestWritable = z.object({
 });
 
 /**
+ * The id of the organization the request acts in. Required when the signed-in person is a member of several organizations; without it, a person with exactly one active membership acts in that organization. Missing while several memberships are active, 409 `org_required` (`error.type`, the usual `ApiError` body); an organization the person is not a member of, 404, as for anything of another organization. A token bound to one organization (device, agent, runner, service key) acts in its own organization
+ */
+export const zOstromOrg = z.string();
+
+/**
  * OK
  */
 export const zHealthRootResponse = zHealth;
@@ -2604,6 +2609,10 @@ export const zCreateLaunchBody = z.object({
     model: z.string().optional()
 });
 
+export const zCreateLaunchHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 /**
  * OK
  */
@@ -2611,6 +2620,10 @@ export const zCreateLaunchResponse = z.object({
     launchId: z.string(),
     agentToken: z.string(),
     expiresAt: z.string()
+});
+
+export const zCheckAgentPolicyHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
 });
 
 export const zCheckAgentPolicyQuery = z.object({
@@ -2626,6 +2639,10 @@ export const zCheckAgentPolicyResponse = z.object({
     allowed: z.boolean(),
     reason: z.string().optional(),
     note: z.string().optional()
+});
+
+export const zGetMeHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
 });
 
 export const zGetMeResponse = z.union([
@@ -2678,6 +2695,10 @@ export const zRevokeAuthSessionPath = z.object({
  */
 export const zRevokeAuthSessionResponse = z.void();
 
+export const zListServiceKeysHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 /**
  * OK
  */
@@ -2691,10 +2712,18 @@ export const zCreateServiceKeyBody = z.object({
     scopes: z.array(z.string())
 });
 
+export const zCreateServiceKeyHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 /**
  * OK
  */
 export const zCreateServiceKeyResponse = zServiceKey;
+
+export const zDeleteServiceKeyHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
 
 export const zDeleteServiceKeyPath = z.object({
     id: z.string()
@@ -2705,12 +2734,20 @@ export const zDeleteServiceKeyPath = z.object({
  */
 export const zDeleteServiceKeyResponse = z.void();
 
+export const zListDevicesHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 /**
  * OK
  */
 export const zListDevicesResponse = z.object({
     items: z.array(zDevice),
     next: z.string().optional()
+});
+
+export const zDeleteDeviceHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
 });
 
 export const zDeleteDevicePath = z.object({
@@ -2729,10 +2766,18 @@ export const zRegisterPushDeviceBody = z.object({
     locale: z.string().optional()
 });
 
+export const zRegisterPushDeviceHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 /**
  * OK
  */
 export const zRegisterPushDeviceResponse = zPushDevice;
+
+export const zDeletePushDeviceHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
 
 export const zDeletePushDevicePath = z.object({
     id: z.string()
@@ -2755,6 +2800,10 @@ export const zSetNotificationPreferencesBody = zNotificationPreferences;
  */
 export const zSetNotificationPreferencesResponse = zNotificationPreferences;
 
+export const zListActivityHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 export const zListActivityQuery = z.object({
     before: z.string().optional(),
     repo: z.string().optional()
@@ -2768,6 +2817,10 @@ export const zListActivityResponse = z.object({
     next: z.string().optional()
 });
 
+export const zGetSpendingHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 export const zGetSpendingQuery = z.object({
     period: z.string().optional()
 });
@@ -2776,6 +2829,10 @@ export const zGetSpendingQuery = z.object({
  * OK
  */
 export const zGetSpendingResponse = zSpending;
+
+export const zGetGithubAppHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
 
 /**
  * OK
@@ -2787,9 +2844,17 @@ export const zGetGithubAppResponse = z.object({
     htmlUrl: z.string().optional()
 });
 
+export const zStartGithubAppManifestHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 export const zGithubAppManifestCallbackQuery = z.object({
     code: z.string().optional(),
     state: z.string().optional()
+});
+
+export const zStartGithubAppInstallHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
 });
 
 export const zGithubAppInstallCallbackQuery = z.object({
@@ -2821,15 +2886,27 @@ export const zGithubCheckBody = z.object({
     base: z.string().optional()
 });
 
+export const zGithubCheckHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 /**
  * OK
  */
 export const zGithubCheckResponse = zGateResponse;
 
+export const zGetOrganizationHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 /**
  * OK
  */
 export const zGetOrganizationResponse = zOrganization;
+
+export const zListMembersHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
 
 /**
  * OK
@@ -2837,6 +2914,10 @@ export const zGetOrganizationResponse = zOrganization;
 export const zListMembersResponse = z.object({
     items: z.array(zMember),
     next: z.string().optional()
+});
+
+export const zRemoveMemberHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
 });
 
 export const zRemoveMemberPath = z.object({
@@ -2847,6 +2928,10 @@ export const zRemoveMemberPath = z.object({
  * Done
  */
 export const zRemoveMemberResponse = z.void();
+
+export const zGetMemberHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
 
 export const zGetMemberPath = z.object({
     login: z.string()
@@ -2863,6 +2948,10 @@ export const zUpdateMemberBody = z.object({
     discordUserId: z.string().optional()
 });
 
+export const zUpdateMemberHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 export const zUpdateMemberPath = z.object({
     login: z.string()
 });
@@ -2876,11 +2965,19 @@ export const zInviteMembersBody = z.object({
     invites: z.array(zMemberInvite)
 });
 
+export const zInviteMembersHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 /**
  * OK
  */
 export const zInviteMembersResponse = z.object({
     invited: z.array(z.string())
+});
+
+export const zListTeamsHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
 });
 
 /**
@@ -2891,12 +2988,20 @@ export const zListTeamsResponse = z.object({
     next: z.string().optional()
 });
 
+export const zListReposHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 /**
  * OK
  */
 export const zListReposResponse = z.object({
     items: z.array(zRepo),
     next: z.string().optional()
+});
+
+export const zGetSettingsHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
 });
 
 /**
@@ -2906,10 +3011,18 @@ export const zGetSettingsResponse = zSettings;
 
 export const zUpdateSettingsBody = zSettings;
 
+export const zUpdateSettingsHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 /**
  * OK
  */
 export const zUpdateSettingsResponse = zSettings;
+
+export const zListSessionsHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
 
 export const zListSessionsQuery = z.object({
     repo: z.string().optional(),
@@ -2928,10 +3041,18 @@ export const zListSessionsResponse = z.object({
 
 export const zStartSessionBody = zStartSessionRequest;
 
+export const zStartSessionHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 /**
  * OK
  */
 export const zStartSessionResponse = zSessionResponse;
+
+export const zGetSessionHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
 
 export const zGetSessionPath = z.object({
     id: z.string()
@@ -2946,6 +3067,10 @@ export const zSessionAliveBody = z.object({
     launchId: z.string().optional()
 });
 
+export const zSessionAliveHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 export const zSessionAlivePath = z.object({
     id: z.string()
 });
@@ -2956,6 +3081,10 @@ export const zSessionAlivePath = z.object({
 export const zSessionAliveResponse = zSession;
 
 export const zEndSessionBody = zEndSessionRequest;
+
+export const zEndSessionHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
 
 export const zEndSessionPath = z.object({
     id: z.string()
@@ -2968,6 +3097,10 @@ export const zEndSessionResponse = zSessionResponse;
 
 export const zReopenSessionBody = z.object({
     launchId: z.string().optional()
+});
+
+export const zReopenSessionHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
 });
 
 export const zReopenSessionPath = z.object({
@@ -2983,6 +3116,10 @@ export const zSignWorkflowReceiptBody = z.object({
     digest: z.string(),
     agent: z.string().optional(),
     model: z.string().optional()
+});
+
+export const zSignWorkflowReceiptHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
 });
 
 export const zSignWorkflowReceiptPath = z.object({
@@ -3003,6 +3140,10 @@ export const zReportSeenBody = z.object({
     via: z.string()
 });
 
+export const zReportSeenHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 export const zReportSeenPath = z.object({
     id: z.string()
 });
@@ -3011,6 +3152,10 @@ export const zReportSeenPath = z.object({
  * Done
  */
 export const zReportSeenResponse = z.void();
+
+export const zListGatesHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
 
 export const zListGatesQuery = z.object({
     sessionId: z.string().optional(),
@@ -3029,10 +3174,18 @@ export const zListGatesResponse = z.object({
 
 export const zAskGateBody = zGateAskRequest;
 
+export const zAskGateHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 /**
  * OK
  */
 export const zAskGateResponse = zGateResponse;
+
+export const zGetGateHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
 
 export const zGetGatePath = z.object({
     id: z.string()
@@ -3047,6 +3200,10 @@ export const zGetGateQuery = z.object({
  */
 export const zGetGateResponse = zGateResponse;
 
+export const zConsumeGateHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 export const zConsumeGatePath = z.object({
     id: z.string()
 });
@@ -3055,6 +3212,10 @@ export const zConsumeGatePath = z.object({
  * OK
  */
 export const zConsumeGateResponse = zGateResponse;
+
+export const zGetApproversGraphHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
 
 export const zGetApproversGraphQuery = z.object({
     repo: z.string().optional()
@@ -3065,6 +3226,10 @@ export const zGetApproversGraphQuery = z.object({
  */
 export const zGetApproversGraphResponse = zApproversGraph;
 
+export const zGetGateCatalogHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 export const zGetGateCatalogQuery = z.object({
     repo: z.string().optional()
 });
@@ -3074,6 +3239,10 @@ export const zGetGateCatalogQuery = z.object({
  */
 export const zGetGateCatalogResponse = zGateCatalog;
 
+export const zGetSignedGatePolicyHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 export const zGetSignedGatePolicyQuery = z.object({
     repo: z.string()
 });
@@ -3082,6 +3251,10 @@ export const zGetSignedGatePolicyQuery = z.object({
  * OK
  */
 export const zGetSignedGatePolicyResponse = zSignedGatePolicy;
+
+export const zGetGatePolicyHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
 
 /**
  * OK
@@ -3094,11 +3267,19 @@ export const zSetGatePolicyBody = z.object({
     selfApproval: z.string()
 });
 
+export const zSetGatePolicyHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 /**
  * OK
  */
 export const zSetGatePolicyResponse = z.object({
     selfApproval: z.string()
+});
+
+export const zListApprovalsHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
 });
 
 export const zListApprovalsQuery = z.object({
@@ -3116,10 +3297,18 @@ export const zListApprovalsResponse = z.object({
     next: z.string().optional()
 });
 
+export const zGetApprovalQueueHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 /**
  * OK
  */
 export const zGetApprovalQueueResponse = zApprovalQueue;
+
+export const zGetApprovalHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
 
 export const zGetApprovalPath = z.object({
     id: z.string()
@@ -3129,6 +3318,10 @@ export const zGetApprovalPath = z.object({
  * OK
  */
 export const zGetApprovalResponse = zApproval;
+
+export const zGetApprovalViewHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
 
 export const zGetApprovalViewPath = z.object({
     id: z.string()
@@ -3141,6 +3334,10 @@ export const zGetApprovalViewResponse = zApprovalView;
 
 export const zAnswerApprovalBody = zAnswerApprovalRequest;
 
+export const zAnswerApprovalHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 export const zAnswerApprovalPath = z.object({
     id: z.string()
 });
@@ -3149,6 +3346,10 @@ export const zAnswerApprovalPath = z.object({
  * The answered approval and its receipt
  */
 export const zAnswerApprovalResponse = zApprovalView;
+
+export const zListDecisionsHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
 
 export const zListDecisionsQuery = z.object({
     subjectKind: z.string().optional(),
@@ -3162,6 +3363,10 @@ export const zListDecisionsQuery = z.object({
 export const zListDecisionsResponse = z.object({
     items: z.array(zDecision),
     next: z.string().optional()
+});
+
+export const zListReceiptsHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
 });
 
 export const zListReceiptsQuery = z.object({
@@ -3185,6 +3390,10 @@ export const zListReceiptKeysResponse = z.object({
     keys: z.array(zPublicKey)
 });
 
+export const zGetReceiptHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 export const zGetReceiptPath = z.object({
     id: z.string()
 });
@@ -3193,6 +3402,10 @@ export const zGetReceiptPath = z.object({
  * OK
  */
 export const zGetReceiptResponse = zReceipt;
+
+export const zVerifyReceiptHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
 
 export const zVerifyReceiptPath = z.object({
     id: z.string()
@@ -3203,6 +3416,10 @@ export const zVerifyReceiptPath = z.object({
  */
 export const zVerifyReceiptResponse = zVerification;
 
+export const zGetReceiptBundleHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 export const zGetReceiptBundlePath = z.object({
     id: z.string()
 });
@@ -3212,6 +3429,10 @@ export const zGetReceiptBundlePath = z.object({
  */
 export const zGetReceiptBundleResponse = zReceiptBundle;
 
+export const zGetCurrentPackageHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 export const zGetCurrentPackageQuery = z.object({
     repo: z.string().optional()
 });
@@ -3220,6 +3441,10 @@ export const zGetCurrentPackageQuery = z.object({
  * OK
  */
 export const zGetCurrentPackageResponse = zPackageEnvelope;
+
+export const zListPackagesHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
 
 export const zListPackagesQuery = z.object({
     repo: z.string().optional()
@@ -3237,10 +3462,18 @@ export const zPreviewPackageBody = z.object({
     repo: z.string().optional()
 });
 
+export const zPreviewPackageHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 /**
  * OK
  */
 export const zPreviewPackageResponse = zSessionPackage;
+
+export const zListPackageAuditHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
 
 /**
  * OK
@@ -3248,6 +3481,10 @@ export const zPreviewPackageResponse = zSessionPackage;
 export const zListPackageAuditResponse = z.object({
     items: z.array(zAuditEvent),
     next: z.string().optional()
+});
+
+export const zGetPackageHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
 });
 
 export const zGetPackagePath = z.object({
@@ -3258,6 +3495,10 @@ export const zGetPackagePath = z.object({
  * OK
  */
 export const zGetPackageResponse = zPackageEnvelope;
+
+export const zGetPackageStatusHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
 
 export const zGetPackageStatusPath = z.object({
     digest: z.string()
@@ -3272,6 +3513,10 @@ export const zRevokePackageBody = z.object({
     reason: z.string()
 });
 
+export const zRevokePackageHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 export const zRevokePackagePath = z.object({
     digest: z.string()
 });
@@ -3281,6 +3526,10 @@ export const zRevokePackagePath = z.object({
  */
 export const zRevokePackageResponse = zPackageSummary;
 
+export const zRestorePackageHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 export const zRestorePackagePath = z.object({
     digest: z.string()
 });
@@ -3289,6 +3538,10 @@ export const zRestorePackagePath = z.object({
  * OK
  */
 export const zRestorePackageResponse = zPackageSummary;
+
+export const zListChecksHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
 
 export const zListChecksQuery = z.object({
     sessionId: z.string().optional(),
@@ -3306,10 +3559,18 @@ export const zListChecksResponse = z.object({
 
 export const zReportCheckBody = zReportCheckRequest;
 
+export const zReportCheckHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 /**
  * OK
  */
 export const zReportCheckResponse = zCheckRun;
+
+export const zListNotificationsHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
 
 export const zListNotificationsQuery = z.object({
     sessionId: z.string().optional(),
@@ -3333,10 +3594,18 @@ export const zSendNotificationBody = z.object({
     command: z.string().optional()
 });
 
+export const zSendNotificationHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 /**
  * OK
  */
 export const zSendNotificationResponse = zNotification;
+
+export const zListRulesHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
 
 export const zListRulesQuery = z.object({
     repo: z.string().optional(),
@@ -3350,6 +3619,10 @@ export const zListRulesQuery = z.object({
 export const zListRulesResponse = z.object({
     items: z.array(zRule),
     next: z.string().optional()
+});
+
+export const zGetRuleHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
 });
 
 export const zGetRulePath = z.object({
@@ -3369,6 +3642,10 @@ export const zUpdateRuleBody = z.object({
     scope: z.array(z.string()).optional()
 });
 
+export const zUpdateRuleHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 export const zUpdateRulePath = z.object({
     id: z.string()
 });
@@ -3383,11 +3660,19 @@ export const zBulkUpdateRulesBody = z.object({
     status: zRuleStatus
 });
 
+export const zBulkUpdateRulesHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 /**
  * OK
  */
 export const zBulkUpdateRulesResponse = z.object({
     updated: z.int()
+});
+
+export const zListWorkflowsHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
 });
 
 export const zListWorkflowsQuery = z.object({
@@ -3405,10 +3690,18 @@ export const zListWorkflowsResponse = z.object({
 
 export const zCreateWorkflowBody = zWorkflow;
 
+export const zCreateWorkflowHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 /**
  * OK
  */
 export const zCreateWorkflowResponse = zWorkflow;
+
+export const zDeleteWorkflowHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
 
 export const zDeleteWorkflowPath = z.object({
     id: z.string()
@@ -3418,6 +3711,10 @@ export const zDeleteWorkflowPath = z.object({
  * Done
  */
 export const zDeleteWorkflowResponse = z.void();
+
+export const zGetWorkflowHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
 
 export const zGetWorkflowPath = z.object({
     id: z.string()
@@ -3433,6 +3730,10 @@ export const zSaveWorkflowBody = z.object({
     expectedVersion: z.int().optional()
 });
 
+export const zSaveWorkflowHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 export const zSaveWorkflowPath = z.object({
     id: z.string()
 });
@@ -3441,6 +3742,10 @@ export const zSaveWorkflowPath = z.object({
  * OK
  */
 export const zSaveWorkflowResponse = zWorkflow;
+
+export const zListWorkflowRunsHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
 
 export const zListWorkflowRunsPath = z.object({
     id: z.string()
@@ -3463,6 +3768,10 @@ export const zStartWorkflowRunBody = z.object({
     inputs: z.record(z.string(), z.string()).optional()
 });
 
+export const zStartWorkflowRunHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 export const zStartWorkflowRunPath = z.object({
     id: z.string()
 });
@@ -3471,6 +3780,10 @@ export const zStartWorkflowRunPath = z.object({
  * OK
  */
 export const zStartWorkflowRunResponse = zWorkflowRun;
+
+export const zListRunsHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
 
 export const zListRunsQuery = z.object({
     status: z.string().optional(),
@@ -3485,6 +3798,10 @@ export const zListRunsResponse = z.object({
     next: z.string().optional()
 });
 
+export const zGetRunHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 export const zGetRunPath = z.object({
     id: z.string()
 });
@@ -3494,6 +3811,10 @@ export const zGetRunPath = z.object({
  */
 export const zGetRunResponse = zWorkflowRun;
 
+export const zCancelRunHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 export const zCancelRunPath = z.object({
     id: z.string()
 });
@@ -3502,6 +3823,10 @@ export const zCancelRunPath = z.object({
  * OK
  */
 export const zCancelRunResponse = zWorkflowRun;
+
+export const zListAutomationsHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
 
 /**
  * OK
@@ -3513,10 +3838,18 @@ export const zListAutomationsResponse = z.object({
 
 export const zCreateAutomationBody = zAutomation;
 
+export const zCreateAutomationHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 /**
  * OK
  */
 export const zCreateAutomationResponse = zAutomation;
+
+export const zDeleteAutomationHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
 
 export const zDeleteAutomationPath = z.object({
     id: z.string()
@@ -3526,6 +3859,10 @@ export const zDeleteAutomationPath = z.object({
  * Done
  */
 export const zDeleteAutomationResponse = z.void();
+
+export const zGetAutomationHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
 
 export const zGetAutomationPath = z.object({
     id: z.string()
@@ -3538,6 +3875,10 @@ export const zGetAutomationResponse = zAutomation;
 
 export const zSaveAutomationBody = zAutomation;
 
+export const zSaveAutomationHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 export const zSaveAutomationPath = z.object({
     id: z.string()
 });
@@ -3546,6 +3887,10 @@ export const zSaveAutomationPath = z.object({
  * OK
  */
 export const zSaveAutomationResponse = zAutomation;
+
+export const zEnableAutomationHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
 
 export const zEnableAutomationPath = z.object({
     id: z.string()
@@ -3556,6 +3901,10 @@ export const zEnableAutomationPath = z.object({
  */
 export const zEnableAutomationResponse = zAutomation;
 
+export const zDisableAutomationHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 export const zDisableAutomationPath = z.object({
     id: z.string()
 });
@@ -3564,6 +3913,10 @@ export const zDisableAutomationPath = z.object({
  * OK
  */
 export const zDisableAutomationResponse = zAutomation;
+
+export const zRotateAutomationSecretHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
 
 export const zRotateAutomationSecretPath = z.object({
     id: z.string()
@@ -3581,6 +3934,10 @@ export const zTestAutomationBody = z.object({
     dryRun: z.boolean().optional()
 });
 
+export const zTestAutomationHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 export const zTestAutomationPath = z.object({
     id: z.string()
 });
@@ -3589,6 +3946,10 @@ export const zTestAutomationResponse = z.union([
     zAutomationDryRun,
     zAutomationRun
 ]);
+
+export const zListAutomationRunsHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
 
 export const zListAutomationRunsPath = z.object({
     id: z.string()
@@ -3622,6 +3983,10 @@ export const zTriggerAutomationResponse = z.object({
     deduplicated: z.boolean()
 });
 
+export const zListWaitsHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 export const zListWaitsQuery = z.object({
     status: z.string().optional(),
     mine: z.boolean().optional(),
@@ -3645,10 +4010,18 @@ export const zCreateWaitBody = z.object({
     question: zWaitSpec
 });
 
+export const zCreateWaitHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 /**
  * OK
  */
 export const zCreateWaitResponse = zWait;
+
+export const zGetWaitHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
 
 export const zGetWaitPath = z.object({
     id: z.string()
@@ -3664,6 +4037,10 @@ export const zAnswerWaitBody = z.object({
     values: z.record(z.string(), z.unknown()).optional()
 });
 
+export const zAnswerWaitHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 export const zAnswerWaitPath = z.object({
     id: z.string()
 });
@@ -3673,6 +4050,10 @@ export const zAnswerWaitPath = z.object({
  */
 export const zAnswerWaitResponse = zWait;
 
+export const zCancelWaitHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 export const zCancelWaitPath = z.object({
     id: z.string()
 });
@@ -3681,6 +4062,10 @@ export const zCancelWaitPath = z.object({
  * OK
  */
 export const zCancelWaitResponse = zWait;
+
+export const zListMcpServersHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
 
 export const zListMcpServersQuery = z.object({
     mine: z.boolean().optional()
@@ -3696,10 +4081,18 @@ export const zListMcpServersResponse = z.object({
 
 export const zCreateMcpServerBody = zMcpServerWritable;
 
+export const zCreateMcpServerHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 /**
  * OK
  */
 export const zCreateMcpServerResponse = zMcpServer;
+
+export const zDeleteMcpServerHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
 
 export const zDeleteMcpServerPath = z.object({
     name: z.string()
@@ -3712,6 +4105,10 @@ export const zDeleteMcpServerResponse = z.void();
 
 export const zSaveMcpServerBody = zMcpServerWritable;
 
+export const zSaveMcpServerHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 export const zSaveMcpServerPath = z.object({
     name: z.string()
 });
@@ -3721,6 +4118,10 @@ export const zSaveMcpServerPath = z.object({
  */
 export const zSaveMcpServerResponse = zMcpServer;
 
+export const zListMcpAssignmentsHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 export const zListMcpAssignmentsPath = z.object({
     name: z.string()
 });
@@ -3729,6 +4130,10 @@ export const zListMcpAssignmentsPath = z.object({
  * OK
  */
 export const zListMcpAssignmentsResponse = zMcpAssignmentsPage;
+
+export const zUnassignMcpServerHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
 
 export const zUnassignMcpServerPath = z.object({
     name: z.string(),
@@ -3742,6 +4147,10 @@ export const zUnassignMcpServerResponse = z.void();
 
 export const zAssignMcpServerBody = zMcpAssignmentRequest;
 
+export const zAssignMcpServerHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 export const zAssignMcpServerPath = z.object({
     name: z.string(),
     member: z.string()
@@ -3751,6 +4160,10 @@ export const zAssignMcpServerPath = z.object({
  * OK
  */
 export const zAssignMcpServerResponse = zMcpAssignment;
+
+export const zListMcpArgumentPoliciesHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
 
 export const zListMcpArgumentPoliciesPath = z.object({
     name: z.string()
@@ -3763,6 +4176,10 @@ export const zListMcpArgumentPoliciesResponse = zMcpArgumentPolicies;
 
 export const zCreateMcpArgumentPolicyBody = zMcpArgumentPolicyRequest;
 
+export const zCreateMcpArgumentPolicyHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 export const zCreateMcpArgumentPolicyPath = z.object({
     name: z.string()
 });
@@ -3771,6 +4188,10 @@ export const zCreateMcpArgumentPolicyPath = z.object({
  * OK
  */
 export const zCreateMcpArgumentPolicyResponse = zMcpArgumentPolicy;
+
+export const zDeleteMcpArgumentPolicyHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
 
 export const zDeleteMcpArgumentPolicyPath = z.object({
     name: z.string(),
@@ -3782,12 +4203,20 @@ export const zDeleteMcpArgumentPolicyPath = z.object({
  */
 export const zDeleteMcpArgumentPolicyResponse = z.void();
 
+export const zGetMcpSettingsHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 /**
  * OK
  */
 export const zGetMcpSettingsResponse = zMcpSettings;
 
 export const zPutMcpSettingsBody = zMcpSettings;
+
+export const zPutMcpSettingsHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
 
 /**
  * OK
@@ -3796,8 +4225,16 @@ export const zPutMcpSettingsResponse = zMcpSettings;
 
 export const zRelayMcpBody = z.unknown();
 
+export const zRelayMcpHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 export const zRelayMcpPath = z.object({
     server: z.string()
+});
+
+export const zListMcpCallsHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
 });
 
 export const zListMcpCallsQuery = z.object({
@@ -3814,12 +4251,20 @@ export const zListMcpCallsResponse = z.object({
     next: z.string().optional()
 });
 
+export const zGetMcpUsageHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 /**
  * OK
  */
 export const zGetMcpUsageResponse = z.object({
     byServer: z.record(z.string(), z.int()),
     byTool: z.record(z.string(), z.int())
+});
+
+export const zListSecretsHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
 });
 
 /**
@@ -3832,10 +4277,18 @@ export const zListSecretsResponse = z.object({
 
 export const zCreateSecretBody = zSecretWrite;
 
+export const zCreateSecretHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 /**
  * OK
  */
 export const zCreateSecretResponse = zSecret;
+
+export const zDeleteSecretHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
 
 export const zDeleteSecretPath = z.object({
     name: z.string()
@@ -3848,6 +4301,10 @@ export const zDeleteSecretResponse = z.void();
 
 export const zRotateSecretBody = zSecretWrite;
 
+export const zRotateSecretHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 export const zRotateSecretPath = z.object({
     name: z.string()
 });
@@ -3858,6 +4315,10 @@ export const zRotateSecretPath = z.object({
 export const zRotateSecretResponse = zSecret;
 
 export const zImportTeamCodeBody = zTeamCodeImportRequestWritable;
+
+export const zImportTeamCodeHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
 
 export const zImportTeamCodeQuery = z.object({
     dryRun: z.boolean().optional()
@@ -3870,15 +4331,35 @@ export const zImportTeamCodeResponse = zImportReport;
 
 export const zInferenceMessagesBody = z.unknown();
 
+export const zInferenceMessagesHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 export const zInferenceResponsesBody = z.unknown();
 
+export const zInferenceResponsesHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 export const zInferenceChatCompletionsBody = z.unknown();
+
+export const zInferenceChatCompletionsHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
+export const zInferenceModelsHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
 
 /**
  * OK
  */
 export const zInferenceModelsResponse = z.object({
     data: z.array(z.record(z.string(), z.unknown()))
+});
+
+export const zGetInferenceSettingsHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
 });
 
 /**
@@ -3888,10 +4369,18 @@ export const zGetInferenceSettingsResponse = zInferenceSettings;
 
 export const zSetInferenceSettingsBody = zInferenceSettings;
 
+export const zSetInferenceSettingsHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 /**
  * OK
  */
 export const zSetInferenceSettingsResponse = zInferenceSettings;
+
+export const zGetModelPolicyHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
 
 /**
  * OK
@@ -3900,10 +4389,18 @@ export const zGetModelPolicyResponse = zModelPolicy;
 
 export const zSetModelPolicyBody = zModelPolicy;
 
+export const zSetModelPolicyHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 /**
  * OK
  */
 export const zSetModelPolicyResponse = zModelPolicy;
+
+export const zListInferenceRoutesHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
 
 /**
  * OK
@@ -3915,10 +4412,18 @@ export const zListInferenceRoutesResponse = z.object({
 
 export const zCreateInferenceRouteBody = zInferenceRoute;
 
+export const zCreateInferenceRouteHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 /**
  * OK
  */
 export const zCreateInferenceRouteResponse = zInferenceRoute;
+
+export const zDeleteInferenceRouteHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
 
 export const zDeleteInferenceRoutePath = z.object({
     id: z.string()
@@ -3928,6 +4433,10 @@ export const zDeleteInferenceRoutePath = z.object({
  * Done
  */
 export const zDeleteInferenceRouteResponse = z.void();
+
+export const zListBudgetsHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
 
 /**
  * OK
@@ -3942,15 +4451,27 @@ export const zListBudgetsResponse = z.object({
 
 export const zSetBudgetBody = zBudget;
 
+export const zSetBudgetHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 /**
  * OK
  */
 export const zSetBudgetResponse = zBudget;
 
+export const zGetMyBudgetHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 /**
  * OK
  */
 export const zGetMyBudgetResponse = zMyBudget;
+
+export const zGetUsageHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
 
 export const zGetUsageQuery = z.object({
     from: z.string().optional(),
@@ -3962,6 +4483,10 @@ export const zGetUsageQuery = z.object({
  * OK
  */
 export const zGetUsageResponse = zUsage;
+
+export const zGetUsageSummaryHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
 
 export const zGetUsageSummaryQuery = z.object({
     days: z.int().gte(1).lte(90).optional().default(7),
@@ -3978,6 +4503,10 @@ export const zGetUsageSummaryQuery = z.object({
  * OK
  */
 export const zGetUsageSummaryResponse = zUsageSummary;
+
+export const zListUsageEventsHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
 
 export const zListUsageEventsQuery = z.object({
     before: z.string().optional(),
@@ -3996,6 +4525,10 @@ export const zRecordUsageEventsBody = z.object({
     events: z.array(zUsageEventInput).max(500)
 });
 
+export const zRecordUsageEventsHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 /**
  * Recorded
  */
@@ -4003,10 +4536,18 @@ export const zRecordUsageEventsResponse = z.object({
     accepted: z.int()
 });
 
+export const zStreamUsageHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 /**
  * The event stream
  */
 export const zStreamUsageResponse = z.string();
+
+export const zListPendingUsageHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
 
 export const zListPendingUsageQuery = z.object({
     member: z.string().optional(),
@@ -4018,6 +4559,10 @@ export const zListPendingUsageQuery = z.object({
  */
 export const zListPendingUsageResponse = z.object({
     items: z.array(z.record(z.string(), z.unknown()))
+});
+
+export const zListUsageReconciliationsHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
 });
 
 export const zListUsageReconciliationsQuery = z.object({
@@ -4036,6 +4581,10 @@ export const zReconcileUsageBody = z.object({
     usd: z.number()
 });
 
+export const zReconcileUsageHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 export const zReconcileUsagePath = z.object({
     id: z.string()
 });
@@ -4046,6 +4595,10 @@ export const zReconcileUsagePath = z.object({
 export const zReconcileUsageResponse = z.object({
     id: z.string(),
     usd: z.number()
+});
+
+export const zListBudgetOverridesHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
 });
 
 export const zListBudgetOverridesPath = z.object({
@@ -4066,6 +4619,10 @@ export const zCreateBudgetOverrideBody = z.object({
     reason: z.string()
 });
 
+export const zCreateBudgetOverrideHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 export const zCreateBudgetOverridePath = z.object({
     login: z.string()
 });
@@ -4074,6 +4631,10 @@ export const zCreateBudgetOverridePath = z.object({
  * OK
  */
 export const zCreateBudgetOverrideResponse = zBudgetOverride;
+
+export const zRevokeBudgetOverrideHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
 
 export const zRevokeBudgetOverridePath = z.object({
     login: z.string(),
@@ -4084,6 +4645,10 @@ export const zRevokeBudgetOverridePath = z.object({
  * OK
  */
 export const zRevokeBudgetOverrideResponse = zBudgetOverride;
+
+export const zListRunnersHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
 
 /**
  * OK
@@ -4099,10 +4664,18 @@ export const zRegisterRunnerBody = z.object({
     version: z.string().optional()
 });
 
+export const zRegisterRunnerHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 /**
  * OK
  */
 export const zRegisterRunnerResponse = zRunner;
+
+export const zDeleteRunnerHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
 
 export const zDeleteRunnerPath = z.object({
     id: z.string()
@@ -4113,6 +4686,10 @@ export const zDeleteRunnerPath = z.object({
  */
 export const zDeleteRunnerResponse = z.void();
 
+export const zRunnerHeartbeatHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 export const zRunnerHeartbeatPath = z.object({
     id: z.string()
 });
@@ -4122,6 +4699,10 @@ export const zRunnerHeartbeatPath = z.object({
  */
 export const zRunnerHeartbeatResponse = z.object({
     sessions: z.array(zCloudSession)
+});
+
+export const zListCloudSessionsHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
 });
 
 export const zListCloudSessionsQuery = z.object({
@@ -4147,10 +4728,18 @@ export const zCreateCloudSessionBody = z.object({
     name: z.string().optional()
 });
 
+export const zCreateCloudSessionHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 /**
  * OK
  */
 export const zCreateCloudSessionResponse = zCloudSession;
+
+export const zStopCloudSessionHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
 
 export const zStopCloudSessionPath = z.object({
     id: z.string()
@@ -4161,6 +4750,10 @@ export const zStopCloudSessionPath = z.object({
  */
 export const zStopCloudSessionResponse = zCloudSession;
 
+export const zGetCloudSessionHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 export const zGetCloudSessionPath = z.object({
     id: z.string()
 });
@@ -4169,6 +4762,10 @@ export const zGetCloudSessionPath = z.object({
  * OK
  */
 export const zGetCloudSessionResponse = zCloudSession;
+
+export const zPauseCloudSessionHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
 
 export const zPauseCloudSessionPath = z.object({
     id: z.string()
@@ -4179,6 +4776,10 @@ export const zPauseCloudSessionPath = z.object({
  */
 export const zPauseCloudSessionResponse = zCloudSession;
 
+export const zResumeCloudSessionHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 export const zResumeCloudSessionPath = z.object({
     id: z.string()
 });
@@ -4187,6 +4788,10 @@ export const zResumeCloudSessionPath = z.object({
  * Accepted, the reconciler starts a new execution
  */
 export const zResumeCloudSessionResponse = zCloudSession;
+
+export const zIssueCloudTerminalTicketHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
 
 export const zIssueCloudTerminalTicketPath = z.object({
     id: z.string()
@@ -4198,6 +4803,10 @@ export const zIssueCloudTerminalTicketPath = z.object({
 export const zIssueCloudTerminalTicketResponse = z.object({
     ticket: z.string(),
     expiresAt: z.string()
+});
+
+export const zAttachCloudTerminalHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
 });
 
 export const zAttachCloudTerminalPath = z.object({
@@ -4216,6 +4825,10 @@ export const zCloudRunnerHeartbeatBody = z.object({
     lastModelRequestAt: z.string().optional()
 });
 
+export const zCloudRunnerHeartbeatHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 /**
  * OK
  */
@@ -4226,6 +4839,10 @@ export const zCloudRunnerHeartbeatResponse = z.object({
 
 export const zSendCloudMessageBody = z.object({
     text: z.string()
+});
+
+export const zSendCloudMessageHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
 });
 
 export const zSendCloudMessagePath = z.object({
@@ -4239,6 +4856,10 @@ export const zSendCloudMessageResponse = z.object({
     id: z.string()
 });
 
+export const zStreamCloudSessionHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 export const zStreamCloudSessionPath = z.object({
     id: z.string()
 });
@@ -4247,6 +4868,10 @@ export const zStreamCloudSessionPath = z.object({
  * Server-sent events
  */
 export const zStreamCloudSessionResponse = z.string();
+
+export const zListArtifactsHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
 
 export const zListArtifactsQuery = z.object({
     before: z.string().optional(),
@@ -4267,10 +4892,18 @@ export const zPublishArtifactBody = z.object({
     files: z.array(zArtifactFile)
 });
 
+export const zPublishArtifactHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 /**
  * OK
  */
 export const zPublishArtifactResponse = zArtifact;
+
+export const zDeleteArtifactHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
 
 export const zDeleteArtifactPath = z.object({
     id: z.string()
@@ -4280,6 +4913,10 @@ export const zDeleteArtifactPath = z.object({
  * Done
  */
 export const zDeleteArtifactResponse = z.void();
+
+export const zGetArtifactHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
 
 export const zGetArtifactPath = z.object({
     id: z.string()
@@ -4295,6 +4932,10 @@ export const zUpdateArtifactBody = z.object({
     access: zArtifactAccess.optional()
 });
 
+export const zUpdateArtifactHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 export const zUpdateArtifactPath = z.object({
     id: z.string()
 });
@@ -4303,6 +4944,10 @@ export const zUpdateArtifactPath = z.object({
  * OK
  */
 export const zUpdateArtifactResponse = zArtifact;
+
+export const zListArtifactVersionsHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
 
 export const zListArtifactVersionsPath = z.object({
     id: z.string()
@@ -4320,6 +4965,10 @@ export const zPublishArtifactVersionBody = z.object({
     files: z.array(zArtifactFile)
 });
 
+export const zPublishArtifactVersionHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 export const zPublishArtifactVersionPath = z.object({
     id: z.string()
 });
@@ -4328,6 +4977,10 @@ export const zPublishArtifactVersionPath = z.object({
  * OK
  */
 export const zPublishArtifactVersionResponse = zArtifactVersion;
+
+export const zGetArtifactFileHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
 
 export const zGetArtifactFilePath = z.object({
     id: z.string(),
@@ -4343,6 +4996,10 @@ export const zGetArtifactFileQuery = z.object({
  */
 export const zGetArtifactFileResponse = z.string();
 
+export const zListArtifactMembersHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 export const zListArtifactMembersPath = z.object({
     id: z.string()
 });
@@ -4354,6 +5011,10 @@ export const zListArtifactMembersResponse = z.object({
     members: z.array(z.string())
 });
 
+export const zUnshareArtifactHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 export const zUnshareArtifactPath = z.object({
     id: z.string(),
     memberId: z.string()
@@ -4363,6 +5024,10 @@ export const zUnshareArtifactPath = z.object({
  * Done
  */
 export const zUnshareArtifactResponse = z.void();
+
+export const zShareArtifactHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
 
 export const zShareArtifactPath = z.object({
     id: z.string(),
@@ -4378,6 +5043,10 @@ export const zCreateArtifactTicketBody = z.object({
     version: z.int().optional()
 });
 
+export const zCreateArtifactTicketHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 export const zCreateArtifactTicketPath = z.object({
     id: z.string()
 });
@@ -4386,6 +5055,10 @@ export const zCreateArtifactTicketPath = z.object({
  * OK
  */
 export const zCreateArtifactTicketResponse = zArtifactTicket;
+
+export const zListSharedAccountsHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
 
 /**
  * OK
@@ -4403,10 +5076,18 @@ export const zEnrollSharedAccountBody = z.object({
     dailyAllocationUsd: z.number().optional()
 });
 
+export const zEnrollSharedAccountHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 /**
  * OK
  */
 export const zEnrollSharedAccountResponse = zSharedAccount;
+
+export const zRemoveSharedAccountHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
 
 export const zRemoveSharedAccountPath = z.object({
     id: z.string()
@@ -4423,6 +5104,10 @@ export const zUpdateSharedAccountBody = z.object({
     paused: z.boolean().optional()
 });
 
+export const zUpdateSharedAccountHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 export const zUpdateSharedAccountPath = z.object({
     id: z.string()
 });
@@ -4432,10 +5117,18 @@ export const zUpdateSharedAccountPath = z.object({
  */
 export const zUpdateSharedAccountResponse = zSharedAccount;
 
+export const zGetCapacityHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 /**
  * OK
  */
 export const zGetCapacityResponse = zCapacity;
+
+export const zListGroupsHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
 
 /**
  * OK
@@ -4451,10 +5144,18 @@ export const zCreateGroupBody = z.object({
     accounts: z.array(z.string()).optional()
 });
 
+export const zCreateGroupHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 /**
  * OK
  */
 export const zCreateGroupResponse = zGroup;
+
+export const zDeleteGroupHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
 
 export const zDeleteGroupPath = z.object({
     id: z.string()
@@ -4464,6 +5165,10 @@ export const zDeleteGroupPath = z.object({
  * Done
  */
 export const zDeleteGroupResponse = z.void();
+
+export const zGetGroupHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
 
 export const zGetGroupPath = z.object({
     id: z.string()
@@ -4479,6 +5184,10 @@ export const zUpdateGroupBody = z.object({
     accounts: z.array(z.string()).optional()
 });
 
+export const zUpdateGroupHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 export const zUpdateGroupPath = z.object({
     id: z.string()
 });
@@ -4487,6 +5196,10 @@ export const zUpdateGroupPath = z.object({
  * OK
  */
 export const zUpdateGroupResponse = zGroup;
+
+export const zRemoveGroupMemberHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
 
 export const zRemoveGroupMemberPath = z.object({
     id: z.string(),
@@ -4497,6 +5210,10 @@ export const zRemoveGroupMemberPath = z.object({
  * Done
  */
 export const zRemoveGroupMemberResponse = z.void();
+
+export const zAddGroupMemberHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
 
 export const zAddGroupMemberPath = z.object({
     id: z.string(),
@@ -4512,6 +5229,10 @@ export const zPauseGroupMemberBody = z.object({
     until: z.string().optional()
 });
 
+export const zPauseGroupMemberHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 export const zPauseGroupMemberPath = z.object({
     id: z.string(),
     login: z.string()
@@ -4522,12 +5243,20 @@ export const zPauseGroupMemberPath = z.object({
  */
 export const zPauseGroupMemberResponse = z.void();
 
+export const zListSkillsHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 /**
  * OK
  */
 export const zListSkillsResponse = z.object({
     items: z.array(zSkill),
     next: z.string().optional()
+});
+
+export const zDeleteSkillHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
 });
 
 export const zDeleteSkillPath = z.object({
@@ -4545,6 +5274,10 @@ export const zPublishSkillBody = z.object({
     description: z.string().optional()
 });
 
+export const zPublishSkillHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 export const zPublishSkillPath = z.object({
     name: z.string()
 });
@@ -4554,11 +5287,19 @@ export const zPublishSkillPath = z.object({
  */
 export const zPublishSkillResponse = zSkill;
 
+export const zGetSkillDeliveryHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 /**
  * OK
  */
 export const zGetSkillDeliveryResponse = z.object({
     skills: z.array(zSkill)
+});
+
+export const zListHooksHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
 });
 
 /**
@@ -4569,11 +5310,19 @@ export const zListHooksResponse = z.object({
     next: z.string().optional()
 });
 
+export const zGetHookDeliveryHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 /**
  * OK
  */
 export const zGetHookDeliveryResponse = z.object({
     hooks: z.array(zHook)
+});
+
+export const zListWebhooksHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
 });
 
 /**
@@ -4589,10 +5338,18 @@ export const zCreateWebhookBody = z.object({
     events: z.array(z.string())
 });
 
+export const zCreateWebhookHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 /**
  * OK
  */
 export const zCreateWebhookResponse = zWebhook;
+
+export const zDeleteWebhookHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
 
 export const zDeleteWebhookPath = z.object({
     id: z.string()
@@ -4603,6 +5360,10 @@ export const zDeleteWebhookPath = z.object({
  */
 export const zDeleteWebhookResponse = z.void();
 
+export const zListWebhookDeliveriesHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 export const zListWebhookDeliveriesPath = z.object({
     id: z.string()
 });
@@ -4612,6 +5373,10 @@ export const zListWebhookDeliveriesPath = z.object({
  */
 export const zListWebhookDeliveriesResponse = z.object({
     items: z.array(z.record(z.string(), z.unknown()))
+});
+
+export const zListAuditHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
 });
 
 export const zListAuditQuery = z.object({
@@ -4628,10 +5393,18 @@ export const zListAuditResponse = z.object({
     next: z.string().optional()
 });
 
+export const zStreamEventsHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 /**
  * Server-sent events
  */
 export const zStreamEventsResponse = z.string();
+
+export const zListEventsHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
 
 export const zListEventsQuery = z.object({
     since: z.string().optional()
@@ -4644,11 +5417,19 @@ export const zListEventsResponse = z.object({
     items: z.array(z.record(z.string(), z.unknown()))
 });
 
+export const zStartAnalysisHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 /**
  * OK
  */
 export const zStartAnalysisResponse = z.object({
     runId: z.string()
+});
+
+export const zRestartAnalysisHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
 });
 
 /**
@@ -4658,16 +5439,28 @@ export const zRestartAnalysisResponse = z.object({
     runId: z.string()
 });
 
+export const zGetAnalysisStateHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 /**
  * OK
  */
 export const zGetAnalysisStateResponse = zAnalysisState;
+
+export const zGetReplayHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
 
 /**
  * OK
  */
 export const zGetReplayResponse = z.object({
     items: z.array(z.record(z.string(), z.unknown()))
+});
+
+export const zStartReplayHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
 });
 
 /**
@@ -4677,12 +5470,20 @@ export const zStartReplayResponse = z.object({
     runId: z.string()
 });
 
+export const zListTasksHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
+
 /**
  * OK
  */
 export const zListTasksResponse = z.object({
     items: z.array(zTask),
     next: z.string().optional()
+});
+
+export const zRunTaskHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
 });
 
 export const zRunTaskPath = z.object({

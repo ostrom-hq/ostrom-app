@@ -58,16 +58,33 @@ describe("HttpClientImpl", () => {
         expect(seen).toEqual({auth: "Bearer ost_1", type: "application/json", query: "1", body: {hello: "world"}})
     })
 
-    it("sends no authorization header and no body when there is none", async () => {
-        let seen: {auth: string | null; type: string | null} | undefined
+    it("sends no authorization header, no organization and no body when there is none", async () => {
+        let seen: {auth: string | null; type: string | null; org: string | null} | undefined
         server.use(
             http.get(`${BASE}/api/ping`, ({request}) => {
-                seen = {auth: request.headers.get("authorization"), type: request.headers.get("content-type")}
+                seen = {auth: request.headers.get("authorization"), type: request.headers.get("content-type"), org: request.headers.get("ostrom-org")}
                 return HttpResponse.json({pong: true})
             }),
         )
         await client().send({method: "GET", path: "/api/ping", response: Pong})
-        expect(seen).toEqual({auth: null, type: null})
+        await new HttpClientImpl({baseUrl: BASE, token: () => undefined, org: () => undefined}).send({method: "GET", path: "/api/ping", response: Pong})
+        expect(seen).toEqual({auth: null, type: null, org: null})
+    })
+
+    it("names the organization the call acts in, read at each call", async () => {
+        const seen: (string | null)[] = []
+        server.use(
+            http.get(`${BASE}/api/ping`, ({request}) => {
+                seen.push(request.headers.get("ostrom-org"))
+                return HttpResponse.json({pong: true})
+            }),
+        )
+        let org = "org_acme"
+        const http1 = new HttpClientImpl({baseUrl: BASE, token: () => "ost_1", org: () => org})
+        await http1.send({method: "GET", path: "/api/ping", response: Pong})
+        org = "org_beta"
+        await http1.send({method: "GET", path: "/api/ping", response: Pong})
+        expect(seen).toEqual(["org_acme", "org_beta"])
     })
 
     it("reads an empty answer as undefined", async () => {

@@ -2,13 +2,15 @@
 import {useCallback, useState} from "react"
 import {useTranslation} from "react-i18next"
 import {type Approval, type ApprovalAnswer, type ApprovalView, needsBiometrics, phoneMayApprove} from "@/api/contract/approvals"
+import {isOrgRequired} from "@/api/http/ApiError"
 import {useAnswer, useApprovalView} from "@/query/approvals"
 import {useServices} from "@/services/AppServices"
 import {biometricProblem, type DecisionProblem, decisionProblem} from "./decisionProblem"
 
 export type RequestScreenState =
     | {readonly kind: "loading"}
-    | {readonly kind: "error"; readonly retry: () => void}
+    /** `orgRequired`: the server wants the organization named, which the app cannot do yet. */
+    | {readonly kind: "error"; readonly orgRequired: boolean; readonly retry: () => void}
     | {readonly kind: "ready"; readonly approval: Approval; readonly view: ApprovalView}
 
 /**
@@ -48,6 +50,18 @@ export interface RequestViewModel {
     readonly approve: () => void
     /** Sends the no with its reason; nothing happens without one. */
     readonly decline: () => void
+    /**
+     * Opens the console on this request (its universal link), where a yes that needs a fresh sign-in, or the
+     * organization the app cannot name, is dealt with; on the server of the session as it is now, nothing after a
+     * sign-out.
+     */
+    readonly openConsole: () => void
+    /**
+     * The console's address, once opening it failed (no browser, a refused link): shown as selectable text, to copy.
+     * `copied` once it is on the clipboard.
+     */
+    readonly consoleLink: {readonly url: string; readonly copied: boolean} | undefined
+    readonly copyConsoleLink: () => void
 }
 
 /**
@@ -66,7 +80,8 @@ function noApproveOf(view: ApprovalView): NoApprove | undefined {
 
 export function useRequestViewModel(id: string): RequestViewModel {
     const {t} = useTranslation()
-    const {biometrics, openUrl, sessionStore} = useServices()
+    const {biometrics, openUrl, copyText, sessionStore} = useServices()
+    const [consoleLink, setConsoleLink] = useState<{readonly url: string; readonly copied: boolean}>()
     const query = useApprovalView(id)
     const {mutateAsync} = useAnswer(id)
     const [sending, setSending] = useState<ApprovalAnswer>()
@@ -93,6 +108,7 @@ export function useRequestViewModel(id: string): RequestViewModel {
             if (answer === "approve" && !mayApprove) return
             setSending(answer)
             setProblem(undefined)
+            setConsoleLink(undefined)
             void (async () => {
                 // Biometrics unless the contract says the action is low risk (`needsBiometrics`).
                 const outcome = needsBiometrics(approval)
@@ -108,14 +124,7 @@ export function useRequestViewModel(id: string): RequestViewModel {
                         setDeclining(false)
                     } catch (error) {
                         // The answer's own invalidation reads the request again (`useAnswer`).
-                        const found = decisionProblem(error, askedByMe)
-                        // A yes that needs a fresh sign-in is given in the console: it opens on this request, on the
-                        // server of the session as it is now (nothing opens after a sign-out during the answer).
-                        const session = sessionStore.getState().state
-                        if (found === "step-up" && session.status === "signed-in") {
-                            void openUrl(`${session.session.serverUrl}/yes/${encodeURIComponent(approval.id)}`)
-                        }
-                        setProblem(found)
+                        setProblem(decisionProblem(error, askedByMe))
                     }
                 } else if (outcome !== "cancelled") {
                     setProblem(biometricProblem(outcome))
@@ -123,7 +132,7 @@ export function useRequestViewModel(id: string): RequestViewModel {
                 setSending(undefined)
             })()
         },
-        [approval, open, mayApprove, pinned, changed, biometrics, t, mutateAsync, askedByMe, openUrl, sessionStore],
+        [approval, open, mayApprove, pinned, changed, biometrics, t, mutateAsync, askedByMe],
     )
 
     const state: RequestScreenState =
@@ -132,6 +141,7 @@ export function useRequestViewModel(id: string): RequestViewModel {
             : query.isError
               ? {
                     kind: "error",
+                    orgRequired: isOrgRequired(query.error),
                     retry: () => {
                         void refetch()
                     },
@@ -149,6 +159,7 @@ export function useRequestViewModel(id: string): RequestViewModel {
         reread: () => {
             if (reading !== undefined) setPinned(reading)
             setProblem(undefined)
+            setConsoleLink(undefined)
         },
         declining,
         reason,
@@ -161,6 +172,32 @@ export function useRequestViewModel(id: string): RequestViewModel {
         },
         approve: () => {
             send("approve")
+        },
+        openConsole: () => {
+            const session = sessionStore.getState().state
+            if (session.status !== "signed-in") return
+            const url = `${session.session.serverUrl}/yes/${encodeURIComponent(id)}`
+            void openUrl(url).then(
+                () => {
+                    setConsoleLink(undefined)
+                },
+                () => {
+                    setConsoleLink({url, copied: false})
+                },
+            )
+        },
+        consoleLink,
+        copyConsoleLink: () => {
+            if (consoleLink === undefined) return
+            const {url} = consoleLink
+            void copyText(url).then(
+                () => {
+                    setConsoleLink({url, copied: true})
+                },
+                () => {
+                    setConsoleLink({url, copied: false})
+                },
+            )
         },
         decline: () => {
             const note = reason.trim()

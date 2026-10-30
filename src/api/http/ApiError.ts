@@ -29,3 +29,11 @@ export class ApiError extends Error {
 export function refusalType(error: unknown): string | undefined {
     return error instanceof ApiError && error.problem.kind === "refused" ? error.problem.type : undefined
 }
+
+/**
+ * The server wants the organization named (409 `org_required`, contract 0.1.142): the person is a member of several,
+ * and this session has none. Screens say so, instead of a plain "could not be loaded".
+ */
+export function isOrgRequired(error: unknown): boolean {
+    return refusalType(error) === "org_required"
+}

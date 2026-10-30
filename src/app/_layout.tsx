@@ -1,8 +1,8 @@
 import "@/config/i18n"
-import {createAppServices} from "@/config/services"
+import {servicesForBuild} from "@/config/buildServices"
 import {AppRoot} from "@/ui/AppRoot"
 
-const services = createAppServices()
+const services = servicesForBuild()
 
 /** A request opened from a notification or a deep link sits on top of the tabs: Back leads to the inbox. */
 export const unstable_settings = {anchor: "(tabs)"}

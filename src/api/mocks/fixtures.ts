@@ -9,8 +9,12 @@ import receiptVectors from "@/domain/receipts/__fixtures__/receipts.json"
 /** Example data shaped like the server's answers. Names are neutral (`acme`, `dev-a`, `rev-b`), as in the vectors. */
 export const MOCK_BASE_URL = "https://ostrom.test"
 
+/** The organization of the mock server's caller. */
+export const acme = {id: "org_acme", name: "acme", avatarUrl: "https://avatars.test/acme", connectedVia: "github-app"} as const
+
 export const me: z.input<typeof MeSchema> = {
     dev: {login: "rev-b", verified: true, via: "github"},
+    organization: acme,
     member: {id: "6f1c2a4e-8b3d-4c5e-9f70-1a2b3c4d5e6f", login: "rev-b", name: "Reviewer B", avatarUrl: "https://avatars.test/rev-b", role: "member"},
     capabilities: ["approvals.answer"],
 }
@@ -60,6 +64,15 @@ export const deployApproval: z.input<typeof ApprovalSchema> = {
     shownDigest: "7e6d5c4b3a2f1e0d9c8b7a6f5e4d3c2b1a0f9e8d7c6b5a4f3e2d1c0b9a8f7e6d",
     action: {kind: "deploy", repo: "acme/acme-api", ref: "main", headSha: "c60f859a1b2c3d4e5f60718293a4b5c6d7e8f901", risk: "low"},
     diffStats: {files: 2, additions: 41, deletions: 7},
+}
+
+/** A production deploy whose yes needs a fresh sign-in: the server answers 403 `step_up_required` (contract 0.1.140). */
+export const stepUpApproval: z.input<typeof ApprovalSchema> = {
+    ...deployApproval,
+    id: "appr_0004",
+    title: "Deploy acme-api to production",
+    shownDigest: "1b2c3d4e5f60718293a4b5c6d7e8f9010a9f8e7d6c5b4a3f2e1d0c9b8a7f6e5d",
+    action: {kind: "deploy", repo: "acme/acme-api", ref: "v2.4.0", headSha: "c60f859a1b2c3d4e5f60718293a4b5c6d7e8f901", risk: "low"},
 }
 
 export const decidedApproval: z.input<typeof ApprovalSchema> = {

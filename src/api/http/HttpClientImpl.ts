@@ -8,6 +8,11 @@ export interface HttpClientConfig {
     readonly baseUrl: string
     /** The session token, read at each call so a sign-in or a sign-out takes effect at once. */
     readonly token: () => string | undefined
+    /**
+     * The organization the calls act in, sent as `Ostrom-Org` (contract 0.1.142): a person in several organizations
+     * gets 409 `org_required` without it. Nothing is sent when it is unknown.
+     */
+    readonly org?: () => string | undefined
     readonly fetch?: typeof fetch
     /** How long to wait for an answer (headers and body) before giving up with `timeout`. */
     readonly timeoutMs?: number
@@ -46,6 +51,8 @@ export class HttpClientImpl implements HttpClient {
         const headers: Record<string, string> = {accept: "application/json"}
         const token = this.config.token()
         if (token !== undefined) headers["authorization"] = `Bearer ${token}`
+        const org = this.config.org?.()
+        if (org !== undefined) headers["ostrom-org"] = org
         const controller = new AbortController()
         const init: RequestInit = {method: request.method, headers, signal: controller.signal}
         if (request.body !== undefined) {

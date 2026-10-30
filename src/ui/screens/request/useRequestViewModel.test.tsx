@@ -191,7 +191,19 @@ describe("useRequestViewModel", () => {
         expect(result.current.changed).toBe(false)
     })
 
-    it("opens nothing on a fresh sign-in asked after the session ended during the answer", async () => {
+    it("opens the console on this request, on the server of the session", async () => {
+        const openUrl = jest.fn((_url: string) => Promise.resolve())
+        const view = (_id: string): Promise<ApprovalView> => Promise.resolve(viewOf(approvals.pending))
+        const services = await signedInServices({
+            repositories: fakeRepositories({approvals: {queue: jest.fn(), view, answer: jest.fn()}}),
+            openUrl,
+        })
+        const {result} = await renderHook(() => useRequestViewModel("appr 1"), {wrapper: wrapperOf(services)})
+        result.current.openConsole()
+        expect(openUrl).toHaveBeenCalledWith("https://ostrom.test/yes/appr%201")
+    })
+
+    it("opens the console on the request, and nothing once the session has ended", async () => {
         const openUrl = jest.fn((_url: string) => Promise.resolve())
         let refuse: (error: unknown) => void = () => undefined
         const answer = jest.fn<Promise<ApprovalView>, Parameters<ApprovalsRepository["answer"]>>(
@@ -223,6 +235,10 @@ describe("useRequestViewModel", () => {
             expect(result.current.problem).toBe("step-up")
         })
         expect(openUrl).not.toHaveBeenCalled()
+        result.current.openConsole()
+        expect(openUrl).not.toHaveBeenCalled()
+        result.current.copyConsoleLink()
+        expect(result.current.consoleLink).toBeUndefined()
     })
 
     it("is mine when the server says the request is mine", async () => {

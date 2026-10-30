@@ -19,6 +19,8 @@ export const fr: TranslationShape = {
     },
     common: {
         retry: "Réessayer",
+        orgRequired:
+            "Tu es membre de plusieurs organisations, et Ostrom doit savoir pour laquelle. L'app ne sait pas encore choisir : passe par la console pour l'instant.",
     },
     status: {
         pending: "En attente",
@@ -132,6 +134,10 @@ export const fr: TranslationShape = {
         truncated: "Le changement n'est pas montré en entier sur le téléphone : approuve-le depuis la console.",
         unknownStatus: "L'app ne connaît pas l'état de cette demande : réponds-y depuis la console.",
         cannotApprove: "Ton oui n'est pas pris sur cette demande.",
+        openConsole: "Ouvrir la console",
+        consoleNotOpened: "La console n'a pas pu s'ouvrir d'ici. Ouvre cette adresse dans un navigateur :",
+        copyLink: "Copier l'adresse",
+        copied: "Adresse copiée",
         note: "Note à l'agent : {{note}}",
         approvedBy: "Approuvée par {{who}}",
         approvedByAt: "Approuvée par {{who}} · {{at}}",
@@ -166,7 +172,9 @@ export const fr: TranslationShape = {
         problems: {
             "biometrics-unavailable": "Active Face ID, une empreinte ou un code sur ce téléphone pour répondre depuis lui.",
             "biometrics-failed": "Ton identité n'a pas pu être confirmée. Rien n'est parti.",
-            "step-up": "Ostrom veut une connexion récente pour ce oui : confirme-le dans la console, qui vient de s'ouvrir.",
+            "step-up": "Ostrom veut une connexion récente pour ce oui : confirme-le dans la console.",
+            "org-required":
+                "Tu es membre de plusieurs organisations, et Ostrom doit savoir pour laquelle est cette réponse. L'app ne sait pas encore choisir : réponds dans la console.",
             "self-approval": "Quelqu'un d'autre peut approuver cette demande : ton propre oui n'est pas pris.",
             changed: "La demande a changé depuis que tu l'as ouverte. Relis-la avant de répondre.",
             "already-decided": "Quelqu'un a déjà répondu à cette demande.",

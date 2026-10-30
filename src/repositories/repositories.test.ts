@@ -2,7 +2,7 @@ import {http as httpMock, HttpResponse} from "msw"
 import {setupServer} from "msw/node"
 import {HttpClientImpl} from "@/api/http/HttpClientImpl"
 import {ApiError} from "@/api/http/ApiError"
-import {MOCK_BASE_URL, notificationSettings, pendingApproval, receipts, selfApproval} from "@/api/mocks/fixtures"
+import {MOCK_BASE_URL, notificationSettings, pendingApproval, receipts, selfApproval, stepUpApproval} from "@/api/mocks/fixtures"
 import {createMockApi} from "@/api/mocks/handlers"
 import {AccountRepositoryImpl} from "./AccountRepositoryImpl"
 import {ActivityRepositoryImpl} from "./ActivityRepositoryImpl"
@@ -40,7 +40,7 @@ describe("ApprovalsRepositoryImpl", () => {
     it("reads the yes queue: what waits for my answer, then what was answered lately", async () => {
         const queue = await approvals.queue()
         expect(queue.operator).toBe("rev-b")
-        expect(queue.pending.map((view) => view.approval.id)).toEqual(["appr_0001", "appr_0002", "appr_0003"])
+        expect(queue.pending.map((view) => view.approval.id)).toEqual(["appr_0001", "appr_0002", "appr_0003", "appr_0004"])
         expect(queue.recent.map((view) => view.approval.id)).toEqual(["appr_0000"])
         // My own request is mine, and not mine to approve: the server says why.
         expect(queue.pending[1]?.you).toMatchObject({self: true, canApprove: false})
@@ -78,8 +78,15 @@ describe("ApprovalsRepositoryImpl", () => {
         expect(sent).toEqual({answer: "reject", shownDigest: "d", note: "Wait for the migration PR"})
     })
 
+    it("wants a fresh sign-in for a yes on the production deploy, but takes a no without one", async () => {
+        expect(await refusal(approvals.answer("appr_0004", "approve", stepUpApproval.shownDigest))).toBe("step_up_required")
+        await expect(approvals.answer("appr_0004", "reject", stepUpApproval.shownDigest, "Not today")).resolves.toMatchObject({
+            approval: {status: "rejected"},
+        })
+    })
+
     it("refuses my own yes when someone else can approve, but takes my no", async () => {
-        expect(await refusal(approvals.answer("appr_0002", "approve", selfApproval.shownDigest))).toBe("forbidden")
+        expect(await refusal(approvals.answer("appr_0002", "approve", selfApproval.shownDigest))).toBe("self_approval_refused")
         await expect(approvals.answer("appr_0002", "reject", selfApproval.shownDigest, "Not this one")).resolves.toMatchObject({
             approval: {status: "rejected"},
         })
@@ -190,6 +197,12 @@ describe("createMockApi", () => {
         const raw = await fetch(`${MOCK_BASE_URL}/api/v1/approvals/queue`)
         const body: unknown = await raw.json()
         expect(body).toMatchObject({operator: "rev-b", you: {login: "rev-b", via: "app"}, recent: [{approval: {id: "appr_0000"}}]})
+    })
+
+    it("answers 404 on a route the contract does not have", async () => {
+        const raw = await fetch(`${MOCK_BASE_URL}/api/v1/nothing/here`)
+        expect(raw.status).toBe(404)
+        expect(await raw.json()).toEqual({error: {type: "not_found", message: "No such route"}})
     })
 
     it("serves another origin when asked", async () => {

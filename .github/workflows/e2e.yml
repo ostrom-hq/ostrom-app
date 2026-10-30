@@ -25,16 +25,21 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      # The release build and the system image leave about 2 GB on the runner, and the emulator needs about 7 GB for
-      # its userdata partition (run 41016791024): drop toolchains this job never uses before anything is installed.
+      # The release build, the system image and the emulator's userdata do not fit on the runner as it comes: drop
+      # toolchains this job never uses before anything is installed. Below 8 GB free, the job stops here, in a minute,
+      # instead of failing on a full disk half an hour later.
       - name: Free disk space on the runner
         run: |
-          df -h /
           sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/local/share/boost /usr/share/swift \
             /opt/hostedtoolcache/CodeQL /opt/microsoft /opt/google/chrome \
             /usr/local/share/powershell /usr/local/share/chromium
           sudo docker image prune --all --force > /dev/null
-          df -h /
+          free_kib=$(df --output=avail -k / | tail -n 1)
+          echo "Free on / after the cleanup: $((free_kib / 1024 / 1024)) GiB"
+          if [ "$free_kib" -lt $((8 * 1024 * 1024)) ]; then
+            echo "::error::Less than 8 GiB free after the cleanup: the build and the emulator would not fit"
+            exit 1
+          fi
       - name: Enable KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -45,8 +50,11 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with: { node-version: 24, cache: npm }
       - run: npm ci
-      # No Ostrom server runs here: the flows prove the release build starts and holds its own checks.
+      # No Ostrom server runs here: the E2E build talks to the in-memory server of src/api/mocks
+      # (EXPO_PUBLIC_OSTROM_MOCK=1, inlined at build time), through the real HTTP client, repositories and screens.
       - name: Build the Android app (release, x86_64 for the emulator)
+        env:
+          EXPO_PUBLIC_OSTROM_MOCK: "1"
         run: |
           npx expo prebuild --platform android --no-install
           cd android && ./gradlew assembleRelease -PreactNativeArchitectures=x86_64 --no-daemon
@@ -67,12 +75,12 @@ jobs:
           disk-size: 4096M
           script: |
             adb install android/app/build/outputs/apk/release/app-release.apk
-            maestro test --format junit --output maestro-report.xml --test-output-dir maestro-output .maestro/
+            scripts/run-maestro.sh
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: maestro-report
           path: |
-            maestro-report.xml
+            maestro-report-*.xml
             maestro-output/
           if-no-files-found: ignore

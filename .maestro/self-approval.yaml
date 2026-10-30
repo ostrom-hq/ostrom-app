@@ -1,0 +1,38 @@
+# A request rev-b asked for: the server says their yes is not taken (canApprove false, self_approval_refused on an
+# answer). Approve is not offered, and the no still goes through, with its reason.
+appId: run.ostrom.app
+---
+- runFlow: common/sign-in.yaml
+- scrollUntilVisible:
+    element:
+      id: "request-appr_0002"
+    direction: DOWN
+- tapOn:
+    id: "request-appr_0002"
+# The buttons come after the evidence, below the fold on a phone.
+- scrollUntilVisible:
+    element:
+      id: "request-decline"
+    direction: DOWN
+- assertVisible: "Your yes is not taken on this request."
+- assertNotVisible:
+    id: "request-approve"
+- tapOn:
+    id: "request-decline"
+- tapOn:
+    id: "request-reason"
+- inputText: "Someone else reviews this one"
+- hideKeyboard
+# The send button comes under the reason field, below the fold.
+- scrollUntilVisible:
+    element:
+      id: "request-send-decline"
+    direction: DOWN
+- tapOn:
+    id: "request-send-decline"
+# The decision shows under the title, at the top of the request.
+- scrollUntilVisible:
+    element: "Declined by rev-b.*"
+    direction: UP
+    timeout: 15000
+- takeScreenshot: self-approval-declined

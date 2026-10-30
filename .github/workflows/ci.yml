@@ -23,7 +23,8 @@ jobs:
     # A draft pull request runs no CI: mark it ready when you want it.
     if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # Three production bundle exports (store check) come on top of the tests.
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
       - name: Read the pinned ostrom-core commit
@@ -56,3 +57,5 @@ jobs:
         run: npm run test:ci
       - name: Expo config is valid
         run: npx expo config --type public > /dev/null
+      - name: No store bundle carries the in-memory server
+        run: scripts/check-store-bundle.sh

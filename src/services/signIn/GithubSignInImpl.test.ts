@@ -16,9 +16,11 @@ function browser(answer: (start: URL) => AuthSessionResult): jest.Mock<Promise<A
     return jest.fn((url: string, _redirectUri: string) => Promise.resolve(answer(new URL(url))))
 }
 
-function account(exchange: AccountRepository["exchangeCode"] = jest.fn()): AccountRepository {
-    return {me: jest.fn(), exchangeCode: exchange, logout: jest.fn()}
+function account(exchange: AccountRepository["exchangeCode"] = jest.fn(), me: AccountRepository["me"] = jest.fn()): AccountRepository {
+    return {me, exchangeCode: exchange, logout: jest.fn()}
 }
+
+const acme = {id: "org_acme", name: "acme", avatarUrl: "https://avatars.test/acme", connectedVia: "github-app" as const}
 
 const callback = (query: Record<string, string>): AuthSessionResult => ({
     type: "success",
@@ -47,6 +49,41 @@ describe("GithubSignInImpl", () => {
         const exchange = exchangeCode.mock.calls[0]?.[0]
         expect(exchange?.code).toBe("good-code")
         expect(pkceChallenge(exchange?.codeVerifier ?? "")).toBe(start.searchParams.get("code_challenge"))
+    })
+
+    it("keeps the organization the server acts in, read with the new token", async () => {
+        const accountOf = jest.fn((_serverUrl: string, _token?: string) =>
+            account(
+                () => Promise.resolve({token: "ost_1", user: {login: "rev-b"}}),
+                () => Promise.resolve({dev: {login: "rev-b", verified: true, via: "github"}, organization: acme, capabilities: []}),
+            ),
+        )
+        const signIn = new GithubSignInImpl({
+            openAuthSession: browser((start) => callback({code: "good-code", state: start.searchParams.get("state") ?? ""})),
+            randomBytes: bytes,
+            accountOf,
+        })
+        await expect(signIn.signIn(SERVER)).resolves.toEqual({
+            kind: "signed-in",
+            session: {serverUrl: SERVER, token: "ost_1", user: {login: "rev-b"}, orgId: "org_acme"},
+        })
+        expect(accountOf).toHaveBeenCalledWith(SERVER, "ost_1")
+    })
+
+    it.each([
+        ["names none", () => Promise.resolve({dev: {login: "rev-b", verified: true, via: "github"}, capabilities: []})],
+        ["wants an organization named (several memberships)", () =>
+            Promise.reject(new ApiError({kind: "refused", status: 409, type: "org_required", message: ""}))],
+    ])("signs in without an organization when the server %s", async (_case, me: AccountRepository["me"]) => {
+        const signIn = new GithubSignInImpl({
+            openAuthSession: browser((start) => callback({code: "good-code", state: start.searchParams.get("state") ?? ""})),
+            randomBytes: bytes,
+            accountOf: () => account(() => Promise.resolve({token: "ost_1", user: {login: "rev-b"}}), me),
+        })
+        await expect(signIn.signIn(SERVER)).resolves.toEqual({
+            kind: "signed-in",
+            session: {serverUrl: SERVER, token: "ost_1", user: {login: "rev-b"}},
+        })
     })
 
     it("is cancelled when the person closes the browser", async () => {

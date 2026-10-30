@@ -12,8 +12,8 @@ export type AuthSessionResult = {readonly type: "success"; readonly url: string}
 export interface GithubSignInDependencies {
     readonly openAuthSession: (url: string, redirectUri: string) => Promise<AuthSessionResult>
     readonly randomBytes: (length: number) => Uint8Array
-    /** The account API of the server being signed in to (no token yet). */
-    readonly accountOf: (serverUrl: string) => AccountRepository
+    /** The account API of the server being signed in to: without a token for the exchange, with it to read `me`. */
+    readonly accountOf: (serverUrl: string, token?: string) => AccountRepository
 }
 
 const CallbackSchema = z.union([
@@ -53,9 +53,23 @@ export class GithubSignInImpl implements GithubSignIn {
             const token = await this.dependencies
                 .accountOf(serverUrl)
                 .exchangeCode({code: callback.data.code, codeVerifier: pkce.verifier, redirectUri: REDIRECT_URI})
-            return {kind: "signed-in", session: {serverUrl, token: token.token, user: token.user}}
+            const session = {serverUrl, token: token.token, user: token.user}
+            const orgId = await this.orgOf(serverUrl, token.token)
+            return {kind: "signed-in", session: orgId === undefined ? session : {...session, orgId}}
         } catch {
             return {kind: "failed", reason: "exchange-failed"}
+        }
+    }
+
+    /**
+     * The organization the server acts in for this person (`me.organization`), sent as `Ostrom-Org` from then on.
+     * None when the server does not say: several memberships answer 409 `org_required`, and the screens tell it.
+     */
+    private async orgOf(serverUrl: string, token: string): Promise<string | undefined> {
+        try {
+            return (await this.dependencies.accountOf(serverUrl, token).me()).organization?.id
+        } catch {
+            return undefined
         }
     }
 }

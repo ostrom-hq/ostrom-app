@@ -171,6 +171,24 @@ function Actions({model, approval}: {model: RequestViewModel; approval: Approval
                     {t(`request.problems.${problem}`)}
                 </Text>
             )}
+            {/* A yes that needs a fresh sign-in, or an organization the app cannot name, is given in the console. */}
+            {problem === "step-up" || problem === "org-required" ? (
+                <Button label={t("request.openConsole")} variant="signal" onPress={model.openConsole} testID="request-open-console" />
+            ) : null}
+            {/* The console did not open: its address, to open by hand. */}
+            {model.consoleLink !== undefined ? (
+                <>
+                    <Text style={[styles.body, {color: colors.text}]}>{t("request.consoleNotOpened")}</Text>
+                    <Text selectable style={[styles.body, {color: colors.text}]} testID="request-console-url">
+                        {model.consoleLink.url}
+                    </Text>
+                    <Button
+                        label={model.consoleLink.copied ? t("request.copied") : t("request.copyLink")}
+                        onPress={model.copyConsoleLink}
+                        testID="request-copy-console"
+                    />
+                </>
+            ) : null}
             {noApprove === undefined ? null : (
                 <Text style={[styles.body, {color: colors.text}]}>
                     {noApprove.kind === "truncated" ? t("request.truncated") : t("request.cannotApprove")}
@@ -235,7 +253,7 @@ export function RequestScreen({id}: {id: string}): React.JSX.Element {
     if (state.kind === "error") {
         return (
             <View style={styles.message}>
-                <Text style={[styles.body, {color: colors.textMuted}]}>{t("request.error")}</Text>
+                <Text style={[styles.body, {color: colors.textMuted}]}>{state.orgRequired ? t("common.orgRequired") : t("request.error")}</Text>
                 <Button label={t("common.retry")} onPress={state.retry} />
             </View>
         )
