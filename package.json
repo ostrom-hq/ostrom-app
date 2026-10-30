@@ -15,7 +15,9 @@
     "lint": "eslint --max-warnings=0 .",
     "test": "jest",
     "test:ci": "jest --ci --coverage",
-    "check": "npm run typecheck && npm run lint && npm run test"
+    "check": "npm run typecheck && npm run lint && npm run test",
+    "gen:api": "npx --yes @hey-api/openapi-ts@0.99.0",
+    "gen:check": "npm run gen:api && git diff --exit-code -- src/api/gen && test -z \"$(git status --porcelain -- src/api/gen)\""
   },
   "dependencies": {
     "@expo/metro-runtime": "~58.0.15",
