@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import {MutationCache, QueryCache, QueryClient} from "@tanstack/react-query"
 import {ApiError} from "@/api/http/ApiError"
 

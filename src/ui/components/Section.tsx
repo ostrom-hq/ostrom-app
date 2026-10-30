@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type {ReactNode} from "react"
 import {StyleSheet, Text, View} from "react-native"
 import {fontSize, radius, space} from "@/ui/theme/tokens"
