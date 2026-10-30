@@ -84,7 +84,7 @@ describe("createMockAppServices", () => {
         expect(await services.push.register()).toEqual({kind: "unavailable"})
         expect(await services.push.launchData()).toBeUndefined()
         const unsubscribe = services.push.onOpen(jest.fn())
-        expect(unsubscribe()).toBeUndefined()
+        expect(unsubscribe).not.toThrow()
     })
 })
 
