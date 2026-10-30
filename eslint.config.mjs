@@ -38,13 +38,24 @@ export default tseslint.config(
                 tsconfigRootDir: import.meta.dirname,
             },
         },
+        // ostrom-core docs/CONVENTIONS.md § 13.2.
         rules: {
+            "@typescript-eslint/no-explicit-any": "error",
+            "@typescript-eslint/no-non-null-assertion": "error",
+            "@typescript-eslint/ban-ts-comment": [
+                "error",
+                {"ts-ignore": true, "ts-expect-error": true, "ts-nocheck": true, "ts-check": false},
+            ],
+            // Only `as const`: data from outside is parsed with zod, never asserted.
+            "@typescript-eslint/consistent-type-assertions": ["error", {assertionStyle: "never"}],
             "@typescript-eslint/consistent-type-imports": ["error", {fixStyle: "inline-type-imports"}],
             "@typescript-eslint/consistent-type-exports": "error",
+            "@typescript-eslint/consistent-type-definitions": ["error", "interface"],
+            "@typescript-eslint/explicit-function-return-type": ["error", {allowExpressions: true}],
             "@typescript-eslint/switch-exhaustiveness-check": "error",
-            "@typescript-eslint/explicit-module-boundary-types": "error",
+            "@typescript-eslint/no-floating-promises": "error",
             "@typescript-eslint/no-unused-vars": ["error", {argsIgnorePattern: "^_", varsIgnorePattern: "^_"}],
-            "@typescript-eslint/strict-boolean-expressions": ["error", {allowNullableBoolean: true}],
+            "@typescript-eslint/strict-boolean-expressions": "error",
             "@typescript-eslint/no-import-type-side-effects": "error",
             "@typescript-eslint/restrict-template-expressions": ["error", {allowNumber: true}],
             "no-console": ["error", {allow: ["warn", "error"]}],
@@ -52,24 +63,7 @@ export default tseslint.config(
         },
     },
     {
-        // JSON.parse and fetch bodies are unknown until a zod schema has read them.
-        files: ["src/**/*.{ts,tsx}"],
-        rules: {
-            "no-restricted-syntax": [
-                "error",
-                {
-                    selector: "TSAsExpression > TSTypeReference[typeName.name!='const']",
-                    message: "No type assertions on data: parse it with a zod schema instead.",
-                },
-            ],
-        },
-    },
-    {
         files: ["**/*.test.{ts,tsx}", "src/test/**/*.{ts,tsx}"],
         languageOptions: {globals: {...globals.jest}},
-        rules: {
-            "no-restricted-syntax": "off",
-            "@typescript-eslint/no-non-null-assertion": "off",
-        },
     },
 )
