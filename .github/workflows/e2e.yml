@@ -11,7 +11,8 @@ on:
 
 concurrency:
   group: e2e-${{ github.ref }}
-  cancel-in-progress: true
+  # Every commit of main keeps its run; a newer push replaces the run of a branch.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 permissions:
   contents: read
@@ -34,14 +35,14 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with: { node-version: 24, cache: npm }
       - run: npm ci
+      # No Ostrom server runs here: the flows prove the release build starts and holds its own checks.
       - name: Build the Android app (release, x86_64 for the emulator)
-        env:
-          # 10.0.2.2 is the host as seen from the Android emulator.
-          EXPO_PUBLIC_OSTROM_API_URL: http://10.0.2.2:4961
         run: |
           npx expo prebuild --platform android --no-install
           cd android && ./gradlew assembleRelease -PreactNativeArchitectures=x86_64 --no-daemon
-      - name: Install Maestro
+      - name: Install Maestro (pinned)
+        env:
+          MAESTRO_VERSION: 2.12.0
         run: |
           curl -fsSL "https://get.maestro.mobile.dev" | bash
           echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
@@ -54,12 +55,12 @@ jobs:
           disable-animations: true
           script: |
             adb install android/app/build/outputs/apk/release/app-release.apk
-            maestro test --format junit --output maestro-report.xml .maestro/
+            maestro test --format junit --output maestro-report.xml --test-output-dir maestro-output .maestro/
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: maestro-report
           path: |
             maestro-report.xml
-            ~/.maestro/tests/
+            maestro-output/
           if-no-files-found: ignore
