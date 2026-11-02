@@ -107,14 +107,17 @@ emulator (device offline, `DeviceServerDiedException`), never on a failed assert
 
 Against the real server, the workflow `App journey` of ostrom-server (`.github/workflows/app-journey.yml`, run on demand
 with this repository's ref; it lives there because that repository's token reads the server image) starts the
-`sha-<7>` image of ostrom-server main with PostgreSQL, signs a new person in by e-mail, gives them an organization and a
-personal token (`scripts/real-server-session.sh`), and builds this app with `EXPO_PUBLIC_OSTROM_REAL_E2E=1`: the real
-services, signed in with that token (`src/config/realServices.ts`). It runs the flows of `.maestro/real/` on an Android
-emulator of the same runner.
+`sha-<7>` image of ostrom-server main with PostgreSQL and the demo stack's fake GitHub, then prepares it through the
+server's own routes (`scripts/real-server-session.sh`): the phone's person signs in with GitHub, owns the organization
+and is named approver of pushes to main; another member, signed in by e-mail, asks two pushes; the phone's session is
+made by the app's sign-in (PKCE S256 to `ostrom://auth/callback`, `POST /auth/mobile/token`). The app is built with
+`EXPO_PUBLIC_OSTROM_REAL_E2E=1`: the real services, given that session and its unlock key (`src/config/realServices.ts`).
+It runs the flows of `.maestro/real/` on an Android emulator of the same runner, then the job checks through the API that
+the gates are approved and rejected and that each receipt verifies.
 
 | Flow (real server) | What it proves | What it does not |
 |---|---|---|
-| `real/journey.yaml` | Signed in on the real server: the inbox reads its yes queue (empty), Settings shows the login and the only organization, the History reads its receipts and keys (none yet) | The PKCE sign-in and the unlock (a personal token stands in), a request answered (none is pending) |
+| `real/journey.yaml` | On the real server: the inbox reads the yes queue, a yes (biometrics, `POST /auth/mobile/unlock`, the answer) and a no with its reason go through, Settings shows the login and the only organization, the History shows the signed receipts verified on the phone | The app's own browser hop of the sign-in (the job makes the session by the same routes); a real fingerprint (the build confirms it: no finger is enrolled on the emulator) |
 
 ## Layout
 

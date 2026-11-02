@@ -1,6 +1,8 @@
-# Against the real Ostrom server (ostrom-server's app-journey workflow): signed in with the token the job made for a new
-# person of a new organization, the inbox reads that server's yes queue (empty), Settings shows who signed in and their
-# only organization, and the History reads its receipts and signing keys: none yet.
+# Against the real Ostrom server (ostrom-server's app-journey workflow). The job signed the phone's person in with
+# GitHub as the app does (PKCE to its deep link, `POST /auth/mobile/token`) and gave the build that session and its
+# unlock key; another member of their organization asked two pushes to main that wait for them. The app reads the
+# real yes queue, says yes to one (biometrics, then the unlock on the server) and no to the other, then shows both
+# signed receipts, verified on the phone. The job checks the gates and receipts through the API afterwards.
 appId: run.ostrom.app
 ---
 - launchApp:
@@ -8,9 +10,64 @@ appId: run.ostrom.app
 - tapOn:
     id: "login-github"
 - extendedWaitUntil:
-    visible: "Nothing waits for your yes right now."
+    visible:
+      id: "request-${OSTROM_E2E_YES}"
     timeout: 30000
+- assertVisible:
+    id: "request-${OSTROM_E2E_NO}"
 - takeScreenshot: real-inbox
+
+# The yes.
+- tapOn:
+    id: "request-${OSTROM_E2E_YES}"
+# The buttons come after the evidence, below the fold on a phone.
+- scrollUntilVisible:
+    element:
+      id: "request-approve"
+    direction: DOWN
+    timeout: 20000
+- tapOn:
+    id: "request-approve"
+# The decision shows under the title, at the top of the request.
+- scrollUntilVisible:
+    element: "Approved by .*"
+    direction: UP
+    timeout: 30000
+- takeScreenshot: real-approved
+- back
+
+# The no, with its reason.
+- extendedWaitUntil:
+    visible:
+      id: "request-${OSTROM_E2E_NO}"
+    timeout: 20000
+- tapOn:
+    id: "request-${OSTROM_E2E_NO}"
+- scrollUntilVisible:
+    element:
+      id: "request-decline"
+    direction: DOWN
+    timeout: 20000
+- tapOn:
+    id: "request-decline"
+- tapOn:
+    id: "request-reason"
+- inputText: "Not this push"
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: "request-send-decline"
+    direction: DOWN
+- tapOn:
+    id: "request-send-decline"
+- scrollUntilVisible:
+    element: "Declined by .*"
+    direction: UP
+    timeout: 30000
+- takeScreenshot: real-declined
+- back
+
+# Who is signed in, and their only organization.
 - tapOn: "Settings"
 - extendedWaitUntil:
     visible: "${OSTROM_E2E_LOGIN}"
@@ -19,8 +76,11 @@ appId: run.ostrom.app
     visible: "acme-e2e"
     timeout: 20000
 - takeScreenshot: real-settings
+
+# Both decisions, signed by the server and verified on the phone against the key it publishes.
 - tapOn: "History"
 - extendedWaitUntil:
-    visible: "No receipt yet."
+    visible: "Signature verified on this phone.*"
     timeout: 30000
+- assertNotVisible: "Signature rejected.*"
 - takeScreenshot: real-history

@@ -7,7 +7,7 @@ const config = getDefaultConfig(__dirname)
 // The E2E build (EXPO_PUBLIC_OSTROM_MOCK=1, set by the E2E workflow only) resolves the services of the build to the
 // in-memory server's. Any other build never resolves that file: the mock server and its fixtures are not in its bundle.
 // The E2E build against a real server (EXPO_PUBLIC_OSTROM_REAL_E2E=1, set by ostrom-server's app-journey only) resolves it to
-// the real services with the token the CI made on that server.
+// the real services with the phone session the CI made on that server.
 if (process.env.EXPO_PUBLIC_OSTROM_MOCK === "1" && process.env.EXPO_PUBLIC_OSTROM_REAL_E2E === "1") {
     throw new Error("EXPO_PUBLIC_OSTROM_MOCK and EXPO_PUBLIC_OSTROM_REAL_E2E are both set: an E2E build has one server")
 }
