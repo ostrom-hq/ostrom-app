@@ -3,9 +3,10 @@ import {act, fireEvent, screen, waitFor} from "@testing-library/react-native"
 import type {Approval, ApprovalAnswer, ApprovalView} from "@/api/contract/approvals"
 import {ApiError} from "@/api/http/ApiError"
 import type {ApprovalsRepository} from "@/repositories/ApprovalsRepository"
+import type {AppServices} from "@/services/AppServices"
 import type {BiometricOutcome} from "@/services/biometrics/BiometricGate"
 import type {UnlockOutcome} from "@/services/unlock/PhoneUnlock"
-import {approvals, fakeRepositories, signedInServices, viewOf} from "@/test/fakeServices"
+import {approvals, fakeRepositories, signedInServices, testSession, viewOf} from "@/test/fakeServices"
 import {renderWithServices} from "@/test/renderWithServices"
 import {RequestScreen} from "./RequestScreen"
 
@@ -227,6 +228,24 @@ describe("RequestScreen", () => {
         await fireEvent.press(await screen.findByRole("button", {name: "Approve"}))
         expect(await screen.findByText("Your session has expired. Sign in again.")).toBeOnTheScreen()
         expect(services.sessionStore.getState().state).toEqual({status: "signed-out"})
+    })
+
+    it("signs nothing out on a late 401 of a session already left", async () => {
+        let services: AppServices | undefined
+        const unlock = jest.fn(async () => {
+            // The person signed out and in again while the unlock was on its way.
+            await services?.sessionStore.getState().signOut()
+            await services?.sessionStore.getState().signIn(testSession)
+            throw new ApiError({kind: "unauthorized"})
+        })
+        services = await signedInServices({
+            unlock: {keep: jest.fn(), unlock, forget: jest.fn()},
+            repositories: fakeRepositories({approvals: {queue: jest.fn(), view: () => Promise.resolve(viewOf(approvals.pending)), answer: jest.fn()}}),
+        })
+        await renderWithServices(<RequestScreen id="appr_0001" />, services)
+        await fireEvent.press(await screen.findByRole("button", {name: "Approve"}))
+        expect(await screen.findByText("Your session has expired. Sign in again.")).toBeOnTheScreen()
+        expect(services.sessionStore.getState().state).toEqual({status: "signed-in", session: testSession})
     })
 
     it("reads the request again when it changed after the screen showed it", async () => {

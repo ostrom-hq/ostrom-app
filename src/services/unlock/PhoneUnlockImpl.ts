@@ -15,11 +15,9 @@ export interface PhoneUnlockDependencies {
     readonly now?: () => number
 }
 
-/** The server's no to the key, with or without the contract's error body (a proxy answers without it). */
+/** The server's own no to the key, in the contract's error body: a proxy's bare 403 is no word on the key. */
 function isRefusal(error: unknown): boolean {
-    if (!(error instanceof ApiError)) return false
-    const {problem} = error
-    return (problem.kind === "refused" || problem.kind === "unexpected-status") && (problem.status === 400 || problem.status === 403)
+    return error instanceof ApiError && error.problem.kind === "refused" && (error.problem.status === 400 || error.problem.status === 403)
 }
 
 function phoneNow(): number {
@@ -28,17 +26,20 @@ function phoneNow(): number {
 
 export class PhoneUnlockImpl implements PhoneUnlock {
     private unlockedAt: number | undefined
-    /** Counts the sign-outs: an unlock that answers after one proves nothing for the next session. */
-    private forgets = 0
+    /** Counts the sessions (a key kept, a key forgotten): an unlock started in one proves nothing for the next. */
+    private session = 0
 
     constructor(private readonly dependencies: PhoneUnlockDependencies) {}
 
     keep(unlockKey: string): Promise<void> {
+        this.session += 1
+        this.unlockedAt = undefined
         return this.dependencies.keys.save(unlockKey)
     }
 
     async unlock(prompt: string, account: AccountRepository, {always}: UnlockOptions): Promise<UnlockOutcome> {
         const {keys, biometrics, now = phoneNow} = this.dependencies
+        const asked = this.session
         // No key (a server before the unlock, or a session kept before it): the app's own check, as before.
         const withoutKey = (): Promise<UnlockOutcome> => (always ? biometrics.confirm(prompt) : Promise.resolve("confirmed"))
         if (!(await keys.has())) return withoutKey()
@@ -48,13 +49,12 @@ export class PhoneUnlockImpl implements PhoneUnlock {
         switch (read.kind) {
             case "none":
                 // Kept, but gone from the keychain (passcode removed, keychain reset): only a new sign-in brings one.
-                await keys.clear().catch(() => undefined)
+                if (asked === this.session) await keys.clear().catch(() => undefined)
                 return "refused"
             case "cancelled":
             case "failed":
                 return read.kind
             case "key": {
-                const asked = this.forgets
                 try {
                     await account.unlock(read.key)
                 } catch (error) {
@@ -63,14 +63,14 @@ export class PhoneUnlockImpl implements PhoneUnlock {
                     if (isRefusal(error)) return "refused"
                     throw error
                 }
-                if (asked === this.forgets) this.unlockedAt = now()
+                if (asked === this.session) this.unlockedAt = now()
                 return "confirmed"
             }
         }
     }
 
     async forget(): Promise<void> {
-        this.forgets += 1
+        this.session += 1
         this.unlockedAt = undefined
         await this.dependencies.keys.clear()
     }

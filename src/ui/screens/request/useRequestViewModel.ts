@@ -124,6 +124,7 @@ export function useRequestViewModel(id: string): RequestViewModel {
                 // Biometrics unless the contract says the action is low risk (`needsBiometrics`), and then proven to
                 // the server; a low-risk answer asks them only when the last unlock is too old for the server.
                 let outcome: UnlockOutcome
+                const askedIn = sessionStore.getState().state
                 try {
                     outcome = await unlock.unlock(
                         t(answer === "approve" ? "request.confirm.approve" : "request.confirm.decline", {title: approval.title}),
@@ -133,7 +134,10 @@ export function useRequestViewModel(id: string): RequestViewModel {
                 } catch (error) {
                     // Offline, a 5xx, the keychain: the unlock comes first, so nothing was sent. The unlock goes around
                     // the query client: a token the server no longer takes signs out here.
-                    if (error instanceof ApiError && error.problem.kind === "unauthorized") void sessionStore.getState().signOut()
+                    // A late 401 of a session already left signs nothing out.
+                    if (error instanceof ApiError && error.problem.kind === "unauthorized" && sessionStore.getState().state === askedIn) {
+                        void sessionStore.getState().signOut()
+                    }
                     setProblem(unlockProblem(error))
                     setSending(undefined)
                     return

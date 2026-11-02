@@ -64,8 +64,6 @@ describe("PhoneUnlockImpl", () => {
     it.each([
         new ApiError({kind: "refused", status: 400, type: "unlock_refused", message: ""}),
         new ApiError({kind: "refused", status: 403, type: "unlock_refused", message: ""}),
-        // A proxy's 403, without the contract's body.
-        new ApiError({kind: "unexpected-status", status: 403}),
     ])("says refused when the server answers %p to the key, and unlocks again next time", async (refusal) => {
         const {unlock, account, serverUnlock} = harness(() => Promise.reject(refusal))
         await unlock.keep("key-1")
@@ -80,6 +78,7 @@ describe("PhoneUnlockImpl", () => {
         ["an expired session", new ApiError({kind: "unauthorized"})],
         ["another refusal", new ApiError({kind: "refused", status: 409, type: "conflict", message: ""})],
         ["another status", new ApiError({kind: "unexpected-status", status: 404})],
+        ["a proxy's bare 403", new ApiError({kind: "unexpected-status", status: 403})],
         ["not the server's", new Error("boom")],
     ])("lets the failure through when the server is %s: the key is not refused", async (_case, error) => {
         const {unlock, keys, account} = harness(() => Promise.reject(error))
@@ -145,6 +144,44 @@ describe("PhoneUnlockImpl", () => {
         expect(await pending).toBe("confirmed")
         expect(await unlock.unlock("Approve", account, {always: false})).toBe("confirmed")
         expect(serverUnlock).toHaveBeenLastCalledWith("key-2")
+    })
+
+    it("leaves the next session's key alone when a read of the last one finds nothing after a sign-out", async () => {
+        let found = (): void => undefined
+        let reach = (): void => undefined
+        const reached = new Promise<void>((resolve) => {
+            reach = resolve
+        })
+        const clear = jest.fn(() => Promise.resolve())
+        const keys: UnlockKeyStore = {
+            save: () => Promise.resolve(),
+            has: () => Promise.resolve(true),
+            read: () =>
+                new Promise((resolve) => {
+                    found = () => {
+                        resolve({kind: "none"})
+                    }
+                    reach()
+                }),
+            clear,
+        }
+        const unlock = new PhoneUnlockImpl({keys, biometrics: {confirm: jest.fn()}, now: () => 0})
+        const pending = unlock.unlock("Approve", harness().account, {always: false})
+        await reached
+        await unlock.keep("key-2")
+        found()
+        expect(await pending).toBe("refused")
+        expect(clear).not.toHaveBeenCalled()
+    })
+
+    it("starts afresh with each key kept: an unlock of the last session is not fresh for the next", async () => {
+        const {unlock, account, serverUnlock} = harness()
+        await unlock.keep("key-1")
+        await unlock.unlock("Approve", account, {always: false})
+        await unlock.keep("key-2")
+        await unlock.unlock("Approve", account, {always: false})
+        expect(serverUnlock).toHaveBeenLastCalledWith("key-2")
+        expect(serverUnlock).toHaveBeenCalledTimes(2)
     })
 
     it("keeps time on the phone's clock by default", async () => {
