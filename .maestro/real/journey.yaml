@@ -2,8 +2,8 @@
 # GitHub as the app does (PKCE to its deep link, `POST /auth/mobile/token`) and gave the build that session and its
 # unlock key; another member of their organization asked two pushes to main that wait for them. The app reads the
 # real yes queue, says yes to one (biometrics, then the unlock on the server) and no to the other, then shows both
-# signed receipts, verified on the phone, the organization's activity (the requests and the decisions, on the
-# repository of the job) and its spending (nothing yet). The job checks the gates and receipts through the API
+# signed receipts, verified on the phone, the organization's activity (the requests, on the repository of the
+# job) and its spending (nothing yet). The job checks the gates and receipts through the API
 # afterwards.
 appId: run.ostrom.app
 ---
@@ -94,22 +94,25 @@ appId: run.ostrom.app
 - assertNotVisible: "Not verified.*"
 - takeScreenshot: real-history
 
-# The organization's activity (`GET /activity`): the two requests and the two decisions, on the job's repository.
+# The organization's activity (`GET /activity`): at least the two requests, on the job's repository. A row's details
+# read "<who> · <repo> · <when>": the separators around the repository keep an empty OSTROM_E2E_REPO from matching any
+# text.
 - tapOn: "Activity"
 - extendedWaitUntil:
-    visible: ".*${OSTROM_E2E_REPO}.*"
+    visible: ".* · ${OSTROM_E2E_REPO} · .*"
     timeout: 30000
 - assertVisible:
-    text: ".*${OSTROM_E2E_REPO}.*"
+    text: ".* · ${OSTROM_E2E_REPO} · .*"
     index: 1
 - assertNotVisible: "No activity yet."
 - assertNotVisible: "The activity could not be loaded."
 - takeScreenshot: real-activity
 
-# Its spending (`GET /spending`): read from the server, nothing spent by a new organization.
+# Its spending (`GET /spending`): read from the server, a total of $0.00 and nothing spent by a new organization.
 - tapOn: "Spending"
 - extendedWaitUntil:
-    visible: "Nothing spent."
+    visible: "\\$0\\.00"
     timeout: 30000
+- assertVisible: "Nothing spent."
 - assertNotVisible: "The spending could not be loaded."
 - takeScreenshot: real-spending
