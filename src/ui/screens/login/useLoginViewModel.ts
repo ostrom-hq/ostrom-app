@@ -43,7 +43,11 @@ export function useLoginViewModel(): LoginViewModel {
                     case "signed-in":
                         // Without the key kept, the server takes no answer from this phone: it says so then. A sign-in
                         // without a key leaves none of an earlier one behind.
-                        await (outcome.unlockKey === undefined ? unlock.forget() : unlock.keep(outcome.unlockKey)).catch(() => undefined)
+                        // A key that cannot be kept takes no earlier one's place either.
+                        const {unlockKey} = outcome
+                        await (unlockKey === undefined ? unlock.forget() : unlock.keep(unlockKey).catch(() => unlock.forget())).catch(
+                            () => undefined,
+                        )
                         await sessionStore.getState().signIn(outcome.session)
                         break
                     case "failed":

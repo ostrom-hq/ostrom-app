@@ -61,8 +61,13 @@ describe("PhoneUnlockImpl", () => {
         expect(confirm).not.toHaveBeenCalled()
     })
 
-    it.each([400, 403])("says refused when the server answers %p to the key, and unlocks again next time", async (status) => {
-        const {unlock, account, serverUnlock} = harness(() => Promise.reject(new ApiError({kind: "refused", status, type: "unlock_refused", message: ""})))
+    it.each([
+        new ApiError({kind: "refused", status: 400, type: "unlock_refused", message: ""}),
+        new ApiError({kind: "refused", status: 403, type: "unlock_refused", message: ""}),
+        // A proxy's 403, without the contract's body.
+        new ApiError({kind: "unexpected-status", status: 403}),
+    ])("says refused when the server answers %p to the key, and unlocks again next time", async (refusal) => {
+        const {unlock, account, serverUnlock} = harness(() => Promise.reject(refusal))
         await unlock.keep("key-1")
         expect(await unlock.unlock("Approve", account, {always: false})).toBe("refused")
         expect(await unlock.unlock("Approve", account, {always: false})).toBe("refused")
@@ -74,6 +79,7 @@ describe("PhoneUnlockImpl", () => {
         ["a 5xx", new ApiError({kind: "server", status: 502})],
         ["an expired session", new ApiError({kind: "unauthorized"})],
         ["another refusal", new ApiError({kind: "refused", status: 409, type: "conflict", message: ""})],
+        ["another status", new ApiError({kind: "unexpected-status", status: 404})],
         ["not the server's", new Error("boom")],
     ])("lets the failure through when the server is %s: the key is not refused", async (_case, error) => {
         const {unlock, keys, account} = harness(() => Promise.reject(error))
@@ -98,7 +104,8 @@ describe("PhoneUnlockImpl", () => {
     })
 
     it.each([true, false])("says refused and clears the mark when the kept key is gone from the keychain (always: %p)", async (always) => {
-        const clear = jest.fn(() => Promise.resolve())
+        // Even a mark that cannot be cleared says refused.
+        const clear = jest.fn(() => Promise.reject(new Error("keychain locked")))
         const keys: UnlockKeyStore = {
             save: jest.fn(),
             has: () => Promise.resolve(true),
@@ -110,6 +117,34 @@ describe("PhoneUnlockImpl", () => {
         expect(await unlock.unlock("Approve", harness().account, {always})).toBe("refused")
         expect(clear).toHaveBeenCalledTimes(1)
         expect(confirm).not.toHaveBeenCalled()
+    })
+
+    it("proves nothing for the next session when the unlock answers after a sign-out", async () => {
+        const unlocked: Unlock = {authenticatedAt: "2026-10-30T12:00:00Z"}
+        let answer = (): void => undefined
+        let reach = (): void => undefined
+        const reached = new Promise<void>((resolve) => {
+            reach = resolve
+        })
+        const {unlock, account, serverUnlock} = harness((key) =>
+            key === "key-1"
+                ? new Promise((resolve) => {
+                      answer = () => {
+                          resolve(unlocked)
+                      }
+                      reach()
+                  })
+                : Promise.resolve(unlocked),
+        )
+        await unlock.keep("key-1")
+        const pending = unlock.unlock("Approve", account, {always: false})
+        await reached
+        await unlock.forget()
+        await unlock.keep("key-2")
+        answer()
+        expect(await pending).toBe("confirmed")
+        expect(await unlock.unlock("Approve", account, {always: false})).toBe("confirmed")
+        expect(serverUnlock).toHaveBeenLastCalledWith("key-2")
     })
 
     it("keeps time on the phone's clock by default", async () => {

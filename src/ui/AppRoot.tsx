@@ -20,12 +20,15 @@ function RootNavigator(): React.JSX.Element | null {
         void sessionStore.getState().hydrate()
     }, [sessionStore])
     useEffect(followAppFocus, [])
+    const wasSignedIn = useRef(false)
     useEffect(() => {
-        // Nothing of one account may show under the next one, nor prove anything for it: this covers every sign-out,
-        // the person's and the server's (401).
-        if (state.status !== "signed-out") return
-        queryClient.clear()
-        void unlock.forget().catch(() => undefined)
+        const signedOut = wasSignedIn.current && state.status === "signed-out"
+        wasSignedIn.current = state.status === "signed-in"
+        // Nothing of one account may show under the next one.
+        if (state.status === "signed-out") queryClient.clear()
+        // Nor prove anything for it: every sign-out, the person's and the server's (401), forgets the unlock key. A
+        // launch that opens signed out (a keychain not readable yet) keeps it, with the session it belongs to.
+        if (signedOut) void unlock.forget().catch(() => undefined)
     }, [state.status, queryClient, unlock])
     const inSession = state.status === "signed-in"
     const orgId = inSession ? state.session.orgId : undefined

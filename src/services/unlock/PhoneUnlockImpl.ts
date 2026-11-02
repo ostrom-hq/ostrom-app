@@ -15,8 +15,11 @@ export interface PhoneUnlockDependencies {
     readonly now?: () => number
 }
 
+/** The server's no to the key, with or without the contract's error body (a proxy answers without it). */
 function isRefusal(error: unknown): boolean {
-    return error instanceof ApiError && error.problem.kind === "refused" && (error.problem.status === 400 || error.problem.status === 403)
+    if (!(error instanceof ApiError)) return false
+    const {problem} = error
+    return (problem.kind === "refused" || problem.kind === "unexpected-status") && (problem.status === 400 || problem.status === 403)
 }
 
 function phoneNow(): number {
@@ -25,6 +28,8 @@ function phoneNow(): number {
 
 export class PhoneUnlockImpl implements PhoneUnlock {
     private unlockedAt: number | undefined
+    /** Counts the sign-outs: an unlock that answers after one proves nothing for the next session. */
+    private forgets = 0
 
     constructor(private readonly dependencies: PhoneUnlockDependencies) {}
 
@@ -43,12 +48,13 @@ export class PhoneUnlockImpl implements PhoneUnlock {
         switch (read.kind) {
             case "none":
                 // Kept, but gone from the keychain (passcode removed, keychain reset): only a new sign-in brings one.
-                await keys.clear()
+                await keys.clear().catch(() => undefined)
                 return "refused"
             case "cancelled":
             case "failed":
                 return read.kind
-            case "key":
+            case "key": {
+                const asked = this.forgets
                 try {
                     await account.unlock(read.key)
                 } catch (error) {
@@ -57,12 +63,14 @@ export class PhoneUnlockImpl implements PhoneUnlock {
                     if (isRefusal(error)) return "refused"
                     throw error
                 }
-                this.unlockedAt = now()
+                if (asked === this.forgets) this.unlockedAt = now()
                 return "confirmed"
+            }
         }
     }
 
     async forget(): Promise<void> {
+        this.forgets += 1
         this.unlockedAt = undefined
         await this.dependencies.keys.clear()
     }

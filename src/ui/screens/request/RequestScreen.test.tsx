@@ -217,6 +217,18 @@ describe("RequestScreen", () => {
         expect(answer).not.toHaveBeenCalled()
     })
 
+    it("signs out when the server no longer takes the token at the unlock", async () => {
+        const unlock = jest.fn(() => Promise.reject(new ApiError({kind: "unauthorized"})))
+        const services = await signedInServices({
+            unlock: {keep: jest.fn(), unlock, forget: jest.fn()},
+            repositories: fakeRepositories({approvals: {queue: jest.fn(), view: () => Promise.resolve(viewOf(approvals.pending)), answer: jest.fn()}}),
+        })
+        await renderWithServices(<RequestScreen id="appr_0001" />, services)
+        await fireEvent.press(await screen.findByRole("button", {name: "Approve"}))
+        expect(await screen.findByText("Your session has expired. Sign in again.")).toBeOnTheScreen()
+        expect(services.sessionStore.getState().state).toEqual({status: "signed-out"})
+    })
+
     it("reads the request again when it changed after the screen showed it", async () => {
         const {approval} = await open(approvals.pending, {refuse: refused(409, "shown_digest_mismatch")})
         const reads = approval.mock.calls.length

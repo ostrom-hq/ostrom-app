@@ -109,6 +109,15 @@ describe("AppRoot", () => {
         expect(client.getQueryData(["account", "organizations"])).toEqual([{id: "org_globex", name: "globex"}])
     })
 
+    it("keeps the unlock key at a launch that opens signed out: the session it belongs to may still be kept", async () => {
+        const storage = keptSession()
+        storage.get = (): Promise<string | undefined> => Promise.reject(new Error("keychain not readable yet"))
+        const forget = jest.fn(() => Promise.resolve())
+        await launch(storage, undefined, true, {keep: jest.fn(), unlock: jest.fn(), forget})
+        expect(await screen.findByRole("button", {name: "Continue with GitHub"})).toBeOnTheScreen()
+        expect(forget).not.toHaveBeenCalled()
+    })
+
     it("signs out when the server no longer accepts the token, and forgets the unlock key with the session", async () => {
         const storage = keptSession()
         // Even a key that cannot be deleted does not hold the sign-out.

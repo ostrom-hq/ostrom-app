@@ -2,7 +2,7 @@
 import {useCallback, useState} from "react"
 import {useTranslation} from "react-i18next"
 import {type Approval, type ApprovalAnswer, type ApprovalView, needsBiometrics, phoneMayApprove} from "@/api/contract/approvals"
-import {isOrgRequired} from "@/api/http/ApiError"
+import {ApiError, isOrgRequired} from "@/api/http/ApiError"
 import {useAnswer, useApprovalView} from "@/query/approvals"
 import type {UnlockOutcome} from "@/services/unlock/PhoneUnlock"
 import {useRepositories, useServices} from "@/services/AppServices"
@@ -131,7 +131,9 @@ export function useRequestViewModel(id: string): RequestViewModel {
                         {always: needsBiometrics(approval)},
                     )
                 } catch (error) {
-                    // Offline, a 5xx, the keychain: the unlock comes first, so nothing was sent.
+                    // Offline, a 5xx, the keychain: the unlock comes first, so nothing was sent. The unlock goes around
+                    // the query client: a token the server no longer takes signs out here.
+                    if (error instanceof ApiError && error.problem.kind === "unauthorized") void sessionStore.getState().signOut()
                     setProblem(unlockProblem(error))
                     setSending(undefined)
                     return
@@ -152,7 +154,7 @@ export function useRequestViewModel(id: string): RequestViewModel {
                 setSending(undefined)
             })()
         },
-        [approval, open, mayApprove, pinned, changed, unlock, account, t, mutateAsync, askedByMe],
+        [approval, open, mayApprove, pinned, changed, unlock, account, t, mutateAsync, askedByMe, sessionStore],
     )
 
     const state: RequestScreenState =

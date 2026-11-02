@@ -31,13 +31,15 @@ describe("LoginScreen", () => {
     })
 
     it.each([
-        ["keeps", () => Promise.resolve()],
-        ["cannot keep", () => Promise.reject(new Error("no biometrics"))],
-    ])("%s the unlock key of the sign-in behind the biometrics, and signs in", async (_case: string, keeping: () => Promise<void>) => {
+        ["keeps", () => Promise.resolve(), 0],
+        ["cannot keep", () => Promise.reject(new Error("no biometrics")), 1],
+    ])("%s the unlock key of the sign-in behind the biometrics, and signs in", async (_case: string, keeping: () => Promise<void>, forgets: number) => {
         const keep = jest.fn((_key: string) => keeping())
+        // An earlier key is forgotten when the new one cannot be kept, even if forgetting fails too.
+        const forget = jest.fn(() => Promise.reject(new Error("keychain locked")))
         const services = fakeServices({
             signIn: {signIn: () => Promise.resolve({kind: "signed-in", session: testSession, unlockKey: "key-1"})},
-            unlock: {keep, unlock: jest.fn(), forget: jest.fn()},
+            unlock: {keep, unlock: jest.fn(), forget},
         })
         await renderLogin(services)
         await fireEvent.press(screen.getByRole("button", {name: "Continue with GitHub"}))
@@ -45,6 +47,7 @@ describe("LoginScreen", () => {
             expect(services.sessionStore.getState().state).toEqual({status: "signed-in", session: testSession})
         })
         expect(keep).toHaveBeenCalledWith("key-1")
+        expect(forget).toHaveBeenCalledTimes(forgets)
     })
 
     it("forgets an earlier unlock key when the sign-in brings none", async () => {
