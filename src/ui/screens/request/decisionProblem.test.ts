@@ -42,6 +42,9 @@ describe("decisionProblem", () => {
         [new ApiError({kind: "timeout"}), "unlock-offline"],
         [new ApiError({kind: "unauthorized"}), "session-expired"],
         [new ApiError({kind: "server", status: 502}), "failed"],
+        [new ApiError({kind: "refused", status: 429, type: "rate_limited", message: ""}), "failed"],
+        [new ApiError({kind: "unexpected-status", status: 404}), "failed"],
+        [new ApiError({kind: "invalid-response", detail: "not json"}), "failed"],
         [new Error("keychain"), "failed"],
     ])("reads a failed unlock %p as %p: nothing was sent", (error, expected) => {
         expect(unlockProblem(error)).toBe(expected)
