@@ -19,6 +19,8 @@ import {BiometricGateImpl} from "@/services/biometrics/BiometricGateImpl"
 import {PushServiceImpl} from "@/services/push/PushServiceImpl"
 import {GithubSignInImpl} from "@/services/signIn/GithubSignInImpl"
 import {SecureStorageImpl} from "@/services/storage/SecureStorageImpl"
+import {PhoneUnlockImpl} from "@/services/unlock/PhoneUnlockImpl"
+import {UnlockKeyStoreImpl} from "@/services/unlock/UnlockKeyStoreImpl"
 import {createSessionStore, type Session} from "@/stores/session"
 
 const ExtraSchema = z.object({eas: z.object({projectId: z.string().min(1)})})
@@ -58,9 +60,12 @@ export async function copyToClipboard(text: string): Promise<void> {
 
 /** The composition root: the only place that picks the implementations. */
 export function createAppServices(): AppServices {
+    const storage = new SecureStorageImpl()
+    const biometrics = new BiometricGateImpl()
     return {
-        sessionStore: createSessionStore(new SecureStorageImpl()),
-        biometrics: new BiometricGateImpl(),
+        sessionStore: createSessionStore(storage),
+        biometrics,
+        unlock: new PhoneUnlockImpl({keys: new UnlockKeyStoreImpl(storage), biometrics}),
         push: new PushServiceImpl({projectId: easProjectId(Constants.expoConfig?.extra), platform: Platform.OS}),
         signIn: new GithubSignInImpl({
             openAuthSession: (url, redirectUri) => WebBrowser.openAuthSessionAsync(url, redirectUri),

@@ -1,4 +1,4 @@
-import type {Me, SessionToken, TokenExchangeRequest} from "@/api/contract/account"
+import type {Me, SessionToken, TokenExchangeRequest, Unlock} from "@/api/contract/account"
 import type {MyOrganization} from "@/api/contract/organizations"
 
 export interface AccountRepository {
@@ -7,6 +7,8 @@ export interface AccountRepository {
     organizations(): Promise<readonly MyOrganization[]>
     /** Trades the one-time code of the sign-in deep link for a session token. */
     exchangeCode(request: TokenExchangeRequest): Promise<SessionToken>
+    /** Records that the person just passed the phone's biometrics: the server takes an answer for 5 minutes after. */
+    unlock(unlockKey: string): Promise<Unlock>
     /** Revokes the token of this session on the server. */
     logout(): Promise<void>
 }

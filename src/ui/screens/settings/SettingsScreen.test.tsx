@@ -50,6 +50,7 @@ async function open({
                 me: jest.fn(),
                 organizations: () => Promise.resolve([{id: "org_acme", name: "acme"}]),
                 exchangeCode: jest.fn(),
+                unlock: jest.fn(),
                 logout,
             },
             notifications: {registerDevice, unregisterDevice, settings: () => Promise.resolve(initial), saveSettings},

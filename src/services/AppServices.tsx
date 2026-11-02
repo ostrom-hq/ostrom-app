@@ -13,6 +13,7 @@ import type {Session, SessionState, SessionStore} from "@/stores/session"
 import type {BiometricGate} from "./biometrics/BiometricGate"
 import type {PushService} from "./push/PushService"
 import type {GithubSignIn} from "./signIn/GithubSignIn"
+import type {PhoneUnlock} from "./unlock/PhoneUnlock"
 
 /** The repositories of one signed-in session. */
 export interface Repositories {
@@ -29,6 +30,8 @@ export interface AppServices {
     readonly sessionStore: StoreApi<SessionStore>
     readonly signIn: GithubSignIn
     readonly biometrics: BiometricGate
+    /** The biometrics before an answer, proven to the server with the unlock key (server#75). */
+    readonly unlock: PhoneUnlock
     readonly push: PushService
     readonly repositoriesFor: (session: Session) => Repositories
     /** Opens a link outside the app: a link of the console opens the console (browser, or its app when installed). */
@@ -62,7 +65,7 @@ function refuse(): Promise<never> {
  * so nothing reaches the server without a session and the screen goes away with the guard.
  */
 export const SIGNED_OUT_REPOSITORIES: Repositories = {
-    account: {me: refuse, organizations: refuse, exchangeCode: refuse, logout: refuse},
+    account: {me: refuse, organizations: refuse, exchangeCode: refuse, unlock: refuse, logout: refuse},
     activity: {page: refuse},
     approvals: {queue: refuse, view: refuse, answer: refuse},
     notifications: {registerDevice: refuse, unregisterDevice: refuse, settings: refuse, saveSettings: refuse},

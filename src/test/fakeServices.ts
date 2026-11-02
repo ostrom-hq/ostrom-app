@@ -4,6 +4,9 @@ import type {BiometricGate} from "@/services/biometrics/BiometricGate"
 import type {PushService} from "@/services/push/PushService"
 import type {GithubSignIn} from "@/services/signIn/GithubSignIn"
 import type {SecureStorage} from "@/services/storage/SecureStorage"
+import {MemoryUnlockKeyStore} from "@/services/unlock/MemoryUnlockKeyStore"
+import type {PhoneUnlock} from "@/services/unlock/PhoneUnlock"
+import {PhoneUnlockImpl} from "@/services/unlock/PhoneUnlockImpl"
 import {type Approval, ApprovalSchema, type ApprovalView} from "@/api/contract/approvals"
 import {decidedApproval, pendingApproval, selfApproval} from "@/api/mocks/fixtures"
 import {createSessionStore, type Session} from "@/stores/session"
@@ -42,6 +45,7 @@ export function fakeRepositories(overrides: Partial<Repositories> = {}): Reposit
             me: unexpected("account.me"),
             organizations: unexpected("account.organizations"),
             exchangeCode: unexpected("account.exchangeCode"),
+            unlock: unexpected("account.unlock"),
             logout: unexpected("account.logout"),
         },
         activity: {page: unexpected("activity.page")},
@@ -66,6 +70,8 @@ export interface FakeServicesOptions {
     readonly storage?: SecureStorage
     readonly signIn?: GithubSignIn
     readonly biometrics?: BiometricGate
+    /** By default, the real unlock over the fake biometrics and an empty key store: the app's own check alone. */
+    readonly unlock?: PhoneUnlock
     readonly push?: PushService
     readonly repositories?: Repositories
     readonly openUrl?: (url: string) => Promise<void>
@@ -75,10 +81,12 @@ export interface FakeServicesOptions {
 /** App services for tests: memory storage, scripted sign-in and biometrics, fake repositories. */
 export function fakeServices(options: FakeServicesOptions = {}): AppServices {
     const repositories = options.repositories ?? fakeRepositories()
+    const biometrics: BiometricGate = options.biometrics ?? {confirm: () => Promise.resolve("confirmed")}
     return {
         sessionStore: createSessionStore(options.storage ?? new MemoryStorage()),
         signIn: options.signIn ?? {signIn: () => Promise.resolve({kind: "cancelled"})},
-        biometrics: options.biometrics ?? {confirm: () => Promise.resolve("confirmed")},
+        biometrics,
+        unlock: options.unlock ?? new PhoneUnlockImpl({keys: new MemoryUnlockKeyStore(), biometrics}),
         push: options.push ?? {
             register: () => Promise.resolve({kind: "unavailable"}),
             onOpen: () => () => undefined,

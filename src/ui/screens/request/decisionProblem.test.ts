@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import {ApiError, type ApiProblem} from "@/api/http/ApiError"
-import {biometricProblem, type DecisionProblem, decisionProblem} from "./decisionProblem"
+import {biometricProblem, type DecisionProblem, decisionProblem, unlockProblem} from "./decisionProblem"
 
 const refused = (status: number, type: string): ApiProblem => ({kind: "refused", status, type, message: ""})
 
@@ -34,5 +34,19 @@ describe("decisionProblem", () => {
     it("maps biometric outcomes", () => {
         expect(biometricProblem("unavailable")).toBe("biometrics-unavailable")
         expect(biometricProblem("failed")).toBe("biometrics-failed")
+        expect(biometricProblem("refused")).toBe("unlock-refused")
+    })
+
+    it.each<[unknown, DecisionProblem]>([
+        [new ApiError({kind: "network"}), "unlock-offline"],
+        [new ApiError({kind: "timeout"}), "unlock-offline"],
+        [new ApiError({kind: "unauthorized"}), "session-expired"],
+        [new ApiError({kind: "server", status: 502}), "failed"],
+        [new ApiError({kind: "refused", status: 429, type: "rate_limited", message: ""}), "failed"],
+        [new ApiError({kind: "unexpected-status", status: 404}), "failed"],
+        [new ApiError({kind: "invalid-response", detail: "not json"}), "failed"],
+        [new Error("keychain"), "failed"],
+    ])("reads a failed unlock %p as %p: nothing was sent", (error, expected) => {
+        expect(unlockProblem(error)).toBe(expected)
     })
 })

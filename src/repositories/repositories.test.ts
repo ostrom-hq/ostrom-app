@@ -143,10 +143,19 @@ describe("AccountRepositoryImpl", () => {
 
     it("trades the sign-in code for a token, and refuses a wrong code", async () => {
         const request = {codeVerifier: "v", redirectUri: "ostrom://auth/callback"}
-        await expect(account.exchangeCode({...request, code: "good-code"})).resolves.toMatchObject({token: "ost_mock_token"})
+        await expect(account.exchangeCode({...request, code: "good-code"})).resolves.toMatchObject({
+            token: "ost_mock_token",
+            unlockKey: "mock-unlock-key",
+        })
         expect(await refusal(account.exchangeCode({...request, code: "bad"}))).toBe("invalid_request")
         const raw = await fetch(`${MOCK_BASE_URL}/api/v1/auth/mobile/token`, {method: "POST", body: "{}"})
         expect(raw.status).toBe(400)
+    })
+
+    it("unlocks with the key of the exchange, and is refused another one", async () => {
+        const {authenticatedAt} = await account.unlock("mock-unlock-key")
+        expect(Number.isNaN(Date.parse(authenticatedAt))).toBe(false)
+        expect(await refusal(account.unlock("another-key"))).toBe("forbidden")
     })
 
     it("revokes the token of the session", async () => {

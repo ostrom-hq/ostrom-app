@@ -30,6 +30,40 @@ describe("LoginScreen", () => {
         expect(signIn).toHaveBeenCalledWith("https://app.ostrom.run")
     })
 
+    it.each([
+        ["keeps", () => Promise.resolve(), 0],
+        ["cannot keep", () => Promise.reject(new Error("no biometrics")), 1],
+    ])("%s the unlock key of the sign-in behind the biometrics, and signs in", async (_case: string, keeping: () => Promise<void>, forgets: number) => {
+        const keep = jest.fn((_key: string) => keeping())
+        // An earlier key is forgotten when the new one cannot be kept, even if forgetting fails too.
+        const forget = jest.fn(() => Promise.reject(new Error("keychain locked")))
+        const services = fakeServices({
+            signIn: {signIn: () => Promise.resolve({kind: "signed-in", session: testSession, unlockKey: "key-1"})},
+            unlock: {keep, unlock: jest.fn(), forget},
+        })
+        await renderLogin(services)
+        await fireEvent.press(screen.getByRole("button", {name: "Continue with GitHub"}))
+        await waitFor(() => {
+            expect(services.sessionStore.getState().state).toEqual({status: "signed-in", session: testSession})
+        })
+        expect(keep).toHaveBeenCalledWith("key-1")
+        expect(forget).toHaveBeenCalledTimes(forgets)
+    })
+
+    it("forgets an earlier unlock key when the sign-in brings none", async () => {
+        const forget = jest.fn(() => Promise.resolve())
+        const services = fakeServices({
+            signIn: {signIn: () => Promise.resolve({kind: "signed-in", session: testSession})},
+            unlock: {keep: jest.fn(), unlock: jest.fn(), forget},
+        })
+        await renderLogin(services)
+        await fireEvent.press(screen.getByRole("button", {name: "Continue with GitHub"}))
+        await waitFor(() => {
+            expect(services.sessionStore.getState().state).toEqual({status: "signed-in", session: testSession})
+        })
+        expect(forget).toHaveBeenCalledTimes(1)
+    })
+
     it("signs in on a self-hosted server", async () => {
         const {signIn, services} = setup({kind: "cancelled"})
         await renderLogin(services)

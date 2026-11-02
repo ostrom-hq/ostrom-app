@@ -2,10 +2,11 @@
 import {useCallback, useState} from "react"
 import {useTranslation} from "react-i18next"
 import {type Approval, type ApprovalAnswer, type ApprovalView, needsBiometrics, phoneMayApprove} from "@/api/contract/approvals"
-import {isOrgRequired} from "@/api/http/ApiError"
+import {ApiError, isOrgRequired} from "@/api/http/ApiError"
 import {useAnswer, useApprovalView} from "@/query/approvals"
-import {useServices} from "@/services/AppServices"
-import {biometricProblem, type DecisionProblem, decisionProblem} from "./decisionProblem"
+import type {UnlockOutcome} from "@/services/unlock/PhoneUnlock"
+import {useRepositories, useServices} from "@/services/AppServices"
+import {biometricProblem, type DecisionProblem, decisionProblem, unlockProblem} from "./decisionProblem"
 
 export type RequestScreenState =
     | {readonly kind: "loading"}
@@ -87,7 +88,8 @@ interface ConsoleLinkState {
 
 export function useRequestViewModel(id: string): RequestViewModel {
     const {t} = useTranslation()
-    const {biometrics, openUrl, copyText, sessionStore} = useServices()
+    const {unlock, openUrl, copyText, sessionStore} = useServices()
+    const {account} = useRepositories()
     // Tagged with the screen it was asked from: a link that failed on the error screen means nothing once the request
     // loads (a refetch on focus, a late rejection after "Try again"), and the other way round.
     const [consoleLink, setConsoleLink] = useState<ConsoleLinkState>()
@@ -119,12 +121,31 @@ export function useRequestViewModel(id: string): RequestViewModel {
             setProblem(undefined)
             setConsoleLink(undefined)
             void (async () => {
-                // Biometrics unless the contract says the action is low risk (`needsBiometrics`).
-                const outcome = needsBiometrics(approval)
-                    ? await biometrics.confirm(
-                          t(answer === "approve" ? "request.confirm.approve" : "request.confirm.decline", {title: approval.title}),
-                      )
-                    : "confirmed"
+                // Biometrics unless the contract says the action is low risk (`needsBiometrics`), and then proven to
+                // the server; a low-risk answer asks them only when the last unlock is too old for the server.
+                let outcome: UnlockOutcome
+                // The token the unlock is made with: a choice of organization keeps it, a sign-out or a sign-in does not.
+                const tokenOf = (): string | undefined => {
+                    const now = sessionStore.getState().state
+                    return now.status === "signed-in" ? now.session.token : undefined
+                }
+                const askedWith = tokenOf()
+                try {
+                    outcome = await unlock.unlock(
+                        t(answer === "approve" ? "request.confirm.approve" : "request.confirm.decline", {title: approval.title}),
+                        account,
+                        {always: needsBiometrics(approval)},
+                    )
+                } catch (error) {
+                    // Offline, a 5xx, the keychain: the unlock comes first, so nothing was sent. A session already left
+                    // hears nothing of its late failure. The unlock goes around the query client: a token the server no
+                    // longer takes signs out here.
+                    setSending(undefined)
+                    if (tokenOf() !== askedWith) return
+                    if (error instanceof ApiError && error.problem.kind === "unauthorized") void sessionStore.getState().signOut()
+                    setProblem(unlockProblem(error))
+                    return
+                }
                 if (outcome === "confirmed") {
                     try {
                         // Not changed: what is on screen is what the person read, digest included.
@@ -141,7 +162,7 @@ export function useRequestViewModel(id: string): RequestViewModel {
                 setSending(undefined)
             })()
         },
-        [approval, open, mayApprove, pinned, changed, biometrics, t, mutateAsync, askedByMe],
+        [approval, open, mayApprove, pinned, changed, unlock, account, t, mutateAsync, askedByMe, sessionStore],
     )
 
     const state: RequestScreenState =

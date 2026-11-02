@@ -26,7 +26,7 @@ function account(
     me: AccountRepository["me"] = jest.fn(),
     organizations: AccountRepository["organizations"] = noOrganizationRoute,
 ): AccountRepository {
-    return {me, organizations, exchangeCode: exchange, logout: jest.fn()}
+    return {me, organizations, exchangeCode: exchange, unlock: jest.fn(), logout: jest.fn()}
 }
 
 const acme = {id: "org_acme", name: "acme", avatarUrl: "https://avatars.test/acme", connectedVia: "github-app" as const}
@@ -77,6 +77,19 @@ describe("GithubSignInImpl", () => {
             session: {serverUrl: SERVER, token: "ost_1", user: {login: "rev-b"}, orgId: "org_acme"},
         })
         expect(accountOf).toHaveBeenCalledWith(SERVER, "ost_1")
+    })
+
+    it("gives the unlock key of the exchange with the session, never inside it", async () => {
+        const signIn = new GithubSignInImpl({
+            openAuthSession: browser((start) => callback({code: "good-code", state: start.searchParams.get("state") ?? ""})),
+            randomBytes: bytes,
+            accountOf: () => account(() => Promise.resolve({token: "ost_1", user: {login: "rev-b"}, unlockKey: "key-1"})),
+        })
+        await expect(signIn.signIn(SERVER)).resolves.toEqual({
+            kind: "signed-in",
+            session: {serverUrl: SERVER, token: "ost_1", user: {login: "rev-b"}},
+            unlockKey: "key-1",
+        })
     })
 
     it("acts in the only organization the person is a member of, without asking me", async () => {

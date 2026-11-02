@@ -10,7 +10,8 @@ export type SignInFailure =
     | "exchange-failed"
 
 export type SignInOutcome =
-    | {readonly kind: "signed-in"; readonly session: Session}
+    /** With the key to keep behind the biometrics, when the server gives one (server#75). */
+    | {readonly kind: "signed-in"; readonly session: Session; readonly unlockKey?: string}
     | {readonly kind: "cancelled"}
     | {readonly kind: "failed"; readonly reason: SignInFailure}
 

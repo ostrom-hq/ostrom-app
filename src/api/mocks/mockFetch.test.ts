@@ -15,7 +15,11 @@ describe("mockFetch", () => {
     it("reads a URL or a Request too, with the Request's method and body", async () => {
         expect((await fetch(new URL(`${MOCK_BASE_URL}/api/v1/auth/me`))).status).toBe(200)
         const request = new Request(`${MOCK_BASE_URL}/api/v1/auth/mobile/token`, {method: "POST", body: JSON.stringify({code: "good-code", codeVerifier: "v", redirectUri: "ostrom://auth/callback"})})
-        expect(await (await fetch(request)).json()).toEqual({token: "ost_mock_token", user: {login: "rev-b"}})
+        expect(await (await fetch(request)).json()).toEqual({
+            token: "ost_mock_token",
+            user: {login: "rev-b"},
+            unlockKey: "mock-unlock-key",
+        })
     })
 
     it("fails as fetch does, with a rejected promise, on a body that is not JSON", async () => {

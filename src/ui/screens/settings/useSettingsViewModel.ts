@@ -67,6 +67,7 @@ export function useSettingsViewModel(locale: string, timeZone: string): Settings
             if (isPresent(device)) await notifications.unregisterDevice(device.id).catch(() => undefined)
             await account.logout().catch(() => undefined)
         })()
+        // The unlock key goes with the session, on this sign-out as on any other (`AppRoot`).
         void sessionStore.getState().signOut()
     }, [device, notifications, account, sessionStore])
 
