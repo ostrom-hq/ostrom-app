@@ -1,5 +1,5 @@
 import {z} from "zod"
-import {zCheckAttestation, zListReceiptKeysResponse, zListReceiptsResponse, zReceipt} from "@/api/gen/zod.gen"
+import {type zCheckAttestation, zListReceiptKeysResponse, zListReceiptsResponse, zReceipt} from "@/api/gen/zod.gen"
 
 export type ReceiptView = z.output<typeof zReceipt>
 

@@ -94,7 +94,8 @@ describe("HistoryScreen", () => {
     })
 
     it("says where each check of a workflow receipt ran: only Ostrom or the CI counts as having run it", async () => {
-        const node = (id: string, kind: string, label: string, outcome: string) => ({id, workflowId: "wf_1", kind, label, outcome})
+        type Node = NonNullable<ReceiptView["nodes"]>[number]
+        const node = (id: string, kind: string, label: string, outcome: string): Node => ({id, workflowId: "wf_1", kind, label, outcome})
         const workflow: ReceiptListItem = {
             readable: true,
             raw: {},
