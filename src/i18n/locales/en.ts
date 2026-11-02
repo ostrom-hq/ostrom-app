@@ -99,6 +99,7 @@ export const en = {
             workstation_declared: "Declared by the workstation",
             isolated_runner: "Run by Ostrom",
             ci: "Run by the CI",
+            unknown: "Origin unknown to this app",
         },
         stale: "The receipts could not be refreshed: the list may be out of date. Pull to try again.",
         verified: "Signature verified on this phone · key {{kid}}",

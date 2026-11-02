@@ -1,3 +1,4 @@
+import {receipts} from "@/api/mocks/fixtures"
 import {activityKind} from "./activity"
 import {ApprovalSchema, ApprovalViewSchema, needsBiometrics, phoneMayApprove} from "./approvals"
 import {PushDataSchema} from "./notifications"
@@ -14,6 +15,16 @@ describe("contract", () => {
         const page = ReceiptPageSchema.parse({items: [{id: 1}]})
         expect(page.items.map((item) => item.readable)).toEqual([false])
         expect(page.next).toBeUndefined()
+    })
+
+    it("reads a check origin of a newer server as unknown, and keeps the receipt readable", () => {
+        const node = {id: "n1", workflowId: "wf_1", kind: "check", label: "Tests", outcome: "passed"}
+        const [golden] = receipts
+        if (typeof golden !== "object" || golden === null) throw new Error("the vectors start with a receipt")
+        const receipt = {...golden, nodes: [{...node, attestation: "hardware_attested"}, {...node, id: "n2", attestation: "ci"}]}
+        const item = ReceiptPageSchema.parse({items: [receipt]}).items[0]
+        if (item?.readable !== true) throw new Error("the receipt should stay readable")
+        expect(item.view.nodes?.map((n) => n.attestation)).toEqual(["unknown", "ci"])
     })
 
     it("reads a check state of a newer server as unknown, never as a pass", () => {

@@ -13,6 +13,7 @@ import {ApiError} from "@/api/http/ApiError"
 import {receiptKey, receipts} from "@/api/mocks/fixtures"
 import {fakeRepositories, signedInServices} from "@/test/fakeServices"
 import {renderWithServices} from "@/test/renderWithServices"
+import {lightTheme} from "@/ui/theme/theme"
 import {HistoryScreen} from "./HistoryScreen"
 import {toReceiptRow} from "./useHistoryViewModel"
 
@@ -116,7 +117,8 @@ describe("HistoryScreen", () => {
         expect(screen.getAllByText("Declared by the workstation")).toHaveLength(2)
         expect(screen.getByText("Run by Ostrom")).toBeOnTheScreen()
         expect(screen.getByText("Build · failed: action blocked (2 runs)")).toBeOnTheScreen()
-        expect(screen.getByText("Run by the CI")).toBeOnTheScreen()
+        // The signature of these rows is not verified (`raw` is not the signed receipt): no origin shows as proven.
+        expect(screen.getByText("Run by the CI")).toHaveStyle({color: lightTheme.colors.warningText})
         // Only checks carry an origin.
         expect(screen.queryByText(/Reviewer/)).toBeNull()
     })

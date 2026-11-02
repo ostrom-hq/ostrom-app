@@ -1,10 +1,24 @@
 import {z} from "zod"
-import {type zCheckAttestation, zListReceiptKeysResponse, zListReceiptsResponse, zReceipt} from "@/api/gen/zod.gen"
+import {zCheckAttestation, zListReceiptKeysResponse, zListReceiptsResponse, zReceipt, zReceiptNode} from "@/api/gen/zod.gen"
 
-export type ReceiptView = z.output<typeof zReceipt>
+/**
+ * Where a check run of a receipt comes from: the workstation's word, an Ostrom runner, or the CI; `unknown` for a value
+ * a newer server sends, which this app cannot vouch for.
+ */
+export type CheckAttestation = z.output<typeof zCheckAttestation> | "unknown"
 
-/** Where a check run of a receipt comes from: the workstation's word, an Ostrom runner, or the CI. */
-export type CheckAttestation = z.output<typeof zCheckAttestation>
+/** A receipt for the screen: an origin this app does not know is read as `unknown`, never as an unreadable receipt. */
+const ReceiptViewSchema = zReceipt.extend({
+    nodes: z
+        .array(
+            zReceiptNode.extend({
+                attestation: z.union([zCheckAttestation, z.string().transform((): "unknown" => "unknown")]).optional(),
+            }),
+        )
+        .optional(),
+})
+
+export type ReceiptView = z.output<typeof ReceiptViewSchema>
 
 /** A receipt as received: the untouched object, for the signature, and its typed view, for the screen. */
 export interface ReceiptEnvelope {
@@ -24,7 +38,7 @@ export type ReceiptListItem = ReceiptEnvelope | UnreadableReceipt
 
 /** Display only: verification works on the raw object, since the schema drops the fields it does not know. */
 function readReceipt(raw: unknown): ReceiptListItem {
-    const view = zReceipt.safeParse(raw)
+    const view = ReceiptViewSchema.safeParse(raw)
     return view.success ? {readable: true, raw, view: view.data} : {readable: false, raw, detail: z.prettifyError(view.error)}
 }
 

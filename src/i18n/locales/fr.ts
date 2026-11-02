@@ -100,6 +100,7 @@ export const fr: TranslationShape = {
             workstation_declared: "Déclaré par le poste",
             isolated_runner: "Exécuté par Ostrom",
             ci: "Exécuté par la CI",
+            unknown: "Origine inconnue de cette app",
         },
         stale: "Les reçus n'ont pas pu être actualisés : la liste n'est peut-être plus à jour. Tire pour réessayer.",
         verified: "Signature vérifiée sur ce téléphone · clé {{kid}}",
