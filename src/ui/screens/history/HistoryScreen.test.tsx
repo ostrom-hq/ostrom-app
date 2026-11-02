@@ -13,6 +13,7 @@ import {ApiError} from "@/api/http/ApiError"
 import {receiptKey, receipts} from "@/api/mocks/fixtures"
 import {fakeRepositories, signedInServices} from "@/test/fakeServices"
 import {renderWithServices} from "@/test/renderWithServices"
+import {lightTheme} from "@/ui/theme/theme"
 import {HistoryScreen} from "./HistoryScreen"
 import {toReceiptRow} from "./useHistoryViewModel"
 
@@ -93,6 +94,40 @@ describe("HistoryScreen", () => {
         expect(screen.getAllByText("Approved by dev-a · self-approved")).toHaveLength(2)
     })
 
+    it("never words an origin as fact on a receipt whose signature is not verified", async () => {
+        type Node = NonNullable<ReceiptView["nodes"]>[number]
+        const node = (id: string, kind: string, label: string, outcome: string): Node => ({id, workflowId: "wf_1", kind, label, outcome})
+        const workflow: ReceiptListItem = {
+            readable: true,
+            raw: {},
+            view: view({
+                id: "r-workflow",
+                nodes: [
+                    {...node("n1", "check", "Unit tests", "passed"), attestation: "workstation_declared"},
+                    {...node("n2", "check", "Lint", "passed"), attestation: "isolated_runner"},
+                    {...node("n3", "check", "Build", "failed: action blocked (2 runs)"), attestation: "ci"},
+                    // Signed before the field existed: the workstation's word.
+                    node("n4", "check", "Format", "passed"),
+                    node("n5", "agent", "Reviewer", "delivered (sub-agent or skill), not reported"),
+                ],
+            }),
+        }
+        await show(jest.fn(() => page([workflow])))
+        expect(await screen.findByText("Unit tests · passed")).toBeOnTheScreen()
+        expect(screen.getAllByText("Declared by the workstation")).toHaveLength(2)
+        expect(screen.getByText("Build · failed: action blocked (2 runs)")).toBeOnTheScreen()
+        // The signature of these rows is not verified (`raw` is not the signed receipt): Ostrom and the CI are only
+        // claimed, and say so.
+        const claimed = screen.getAllByText("Origin not verified")
+        expect(claimed).toHaveLength(2)
+        for (const badge of claimed) {
+            expect(badge).toHaveStyle({color: lightTheme.colors.warningText})
+        }
+        expect(screen.queryByText(/^Run by/)).toBeNull()
+        // Only checks carry an origin.
+        expect(screen.queryByText(/Reviewer/)).toBeNull()
+    })
+
     it("says when there is no receipt yet", async () => {
         await show(jest.fn(() => page([])))
         expect(await screen.findByText("No receipt yet.")).toBeOnTheScreen()
@@ -144,5 +179,30 @@ describe("toReceiptRow", () => {
     it("dates a receipt without decision by its creation", () => {
         const row = toReceiptRow({readable: true, raw: {}, view: view({decisions: [], createdAt: "2026-10-29T10:00:00.000Z"})}, 0, {kind: "no-key"})
         expect(row).toMatchObject({readable: true, at: "2026-10-29T10:00:00.000Z", result: undefined})
+    })
+
+    it("proves Ostrom or the CI only on a verified signature", () => {
+        const nodes = [
+            {id: "n1", workflowId: "wf_1", kind: "check", label: "Build", outcome: "passed", attestation: "ci" as const},
+            {id: "n2", workflowId: "wf_1", kind: "check", label: "Lint", outcome: "passed"},
+        ]
+        const item: ReceiptListItem = {readable: true, raw: {}, view: view({nodes})}
+        expect(toReceiptRow(item, 0, {kind: "verified", kid: "k"})).toMatchObject({
+            checkRuns: [
+                {label: "Build", badge: "ci"},
+                {label: "Lint", badge: "workstation_declared"},
+            ],
+        })
+        expect(toReceiptRow(item, 0, {kind: "rejected", reason: "bad-signature"})).toMatchObject({
+            checkRuns: [
+                {label: "Build", badge: "unverified"},
+                {label: "Lint", badge: "workstation_declared"},
+            ],
+        })
+    })
+
+    it("lists no check for a receipt without nodes", () => {
+        const row = toReceiptRow({readable: true, raw: {}, view: view({nodes: undefined})}, 0, {kind: "no-key"})
+        expect(row).toMatchObject({readable: true, checkRuns: []})
     })
 })

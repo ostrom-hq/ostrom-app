@@ -10,7 +10,7 @@ import type {ThemeColors} from "@/ui/theme/theme"
 import {fontSize, radius, space} from "@/ui/theme/tokens"
 import {useTheme} from "@/ui/theme/useTheme"
 import type {ReceiptCheck} from "./receiptCheck"
-import {type ReceiptRowModel, useHistoryViewModel} from "./useHistoryViewModel"
+import {isProven, type ReceiptCheckRun, type ReceiptRowModel, useHistoryViewModel} from "./useHistoryViewModel"
 
 function CheckLine({check}: {check: ReceiptCheck}): React.JSX.Element {
     const {t} = useTranslation()
@@ -28,6 +28,27 @@ function lineOf(check: ReceiptCheck, t: ReturnType<typeof useTranslation>["t"], 
         case "no-key":
             return [t("history.noKey"), colors.textMuted]
     }
+}
+
+/** A check of the receipt with where it ran; the colour says whether that origin is proven, never whether it passed. */
+function CheckRunLine({run}: {run: ReceiptCheckRun}): React.JSX.Element {
+    const {t} = useTranslation()
+    const {colors} = useTheme()
+    return (
+        <View style={styles.checkRun}>
+            <Text style={[styles.detail, styles.checkRunText, {color: colors.text}]}>{`${run.label} · ${run.outcome}`}</Text>
+            <Text
+                style={[
+                    styles.badge,
+                    isProven(run)
+                        ? {color: colors.info, backgroundColor: colors.infoTint}
+                        : {color: colors.warningText, backgroundColor: colors.warningTint},
+                ]}
+            >
+                {t(`history.attestation.${run.badge}`)}
+            </Text>
+        </View>
+    )
 }
 
 function ReceiptRow({row}: {row: ReceiptRowModel}): React.JSX.Element {
@@ -56,6 +77,10 @@ function ReceiptRow({row}: {row: ReceiptRowModel}): React.JSX.Element {
             </Text>
             <Text style={[styles.detail, {color: colors.textMuted}]}>{row.subject}</Text>
             <Text style={[styles.detail, {color: colors.textMuted}]}>{formatDateTime(row.at, i18n.language)}</Text>
+            {row.checkRuns.map((run, index) => (
+                // Index first: two checks may share a label.
+                <CheckRunLine key={`${String(index)}:${run.label}`} run={run} />
+            ))}
             <CheckLine check={row.check} />
         </View>
     )
@@ -118,4 +143,7 @@ const styles = StyleSheet.create({
     rowTitle: {fontSize: fontSize[16], fontWeight: "700"},
     detail: {fontSize: fontSize[14]},
     check: {fontSize: fontSize[12], fontWeight: "700"},
+    checkRun: {flexDirection: "row", alignItems: "center", gap: space[2]},
+    checkRunText: {flexShrink: 1},
+    badge: {fontSize: fontSize[12], fontWeight: "700", borderRadius: radius.sm, paddingHorizontal: space[2], overflow: "hidden"},
 })

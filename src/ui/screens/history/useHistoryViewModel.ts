@@ -1,9 +1,39 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import {useMemo} from "react"
-import type {ReceiptListItem} from "@/api/contract/receipts"
+import type {CheckAttestation, ReceiptListItem, ReceiptView} from "@/api/contract/receipts"
 import type {ReceiptKey} from "@/domain/receipts/publicKey"
 import {useReceiptKeys, useReceipts} from "@/query/receipts"
 import {checkReceipt, type ReceiptCheck} from "./receiptCheck"
+
+/**
+ * A check the receipt reports, and where it ran. A run the workstation only declared proves nothing, and neither does
+ * an origin read on a receipt whose signature this phone did not verify: it is `unverified`.
+ */
+export interface ReceiptCheckRun {
+    readonly label: string
+    /** The server's words, shown as they are. */
+    readonly outcome: string
+    /** `isolated_runner` or `ci` only on a verified receipt: the two origins shown as proven. */
+    readonly badge: CheckAttestation | "unverified"
+}
+
+/** Run by Ostrom or the CI, on a verified receipt. */
+export function isProven(run: ReceiptCheckRun): boolean {
+    return run.badge === "isolated_runner" || run.badge === "ci"
+}
+
+type CheckNode = Pick<NonNullable<ReceiptView["nodes"]>[number], "label" | "outcome" | "attestation">
+
+function checkRunOf(node: CheckNode, verified: boolean): ReceiptCheckRun {
+    // A check signed before the field existed has none: it was the workstation's word.
+    const attestation = node.attestation ?? "workstation_declared"
+    const claimsRun = attestation === "isolated_runner" || attestation === "ci"
+    return {
+        label: node.label,
+        outcome: node.outcome,
+        badge: claimsRun && !verified ? "unverified" : attestation,
+    }
+}
 
 /** One receipt of the history: what it says when the app can read it, and always what the phone found of its signature. */
 export type ReceiptRowModel =
@@ -25,6 +55,8 @@ export type ReceiptRowModel =
           readonly subject: string
           readonly at: string
           readonly check: ReceiptCheck
+          /** The check nodes of a workflow receipt, in its order. */
+          readonly checkRuns: readonly ReceiptCheckRun[]
       }
 
 export type HistoryState =
@@ -58,6 +90,7 @@ export function toReceiptRow(item: ReceiptListItem, index: number, check: Receip
         subject: `${view.subject.kind} ${view.subject.id}`,
         at: decision?.at ?? view.createdAt,
         check,
+        checkRuns: (view.nodes ?? []).filter((node) => node.kind === "check").map((node) => checkRunOf(node, check.kind === "verified")),
     }
 }
 

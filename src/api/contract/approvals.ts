@@ -17,17 +17,7 @@ import {
     zCheckState,
     zGateRef,
 } from "@/api/gen/zod.gen"
-
-/**
- * A value of a newer server, outside the list `schema` knows, reads as `fallback` instead of failing the request: the
- * person approves on this evidence, with an app that may be months old.
- */
-function orElse<T extends z.ZodType<string>, F extends string>(
-    schema: T,
-    fallback: F,
-): z.ZodUnion<readonly [T, z.ZodPipe<z.ZodString, z.ZodTransform<F, string>>]> {
-    return z.union([schema, z.string().transform((): F => fallback)])
-}
+import {orElse} from "./orElse"
 
 /** A check state this app does not know reads as `unknown`, never as a pass. */
 export const CheckStateSchema = orElse(zCheckState, "unknown")
