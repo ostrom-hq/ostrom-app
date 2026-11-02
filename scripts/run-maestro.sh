@@ -11,7 +11,8 @@ set -uo pipefail
 # Waits at most this long for each condition.
 LIMIT_SECONDS=180
 # What Maestro and adb print when the emulator or Maestro's driver on it, not the app, is the problem. Read in the
-# flow's console only: Maestro's own log lists adb commands that worked, and a failed assertion prints none of these.
+# flow's console and in Maestro's log of the flow, where the outage is written (the console only says "Failed", run
+# 41071045167); never in the device's logcat, where adb and the system print such words on their own.
 OUTAGE='device offline|DeviceServerDiedException|device not found|no devices/emulators found|Maestro driver did not start up in time|Failed to connect to /127\.0\.0\.1:7001|UNAVAILABLE: io exception'
 
 until_ok() {
@@ -48,7 +49,8 @@ run() {
 
 # The first attempt failed because the emulator went away, not because the app did.
 outage() {
-    grep -qsE "$OUTAGE" "maestro-output/$1-1.console"
+    local logs=("maestro-output/$1-1/"*/*/logs/maestro.log)
+    grep -qsE "$OUTAGE" "maestro-output/$1-1.console" "${logs[@]}"
 }
 
 # An emulator that stays away after a reconnect fails the job at once, rather than each flow waiting for it in turn.
