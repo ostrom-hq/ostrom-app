@@ -121,9 +121,24 @@ describe("createRealServerAppServices", () => {
     })
 
     it("stops at once when the build was not given its server, token and login", () => {
-        expect(() => realServer({token: "ost_ci", login: "e2e"})).toThrow(/EXPO_PUBLIC_OSTROM_E2E_SERVER/)
-        // Nothing of the kind in the test environment.
-        expect(() => realServicesForBuild()).toThrow(/EXPO_PUBLIC_OSTROM_E2E_SERVER/)
+        expect(() => realServer({token: "ost_ci", login: "e2e"})).toThrow(/needs EXPO_PUBLIC_OSTROM_E2E_SERVER$/)
+        expect(() => realServer({serverUrl: "http://10.0.2.2:4600", token: "", login: "e2e"})).toThrow(
+            /needs EXPO_PUBLIC_OSTROM_E2E_TOKEN$/,
+        )
+        expect(() => realServer({serverUrl: "not a url", token: "ost_ci"})).toThrow(
+            /needs EXPO_PUBLIC_OSTROM_E2E_SERVER, EXPO_PUBLIC_OSTROM_E2E_LOGIN$/,
+        )
+        // Nothing at all: the three are named.
+        expect(() => realServer(undefined)).toThrow(/needs EXPO_PUBLIC_OSTROM_E2E_SERVER, _TOKEN and _LOGIN$/)
+    })
+})
+
+describe("realServicesForBuild", () => {
+    it("stops at once when the build was given none of its variables", () => {
+        // Nothing of the kind in the test environment: the job sets them for its build only.
+        expect(() => realServicesForBuild()).toThrow(
+            /needs EXPO_PUBLIC_OSTROM_E2E_SERVER, EXPO_PUBLIC_OSTROM_E2E_TOKEN, EXPO_PUBLIC_OSTROM_E2E_LOGIN$/,
+        )
     })
 })
 

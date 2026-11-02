@@ -9,11 +9,21 @@ import {createAppServices} from "./services"
 /** The real server the CI started, and the token it made there for a person it signed in by e-mail. */
 const RealServerSchema = z.object({serverUrl: z.url(), token: z.string().min(1), login: z.string().min(1)})
 export type RealServer = z.output<typeof RealServerSchema>
+const variables: Readonly<Record<string, string>> = {
+    serverUrl: "EXPO_PUBLIC_OSTROM_E2E_SERVER",
+    token: "EXPO_PUBLIC_OSTROM_E2E_TOKEN",
+    login: "EXPO_PUBLIC_OSTROM_E2E_LOGIN",
+}
 
 /** What the build was given; a missing value stops the app at once, rather than a flow failing on a blank screen. */
 export function realServer(given: unknown): RealServer {
     const parsed = RealServerSchema.safeParse(given)
-    if (!parsed.success) throw new Error("The real-server E2E build needs EXPO_PUBLIC_OSTROM_E2E_SERVER, _TOKEN and _LOGIN")
+    if (!parsed.success) {
+        const missing = parsed.error.issues.map(
+            (issue) => variables[issue.path.map(String).join(".")] ?? "EXPO_PUBLIC_OSTROM_E2E_SERVER, _TOKEN and _LOGIN",
+        )
+        throw new Error(`The real-server E2E build needs ${missing.join(", ")}`)
+    }
     return parsed.data
 }
 
