@@ -68,7 +68,7 @@ describe("AppRoot", () => {
             repositoriesFor: (session: {readonly orgId?: string | undefined}) =>
                 fakeRepositories({
                     approvals: {
-                        queue: () => Promise.resolve(session.orgId === "org_globex" ? {...EMPTY, pending: [approvals.pending]} : EMPTY),
+                        queue: () => Promise.resolve(session.orgId === "org_globex" ? {...EMPTY, pending: [viewOf(approvals.pending)]} : EMPTY),
                         view: jest.fn(),
                         answer: jest.fn(),
                     },
