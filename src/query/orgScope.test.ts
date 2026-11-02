@@ -18,9 +18,9 @@ function queryOf(key: readonly unknown[]): Query {
 }
 
 describe("isOrgScoped", () => {
-    it.each([accountKeys.organizations(), notificationKeys.settings, notificationKeys.device("fr")])(
-        "keeps %p, a read of the person, across organizations",
-        (key) => {
+    it.each([{key: accountKeys.organizations()}, {key: notificationKeys.settings}, {key: notificationKeys.device("fr")}])(
+        "keeps $key, a read of the person, across organizations",
+        ({key}) => {
             expect(isOrgScoped(queryOf(key))).toBe(false)
         },
     )
