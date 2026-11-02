@@ -94,7 +94,7 @@ describe("HistoryScreen", () => {
         expect(screen.getAllByText("Approved by dev-a · self-approved")).toHaveLength(2)
     })
 
-    it("says where each check of a workflow receipt ran: only Ostrom or the CI counts as having run it", async () => {
+    it("never words an origin as fact on a receipt whose signature is not verified", async () => {
         type Node = NonNullable<ReceiptView["nodes"]>[number]
         const node = (id: string, kind: string, label: string, outcome: string): Node => ({id, workflowId: "wf_1", kind, label, outcome})
         const workflow: ReceiptListItem = {
@@ -115,10 +115,15 @@ describe("HistoryScreen", () => {
         await show(jest.fn(() => page([workflow])))
         expect(await screen.findByText("Unit tests · passed")).toBeOnTheScreen()
         expect(screen.getAllByText("Declared by the workstation")).toHaveLength(2)
-        expect(screen.getByText("Run by Ostrom")).toBeOnTheScreen()
         expect(screen.getByText("Build · failed: action blocked (2 runs)")).toBeOnTheScreen()
-        // The signature of these rows is not verified (`raw` is not the signed receipt): no origin shows as proven.
-        expect(screen.getByText("Run by the CI")).toHaveStyle({color: lightTheme.colors.warningText})
+        // The signature of these rows is not verified (`raw` is not the signed receipt): Ostrom and the CI are only
+        // claimed, and say so.
+        const claimed = screen.getAllByText("Origin not verified")
+        expect(claimed).toHaveLength(2)
+        for (const badge of claimed) {
+            expect(badge).toHaveStyle({color: lightTheme.colors.warningText})
+        }
+        expect(screen.queryByText(/^Run by/)).toBeNull()
         // Only checks carry an origin.
         expect(screen.queryByText(/Reviewer/)).toBeNull()
     })
@@ -174,6 +179,26 @@ describe("toReceiptRow", () => {
     it("dates a receipt without decision by its creation", () => {
         const row = toReceiptRow({readable: true, raw: {}, view: view({decisions: [], createdAt: "2026-10-29T10:00:00.000Z"})}, 0, {kind: "no-key"})
         expect(row).toMatchObject({readable: true, at: "2026-10-29T10:00:00.000Z", result: undefined})
+    })
+
+    it("proves Ostrom or the CI only on a verified signature", () => {
+        const nodes = [
+            {id: "n1", workflowId: "wf_1", kind: "check", label: "Build", outcome: "passed", attestation: "ci" as const},
+            {id: "n2", workflowId: "wf_1", kind: "check", label: "Lint", outcome: "passed"},
+        ]
+        const item: ReceiptListItem = {readable: true, raw: {}, view: view({nodes})}
+        expect(toReceiptRow(item, 0, {kind: "verified", kid: "k"})).toMatchObject({
+            checkRuns: [
+                {label: "Build", badge: "ci", proven: true},
+                {label: "Lint", badge: "workstation_declared", proven: false},
+            ],
+        })
+        expect(toReceiptRow(item, 0, {kind: "rejected", reason: "bad-signature"})).toMatchObject({
+            checkRuns: [
+                {label: "Build", badge: "unverified", proven: false},
+                {label: "Lint", badge: "workstation_declared", proven: false},
+            ],
+        })
     })
 
     it("lists no check for a receipt without nodes", () => {

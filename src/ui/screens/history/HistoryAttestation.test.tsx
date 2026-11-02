@@ -46,7 +46,7 @@ describe("HistoryScreen on a verified receipt", () => {
             }),
         })
         await renderWithServices(<HistoryScreen />, services)
-        const proven = {color: colors.signalText, backgroundColor: colors.signalTint}
+        const proven = {color: colors.info, backgroundColor: colors.infoTint}
         const unproven = {color: colors.warningText, backgroundColor: colors.warningTint}
         expect(await screen.findByText("Run by Ostrom")).toHaveStyle(proven)
         expect(screen.getByText("Run by the CI")).toHaveStyle(proven)

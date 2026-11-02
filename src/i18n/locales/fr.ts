@@ -101,6 +101,7 @@ export const fr: TranslationShape = {
             isolated_runner: "Exécuté par Ostrom",
             ci: "Exécuté par la CI",
             unknown: "Origine inconnue de cette app",
+            unverified: "Origine non vérifiée",
         },
         stale: "Les reçus n'ont pas pu être actualisés : la liste n'est peut-être plus à jour. Tire pour réessayer.",
         verified: "Signature vérifiée sur ce téléphone · clé {{kid}}",

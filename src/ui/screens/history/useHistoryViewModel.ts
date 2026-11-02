@@ -5,12 +5,35 @@ import type {ReceiptKey} from "@/domain/receipts/publicKey"
 import {useReceiptKeys, useReceipts} from "@/query/receipts"
 import {checkReceipt, type ReceiptCheck} from "./receiptCheck"
 
-/** A check the receipt reports, and where it ran: a run the workstation only declared proves nothing. */
+/**
+ * A check the receipt reports, and where it ran. A run the workstation only declared proves nothing, and neither does
+ * an origin read on a receipt whose signature this phone did not verify: it is `unverified`.
+ */
 export interface ReceiptCheckRun {
     readonly label: string
     /** The server's words, shown as they are. */
     readonly outcome: string
-    readonly attestation: CheckAttestation
+    readonly badge: CheckAttestation | "unverified"
+    /** Run by Ostrom or the CI, on a verified receipt. */
+    readonly proven: boolean
+}
+
+interface CheckNode {
+    readonly label: string
+    readonly outcome: string
+    readonly attestation?: CheckAttestation | undefined
+}
+
+function checkRunOf(node: CheckNode, verified: boolean): ReceiptCheckRun {
+    // A check signed before the field existed has none: it was the workstation's word.
+    const attestation = node.attestation ?? "workstation_declared"
+    const claimsRun = attestation === "isolated_runner" || attestation === "ci"
+    return {
+        label: node.label,
+        outcome: node.outcome,
+        badge: claimsRun && !verified ? "unverified" : attestation,
+        proven: claimsRun && verified,
+    }
 }
 
 /** One receipt of the history: what it says when the app can read it, and always what the phone found of its signature. */
@@ -68,10 +91,7 @@ export function toReceiptRow(item: ReceiptListItem, index: number, check: Receip
         subject: `${view.subject.kind} ${view.subject.id}`,
         at: decision?.at ?? view.createdAt,
         check,
-        checkRuns: (view.nodes ?? [])
-            .filter((node) => node.kind === "check")
-            // A check signed before the field existed has none: it was the workstation's word.
-            .map((node) => ({label: node.label, outcome: node.outcome, attestation: node.attestation ?? "workstation_declared"})),
+        checkRuns: (view.nodes ?? []).filter((node) => node.kind === "check").map((node) => checkRunOf(node, check.kind === "verified")),
     }
 }
 

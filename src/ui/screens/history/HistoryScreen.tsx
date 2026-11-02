@@ -30,26 +30,22 @@ function lineOf(check: ReceiptCheck, t: ReturnType<typeof useTranslation>["t"], 
     }
 }
 
-/**
- * A check of the receipt with where it ran. Only an Ostrom runner or the CI, on a receipt whose signature this phone
- * verified, is shown as proven; the accent says where it ran, never whether it passed.
- */
-function CheckRunLine({run, signed}: {run: ReceiptCheckRun; signed: boolean}): React.JSX.Element {
+/** A check of the receipt with where it ran; the colour says whether that origin is proven, never whether it passed. */
+function CheckRunLine({run}: {run: ReceiptCheckRun}): React.JSX.Element {
     const {t} = useTranslation()
     const {colors} = useTheme()
-    const proven = signed && (run.attestation === "isolated_runner" || run.attestation === "ci")
     return (
         <View style={styles.checkRun}>
             <Text style={[styles.detail, styles.checkRunText, {color: colors.text}]}>{`${run.label} · ${run.outcome}`}</Text>
             <Text
                 style={[
                     styles.badge,
-                    proven
-                        ? {color: colors.signalText, backgroundColor: colors.signalTint}
+                    run.proven
+                        ? {color: colors.info, backgroundColor: colors.infoTint}
                         : {color: colors.warningText, backgroundColor: colors.warningTint},
                 ]}
             >
-                {t(`history.attestation.${run.attestation}`)}
+                {t(`history.attestation.${run.badge}`)}
             </Text>
         </View>
     )
@@ -83,7 +79,7 @@ function ReceiptRow({row}: {row: ReceiptRowModel}): React.JSX.Element {
             <Text style={[styles.detail, {color: colors.textMuted}]}>{formatDateTime(row.at, i18n.language)}</Text>
             {row.checkRuns.map((run, index) => (
                 // Index first: two checks may share a label.
-                <CheckRunLine key={`${String(index)}:${run.label}`} run={run} signed={row.check.kind === "verified"} />
+                <CheckRunLine key={`${String(index)}:${run.label}`} run={run} />
             ))}
             <CheckLine check={row.check} />
         </View>
