@@ -10,7 +10,7 @@
 # - The asker signs in by e-mail (the link read from the directory the server writes its mails to), accepts the
 #   invitation, and asks the two gates with a token of their own (`gates:ask`), which the job also reads them with.
 # Masks the secrets in the job's log, and writes `token`, `unlock_key`, `login`, `yes_approval`, `no_approval`,
-# `yes_gate`, `no_gate` and `asker_token` to $GITHUB_OUTPUT (standard output outside Actions).
+# `yes_gate`, `no_gate`, `asker_token` and `repo` to $GITHUB_OUTPUT (standard output outside Actions).
 # Usage: scripts/real-server-session.sh <server origin> <mail directory> <fake GitHub origin>
 # Linux only (bash 4.4 or later, GNU coreutils), as on the CI runner. A refused call prints the server's answer.
 set -euo pipefail
@@ -178,6 +178,7 @@ echo "::add-mask::$unlock_key"
     echo "token=$token"
     echo "unlock_key=$unlock_key"
     echo "login=$login"
+    echo "repo=$repo"
     echo "yes_approval=$yes_approval"
     echo "no_approval=$no_approval"
     echo "yes_gate=$yes_gate"

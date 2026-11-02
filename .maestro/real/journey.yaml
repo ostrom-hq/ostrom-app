@@ -2,7 +2,9 @@
 # GitHub as the app does (PKCE to its deep link, `POST /auth/mobile/token`) and gave the build that session and its
 # unlock key; another member of their organization asked two pushes to main that wait for them. The app reads the
 # real yes queue, says yes to one (biometrics, then the unlock on the server) and no to the other, then shows both
-# signed receipts, verified on the phone. The job checks the gates and receipts through the API afterwards.
+# signed receipts, verified on the phone, the organization's activity (the requests and the decisions, on the
+# repository of the job) and its spending (nothing yet). The job checks the gates and receipts through the API
+# afterwards.
 appId: run.ostrom.app
 ---
 - launchApp:
@@ -91,3 +93,23 @@ appId: run.ostrom.app
 - assertNotVisible: "Signature rejected.*"
 - assertNotVisible: "Not verified.*"
 - takeScreenshot: real-history
+
+# The organization's activity (`GET /activity`): the two requests and the two decisions, on the job's repository.
+- tapOn: "Activity"
+- extendedWaitUntil:
+    visible: ".*${OSTROM_E2E_REPO}.*"
+    timeout: 30000
+- assertVisible:
+    text: ".*${OSTROM_E2E_REPO}.*"
+    index: 1
+- assertNotVisible: "No activity yet."
+- assertNotVisible: "The activity could not be loaded."
+- takeScreenshot: real-activity
+
+# Its spending (`GET /spending`): read from the server, nothing spent by a new organization.
+- tapOn: "Spending"
+- extendedWaitUntil:
+    visible: "Nothing spent."
+    timeout: 30000
+- assertNotVisible: "The spending could not be loaded."
+- takeScreenshot: real-spending
