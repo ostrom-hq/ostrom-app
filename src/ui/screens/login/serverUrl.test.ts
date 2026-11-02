@@ -38,7 +38,8 @@ describe("normalizeServerUrl", () => {
         let development: jest.ReplaceProperty<boolean>
 
         beforeEach(() => {
-            development = jest.replaceProperty(globalThis, "__DEV__", false)
+            // React Native declares `__DEV__` as a global constant; Jest sets it on the global object.
+            development = jest.replaceProperty(globalThis as unknown as {__DEV__: boolean}, "__DEV__", false)
         })
 
         afterEach(() => {
