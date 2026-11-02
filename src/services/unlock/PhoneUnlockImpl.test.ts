@@ -69,7 +69,7 @@ describe("PhoneUnlockImpl", () => {
         expect(serverUnlock).toHaveBeenCalledTimes(2)
     })
 
-    it.each<[string, unknown]>([
+    it.each<[string, Error]>([
         ["offline", new ApiError({kind: "network"})],
         ["a 5xx", new ApiError({kind: "server", status: 502})],
         ["an expired session", new ApiError({kind: "unauthorized"})],

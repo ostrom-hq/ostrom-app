@@ -46,7 +46,10 @@ export function unlockProblem(error: unknown): DecisionProblem {
             return "unlock-offline"
         case "unauthorized":
             return "session-expired"
-        default:
+        case "refused":
+        case "unexpected-status":
+        case "server":
+        case "invalid-response":
             return "failed"
     }
 }
