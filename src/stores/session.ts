@@ -54,26 +54,26 @@ export function createSessionStore(storage: SecureStorage): StoreApi<SessionStor
     }
     // A sign-out is the only change that shows at once, outside the turns: a change asked before it never shows after.
     let signOuts = 0
-    // A keychain write whose failure changes nothing, even when it throws at once.
+    // A keychain write let go when it fails, even when it throws at once: what the person sees does not wait on it.
     const quietly = (write: () => Promise<void>): Promise<void> => Promise.resolve().then(write).catch(() => undefined)
     return createStore<SessionStore>()((set, get) => ({
         state: {status: "loading"},
-        hydrate: () => {
-            const asked = signOuts
-            return inTurn(async () => {
+        // Only the launch is decided here: once the person has signed in or out, a reading of the keychain changes nothing.
+        hydrate: () =>
+            inTurn(async () => {
                 let stored: string | undefined
                 try {
                     stored = await storage.get(SESSION_KEY)
                 } catch {
                     // The keychain cannot be read (a launch while the phone is locked): sign in again rather than stay blank.
-                    set({state: {status: "signed-out"}})
+                    if (get().state.status === "loading") set({state: {status: "signed-out"}})
                     return
                 }
                 const session = parseStored(stored)
                 if (session === undefined) await quietly(() => storage.remove(SESSION_KEY))
-                if (signOuts === asked) set({state: session === undefined ? {status: "signed-out"} : {status: "signed-in", session}})
-            })
-        },
+                if (get().state.status === "loading")
+                    set({state: session === undefined ? {status: "signed-out"} : {status: "signed-in", session}})
+            }),
         signIn: (session) => {
             const asked = signOuts
             return inTurn(async () => {

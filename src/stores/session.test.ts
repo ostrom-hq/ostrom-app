@@ -127,7 +127,20 @@ describe("session store", () => {
         expect(storage.items.has(SESSION_KEY)).toBe(false)
     })
 
-    it("drops a choice asked before a sign-out and a sign-in: it never lands on the next session", async () => {
+    it("reads the keychain at launch only: a later reading, even an unreadable one, leaves a sign-in as it is", async () => {
+        const storage = new MemoryStorage()
+        const store = createSessionStore(storage)
+        await store.getState().signIn(session)
+        storage.get = (): Promise<string | undefined> => Promise.reject(new Error("locked"))
+        await store.getState().hydrate()
+        expect(store.getState().state).toEqual({status: "signed-in", session})
+        storage.items.set(SESSION_KEY, "not json")
+        storage.get = (key: string): Promise<string | undefined> => Promise.resolve(storage.items.get(key))
+        await store.getState().hydrate()
+        expect(store.getState().state).toEqual({status: "signed-in", session})
+    })
+
+    it("drops a choice asked before a sign-out: it never lands on the next session", async () => {
         const storage = new MemoryStorage()
         const store = createSessionStore(storage)
         await store.getState().signIn(session)
