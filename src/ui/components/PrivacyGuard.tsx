@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import {type ReactNode, useEffect, useState} from "react"
 import {useTranslation} from "react-i18next"
-import {AppState, type AppStateStatus, StyleSheet, Text, View} from "react-native"
+import {AppState, StyleSheet, Text, View} from "react-native"
 import {fontSize} from "@/ui/theme/tokens"
 import {useTheme} from "@/ui/theme/useTheme"
 
@@ -9,7 +9,7 @@ import {useTheme} from "@/ui/theme/useTheme"
  * iOS takes the app switcher's picture while `inactive`; Android goes straight to `background`. `unknown` and
  * `extension` leave the screens visible: a cover that no later event lifts would lock the app.
  */
-function isHidden(status: AppStateStatus): boolean {
+function isHidden(status: string | null | undefined): boolean {
     return status === "inactive" || status === "background"
 }
 

@@ -7,7 +7,7 @@ describe("PrivacyGuard", () => {
     let listener: (status: AppStateStatus) => void
     let remove: jest.Mock
     let subscribe: jest.SpyInstance
-    let current: jest.ReplaceProperty<AppStateStatus>
+    let current: jest.ReplaceProperty<typeof AppState.currentState>
 
     beforeEach(() => {
         listener = () => undefined
