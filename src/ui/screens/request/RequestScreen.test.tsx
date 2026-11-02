@@ -422,7 +422,7 @@ describe("RequestScreen", () => {
         await waitFor(() => {
             expect(screen.queryByText("https://ostrom.test/yes/appr_0001")).toBeNull()
         })
-        expect(await screen.findByText("You are a member of several organizations, and Ostrom needs to know which one this is for. choose it in Settings.")).toBeOnTheScreen()
+        expect(await screen.findByText("You are a member of several organizations, and Ostrom needs to know which one this is for: choose it in Settings.")).toBeOnTheScreen()
     })
 
     it("drops the address of the error screen once the request loads by any refetch, not only Try again", async () => {
@@ -457,5 +457,6 @@ describe("RequestScreen", () => {
                 "You are a member of several organizations, and Ostrom needs to know which one this answer is for: choose it in Settings, or answer in the console.",
             ),
         ).toBeOnTheScreen()
+        expect(screen.getByRole("button", {name: "Choose the organization"})).toBeOnTheScreen()
     })
 })

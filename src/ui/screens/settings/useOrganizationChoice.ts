@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import {useQueryClient} from "@tanstack/react-query"
-import {useCallback, useState} from "react"
+import {useCallback, useEffect, useState} from "react"
 import type {MyOrganization} from "@/api/contract/organizations"
-import {accountKeys, useMyOrganizations} from "@/query/account"
+import {useMyOrganizations} from "@/query/account"
 import {useServices, useSessionState} from "@/services/AppServices"
 
 export type OrganizationChoiceState =
@@ -23,7 +22,6 @@ export interface OrganizationChoice {
 export function useOrganizationChoice(): OrganizationChoice {
     const session = useSessionState()
     const {sessionStore} = useServices()
-    const queryClient = useQueryClient()
     const query = useMyOrganizations()
     const [choosing, setChoosing] = useState<string | undefined>(undefined)
     const [failed, setFailed] = useState(false)
@@ -36,9 +34,8 @@ export function useOrganizationChoice(): OrganizationChoice {
             setFailed(false)
             void (async () => {
                 try {
+                    // The reads of the organization are made again by the app root, once the screens use the new one.
                     await sessionStore.getState().chooseOrg(id)
-                    // Nothing of one organization may show under the next one: every read but the list is read again.
-                    await queryClient.resetQueries({predicate: (cached) => cached.queryKey[0] !== accountKeys.all[0]})
                 } catch {
                     setFailed(true)
                 } finally {
@@ -46,10 +43,15 @@ export function useOrganizationChoice(): OrganizationChoice {
                 }
             })()
         },
-        [current, sessionStore, queryClient],
+        [current, sessionStore],
     )
 
     const organizations = query.data
+    // A single membership is the organization, even when the session names another the person has left.
+    const only = organizations?.length === 1 ? organizations[0] : undefined
+    useEffect(() => {
+        if (only !== undefined && only.id !== current) choose(only.id)
+    }, [only, current, choose])
     const state: OrganizationChoiceState =
         organizations !== undefined
             ? {kind: "ready", organizations, current}

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+import {router} from "expo-router"
 import {useTranslation} from "react-i18next"
 import {ActivityIndicator, Platform, ScrollView, StyleSheet, Text, View} from "react-native"
 import {SafeAreaView} from "react-native-safe-area-context"
@@ -158,6 +159,20 @@ function Outcome({approval}: {approval: Approval}): React.JSX.Element | null {
     )
 }
 
+/** The organization is chosen in Settings: the way there, wherever the request says it is needed. */
+function ChooseOrganization(): React.JSX.Element {
+    const {t} = useTranslation()
+    return (
+        <Button
+            label={t("common.chooseOrganization")}
+            onPress={() => {
+                router.navigate("/settings")
+            }}
+            testID="request-choose-organization"
+        />
+    )
+}
+
 /** The console did not open: its address, to select or copy and open by hand. */
 function ConsoleLink({model}: {model: RequestViewModel}): React.JSX.Element | null {
     const {t} = useTranslation()
@@ -192,6 +207,7 @@ function Actions({model, approval}: {model: RequestViewModel; approval: Approval
             {problem === "step-up" || problem === "org-required" ? (
                 <Button label={t("request.openConsole")} variant="signal" onPress={model.openConsole} testID="request-open-console" />
             ) : null}
+            {problem === "org-required" ? <ChooseOrganization /> : null}
             <ConsoleLink model={model} />
             {noApprove === undefined ? null : (
                 <Text style={[styles.body, {color: colors.text}]}>
@@ -260,7 +276,10 @@ export function RequestScreen({id}: {id: string}): React.JSX.Element {
                 <Text style={[styles.body, {color: colors.textMuted}]}>{state.orgRequired ? t("common.orgRequired") : t("request.error")}</Text>
                 {/* The console names the organization the app cannot: the request opens there. */}
                 {state.orgRequired ? (
-                    <Button label={t("request.openConsole")} variant="signal" onPress={model.openConsole} testID="request-open-console" />
+                    <>
+                        <ChooseOrganization />
+                        <Button label={t("request.openConsole")} onPress={model.openConsole} testID="request-open-console" />
+                    </>
                 ) : null}
                 <ConsoleLink model={model} />
                 <Button label={t("common.retry")} onPress={state.retry} />

@@ -67,7 +67,7 @@ describe("contract", () => {
         expect(activityKind("gate.decided")).toBe("gate.decided")
     })
 
-    it("reads an organization of the list with or without a picture, and ignores what it does not use", () => {
+    it("reads an organization of the list, and ignores what it does not use", () => {
         const page = MyOrganizationsSchema.parse({
             items: [
                 {id: "org_acme", slug: "acme", name: "acme", avatarUrl: "https://avatars.test/acme", role: "admin"},
@@ -76,9 +76,9 @@ describe("contract", () => {
             ],
         })
         expect(page.items).toEqual([
-            {id: "org_acme", name: "acme", avatarUrl: "https://avatars.test/acme"},
-            {id: "org_globex", name: "globex", avatarUrl: undefined},
-            {id: "org_initech", name: "initech", avatarUrl: undefined},
+            {id: "org_acme", name: "acme"},
+            {id: "org_globex", name: "globex"},
+            {id: "org_initech", name: "initech"},
         ])
         expect(MyOrganizationsSchema.safeParse({items: [{id: "", name: "x"}]}).success).toBe(false)
     })

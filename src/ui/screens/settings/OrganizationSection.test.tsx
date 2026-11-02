@@ -7,8 +7,8 @@ import {fakeRepositories, MemoryStorage, signedInServices, testSession} from "@/
 import {renderWithServices, testQueryClient} from "@/test/renderWithServices"
 import {OrganizationSection} from "./OrganizationSection"
 
-const acme: MyOrganization = {id: "org_acme", name: "acme", avatarUrl: "https://avatars.test/acme"}
-const globex: MyOrganization = {id: "org_globex", name: "globex", avatarUrl: undefined}
+const acme: MyOrganization = {id: "org_acme", name: "acme"}
+const globex: MyOrganization = {id: "org_globex", name: "globex"}
 
 async function open(
     organizations: () => Promise<readonly MyOrganization[]>,
@@ -21,8 +21,6 @@ async function open(
         }),
     })
     const client = testQueryClient()
-    // A read of the organization acted in so far: it must not show under the next one.
-    client.setQueryData(["approvals", "queue"], {pending: ["of acme"]})
     await renderWithServices(<OrganizationSection />, services, client)
     return {services, client}
 }
@@ -33,10 +31,14 @@ function orgIdOf(services: AppServices): string | undefined {
 }
 
 describe("OrganizationSection", () => {
-    it("shows the one organization the person is a member of, with nothing to choose", async () => {
-        await open(() => Promise.resolve([acme]))
+    it("shows the one organization the person is a member of, with nothing to choose, and acts in it", async () => {
+        // The session names no organization, or one the person has left: the only membership is the one.
+        const {services} = await open(() => Promise.resolve([acme]))
         expect(await screen.findByText("acme")).toBeOnTheScreen()
         expect(screen.queryByRole("radio")).toBeNull()
+        await waitFor(() => {
+            expect(orgIdOf(services)).toBe("org_acme")
+        })
     })
 
     it("says when the person is a member of no organization", async () => {
@@ -55,7 +57,7 @@ describe("OrganizationSection", () => {
         expect(await screen.findByText("acme")).toBeOnTheScreen()
     })
 
-    it("lets a member of several choose the one Ostrom acts in, and reads everything else again", async () => {
+    it("lets a member of several choose the one Ostrom acts in", async () => {
         const {services, client} = await open(() => Promise.resolve([acme, globex]))
         expect(await screen.findByText("You are a member of several organizations: choose the one Ostrom acts in.")).toBeOnTheScreen()
         expect(screen.getByRole("radio", {name: "acme"})).not.toBeChecked()
@@ -63,7 +65,6 @@ describe("OrganizationSection", () => {
         expect(await screen.findByText(/Ostrom acts in the organization chosen here/)).toBeOnTheScreen()
         expect(screen.getByRole("radio", {name: "globex"})).toBeChecked()
         expect(orgIdOf(services)).toBe("org_globex")
-        expect(client.getQueryData(["approvals", "queue"])).toBeUndefined()
         expect(client.getQueryData(["account", "organizations"])).toEqual([acme, globex])
         // The organization already chosen: nothing to do.
         await fireEvent.press(screen.getByRole("radio", {name: "globex"}))

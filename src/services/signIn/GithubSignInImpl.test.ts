@@ -88,7 +88,7 @@ describe("GithubSignInImpl", () => {
                 account(
                     () => Promise.resolve({token: "ost_1", user: {login: "rev-b"}}),
                     me,
-                    () => Promise.resolve([{id: "org_globex", name: "globex", avatarUrl: undefined}]),
+                    () => Promise.resolve([{id: "org_globex", name: "globex"}]),
                 ),
         })
         await expect(signIn.signIn(SERVER)).resolves.toEqual({
@@ -99,7 +99,7 @@ describe("GithubSignInImpl", () => {
     })
 
     it.each([
-        ["several", [{id: "org_acme", name: "acme", avatarUrl: undefined}, {id: "org_globex", name: "globex", avatarUrl: undefined}]],
+        ["several", [{id: "org_acme", name: "acme"}, {id: "org_globex", name: "globex"}]],
         ["none", []],
     ])("asks me which organization to act in when the person is a member of %s", async (_case: string, organizations: readonly MyOrganization[]) => {
         const signIn = new GithubSignInImpl({

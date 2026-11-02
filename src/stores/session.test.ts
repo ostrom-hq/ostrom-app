@@ -36,6 +36,38 @@ describe("session store", () => {
         expect(relaunched.getState().state).toEqual({status: "signed-in", session: {...session, orgId: "org_globex"}})
     })
 
+    it("lets a sign-out made while the choice is saved win: the token stays out of the keychain", async () => {
+        const storage = new MemoryStorage()
+        const store = createSessionStore(storage)
+        await store.getState().signIn(session)
+        const save = storage.set.bind(storage)
+        storage.set = async (key: string, value: string): Promise<void> => {
+            await save(key, value)
+            await store.getState().signOut()
+        }
+        await store.getState().chooseOrg("org_globex")
+        expect(store.getState().state).toEqual({status: "signed-out"})
+        expect(storage.items.has(SESSION_KEY)).toBe(false)
+    })
+
+    it("keeps the session signed in while the choice was saved, not the choice", async () => {
+        const storage = new MemoryStorage()
+        const store = createSessionStore(storage)
+        await store.getState().signIn(session)
+        const other = {...session, token: "ost_2"}
+        const save = storage.set.bind(storage)
+        let again = true
+        storage.set = async (key: string, value: string): Promise<void> => {
+            await save(key, value)
+            if (!again) return
+            again = false
+            await store.getState().signIn(other)
+        }
+        await store.getState().chooseOrg("org_globex")
+        expect(store.getState().state).toEqual({status: "signed-in", session: other})
+        expect(storage.items.get(SESSION_KEY)).toBe(JSON.stringify(other))
+    })
+
     it("signs out even when the keychain refuses to remove the token, and blanks it instead", async () => {
         const storage = new MemoryStorage()
         const store = createSessionStore(storage)

@@ -48,7 +48,7 @@ async function open({
         repositories: fakeRepositories({
             account: {
                 me: jest.fn(),
-                organizations: () => Promise.resolve([{id: "org_acme", name: "acme", avatarUrl: undefined}]),
+                organizations: () => Promise.resolve([{id: "org_acme", name: "acme"}]),
                 exchangeCode: jest.fn(),
                 logout,
             },

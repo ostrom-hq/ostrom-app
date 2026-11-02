@@ -69,6 +69,12 @@ export function createSessionStore(storage: SecureStorage): StoreApi<SessionStor
             if (state.status !== "signed-in") return
             const session = {...state.session, orgId}
             await storage.set(SESSION_KEY, JSON.stringify(session))
+            const now = get().state
+            if (now !== state) {
+                // Signed out, or signed in again, while it was saved: the keychain follows that, not this choice.
+                await (now.status === "signed-in" ? storage.set(SESSION_KEY, JSON.stringify(now.session)) : storage.remove(SESSION_KEY))
+                return
+            }
             set({state: {status: "signed-in", session}})
         },
         signOut: async () => {

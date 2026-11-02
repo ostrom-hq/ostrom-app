@@ -133,11 +133,11 @@ describe("AccountRepositoryImpl", () => {
         await expect(account.me()).resolves.toMatchObject({dev: {login: "rev-b"}, member: {name: "Reviewer B"}})
     })
 
-    it("lists the organizations I may act in, without a picture where there is none", async () => {
+    it("lists the organizations I may act in", async () => {
         server.resetHandlers(...createMockApi(MOCK_BASE_URL, {memberships: ["org_acme", "org_globex"]}).handlers)
         await expect(account.organizations()).resolves.toEqual([
-            {id: "org_acme", name: "acme", avatarUrl: "https://avatars.test/acme"},
-            {id: "org_globex", name: "globex", avatarUrl: undefined},
+            {id: "org_acme", name: "acme"},
+            {id: "org_globex", name: "globex"},
         ])
     })
 
