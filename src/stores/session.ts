@@ -71,8 +71,8 @@ export function createSessionStore(storage: SecureStorage): StoreApi<SessionStor
                 }
                 const session = parseStored(stored)
                 if (session === undefined) await quietly(() => storage.remove(SESSION_KEY))
-                if (get().state.status === "loading")
-                    set({state: session === undefined ? {status: "signed-out"} : {status: "signed-in", session}})
+                const launched: SessionState = session === undefined ? {status: "signed-out"} : {status: "signed-in", session}
+                if (get().state.status === "loading") set({state: launched})
             }),
         signIn: (session) => {
             const asked = signOuts
