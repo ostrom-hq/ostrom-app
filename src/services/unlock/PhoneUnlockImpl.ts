@@ -63,7 +63,9 @@ export class PhoneUnlockImpl implements PhoneUnlock {
                     if (isRefusal(error)) return "refused"
                     throw error
                 }
-                if (asked === this.session) this.unlockedAt = now()
+                // Started in a session that has ended: it proves nothing, and no answer leaves on it.
+                if (asked !== this.session) return "cancelled"
+                this.unlockedAt = now()
                 return "confirmed"
             }
         }

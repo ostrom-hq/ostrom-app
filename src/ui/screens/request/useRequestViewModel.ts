@@ -124,7 +124,12 @@ export function useRequestViewModel(id: string): RequestViewModel {
                 // Biometrics unless the contract says the action is low risk (`needsBiometrics`), and then proven to
                 // the server; a low-risk answer asks them only when the last unlock is too old for the server.
                 let outcome: UnlockOutcome
-                const askedIn = sessionStore.getState().state
+                // The token the unlock is made with: a choice of organization keeps it, a sign-out or a sign-in does not.
+                const tokenOf = (): string | undefined => {
+                    const now = sessionStore.getState().state
+                    return now.status === "signed-in" ? now.session.token : undefined
+                }
+                const askedWith = tokenOf()
                 try {
                     outcome = await unlock.unlock(
                         t(answer === "approve" ? "request.confirm.approve" : "request.confirm.decline", {title: approval.title}),
@@ -132,14 +137,13 @@ export function useRequestViewModel(id: string): RequestViewModel {
                         {always: needsBiometrics(approval)},
                     )
                 } catch (error) {
-                    // Offline, a 5xx, the keychain: the unlock comes first, so nothing was sent. The unlock goes around
-                    // the query client: a token the server no longer takes signs out here.
-                    // A late 401 of a session already left signs nothing out.
-                    if (error instanceof ApiError && error.problem.kind === "unauthorized" && sessionStore.getState().state === askedIn) {
-                        void sessionStore.getState().signOut()
-                    }
-                    setProblem(unlockProblem(error))
+                    // Offline, a 5xx, the keychain: the unlock comes first, so nothing was sent. A session already left
+                    // hears nothing of its late failure. The unlock goes around the query client: a token the server no
+                    // longer takes signs out here.
                     setSending(undefined)
+                    if (tokenOf() !== askedWith) return
+                    if (error instanceof ApiError && error.problem.kind === "unauthorized") void sessionStore.getState().signOut()
+                    setProblem(unlockProblem(error))
                     return
                 }
                 if (outcome === "confirmed") {

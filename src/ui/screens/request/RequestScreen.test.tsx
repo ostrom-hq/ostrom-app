@@ -218,6 +218,44 @@ describe("RequestScreen", () => {
         expect(answer).not.toHaveBeenCalled()
     })
 
+    it("says nothing of a failed unlock once the person has signed out", async () => {
+        const later: {services?: AppServices} = {}
+        const unlock = jest.fn(async () => {
+            await later.services?.sessionStore.getState().signOut()
+            throw new ApiError({kind: "network"})
+        })
+        const services = await signedInServices({
+            unlock: {keep: jest.fn(), unlock, forget: jest.fn()},
+            repositories: fakeRepositories({approvals: {queue: jest.fn(), view: () => Promise.resolve(viewOf(approvals.pending)), answer: jest.fn()}}),
+        })
+        later.services = services
+        await renderWithServices(<RequestScreen id="appr_0001" />, services)
+        await fireEvent.press(await screen.findByRole("button", {name: "Approve"}))
+        // The buttons come back once the failure is read.
+        await waitFor(() => {
+            expect(screen.getByRole("button", {name: "Approve"})).toBeEnabled()
+        })
+        expect(screen.queryByText("The server could not be reached. Nothing was sent: try again.")).toBeNull()
+        expect(services.sessionStore.getState().state).toEqual({status: "signed-out"})
+    })
+
+    it("still signs out on a 401 at the unlock after a choice of organization: the token is the same", async () => {
+        const later: {services?: AppServices} = {}
+        const unlock = jest.fn(async () => {
+            await later.services?.sessionStore.getState().chooseOrg("org_globex")
+            throw new ApiError({kind: "unauthorized"})
+        })
+        const services = await signedInServices({
+            unlock: {keep: jest.fn(), unlock, forget: jest.fn()},
+            repositories: fakeRepositories({approvals: {queue: jest.fn(), view: () => Promise.resolve(viewOf(approvals.pending)), answer: jest.fn()}}),
+        })
+        later.services = services
+        await renderWithServices(<RequestScreen id="appr_0001" />, services)
+        await fireEvent.press(await screen.findByRole("button", {name: "Approve"}))
+        expect(await screen.findByText("Your session has expired. Sign in again.")).toBeOnTheScreen()
+        expect(services.sessionStore.getState().state).toEqual({status: "signed-out"})
+    })
+
     it("signs out when the server no longer takes the token at the unlock", async () => {
         const unlock = jest.fn(() => Promise.reject(new ApiError({kind: "unauthorized"})))
         const services = await signedInServices({
@@ -230,12 +268,13 @@ describe("RequestScreen", () => {
         expect(services.sessionStore.getState().state).toEqual({status: "signed-out"})
     })
 
-    it("signs nothing out on a late 401 of a session already left", async () => {
+    it("signs nothing out and says nothing on a late 401 of a session already left", async () => {
+        const next = {...testSession, token: "ost_2"}
         const later: {services?: AppServices} = {}
         const unlock = jest.fn(async () => {
             // The person signed out and in again while the unlock was on its way.
             await later.services?.sessionStore.getState().signOut()
-            await later.services?.sessionStore.getState().signIn(testSession)
+            await later.services?.sessionStore.getState().signIn(next)
             throw new ApiError({kind: "unauthorized"})
         })
         const services = await signedInServices({
@@ -245,8 +284,11 @@ describe("RequestScreen", () => {
         later.services = services
         await renderWithServices(<RequestScreen id="appr_0001" />, services)
         await fireEvent.press(await screen.findByRole("button", {name: "Approve"}))
-        expect(await screen.findByText("Your session has expired. Sign in again.")).toBeOnTheScreen()
-        expect(services.sessionStore.getState().state).toEqual({status: "signed-in", session: testSession})
+        await waitFor(() => {
+            expect(screen.getByRole("button", {name: "Approve"})).toBeEnabled()
+        })
+        expect(screen.queryByText("Your session has expired. Sign in again.")).toBeNull()
+        expect(services.sessionStore.getState().state).toEqual({status: "signed-in", session: next})
     })
 
     it("reads the request again when it changed after the screen showed it", async () => {

@@ -141,7 +141,8 @@ describe("PhoneUnlockImpl", () => {
         await unlock.forget()
         await unlock.keep("key-2")
         answer()
-        expect(await pending).toBe("confirmed")
+        // No answer leaves on an unlock of the session that ended.
+        expect(await pending).toBe("cancelled")
         expect(await unlock.unlock("Approve", account, {always: false})).toBe("confirmed")
         expect(serverUnlock).toHaveBeenLastCalledWith("key-2")
     })
