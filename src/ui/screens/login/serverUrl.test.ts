@@ -35,15 +35,17 @@ describe("normalizeServerUrl", () => {
     })
 
     describe("by default, the build's own __DEV__", () => {
-        let development: jest.ReplaceProperty<boolean>
+        // React Native declares `__DEV__` as a global constant; Jest sets it on the global object.
+        const setDevelopment = (value: boolean): void => {
+            Reflect.set(globalThis, "__DEV__", value)
+        }
 
         beforeEach(() => {
-            // React Native declares `__DEV__` as a global constant; Jest sets it on the global object.
-            development = jest.replaceProperty(globalThis as unknown as {__DEV__: boolean}, "__DEV__", false)
+            setDevelopment(false)
         })
 
         afterEach(() => {
-            development.restore()
+            setDevelopment(true)
         })
 
         it("refuses HTTP on this computer in a release build", () => {
@@ -52,7 +54,7 @@ describe("normalizeServerUrl", () => {
         })
 
         it("takes it in a development build", () => {
-            development.replaceValue(true)
+            setDevelopment(true)
             expect(normalizeServerUrl("http://10.0.2.2:4961")).toBe("http://10.0.2.2:4961")
         })
     })
