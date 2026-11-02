@@ -45,9 +45,16 @@ function parseStored(text: string | undefined): Session | undefined {
 
 /** The session, kept in the secure storage. Client state only: nothing from the server is copied here. */
 export function createSessionStore(storage: SecureStorage): StoreApi<SessionStore> {
+    // The keychain is written one change at a time, in the order they were asked: the last asked is the one kept.
+    let tail: Promise<unknown> = Promise.resolve()
+    function inTurn<T>(change: () => Promise<T>): Promise<T> {
+        const result = tail.then(change)
+        tail = result.catch(() => undefined)
+        return result
+    }
     return createStore<SessionStore>()((set, get) => ({
         state: {status: "loading"},
-        hydrate: async () => {
+        hydrate: () => inTurn(async () => {
             let stored: string | undefined
             try {
                 stored = await storage.get(SESSION_KEY)
@@ -59,29 +66,26 @@ export function createSessionStore(storage: SecureStorage): StoreApi<SessionStor
             const session = parseStored(stored)
             if (session === undefined) await storage.remove(SESSION_KEY).catch(() => undefined)
             set({state: session === undefined ? {status: "signed-out"} : {status: "signed-in", session}})
-        },
-        signIn: async (session) => {
-            await storage.set(SESSION_KEY, JSON.stringify(session))
-            set({state: {status: "signed-in", session}})
-        },
-        chooseOrg: async (orgId) => {
-            const {state} = get()
-            if (state.status !== "signed-in") return
-            const session = {...state.session, orgId}
-            await storage.set(SESSION_KEY, JSON.stringify(session))
-            const now = get().state
-            if (now !== state) {
-                // Signed out, or signed in again, while it was saved: the keychain follows that, not this choice.
-                await (now.status === "signed-in" ? storage.set(SESSION_KEY, JSON.stringify(now.session)) : storage.remove(SESSION_KEY))
-                return
-            }
-            set({state: {status: "signed-in", session}})
-        },
-        signOut: async () => {
+        }),
+        signIn: (session) =>
+            inTurn(async () => {
+                await storage.set(SESSION_KEY, JSON.stringify(session))
+                set({state: {status: "signed-in", session}})
+            }),
+        chooseOrg: (orgId) =>
+            inTurn(async () => {
+                const {state} = get()
+                if (state.status !== "signed-in") return
+                const session = {...state.session, orgId}
+                await storage.set(SESSION_KEY, JSON.stringify(session))
+                // Signed out while it was saved: that wins, and its removal, queued behind this write, clears the keychain.
+                if (get().state === state) set({state: {status: "signed-in", session}})
+            }),
+        signOut: () => {
             // Signed out at once, whatever the keychain says. If the token cannot be removed, it is blanked: the next
             // launch reads an unreadable session, which is signed out too.
             set({state: {status: "signed-out"}})
-            await storage.remove(SESSION_KEY).catch(() => storage.set(SESSION_KEY, "").catch(() => undefined))
+            return inTurn(() => storage.remove(SESSION_KEY).catch(() => storage.set(SESSION_KEY, "").catch(() => undefined)))
         },
     }))
 }

@@ -50,7 +50,8 @@ export function useOrganizationChoice(): OrganizationChoice {
     // A single membership is the organization, even when the session names another the person has left.
     const only = organizations?.length === 1 ? organizations[0] : undefined
     useEffect(() => {
-        // Straight to the session store, nothing shown: a failure is retried on the next reading of the memberships.
+        // Straight to the session store, nothing shown. If it cannot be saved, the session stays as it was, and the server
+        // still acts in the only membership of a call that names none (server#64); the next opening of Settings tries again.
         if (only !== undefined && only.id !== current) void sessionStore.getState().chooseOrg(only.id).catch(() => undefined)
     }, [only, current, sessionStore])
     const state: OrganizationChoiceState =

@@ -61,6 +61,15 @@ describe("AppRoot", () => {
         expect(await screen.findByText("Nothing waits for your yes right now.")).toBeOnTheScreen()
     })
 
+    it("reads the inbox once at a launch with an organization kept: a launch is no change of organization", async () => {
+        const storage = new MemoryStorage()
+        storage.items.set(SESSION_KEY, JSON.stringify({...testSession, orgId: "org_acme"}))
+        const queue = jest.fn(() => Promise.resolve(EMPTY))
+        await launch(storage, queue)
+        expect(await screen.findByText("Nothing waits for your yes right now.")).toBeOnTheScreen()
+        expect(queue).toHaveBeenCalledTimes(1)
+    })
+
     it("reads the organization's data again through its own repositories once another is chosen, and keeps the person's", async () => {
         const base = fakeServices({storage: keptSession()})
         const services = {

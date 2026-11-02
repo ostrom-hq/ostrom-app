@@ -41,12 +41,14 @@ describe("session store", () => {
         const store = createSessionStore(storage)
         await store.getState().signIn(session)
         const save = storage.set.bind(storage)
+        let signingOut: Promise<void> | undefined
         storage.set = async (key: string, value: string): Promise<void> => {
             await save(key, value)
-            await store.getState().signOut()
+            signingOut = store.getState().signOut()
         }
         await store.getState().chooseOrg("org_globex")
         expect(store.getState().state).toEqual({status: "signed-out"})
+        await signingOut
         expect(storage.items.has(SESSION_KEY)).toBe(false)
     })
 
@@ -56,16 +58,41 @@ describe("session store", () => {
         await store.getState().signIn(session)
         const other = {...session, token: "ost_2"}
         const save = storage.set.bind(storage)
-        let again = true
+        let signingIn: Promise<void> | undefined
         storage.set = async (key: string, value: string): Promise<void> => {
             await save(key, value)
-            if (!again) return
-            again = false
-            await store.getState().signIn(other)
+            signingIn ??= store.getState().signIn(other)
         }
         await store.getState().chooseOrg("org_globex")
+        await signingIn
         expect(store.getState().state).toEqual({status: "signed-in", session: other})
         expect(storage.items.get(SESSION_KEY)).toBe(JSON.stringify(other))
+    })
+
+    it("keeps the last of two choices asked one after the other, in memory and in the keychain", async () => {
+        const storage = new MemoryStorage()
+        const store = createSessionStore(storage)
+        await store.getState().signIn(session)
+        await Promise.all([store.getState().chooseOrg("org_acme"), store.getState().chooseOrg("org_globex")])
+        expect(store.getState().state).toEqual({status: "signed-in", session: {...session, orgId: "org_globex"}})
+        expect(storage.items.get(SESSION_KEY)).toBe(JSON.stringify({...session, orgId: "org_globex"}))
+    })
+
+    it("goes on with the next change after one the keychain refused", async () => {
+        const storage = new MemoryStorage()
+        const store = createSessionStore(storage)
+        const save = storage.set.bind(storage)
+        let refuse = true
+        storage.set = (key: string, value: string): Promise<void> => {
+            if (!refuse) return save(key, value)
+            refuse = false
+            return Promise.reject(new Error("locked"))
+        }
+        const refused = store.getState().signIn(session)
+        const next = store.getState().signIn(session)
+        await expect(refused).rejects.toThrow("locked")
+        await next
+        expect(store.getState().state).toEqual({status: "signed-in", session})
     })
 
     it("signs out even when the keychain refuses to remove the token, and blanks it instead", async () => {

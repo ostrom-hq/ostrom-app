@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import {router} from "expo-router"
+import {useRouter} from "expo-router"
 import {useTranslation} from "react-i18next"
 import {ActivityIndicator, Platform, ScrollView, StyleSheet, Text, View} from "react-native"
 import {SafeAreaView} from "react-native-safe-area-context"
@@ -162,6 +162,7 @@ function Outcome({approval}: {approval: Approval}): React.JSX.Element | null {
 /** The organization is chosen in Settings: the way there, wherever the request says it is needed. */
 function ChooseOrganization(): React.JSX.Element {
     const {t} = useTranslation()
+    const router = useRouter()
     return (
         <Button
             label={t("common.chooseOrganization")}
