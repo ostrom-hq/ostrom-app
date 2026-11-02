@@ -7,7 +7,9 @@ import {ApprovalsRepositoryImpl} from "@/repositories/ApprovalsRepositoryImpl"
 import {GithubSignInImpl} from "@/services/signIn/GithubSignInImpl"
 import {servicesForBuild} from "./buildServices"
 import {servicesForBuild as e2eServicesForBuild} from "./buildServicesE2e"
+import {servicesForBuild as realServicesForBuild} from "./buildServicesReal"
 import {createMockAppServices} from "./mockServices"
+import {createRealServerAppServices, realServer} from "./realServices"
 import {createAppServices, easProjectId, repositoriesFor} from "./services"
 
 // 16 zero bytes in base64url: the state the sign-in draws with the mocked random source.
@@ -100,6 +102,51 @@ describe("createMockAppServices", () => {
         expect(await services.push.launchData()).toBeUndefined()
         const unsubscribe = services.push.onOpen(jest.fn())
         expect(unsubscribe).not.toThrow()
+    })
+})
+
+describe("createRealServerAppServices", () => {
+    it("signs in with the token the CI made on its server, whatever address is typed", async () => {
+        const services = createRealServerAppServices(
+            realServer({serverUrl: "http://10.0.2.2:4600", token: "osm_ci", login: "e2e", unlockKey: "key_ci"}),
+        )
+        expect(await services.signIn.signIn("https://app.ostrom.run")).toEqual({
+            kind: "signed-in",
+            session: {serverUrl: "http://10.0.2.2:4600", token: "osm_ci", user: {login: "e2e"}},
+            unlockKey: "key_ci",
+        })
+        expect(services.repositoriesFor).toBe(repositoriesFor)
+        expect(await services.biometrics.confirm("Approve")).toBe("confirmed")
+        expect(await services.push.register()).toEqual({kind: "unavailable"})
+        expect(await services.push.launchData()).toBeUndefined()
+        const unsubscribe = services.push.onOpen(jest.fn())
+        expect(unsubscribe).not.toThrow()
+    })
+
+    it("stops at once when the build was not given its server, token and login", () => {
+        expect(() => realServer({token: "osm_ci", login: "e2e", unlockKey: "key_ci"})).toThrow(
+            /needs EXPO_PUBLIC_OSTROM_E2E_SERVER$/,
+        )
+        expect(() =>
+            realServer({serverUrl: "http://10.0.2.2:4600", token: "", login: "e2e", unlockKey: "key_ci"}),
+        ).toThrow(/needs EXPO_PUBLIC_OSTROM_E2E_TOKEN$/)
+        expect(() => realServer({serverUrl: "not a url", token: "osm_ci", unlockKey: "key_ci"})).toThrow(
+            /needs EXPO_PUBLIC_OSTROM_E2E_SERVER, EXPO_PUBLIC_OSTROM_E2E_LOGIN$/,
+        )
+        expect(() => realServer({serverUrl: "http://10.0.2.2:4600", token: "osm_ci", login: "e2e"})).toThrow(
+            /needs EXPO_PUBLIC_OSTROM_E2E_UNLOCK_KEY$/,
+        )
+        // Nothing at all: the four are named.
+        expect(() => realServer(undefined)).toThrow(/needs EXPO_PUBLIC_OSTROM_E2E_SERVER, _TOKEN, _LOGIN and _UNLOCK_KEY$/)
+    })
+})
+
+describe("realServicesForBuild", () => {
+    it("stops at once when the build was given none of its variables", () => {
+        // Nothing of the kind in the test environment: the job sets them for its build only.
+        expect(() => realServicesForBuild()).toThrow(
+            /needs EXPO_PUBLIC_OSTROM_E2E_SERVER, EXPO_PUBLIC_OSTROM_E2E_TOKEN, EXPO_PUBLIC_OSTROM_E2E_LOGIN, EXPO_PUBLIC_OSTROM_E2E_UNLOCK_KEY$/,
+        )
     })
 })
 

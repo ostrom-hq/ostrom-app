@@ -1,12 +1,16 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: AGPL-3.0-only
-# Runs each Maestro flow of .maestro/ on the CI emulator, one at a time. The emulator sometimes goes offline for a
+# Runs each Maestro flow of a directory (.maestro/ by default) on the CI emulator, one at a time; the arguments after
+# the directory go to each `maestro test` (ostrom-server's app-journey passes `-e OSTROM_E2E_LOGIN=…`). The emulator sometimes goes offline for a
 # moment ("adb: device offline", DeviceServerDiedException: runs 41035568416, 41038267977, 41041831225), mostly just
 # after it boots. So the device must answer adb, have finished booting and answer the package manager before each
 # flow (with one `adb reconnect` when it does not), and a warm-up flow runs first without counting.
 # A flow is run a second time only when its first failure is such an outage of the emulator, never when an assertion
 # of the flow failed: an app that fails now and then fails the job.
 set -uo pipefail
+
+flows="${1:-.maestro}"
+shift $(($# > 0 ? 1 : 0))
 
 # Waits at most this long for each condition.
 LIMIT_SECONDS=180
@@ -41,10 +45,11 @@ steady() {
 
 run() {
     local flow="$1" attempt="$2" name
+    shift 2
     name="$(basename "$flow" .yaml)"
     mkdir -p maestro-output
     maestro test --format junit --output "maestro-report-$name-$attempt.xml" \
-        --test-output-dir "maestro-output/$name-$attempt" "$flow" 2>&1 | tee "maestro-output/$name-$attempt.console"
+        --test-output-dir "maestro-output/$name-$attempt" "$@" "$flow" 2>&1 | tee "maestro-output/$name-$attempt.console"
 }
 
 # The first attempt failed because the emulator went away, not because the app did.
@@ -69,12 +74,12 @@ if ! maestro test --test-output-dir maestro-output/warm-up .maestro/common/warm-
 fi
 
 failed=0
-for flow in .maestro/*.yaml; do
+for flow in "$flows"/*.yaml; do
     name="$(basename "$flow" .yaml)"
     # A workspace configuration is not a flow.
     [ "$name" = "config" ] && continue
     steady_or_stop
-    if run "$flow" 1; then continue; fi
+    if run "$flow" 1 "$@"; then continue; fi
     if ! outage "$name"; then
         echo "::error::$name failed (no outage of the emulator: not run again)"
         failed=1
@@ -83,7 +88,7 @@ for flow in .maestro/*.yaml; do
     echo "::warning::$name failed on an outage of the emulator: adb reconnect, then run it again from a clean state"
     adb reconnect offline
     steady_or_stop
-    if ! run "$flow" 2; then
+    if ! run "$flow" 2 "$@"; then
         echo "::error::$name failed twice"
         failed=1
     fi

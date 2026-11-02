@@ -105,6 +105,20 @@ emulator (device offline, `DeviceServerDiedException`), never on a failed assert
 | Organization isolation | Another organization's data never shows (CONVENTIONS.md section 16) | Missing: needs a second organization on a real server |
 | Receipts, history, activity, spending | Each screen opens and reads its data | Missing |
 
+Against the real server, the workflow `App journey` of ostrom-server (`.github/workflows/app-journey.yml`, run on demand
+with this repository's ref; it lives there because that repository's token reads the server image) starts the
+`sha-<7>` image of ostrom-server main with PostgreSQL and the demo stack's fake GitHub, then prepares it through the
+server's own routes (`scripts/real-server-session.sh`): the phone's person signs in with GitHub, owns the organization
+and is named approver of pushes to main; another member, signed in by e-mail, asks two pushes; the phone's session is
+made by the app's sign-in (PKCE S256 to `ostrom://auth/callback`, `POST /auth/mobile/token`). The app is built with
+`EXPO_PUBLIC_OSTROM_REAL_E2E=1`: the real services, given that session and its unlock key (`src/config/realServices.ts`).
+It runs the flows of `.maestro/real/` on an Android emulator of the same runner, then the job checks through the API that
+the gates are approved and rejected and that each receipt verifies.
+
+| Flow (real server) | What it proves | What it does not |
+|---|---|---|
+| `real/journey.yaml` | On the real server: the inbox reads the yes queue, a yes (biometrics, `POST /auth/mobile/unlock`, the answer) and a no with its reason go through, Settings shows the login and the only organization, the History shows the signed receipts verified on the phone | The app's own browser hop of the sign-in (the job makes the session by the same routes); a real fingerprint (the build confirms it: no finger is enrolled on the emulator) |
+
 ## Layout
 
 | Path | What lives there |
