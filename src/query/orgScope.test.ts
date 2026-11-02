@@ -20,7 +20,7 @@ describe("isOrgScoped", () => {
         },
     )
 
-    it.each([["approvals", "queue"], ["receipts"], ["activity"]])("reads %p again in another organization", (...key) => {
+    it.each([{key: ["approvals", "queue"]}, {key: ["receipts"]}, {key: ["activity"]}])("reads $key again in another organization", ({key}) => {
         expect(isOrgScoped(queryOf(key))).toBe(true)
     })
 })
