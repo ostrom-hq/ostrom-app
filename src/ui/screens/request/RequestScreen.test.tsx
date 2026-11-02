@@ -231,17 +231,18 @@ describe("RequestScreen", () => {
     })
 
     it("signs nothing out on a late 401 of a session already left", async () => {
-        let services: AppServices | undefined
+        const later: {services?: AppServices} = {}
         const unlock = jest.fn(async () => {
             // The person signed out and in again while the unlock was on its way.
-            await services?.sessionStore.getState().signOut()
-            await services?.sessionStore.getState().signIn(testSession)
+            await later.services?.sessionStore.getState().signOut()
+            await later.services?.sessionStore.getState().signIn(testSession)
             throw new ApiError({kind: "unauthorized"})
         })
-        services = await signedInServices({
+        const services = await signedInServices({
             unlock: {keep: jest.fn(), unlock, forget: jest.fn()},
             repositories: fakeRepositories({approvals: {queue: jest.fn(), view: () => Promise.resolve(viewOf(approvals.pending)), answer: jest.fn()}}),
         })
+        later.services = services
         await renderWithServices(<RequestScreen id="appr_0001" />, services)
         await fireEvent.press(await screen.findByRole("button", {name: "Approve"}))
         expect(await screen.findByText("Your session has expired. Sign in again.")).toBeOnTheScreen()
