@@ -82,5 +82,12 @@ appId: run.ostrom.app
 - extendedWaitUntil:
     visible: "Signature verified on this phone.*"
     timeout: 30000
+# Both receipts, the yes and the no: a second verified row.
+- extendedWaitUntil:
+    visible:
+      text: "Signature verified on this phone.*"
+      index: 1
+    timeout: 30000
 - assertNotVisible: "Signature rejected.*"
+- assertNotVisible: "Not verified.*"
 - takeScreenshot: real-history

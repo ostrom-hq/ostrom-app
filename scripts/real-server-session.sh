@@ -12,7 +12,10 @@
 # Masks the secrets in the job's log, and writes `token`, `unlock_key`, `login`, `yes_approval`, `no_approval`,
 # `yes_gate`, `no_gate` and `asker_token` to $GITHUB_OUTPUT (standard output outside Actions).
 # Usage: scripts/real-server-session.sh <server origin> <mail directory> <fake GitHub origin>
+# Linux only (bash 4.4 or later, GNU coreutils), as on the CI runner. A refused call prints the server's answer.
 set -euo pipefail
+# A failure inside `$(…)` stops the script too (bash resets -e there otherwise).
+shopt -s inherit_errexit
 
 server="$1"
 mail_dir="$2"
@@ -28,6 +31,21 @@ json=(-H "content-type: application/json" -H "accept: application/json")
 fail() {
     echo "::error::$1" >&2
     exit 1
+}
+
+# A call to the server: its body, or the call's address, status and the server's answer on standard error (never the
+# headers, which carry the credentials).
+api() {
+    local out code url arg
+    for arg in "$@"; do case "$arg" in http*) url="$arg" ;; esac; done
+    out="$(curl -sS -w '\n%{http_code}' "$@")"
+    code="${out##*$'\n'}"
+    out="${out%$'\n'*}"
+    if [ "$code" -ge 400 ]; then
+        echo "::error::${url%%\?*} → $code $out" >&2
+        exit 1
+    fi
+    printf '%s' "$out"
 }
 
 # The response headers of a request, without following a redirect (curl fails only on a transport error).
@@ -98,19 +116,19 @@ header_args() {
 signed="$(github_sign_in "redirect=/")"
 lines="$(browser_of "$signed" "The GitHub sign-in in the browser")"
 mapfile -d '' -t owner < <(header_args "$lines")
-org="$(curl -fsS "${json[@]}" "${owner[@]}" -X POST "$server/api/v1/orgs" -d '{"name":"acme-e2e"}' | jq -er '.id')"
-curl -fsS "${json[@]}" "${owner[@]}" -X POST "$server/api/v1/orgs/$org/members/invites" -d "{\"invites\":[{\"email\":\"$asker_email\",\"role\":\"member\"}]}" > /dev/null
+org="$(api "${json[@]}" "${owner[@]}" -X POST "$server/api/v1/orgs" -d '{"name":"acme-e2e"}' | jq -er '.id')"
+api "${json[@]}" "${owner[@]}" -X POST "$server/api/v1/orgs/$org/members/invites" -d "{\"invites\":[{\"email\":\"$asker_email\",\"role\":\"member\"}]}" > /dev/null
 
 # The asker: e-mail sign-in, the invitation accepted, a token that asks and reads gates and reads receipts.
-curl -fsS "${json[@]}" -X POST "$server/api/v1/auth/email" -d "{\"email\":\"$asker_email\"}" > /dev/null
+api "${json[@]}" -X POST "$server/api/v1/auth/email" -d "{\"email\":\"$asker_email\"}" > /dev/null
 link="$(mailed_token "$asker_email" "/auth/email")"
 signed="$(headers "${json[@]}" -X POST "$server/api/v1/auth/email/verify" -d "{\"token\":\"$link\"}")"
 lines="$(browser_of "$signed" "The e-mail sign-in")"
 mapfile -d '' -t asker < <(header_args "$lines")
 invitation="$(mailed_token "$asker_email" "/invite")"
-joined="$(curl -fsS "${json[@]}" "${asker[@]}" -X POST "$server/api/v1/invitations/accept" -d "{\"token\":\"$invitation\"}" | jq -r '.id')"
+joined="$(api "${json[@]}" "${asker[@]}" -X POST "$server/api/v1/invitations/accept" -d "{\"token\":\"$invitation\"}" | jq -r '.id')"
 [ "$joined" = "$org" ] || fail "The asker joined $joined, not $org"
-asker_token="$(curl -fsS "${json[@]}" "${asker[@]}" -X POST "$server/api/v1/tokens" \
+asker_token="$(api "${json[@]}" "${asker[@]}" -X POST "$server/api/v1/tokens" \
     -d '{"name":"app e2e asker","expiresInDays":1,"scopes":["gates:ask","gates:read","receipts:read"]}' | jq -er '.secret')"
 echo "::add-mask::$asker_token"
 
@@ -119,19 +137,19 @@ workflow="$(jq -nc --arg id "app-e2e-$run" --arg login "$login" --arg repo "$rep
     '{id: $id, name: "App journey", domain: "delivery", status: "accepted", foundAt: $at, edges: [],
       nodes: [{id: "push-main", kind: "gate", label: "Push to main", approvers: [$login],
                actions: [{class: "push-main", label: "Push to the main branch", patterns: [], repos: [$repo]}]}]}')"
-curl -fsS "${json[@]}" "${owner[@]}" -X POST "$server/api/v1/workflows" -d "$workflow" > /dev/null
+api "${json[@]}" "${owner[@]}" -X POST "$server/api/v1/workflows" -d "$workflow" > /dev/null
 
 # Two pushes to main, asked by the asker: one for the yes, one for the no.
 ask() {
     local sha
     sha="$(printf '%s' "$run-$1" | sha1sum | cut -d' ' -f1)"
-    curl -fsS "${json[@]}" -H "authorization: Bearer $asker_token" -X POST "$server/api/v1/gates" \
+    api "${json[@]}" -H "authorization: Bearer $asker_token" -X POST "$server/api/v1/gates" \
         -d "{\"repo\":\"$repo\",\"class\":\"git.push\",\"tool\":\"Bash\",\"command\":\"git push origin main\",\"push\":{\"remote\":\"origin\",\"refs\":[{\"ref\":\"refs/heads/main\",\"sha\":\"$sha\"}]}}" |
         jq -er '.gate.id'
 }
 yes_gate="$(ask yes)"
 no_gate="$(ask no)"
-pending="$(curl -fsS "${json[@]}" "${owner[@]}" "$server/api/v1/approvals?mine=true&status=pending&limit=50")"
+pending="$(api "${json[@]}" "${owner[@]}" "$server/api/v1/approvals?mine=true&status=pending&limit=50")"
 approval_of() {
     printf '%s' "$pending" | jq -er --arg gate "$1" '[.items[] | select(.group == $gate)][0].id'
 }
@@ -147,7 +165,7 @@ back="$(location "$signed")"
 case "$back" in "$redirect_uri?"*"state=$state"*) ;; *) fail "The app's sign-in came back to ${back:-nothing}" ;; esac
 code="$(printf '%s' "${back#*\?}" | tr '&' '\n' | grep '^code=' | cut -d= -f2- || true)"
 [ -n "$code" ] || fail "The app's sign-in came back without a code"
-mobile="$(curl -fsS "${json[@]}" -X POST "$server/api/v1/auth/mobile/token" \
+mobile="$(api "${json[@]}" -X POST "$server/api/v1/auth/mobile/token" \
     -d "$(jq -nc --arg code "$code" --arg verifier "$verifier" --arg uri "$redirect_uri" '{code: $code, codeVerifier: $verifier, redirectUri: $uri}')")"
 token="$(printf '%s' "$mobile" | jq -er '.token')"
 unlock_key="$(printf '%s' "$mobile" | jq -er '.unlockKey')"
