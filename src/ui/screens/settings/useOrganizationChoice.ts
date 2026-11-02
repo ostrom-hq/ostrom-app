@@ -50,8 +50,9 @@ export function useOrganizationChoice(): OrganizationChoice {
     // A single membership is the organization, even when the session names another the person has left.
     const only = organizations?.length === 1 ? organizations[0] : undefined
     useEffect(() => {
-        if (only !== undefined && only.id !== current) choose(only.id)
-    }, [only, current, choose])
+        // Straight to the session store, nothing shown: a failure is retried on the next reading of the memberships.
+        if (only !== undefined && only.id !== current) void sessionStore.getState().chooseOrg(only.id).catch(() => undefined)
+    }, [only, current, sessionStore])
     const state: OrganizationChoiceState =
         organizations !== undefined
             ? {kind: "ready", organizations, current}

@@ -41,6 +41,25 @@ describe("OrganizationSection", () => {
         })
     })
 
+    it("keeps showing the one organization when its choice cannot be saved", async () => {
+        const storage = new MemoryStorage()
+        const services = await signedInServices({
+            storage,
+            repositories: fakeRepositories({
+                account: {me: jest.fn(), organizations: () => Promise.resolve([acme]), exchangeCode: jest.fn(), logout: jest.fn()},
+            }),
+        })
+        const set = jest.fn((_key: string, _value: string) => Promise.reject(new Error("keychain locked")))
+        storage.set = set
+        await renderWithServices(<OrganizationSection />, services, testQueryClient())
+        expect(await screen.findByText("acme")).toBeOnTheScreen()
+        await waitFor(() => {
+            expect(set).toHaveBeenCalled()
+        })
+        expect(orgIdOf(services)).toBeUndefined()
+        expect(screen.queryByText(/could not be/)).toBeNull()
+    })
+
     it("says when the person is a member of no organization", async () => {
         await open(() => Promise.resolve([]))
         expect(await screen.findByText("You are not a member of any organization yet.")).toBeOnTheScreen()
