@@ -6,13 +6,19 @@ import {PrivacyGuard} from "./PrivacyGuard"
 describe("PrivacyGuard", () => {
     let listener: (status: AppStateStatus) => void
     let remove: jest.Mock
-    let subscribe: jest.SpyInstance
+    let subscribe: jest.SpiedFunction<typeof AppState.addEventListener>
     let current: jest.ReplaceProperty<typeof AppState.currentState>
+
+    /** The app moves to a state, as React Native says it: the state, then the event. */
+    const move = (status: AppStateStatus): void => {
+        current.replaceValue(status)
+        listener(status)
+    }
 
     beforeEach(() => {
         listener = () => undefined
         remove = jest.fn()
-        subscribe = jest.spyOn(AppState, "addEventListener").mockImplementation((_type, handler) => {
+        subscribe = jest.spyOn(AppState, "addEventListener").mockImplementation((_type, handler: (status: AppStateStatus) => void) => {
             listener = handler
             return {remove}
         })
@@ -41,14 +47,14 @@ describe("PrivacyGuard", () => {
         async (status) => {
             await render(guarded)
             await act(() => {
-                listener(status)
+                move(status)
             })
             expect(screen.getByTestId("privacy-cover")).toBeOnTheScreen()
             expect(screen.getByText("Ostrom")).toBeOnTheScreen()
             // Hidden from the accessibility tree: the default query no longer finds the covered text.
             expect(screen.queryByText("git push origin main")).toBeNull()
             await act(() => {
-                listener("active")
+                move("active")
             })
             expect(screen.queryByTestId("privacy-cover")).toBeNull()
             expect(screen.getByText("git push origin main")).toBeOnTheScreen()
@@ -63,7 +69,7 @@ describe("PrivacyGuard", () => {
 
     it("reads a change made before it listens", async () => {
         // The state moves between the first render and the subscription: the subscription reads it again.
-        subscribe.mockImplementation((_type, handler) => {
+        subscribe.mockImplementation((_type, handler: (status: AppStateStatus) => void) => {
             listener = handler
             current.replaceValue("background")
             return {remove}
@@ -80,9 +86,7 @@ describe("PrivacyGuard", () => {
 
     it("stops listening when it leaves", async () => {
         const {unmount} = await render(guarded)
-        await act(() => {
-            unmount()
-        })
+        await unmount()
         expect(remove).toHaveBeenCalledTimes(1)
     })
 })

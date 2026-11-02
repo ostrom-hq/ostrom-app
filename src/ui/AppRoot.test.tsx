@@ -116,21 +116,25 @@ describe("AppRoot", () => {
             listeners.push(handler)
             return {remove: jest.fn()}
         })
+        const current = jest.replaceProperty(AppState, "currentState", "active")
         try {
             await launch(keptSession())
             expect(await screen.findByText("Nothing waits for your yes right now.")).toBeOnTheScreen()
             expect(screen.queryByTestId("privacy-cover")).toBeNull()
             await act(() => {
+                current.replaceValue("inactive")
                 for (const listener of listeners) listener("inactive")
             })
             expect(screen.getByTestId("privacy-cover")).toBeOnTheScreen()
             expect(screen.queryByText("Nothing waits for your yes right now.")).toBeNull()
             await act(() => {
+                current.replaceValue("active")
                 for (const listener of listeners) listener("active")
             })
             expect(screen.queryByTestId("privacy-cover")).toBeNull()
         } finally {
             subscribe.mockRestore()
+            current.restore()
         }
     })
 

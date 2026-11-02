@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import {type ReactNode, useEffect, useState} from "react"
+import {type ReactNode, useSyncExternalStore} from "react"
 import {useTranslation} from "react-i18next"
 import {AppState, StyleSheet, Text, View} from "react-native"
 import {fontSize} from "@/ui/theme/tokens"
@@ -13,6 +13,17 @@ function isHidden(status: string | null | undefined): boolean {
     return status === "inactive" || status === "background"
 }
 
+function followAppState(onChange: () => void): () => void {
+    const subscription = AppState.addEventListener("change", onChange)
+    return () => {
+        subscription.remove()
+    }
+}
+
+function currentAppState(): string | null | undefined {
+    return AppState.currentState
+}
+
 /**
  * Covers every screen while the app is not in front, so the picture the system keeps for the app switcher shows no
  * request, diff or receipt (AUDIT-SECU-APP-2 A1): anyone holding the unlocked phone would read them there without
@@ -22,17 +33,8 @@ function isHidden(status: string | null | undefined): boolean {
 export function PrivacyGuard({children}: {readonly children: ReactNode}): React.JSX.Element {
     const {t} = useTranslation()
     const {colors} = useTheme()
-    const [hidden, setHidden] = useState(() => isHidden(AppState.currentState))
-    useEffect(() => {
-        const subscription = AppState.addEventListener("change", (status) => {
-            setHidden(isHidden(status))
-        })
-        // A change between the first render and this subscription is read here, not lost.
-        setHidden(isHidden(AppState.currentState))
-        return () => {
-            subscription.remove()
-        }
-    }, [])
+    // React reads the state again once subscribed: a change between the render and the subscription is not lost.
+    const hidden = isHidden(useSyncExternalStore(followAppState, currentAppState))
     return (
         <>
             <View
