@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type {z} from "zod"
 import type {ApprovalSchema, ApprovalViewSchema} from "@/api/contract/approvals"
+import type {MyOrganizationsSchema} from "@/api/contract/organizations"
 import {
     zAnswerApprovalBody,
     zMobileTokenBody,
@@ -157,7 +158,7 @@ export function createMockServer({memberships = [fixtures.acme.id]}: MockServerO
                     const name = known?.name ?? id
                     return {id, slug: name, name, avatarUrl: known?.avatarUrl ?? "", role: "member"}
                 }),
-            }),
+            } satisfies z.input<typeof MyOrganizationsSchema>),
         ),
         route(
             "POST",

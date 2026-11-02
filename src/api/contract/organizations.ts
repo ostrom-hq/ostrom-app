@@ -1,22 +1,20 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import {z} from "zod"
+import {zListMyOrganizationsResponse, zOrganization} from "@/api/gen/zod.gen"
 
 /**
- * `GET /api/v1/me/organizations` (`listMyOrganizations`, core#31): the organizations the person is an active member
- * of, to choose the one sent in `Ostrom-Org`. It needs no `Ostrom-Org` itself and never answers `org_required`.
+ * `GET /api/v1/me/organizations` (`listMyOrganizations`): the organizations the person is an active member of, to
+ * choose the one sent in `Ostrom-Org`. It needs no `Ostrom-Org` itself and never answers `org_required`.
  *
- * Written by hand, not generated: the contract copy (`contract/CORE_SHA`) predates the route, and server#64 serves
- * `{items: [{id, slug, name, avatarUrl, role}]}`, without the `connectedVia` the contract's `Organization` requires.
- * The app reads only what both say. An empty `avatarUrl` (no linked GitHub organization) means no picture.
+ * The contract's `Organization`, of which the app reads only the id, the name and the picture: server#64 serves
+ * `{id, slug, name, avatarUrl, role}`, without the `connectedVia` the contract requires, and the chooser needs no more.
+ * An empty `avatarUrl` (no linked GitHub organization) means no picture.
  */
 export const MyOrganizationSchema = z.object({
-    id: z.string().min(1),
-    name: z.string().min(1),
-    avatarUrl: z
-        .string()
-        .optional()
-        .transform((url) => (url === undefined || url === "" ? undefined : url)),
+    id: zOrganization.shape.id.min(1),
+    name: zOrganization.shape.name.min(1),
+    avatarUrl: zOrganization.shape.avatarUrl.optional().transform((url) => (url === undefined || url === "" ? undefined : url)),
 })
 export type MyOrganization = z.output<typeof MyOrganizationSchema>
 
-export const MyOrganizationsSchema = z.object({items: z.array(MyOrganizationSchema)})
+export const MyOrganizationsSchema = zListMyOrganizationsResponse.extend({items: z.array(MyOrganizationSchema)})
