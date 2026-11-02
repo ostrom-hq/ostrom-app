@@ -52,55 +52,56 @@ export function createSessionStore(storage: SecureStorage): StoreApi<SessionStor
         tail = result.catch(() => undefined)
         return result
     }
-    // Each sign-in and sign-out starts anew: a change asked before one never shows after it.
-    let epoch = 0
+    // A sign-out is the only change that shows at once, outside the turns: a change asked before it never shows after.
+    let signOuts = 0
+    // A keychain write whose failure changes nothing, even when it throws at once.
+    const quietly = (write: () => Promise<void>): Promise<void> => Promise.resolve().then(write).catch(() => undefined)
     return createStore<SessionStore>()((set, get) => ({
         state: {status: "loading"},
         hydrate: () => {
-            const asked = epoch
+            const asked = signOuts
             return inTurn(async () => {
                 let stored: string | undefined
                 try {
                     stored = await storage.get(SESSION_KEY)
                 } catch {
                     // The keychain cannot be read (a launch while the phone is locked): sign in again rather than stay blank.
-                    if (epoch === asked) set({state: {status: "signed-out"}})
+                    set({state: {status: "signed-out"}})
                     return
                 }
                 const session = parseStored(stored)
-                if (session === undefined) await storage.remove(SESSION_KEY).catch(() => undefined)
-                if (epoch === asked) set({state: session === undefined ? {status: "signed-out"} : {status: "signed-in", session}})
+                if (session === undefined) await quietly(() => storage.remove(SESSION_KEY))
+                if (signOuts === asked) set({state: session === undefined ? {status: "signed-out"} : {status: "signed-in", session}})
             })
         },
         signIn: (session) => {
-            epoch += 1
-            const asked = epoch
+            const asked = signOuts
             return inTurn(async () => {
                 await storage.set(SESSION_KEY, JSON.stringify(session))
-                if (epoch === asked) set({state: {status: "signed-in", session}})
+                if (signOuts === asked) set({state: {status: "signed-in", session}})
             })
         },
         chooseOrg: (orgId) => {
-            const asked = epoch
+            const asked = signOuts
             return inTurn(async () => {
                 const {state} = get()
-                if (epoch !== asked || state.status !== "signed-in") return
+                if (signOuts !== asked || state.status !== "signed-in") return
                 const session = {...state.session, orgId}
                 await storage.set(SESSION_KEY, JSON.stringify(session))
-                // Signed out or in again while it was saved: that wins, and its own write, queued behind this one, follows.
-                if (epoch === asked) set({state: {status: "signed-in", session}})
+                // Signed out while it was saved: that wins, and its removal, queued behind this write, clears the keychain.
+                if (signOuts === asked) set({state: {status: "signed-in", session}})
             })
         },
         signOut: () => {
             // Signed out at once, whatever the keychain says. If the token cannot be removed, it is blanked: the next
             // launch reads an unreadable session, which is signed out too.
-            epoch += 1
+            signOuts += 1
             set({state: {status: "signed-out"}})
             return inTurn(async () => {
                 try {
                     await storage.remove(SESSION_KEY)
                 } catch {
-                    await storage.set(SESSION_KEY, "").catch(() => undefined)
+                    await quietly(() => storage.set(SESSION_KEY, ""))
                 }
             })
         },
