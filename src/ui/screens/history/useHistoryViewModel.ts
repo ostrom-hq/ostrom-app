@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import {useMemo} from "react"
-import type {CheckAttestation, ReceiptListItem} from "@/api/contract/receipts"
+import type {CheckAttestation, ReceiptListItem, ReceiptView} from "@/api/contract/receipts"
 import type {ReceiptKey} from "@/domain/receipts/publicKey"
 import {useReceiptKeys, useReceipts} from "@/query/receipts"
 import {checkReceipt, type ReceiptCheck} from "./receiptCheck"
@@ -13,16 +13,16 @@ export interface ReceiptCheckRun {
     readonly label: string
     /** The server's words, shown as they are. */
     readonly outcome: string
+    /** `isolated_runner` or `ci` only on a verified receipt: the two origins shown as proven. */
     readonly badge: CheckAttestation | "unverified"
-    /** Run by Ostrom or the CI, on a verified receipt. */
-    readonly proven: boolean
 }
 
-interface CheckNode {
-    readonly label: string
-    readonly outcome: string
-    readonly attestation?: CheckAttestation | undefined
+/** Run by Ostrom or the CI, on a verified receipt. */
+export function isProven(run: ReceiptCheckRun): boolean {
+    return run.badge === "isolated_runner" || run.badge === "ci"
 }
+
+type CheckNode = Pick<NonNullable<ReceiptView["nodes"]>[number], "label" | "outcome" | "attestation">
 
 function checkRunOf(node: CheckNode, verified: boolean): ReceiptCheckRun {
     // A check signed before the field existed has none: it was the workstation's word.
@@ -32,7 +32,6 @@ function checkRunOf(node: CheckNode, verified: boolean): ReceiptCheckRun {
         label: node.label,
         outcome: node.outcome,
         badge: claimsRun && !verified ? "unverified" : attestation,
-        proven: claimsRun && verified,
     }
 }
 

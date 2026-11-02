@@ -189,14 +189,14 @@ describe("toReceiptRow", () => {
         const item: ReceiptListItem = {readable: true, raw: {}, view: view({nodes})}
         expect(toReceiptRow(item, 0, {kind: "verified", kid: "k"})).toMatchObject({
             checkRuns: [
-                {label: "Build", badge: "ci", proven: true},
-                {label: "Lint", badge: "workstation_declared", proven: false},
+                {label: "Build", badge: "ci"},
+                {label: "Lint", badge: "workstation_declared"},
             ],
         })
         expect(toReceiptRow(item, 0, {kind: "rejected", reason: "bad-signature"})).toMatchObject({
             checkRuns: [
-                {label: "Build", badge: "unverified", proven: false},
-                {label: "Lint", badge: "workstation_declared", proven: false},
+                {label: "Build", badge: "unverified"},
+                {label: "Lint", badge: "workstation_declared"},
             ],
         })
     })

@@ -2,11 +2,11 @@ import {z} from "zod"
 import {zCheckAttestation, zListReceiptKeysResponse, zListReceiptsResponse, zReceipt, zReceiptNode} from "@/api/gen/zod.gen"
 import {orElse} from "./orElse"
 
+const CheckAttestationSchema = orElse(zCheckAttestation, "unknown")
 /**
  * Where a check run of a receipt comes from: the workstation's word, an Ostrom runner, or the CI; `unknown` for a value
- * a newer server sends, which this app cannot vouch for.
+ * a newer server sends, which this app cannot vouch for and never counts as proof.
  */
-const CheckAttestationSchema = orElse(zCheckAttestation, "unknown")
 export type CheckAttestation = z.output<typeof CheckAttestationSchema>
 
 /** A receipt for the screen: an origin this app does not know is read as `unknown`, never as an unreadable receipt. */

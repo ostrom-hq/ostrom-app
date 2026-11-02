@@ -10,7 +10,7 @@ import type {ThemeColors} from "@/ui/theme/theme"
 import {fontSize, radius, space} from "@/ui/theme/tokens"
 import {useTheme} from "@/ui/theme/useTheme"
 import type {ReceiptCheck} from "./receiptCheck"
-import {type ReceiptCheckRun, type ReceiptRowModel, useHistoryViewModel} from "./useHistoryViewModel"
+import {isProven, type ReceiptCheckRun, type ReceiptRowModel, useHistoryViewModel} from "./useHistoryViewModel"
 
 function CheckLine({check}: {check: ReceiptCheck}): React.JSX.Element {
     const {t} = useTranslation()
@@ -40,7 +40,7 @@ function CheckRunLine({run}: {run: ReceiptCheckRun}): React.JSX.Element {
             <Text
                 style={[
                     styles.badge,
-                    run.proven
+                    isProven(run)
                         ? {color: colors.info, backgroundColor: colors.infoTint}
                         : {color: colors.warningText, backgroundColor: colors.warningTint},
                 ]}
