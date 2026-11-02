@@ -93,7 +93,10 @@ describe("InboxScreen", () => {
         await act(async () => {
             await client.invalidateQueries()
         })
-        expect(await screen.findByRole("alert")).toHaveTextContent(/several organizations/)
+        // One alert, read out once by screen readers: the list may be out of date, and why.
+        const alert = await screen.findByRole("alert")
+        expect(alert).toHaveTextContent(/could not be refreshed[\s\S]*several organizations/)
+        expect(screen.getByText("Merge PR #6 into main")).toBeOnTheScreen()
     })
 
     it("says clearly when the server wants the organization named, instead of a plain failure", async () => {

@@ -78,10 +78,19 @@ function noApproveOf(view: ApprovalView): NoApprove | undefined {
     return phoneMayApprove(view.approval) ? undefined : {kind: "truncated"}
 }
 
+/** The console's address once opening it failed, and the screen it failed on. */
+interface ConsoleLinkState {
+    readonly url: string
+    readonly copied: boolean
+    readonly from: "error" | "ready"
+}
+
 export function useRequestViewModel(id: string): RequestViewModel {
     const {t} = useTranslation()
     const {biometrics, openUrl, copyText, sessionStore} = useServices()
-    const [consoleLink, setConsoleLink] = useState<{readonly url: string; readonly copied: boolean}>()
+    // Tagged with the screen it was asked from: a link that failed on the error screen means nothing once the request
+    // loads (a refetch on focus, a late rejection after "Try again"), and the other way round.
+    const [consoleLink, setConsoleLink] = useState<ConsoleLinkState>()
     const query = useApprovalView(id)
     const {mutateAsync} = useAnswer(id)
     const [sending, setSending] = useState<ApprovalAnswer>()
@@ -143,10 +152,13 @@ export function useRequestViewModel(id: string): RequestViewModel {
                     kind: "error",
                     orgRequired: isOrgRequired(query.error),
                     retry: () => {
+                        // A console link that did not open belongs to this attempt, not to the request read next.
+                        setConsoleLink(undefined)
                         void refetch()
                     },
                 }
               : {kind: "loading"}
+    const shownLink = consoleLink?.from === state.kind ? consoleLink : undefined
     return {
         state,
         open,
@@ -177,25 +189,26 @@ export function useRequestViewModel(id: string): RequestViewModel {
             const session = sessionStore.getState().state
             if (session.status !== "signed-in") return
             const url = `${session.session.serverUrl}/yes/${encodeURIComponent(id)}`
+            const from = view === undefined ? "error" : "ready"
             void openUrl(url).then(
                 () => {
                     setConsoleLink(undefined)
                 },
                 () => {
-                    setConsoleLink({url, copied: false})
+                    setConsoleLink({url, copied: false, from})
                 },
             )
         },
-        consoleLink,
+        consoleLink: shownLink,
         copyConsoleLink: () => {
-            if (consoleLink === undefined) return
-            const {url} = consoleLink
+            if (shownLink === undefined) return
+            const {url, from} = shownLink
             void copyText(url).then(
                 () => {
-                    setConsoleLink({url, copied: true})
+                    setConsoleLink({url, copied: true, from})
                 },
                 () => {
-                    setConsoleLink({url, copied: false})
+                    setConsoleLink({url, copied: false, from})
                 },
             )
         },

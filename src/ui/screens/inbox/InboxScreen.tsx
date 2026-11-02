@@ -69,9 +69,10 @@ export function InboxScreen(): React.JSX.Element {
                     ListHeaderComponent={
                         <View style={styles.header}>
                             <ScreenTitle>{t("inbox.title")}</ScreenTitle>
+                            {/* One alert, read out once: the list may be out of date, and why when it is the organization. */}
                             {state.stale ? (
                                 <Text accessibilityRole="alert" style={[styles.stale, {color: colors.danger}]}>
-                                    {state.orgRequired ? t("common.orgRequired") : t("inbox.stale")}
+                                    {state.orgRequired ? `${t("inbox.stale")}\n${t("common.orgRequired")}` : t("inbox.stale")}
                                 </Text>
                             ) : null}
                         </View>
