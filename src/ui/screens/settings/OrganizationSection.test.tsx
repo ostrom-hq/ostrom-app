@@ -46,7 +46,7 @@ describe("OrganizationSection", () => {
         const services = await signedInServices({
             storage,
             repositories: fakeRepositories({
-                account: {me: jest.fn(), organizations: () => Promise.resolve([acme]), exchangeCode: jest.fn(), logout: jest.fn()},
+                account: {me: jest.fn(), organizations: () => Promise.resolve([acme]), exchangeCode: jest.fn(), unlock: jest.fn(), logout: jest.fn()},
             }),
         })
         const set = jest.fn((_key: string, _value: string) => Promise.reject(new Error("keychain locked")))
