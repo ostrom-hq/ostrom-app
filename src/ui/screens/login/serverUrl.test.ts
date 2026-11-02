@@ -9,14 +9,14 @@ describe("normalizeServerUrl", () => {
         ["http://localhost:4961", "http://localhost:4961"],
         ["http://10.0.2.2:4961", "http://10.0.2.2:4961"],
         ["localhost:4961", "http://localhost:4961"],
-    ])("reads %s as %s", (input, origin) => {
-        expect(normalizeServerUrl(input)).toBe(origin)
+    ])("reads %s as %s in a development build", (input, origin) => {
+        expect(normalizeServerUrl(input, true)).toBe(origin)
     })
 
     it.each(["http://ostrom.acme.dev", "ftp://ostrom.acme.dev", "https://", "not a url at all", ""])(
         "refuses %s",
         (input) => {
-            expect(normalizeServerUrl(input)).toBeUndefined()
+            expect(normalizeServerUrl(input, true)).toBeUndefined()
         },
     )
 
@@ -34,8 +34,25 @@ describe("normalizeServerUrl", () => {
         })
     })
 
-    it("takes HTTP on this computer in a development build, the Jest default", () => {
-        expect(__DEV__).toBe(true)
-        expect(normalizeServerUrl("http://10.0.2.2:4961", true)).toBe("http://10.0.2.2:4961")
+    describe("by default, the build's own __DEV__", () => {
+        let development: jest.ReplaceProperty<boolean>
+
+        beforeEach(() => {
+            development = jest.replaceProperty(globalThis, "__DEV__", false)
+        })
+
+        afterEach(() => {
+            development.restore()
+        })
+
+        it("refuses HTTP on this computer in a release build", () => {
+            expect(normalizeServerUrl("http://10.0.2.2:4961")).toBeUndefined()
+            expect(normalizeServerUrl("localhost:4961")).toBe("https://localhost:4961")
+        })
+
+        it("takes it in a development build", () => {
+            development.replaceValue(true)
+            expect(normalizeServerUrl("http://10.0.2.2:4961")).toBe("http://10.0.2.2:4961")
+        })
     })
 })
