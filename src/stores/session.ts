@@ -23,9 +23,14 @@ export type SessionState =
 
 export interface SessionStore {
     readonly state: SessionState
-    /** Reads the stored session at launch; a missing or unreadable one means signed out. */
+    /**
+     * Reads the stored session at launch; a missing or unreadable one means signed out. Once the person has signed in or
+     * out, it changes nothing, in memory or in the keychain.
+     */
     hydrate(): Promise<void>
     signIn(session: Session): Promise<void>
+    /** Keeps the organization the calls act in from now on; nothing happens signed out. */
+    chooseOrg(orgId: string): Promise<void>
     signOut(): Promise<void>
 }
 
@@ -43,30 +48,65 @@ function parseStored(text: string | undefined): Session | undefined {
 
 /** The session, kept in the secure storage. Client state only: nothing from the server is copied here. */
 export function createSessionStore(storage: SecureStorage): StoreApi<SessionStore> {
-    return createStore<SessionStore>()((set) => ({
+    // The keychain is written one change at a time, in the order they were asked: the last asked is the one kept.
+    let tail: Promise<unknown> = Promise.resolve()
+    function inTurn<T>(change: () => Promise<T>): Promise<T> {
+        const result = tail.then(change)
+        tail = result.catch(() => undefined)
+        return result
+    }
+    // A sign-out is the only change that shows at once, outside the turns: a change asked before it never shows after.
+    let signOuts = 0
+    // A keychain write whose failure is ignored, even when it throws at once.
+    const quietly = (write: () => Promise<void>): Promise<void> => Promise.resolve().then(write).catch(() => undefined)
+    return createStore<SessionStore>()((set, get) => ({
         state: {status: "loading"},
-        hydrate: async () => {
-            let stored: string | undefined
-            try {
-                stored = await storage.get(SESSION_KEY)
-            } catch {
-                // The keychain cannot be read (a launch while the phone is locked): sign in again rather than stay blank.
-                set({state: {status: "signed-out"}})
-                return
-            }
-            const session = parseStored(stored)
-            if (session === undefined) await storage.remove(SESSION_KEY).catch(() => undefined)
-            set({state: session === undefined ? {status: "signed-out"} : {status: "signed-in", session}})
+        // Only the launch is decided here: once the person has signed in or out, a reading of the keychain changes nothing.
+        hydrate: () =>
+            inTurn(async () => {
+                let stored: string | undefined
+                try {
+                    stored = await storage.get(SESSION_KEY)
+                } catch {
+                    // The keychain cannot be read (a launch while the phone is locked): sign in again rather than stay blank.
+                    if (get().state.status === "loading") set({state: {status: "signed-out"}})
+                    return
+                }
+                if (get().state.status !== "loading") return
+                const session = parseStored(stored)
+                if (session === undefined) await quietly(() => storage.remove(SESSION_KEY))
+                set({state: session === undefined ? {status: "signed-out"} : {status: "signed-in", session}})
+            }),
+        signIn: (session) => {
+            const asked = signOuts
+            return inTurn(async () => {
+                await storage.set(SESSION_KEY, JSON.stringify(session))
+                if (signOuts === asked) set({state: {status: "signed-in", session}})
+            })
         },
-        signIn: async (session) => {
-            await storage.set(SESSION_KEY, JSON.stringify(session))
-            set({state: {status: "signed-in", session}})
+        chooseOrg: (orgId) => {
+            const asked = signOuts
+            return inTurn(async () => {
+                const {state} = get()
+                if (signOuts !== asked || state.status !== "signed-in") return
+                const session = {...state.session, orgId}
+                await storage.set(SESSION_KEY, JSON.stringify(session))
+                // Signed out while it was saved: that wins, and its removal, queued behind this write, clears the keychain.
+                if (signOuts === asked) set({state: {status: "signed-in", session}})
+            })
         },
-        signOut: async () => {
+        signOut: () => {
             // Signed out at once, whatever the keychain says. If the token cannot be removed, it is blanked: the next
             // launch reads an unreadable session, which is signed out too.
+            signOuts += 1
             set({state: {status: "signed-out"}})
-            await storage.remove(SESSION_KEY).catch(() => storage.set(SESSION_KEY, "").catch(() => undefined))
+            return inTurn(async () => {
+                try {
+                    await storage.remove(SESSION_KEY)
+                } catch {
+                    await quietly(() => storage.set(SESSION_KEY, ""))
+                }
+            })
         },
     }))
 }

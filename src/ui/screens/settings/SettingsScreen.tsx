@@ -8,6 +8,7 @@ import {Field, Section} from "@/ui/components/Section"
 import {TAB_EDGES} from "@/ui/navigation/tabEdges"
 import {fontSize, radius, space} from "@/ui/theme/tokens"
 import {useTheme} from "@/ui/theme/useTheme"
+import {OrganizationSection} from "./OrganizationSection"
 import {type Toggle, useSettingsViewModel} from "./useSettingsViewModel"
 
 const TOGGLES: readonly Toggle[] = ["requests", "decisions", "spending"]
@@ -97,6 +98,7 @@ export function SettingsScreen(): React.JSX.Element {
                     {vm.login === undefined ? null : <Field label={t("settings.login")} value={vm.login} />}
                     {vm.serverUrl === undefined ? null : <Field label={t("settings.server")} value={vm.serverUrl} />}
                 </Section>
+                <OrganizationSection />
                 <Section title={t("settings.notifications")}>
                     {push === undefined ? null : <Text style={[styles.body, {color: colors.textMuted}]}>{push}</Text>}
                     {notifications}

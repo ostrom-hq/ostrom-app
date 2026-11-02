@@ -12,6 +12,9 @@ export const MOCK_BASE_URL = "https://ostrom.test"
 /** The organization of the mock server's caller. */
 export const acme = {id: "org_acme", name: "acme", avatarUrl: "https://avatars.test/acme", connectedVia: "github-app"} as const
 
+/** A second organization the caller may be a member of, without a linked GitHub organization (so no picture). */
+export const globex = {id: "org_globex", name: "globex", avatarUrl: ""} as const
+
 export const me: z.input<typeof MeSchema> = {
     dev: {login: "rev-b", verified: true, via: "github"},
     organization: acme,

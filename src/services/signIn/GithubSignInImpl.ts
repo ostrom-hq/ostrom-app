@@ -62,12 +62,17 @@ export class GithubSignInImpl implements GithubSignIn {
     }
 
     /**
-     * The organization the server acts in for this person (`me.organization`), sent as `Ostrom-Org` from then on.
-     * None when the server does not say: several memberships answer 409 `org_required`, and the screens tell it.
+     * The organization the calls act in from then on (`Ostrom-Org`): the only one the person is a member of. With
+     * several, the one `me` names, if any; otherwise none, and the person chooses it in Settings (409 `org_required`
+     * says so meanwhile). A server without `GET /me/organizations` is asked `me` alone.
      */
     private async orgOf(serverUrl: string, token: string): Promise<string | undefined> {
+        const account = this.dependencies.accountOf(serverUrl, token)
+        const organizations = await account.organizations().catch(() => undefined)
+        const [only, ...others] = organizations ?? []
+        if (only !== undefined && others.length === 0) return only.id
         try {
-            return (await this.dependencies.accountOf(serverUrl, token).me()).organization?.id
+            return (await account.me()).organization?.id
         } catch {
             return undefined
         }

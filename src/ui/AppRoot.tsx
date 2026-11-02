@@ -2,8 +2,9 @@
 import {type QueryClient, QueryClientProvider, useQueryClient} from "@tanstack/react-query"
 import {Stack, ThemeProvider} from "expo-router"
 import {StatusBar} from "expo-status-bar"
-import {useEffect, useState} from "react"
+import {useEffect, useRef, useState} from "react"
 import {useTranslation} from "react-i18next"
+import {isOrgScoped} from "@/query/orgScope"
 import {createQueryClient, followAppFocus} from "@/query/queryClient"
 import {type AppServices, ServicesProvider, useServices, useSessionState} from "@/services/AppServices"
 import {navigationThemeFor} from "@/ui/theme/navigationTheme"
@@ -23,6 +24,20 @@ function RootNavigator(): React.JSX.Element | null {
         // Nothing of one account may show under the next one.
         if (state.status === "signed-out") queryClient.clear()
     }, [state.status, queryClient])
+    const inSession = state.status === "signed-in"
+    const orgId = inSession ? state.session.orgId : undefined
+    // The organization of the session the screens read in; none before a launch or a sign-in reads anything.
+    const readIn = useRef<{readonly orgId: string | undefined} | undefined>(undefined)
+    useEffect(() => {
+        const before = readIn.current
+        readIn.current = inSession ? {orgId} : undefined
+        // A launch or a sign-in reads everything for the first time (a sign-out clears all): only another organization
+        // within the same session is read again.
+        if (before === undefined || !inSession || before.orgId === orgId) return
+        // Nothing of one organization may show under the next one. Here, in the parent of every screen, the effect runs
+        // after the screens' own: their queries already read through the new organization's repositories.
+        void queryClient.resetQueries({predicate: isOrgScoped})
+    }, [inSession, orgId, queryClient])
     if (state.status === "loading") return null
     const signedIn = state.status === "signed-in"
     return (

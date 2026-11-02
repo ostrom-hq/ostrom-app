@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import {screen} from "@testing-library/react-native"
+import {act, fireEvent, screen} from "@testing-library/react-native"
 import {renderRouter} from "expo-router/testing-library"
 import type {ApprovalQueue} from "@/api/contract/approvals"
 import {ApiError} from "@/api/http/ApiError"
@@ -61,6 +61,51 @@ describe("AppRoot", () => {
         expect(await screen.findByText("Nothing waits for your yes right now.")).toBeOnTheScreen()
     })
 
+    it("reads the inbox once at a launch with an organization kept: a launch is no change of organization", async () => {
+        const storage = new MemoryStorage()
+        storage.items.set(SESSION_KEY, JSON.stringify({...testSession, orgId: "org_acme"}))
+        const queue = jest.fn(() => Promise.resolve(EMPTY))
+        await launch(storage, queue)
+        expect(await screen.findByText("Nothing waits for your yes right now.")).toBeOnTheScreen()
+        expect(queue).toHaveBeenCalledTimes(1)
+    })
+
+    it("reads the organization's data again through its own repositories once another is chosen, and keeps the person's", async () => {
+        const base = fakeServices({storage: keptSession()})
+        const services = {
+            ...base,
+            repositoriesFor: (session: {readonly orgId?: string | undefined}) =>
+                fakeRepositories({
+                    approvals: {
+                        queue: () => Promise.resolve(session.orgId === "org_globex" ? {...EMPTY, pending: [viewOf(approvals.pending)]} : EMPTY),
+                        view: jest.fn(),
+                        answer: jest.fn(),
+                    },
+                }),
+        }
+        const client = testQueryClient()
+        await renderRouter(
+            {
+                _layout: (): React.JSX.Element => <AppRoot services={services} queryClient={client} />,
+                "(tabs)/_layout": TabsLayout,
+                "(tabs)/index": InboxScreen,
+                "(tabs)/history": HistoryScreen,
+                "(tabs)/activity": ActivityScreen,
+                "(tabs)/spending": SpendingScreen,
+                "(tabs)/settings": SettingsScreen,
+                login: LoginScreen,
+            },
+            {initialUrl: "/"},
+        )
+        expect(await screen.findByText("Nothing waits for your yes right now.")).toBeOnTheScreen()
+        client.setQueryData(["account", "organizations"], [{id: "org_globex", name: "globex"}])
+        await act(async () => {
+            await services.sessionStore.getState().chooseOrg("org_globex")
+        })
+        expect(await screen.findByText("Merge PR #6 into main")).toBeOnTheScreen()
+        expect(client.getQueryData(["account", "organizations"])).toEqual([{id: "org_globex", name: "globex"}])
+    })
+
     it("signs out when the server no longer accepts the token", async () => {
         const storage = keptSession()
         await launch(storage, () => Promise.reject(new ApiError({kind: "unauthorized"})), false)
@@ -93,6 +138,35 @@ async function openUrl(url: string): Promise<void> {
 }
 
 describe("RequestRoute", () => {
+    it("leads to the choice of the organization in Settings when the request needs it named", async () => {
+        const services = fakeServices({
+            storage: keptSession(),
+            repositories: fakeRepositories({
+                approvals: {
+                    queue: () => Promise.resolve(EMPTY),
+                    view: () => Promise.reject(new ApiError({kind: "refused", status: 409, type: "org_required", message: ""})),
+                    answer: jest.fn(),
+                },
+            }),
+        })
+        const rendered = await renderRouter(
+            {
+                _layout: (): React.JSX.Element => <AppRoot services={services} queryClient={testQueryClient()} />,
+                "(tabs)/_layout": TabsLayout,
+                "(tabs)/index": InboxScreen,
+                "(tabs)/history": HistoryScreen,
+                "(tabs)/activity": ActivityScreen,
+                "(tabs)/spending": SpendingScreen,
+                "(tabs)/settings": (): React.JSX.Element => <></>,
+                login: LoginScreen,
+                "request/[id]": RequestRoute,
+            },
+            {initialUrl: "/request/appr_0001"},
+        )
+        await fireEvent.press(await screen.findByRole("button", {name: "Choose the organization"}))
+        expect(rendered.getPathname()).toBe("/settings")
+    })
+
     it("opens a request from its deep link", async () => {
         await openUrl("/request/appr_0001")
         expect(await screen.findByRole("header", {name: "Merge PR #6 into main"})).toBeOnTheScreen()

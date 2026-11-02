@@ -44,6 +44,9 @@ export function InboxScreen(): React.JSX.Element {
     const open = (id: string): void => {
         router.push(`/request/${encodeURIComponent(id)}`)
     }
+    const chooseOrganization = (): void => {
+        router.navigate("/settings")
+    }
 
     let body: React.JSX.Element
     switch (state.kind) {
@@ -54,6 +57,9 @@ export function InboxScreen(): React.JSX.Element {
             body = (
                 <View style={styles.message}>
                     <Text style={[styles.body, {color: colors.textMuted}]}>{state.orgRequired ? t("common.orgRequired") : t("inbox.error")}</Text>
+                    {state.orgRequired ? (
+                        <Button label={t("common.chooseOrganization")} variant="signal" onPress={chooseOrganization} testID="inbox-choose-organization" />
+                    ) : null}
                     <Button label={t("common.retry")} onPress={refresh} />
                 </View>
             )
@@ -74,6 +80,9 @@ export function InboxScreen(): React.JSX.Element {
                                 <Text accessibilityRole="alert" style={[styles.stale, {color: colors.danger}]}>
                                     {state.orgRequired ? `${t("inbox.stale")}\n${t("common.orgRequired")}` : t("inbox.stale")}
                                 </Text>
+                            ) : null}
+                            {state.orgRequired ? (
+                                <Button label={t("common.chooseOrganization")} onPress={chooseOrganization} testID="inbox-choose-organization" />
                             ) : null}
                         </View>
                     }
