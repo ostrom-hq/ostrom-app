@@ -7,6 +7,7 @@ import {useTranslation} from "react-i18next"
 import {isOrgScoped} from "@/query/orgScope"
 import {createQueryClient, followAppFocus} from "@/query/queryClient"
 import {type AppServices, ServicesProvider, useServices, useSessionState} from "@/services/AppServices"
+import {PrivacyCover} from "@/ui/components/PrivacyCover"
 import {navigationThemeFor} from "@/ui/theme/navigationTheme"
 import {useTheme} from "@/ui/theme/useTheme"
 
@@ -83,6 +84,8 @@ export function AppRoot({services, queryClient}: AppRootProps): React.JSX.Elemen
                 <ThemeProvider value={navigation}>
                     <StatusBar style={statusBar} />
                     <RootNavigator />
+                    {/* Over every screen, signed in or out: the app switcher's picture shows none of them. */}
+                    <PrivacyCover />
                 </ThemeProvider>
             </QueryClientProvider>
         </ServicesProvider>

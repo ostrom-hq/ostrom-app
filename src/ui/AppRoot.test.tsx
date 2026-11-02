@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import {act, fireEvent, screen} from "@testing-library/react-native"
+import {AppState, type AppStateStatus} from "react-native"
 import {renderRouter} from "expo-router/testing-library"
 import type {ApprovalQueue} from "@/api/contract/approvals"
 import {ApiError} from "@/api/http/ApiError"
@@ -107,6 +108,26 @@ describe("AppRoot", () => {
         })
         expect(await screen.findByText("Merge PR #6 into main")).toBeOnTheScreen()
         expect(client.getQueryData(["account", "organizations"])).toEqual([{id: "org_globex", name: "globex"}])
+    })
+
+    it("covers the request in the app switcher's picture: nothing of it shows while the app is not in front", async () => {
+        const listeners: ((status: AppStateStatus) => void)[] = []
+        const subscribe = jest.spyOn(AppState, "addEventListener").mockImplementation((_type, handler) => {
+            listeners.push(handler)
+            return {remove: jest.fn()}
+        })
+        await launch(keptSession())
+        expect(await screen.findByText("Nothing waits for your yes right now.")).toBeOnTheScreen()
+        expect(screen.queryByTestId("privacy-cover")).toBeNull()
+        await act(() => {
+            for (const listener of listeners) listener("inactive")
+        })
+        expect(screen.getByTestId("privacy-cover")).toBeOnTheScreen()
+        await act(() => {
+            for (const listener of listeners) listener("active")
+        })
+        expect(screen.queryByTestId("privacy-cover")).toBeNull()
+        subscribe.mockRestore()
     })
 
     it("keeps the unlock key at a launch that opens signed out: the session it belongs to may still be kept", async () => {
