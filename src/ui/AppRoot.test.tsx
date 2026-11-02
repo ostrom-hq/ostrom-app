@@ -116,18 +116,22 @@ describe("AppRoot", () => {
             listeners.push(handler)
             return {remove: jest.fn()}
         })
-        await launch(keptSession())
-        expect(await screen.findByText("Nothing waits for your yes right now.")).toBeOnTheScreen()
-        expect(screen.queryByTestId("privacy-cover")).toBeNull()
-        await act(() => {
-            for (const listener of listeners) listener("inactive")
-        })
-        expect(screen.getByTestId("privacy-cover")).toBeOnTheScreen()
-        await act(() => {
-            for (const listener of listeners) listener("active")
-        })
-        expect(screen.queryByTestId("privacy-cover")).toBeNull()
-        subscribe.mockRestore()
+        try {
+            await launch(keptSession())
+            expect(await screen.findByText("Nothing waits for your yes right now.")).toBeOnTheScreen()
+            expect(screen.queryByTestId("privacy-cover")).toBeNull()
+            await act(() => {
+                for (const listener of listeners) listener("inactive")
+            })
+            expect(screen.getByTestId("privacy-cover")).toBeOnTheScreen()
+            expect(screen.queryByText("Nothing waits for your yes right now.")).toBeNull()
+            await act(() => {
+                for (const listener of listeners) listener("active")
+            })
+            expect(screen.queryByTestId("privacy-cover")).toBeNull()
+        } finally {
+            subscribe.mockRestore()
+        }
     })
 
     it("keeps the unlock key at a launch that opens signed out: the session it belongs to may still be kept", async () => {
