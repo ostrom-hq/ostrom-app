@@ -33,7 +33,7 @@ export interface SettingsViewModel {
 
 export function useSettingsViewModel(locale: string, timeZone: string): SettingsViewModel {
     const session = useSessionState()
-    const {sessionStore, unlock} = useServices()
+    const {sessionStore} = useServices()
     const {account, notifications} = useRepositories()
     const query = useNotificationSettings()
     const editor = useNotificationSettingsEditor()
@@ -67,9 +67,9 @@ export function useSettingsViewModel(locale: string, timeZone: string): Settings
             if (isPresent(device)) await notifications.unregisterDevice(device.id).catch(() => undefined)
             await account.logout().catch(() => undefined)
         })()
-        void unlock.forget().catch(() => undefined)
+        // The unlock key goes with the session, on this sign-out as on any other (`AppRoot`).
         void sessionStore.getState().signOut()
-    }, [device, notifications, account, sessionStore, unlock])
+    }, [device, notifications, account, sessionStore])
 
     const signedIn = session.status === "signed-in" ? session.session : undefined
     const state: SettingsState =

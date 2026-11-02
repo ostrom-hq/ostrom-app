@@ -3,6 +3,7 @@ import {act, fireEvent, screen} from "@testing-library/react-native"
 import {renderRouter} from "expo-router/testing-library"
 import type {ApprovalQueue} from "@/api/contract/approvals"
 import {ApiError} from "@/api/http/ApiError"
+import type {PhoneUnlock} from "@/services/unlock/PhoneUnlock"
 import {SESSION_KEY} from "@/stores/session"
 import {approvals, fakeRepositories, fakeServices, MemoryStorage, testSession, viewOf} from "@/test/fakeServices"
 import {testQueryClient} from "@/test/renderWithServices"
@@ -22,10 +23,12 @@ async function launch(
     storage: MemoryStorage,
     queue: () => Promise<ApprovalQueue> = () => Promise.resolve(EMPTY),
     withTestClient = true,
+    unlock?: PhoneUnlock,
 ): Promise<void> {
     const services = fakeServices({
         storage,
         repositories: fakeRepositories({approvals: {queue, view: jest.fn(), answer: jest.fn()}}),
+        ...(unlock === undefined ? {} : {unlock}),
     })
     const root = withTestClient ? <AppRoot services={services} queryClient={testQueryClient()} /> : <AppRoot services={services} />
     await renderRouter(
@@ -106,11 +109,14 @@ describe("AppRoot", () => {
         expect(client.getQueryData(["account", "organizations"])).toEqual([{id: "org_globex", name: "globex"}])
     })
 
-    it("signs out when the server no longer accepts the token", async () => {
+    it("signs out when the server no longer accepts the token, and forgets the unlock key with the session", async () => {
         const storage = keptSession()
-        await launch(storage, () => Promise.reject(new ApiError({kind: "unauthorized"})), false)
+        // Even a key that cannot be deleted does not hold the sign-out.
+        const forget = jest.fn(() => Promise.reject(new Error("keychain locked")))
+        await launch(storage, () => Promise.reject(new ApiError({kind: "unauthorized"})), false, {keep: jest.fn(), unlock: jest.fn(), forget})
         expect(await screen.findByRole("button", {name: "Continue with GitHub"})).toBeOnTheScreen()
         expect(storage.items.has(SESSION_KEY)).toBe(false)
+        expect(forget).toHaveBeenCalled()
     })
 })
 

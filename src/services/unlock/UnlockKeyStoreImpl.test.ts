@@ -61,4 +61,13 @@ describe("UnlockKeyStoreImpl", () => {
         expect(plain.items.has(UNLOCK_KEY_KEPT)).toBe(false)
         expect(SecureStore.deleteItemAsync).toHaveBeenCalledWith(UNLOCK_KEY, {keychainAccessible: 6, requireAuthentication: true})
     })
+
+    it("keeps the mark when the key cannot be deleted, so that the next sign-out tries again", async () => {
+        const plain = new MemoryStorage()
+        const keys = new UnlockKeyStoreImpl(plain)
+        await keys.save("key-1")
+        jest.mocked(SecureStore.deleteItemAsync).mockRejectedValueOnce(new Error("keychain locked"))
+        await expect(keys.clear()).rejects.toThrow("keychain locked")
+        expect(await keys.has()).toBe(true)
+    })
 })

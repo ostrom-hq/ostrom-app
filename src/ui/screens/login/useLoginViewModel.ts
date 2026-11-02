@@ -41,8 +41,9 @@ export function useLoginViewModel(): LoginViewModel {
                 const outcome = await signIn.signIn(origin)
                 switch (outcome.kind) {
                     case "signed-in":
-                        // Without the key kept, the server takes no answer from this phone: it says so then.
-                        if (outcome.unlockKey !== undefined) await unlock.keep(outcome.unlockKey).catch(() => undefined)
+                        // Without the key kept, the server takes no answer from this phone: it says so then. A sign-in
+                        // without a key leaves none of an earlier one behind.
+                        await (outcome.unlockKey === undefined ? unlock.forget() : unlock.keep(outcome.unlockKey)).catch(() => undefined)
                         await sessionStore.getState().signIn(outcome.session)
                         break
                     case "failed":

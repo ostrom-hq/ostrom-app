@@ -9,6 +9,8 @@ export type DecisionProblem =
     | "biometrics-failed"
     /** The server did not take this phone's unlock key: signing in again gives a new one. */
     | "unlock-refused"
+    /** The unlock could not reach the server: it comes before the answer, so nothing was sent. */
+    | "unlock-offline"
     /** The yes needs a sign-in less than 5 minutes old: the console, just opened on the request, takes it. */
     | "step-up"
     /** The person asked for this, and someone else can approve it: the server never takes that yes. */
@@ -32,6 +34,20 @@ export function biometricProblem(outcome: Exclude<UnlockOutcome, "confirmed" | "
             return "unlock-refused"
         case "failed":
             return "biometrics-failed"
+    }
+}
+
+/** The unlock failed before the answer left: nothing was sent, whatever the error. */
+export function unlockProblem(error: unknown): DecisionProblem {
+    if (!(error instanceof ApiError)) return "failed"
+    switch (error.problem.kind) {
+        case "network":
+        case "timeout":
+            return "unlock-offline"
+        case "unauthorized":
+            return "session-expired"
+        default:
+            return "failed"
     }
 }
 

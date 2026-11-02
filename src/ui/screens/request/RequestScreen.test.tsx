@@ -203,6 +203,20 @@ describe("RequestScreen", () => {
         expect(answer).not.toHaveBeenCalled()
     })
 
+    it("says the server could not be reached when the unlock fails offline, and gives the buttons back", async () => {
+        const answer = jest.fn()
+        const unlock = jest.fn(() => Promise.reject(new ApiError({kind: "network"})))
+        const services = await signedInServices({
+            unlock: {keep: jest.fn(), unlock, forget: jest.fn()},
+            repositories: fakeRepositories({approvals: {queue: jest.fn(), view: () => Promise.resolve(viewOf(approvals.pending)), answer}}),
+        })
+        await renderWithServices(<RequestScreen id="appr_0001" />, services)
+        await fireEvent.press(await screen.findByRole("button", {name: "Approve"}))
+        expect(await screen.findByText("The server could not be reached. Nothing was sent: try again.")).toBeOnTheScreen()
+        expect(screen.getByRole("button", {name: "Approve"})).toBeEnabled()
+        expect(answer).not.toHaveBeenCalled()
+    })
+
     it("reads the request again when it changed after the screen showed it", async () => {
         const {approval} = await open(approvals.pending, {refuse: refused(409, "shown_digest_mismatch")})
         const reads = approval.mock.calls.length

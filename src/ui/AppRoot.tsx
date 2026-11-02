@@ -13,7 +13,7 @@ import {useTheme} from "@/ui/theme/useTheme"
 /** The routes, guarded by the session: signed out, only the login screen exists. */
 function RootNavigator(): React.JSX.Element | null {
     const {t} = useTranslation()
-    const {sessionStore} = useServices()
+    const {sessionStore, unlock} = useServices()
     const queryClient = useQueryClient()
     const state = useSessionState()
     useEffect(() => {
@@ -21,9 +21,12 @@ function RootNavigator(): React.JSX.Element | null {
     }, [sessionStore])
     useEffect(followAppFocus, [])
     useEffect(() => {
-        // Nothing of one account may show under the next one.
-        if (state.status === "signed-out") queryClient.clear()
-    }, [state.status, queryClient])
+        // Nothing of one account may show under the next one, nor prove anything for it: this covers every sign-out,
+        // the person's and the server's (401).
+        if (state.status !== "signed-out") return
+        queryClient.clear()
+        void unlock.forget().catch(() => undefined)
+    }, [state.status, queryClient, unlock])
     const inSession = state.status === "signed-in"
     const orgId = inSession ? state.session.orgId : undefined
     // The organization of the session the screens read in; none before a launch or a sign-in reads anything.

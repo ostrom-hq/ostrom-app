@@ -47,6 +47,20 @@ describe("LoginScreen", () => {
         expect(keep).toHaveBeenCalledWith("key-1")
     })
 
+    it("forgets an earlier unlock key when the sign-in brings none", async () => {
+        const forget = jest.fn(() => Promise.resolve())
+        const services = fakeServices({
+            signIn: {signIn: () => Promise.resolve({kind: "signed-in", session: testSession})},
+            unlock: {keep: jest.fn(), unlock: jest.fn(), forget},
+        })
+        await renderLogin(services)
+        await fireEvent.press(screen.getByRole("button", {name: "Continue with GitHub"}))
+        await waitFor(() => {
+            expect(services.sessionStore.getState().state).toEqual({status: "signed-in", session: testSession})
+        })
+        expect(forget).toHaveBeenCalledTimes(1)
+    })
+
     it("signs in on a self-hosted server", async () => {
         const {signIn, services} = setup({kind: "cancelled"})
         await renderLogin(services)

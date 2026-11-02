@@ -37,7 +37,8 @@ export class UnlockKeyStoreImpl implements UnlockKeyStore {
     }
 
     async clear(): Promise<void> {
-        await this.plain.remove(UNLOCK_KEY_KEPT)
+        // The key first: if it cannot be deleted, the mark stays and the next sign-out tries again.
         await SecureStore.deleteItemAsync(UNLOCK_KEY, GUARDED)
+        await this.plain.remove(UNLOCK_KEY_KEPT)
     }
 }

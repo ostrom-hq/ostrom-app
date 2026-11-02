@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+import {ApiError} from "@/api/http/ApiError"
 import type {AccountRepository} from "@/repositories/AccountRepository"
 import type {BiometricGate} from "@/services/biometrics/BiometricGate"
 import type {PhoneUnlock, UnlockOptions, UnlockOutcome} from "./PhoneUnlock"
@@ -12,6 +13,10 @@ export interface PhoneUnlockDependencies {
     readonly biometrics: BiometricGate
     /** The clock, in milliseconds; the phone's by default. */
     readonly now?: () => number
+}
+
+function isRefusal(error: unknown): boolean {
+    return error instanceof ApiError && error.problem.kind === "refused" && (error.problem.status === 400 || error.problem.status === 403)
 }
 
 function phoneNow(): number {
@@ -37,15 +42,20 @@ export class PhoneUnlockImpl implements PhoneUnlock {
         const read = await keys.read(prompt)
         switch (read.kind) {
             case "none":
-                return withoutKey()
+                // Kept, but gone from the keychain (passcode removed, keychain reset): only a new sign-in brings one.
+                await keys.clear()
+                return "refused"
             case "cancelled":
             case "failed":
                 return read.kind
             case "key":
                 try {
                     await account.unlock(read.key)
-                } catch {
-                    return "refused"
+                } catch (error) {
+                    // Only the server's no refuses the key. Offline, a 5xx or an expired session is the answer's own
+                    // problem, said as such by the screen.
+                    if (isRefusal(error)) return "refused"
+                    throw error
                 }
                 this.unlockedAt = now()
                 return "confirmed"
