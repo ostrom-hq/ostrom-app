@@ -4,8 +4,13 @@ import {accountKeys} from "./account"
 import {notificationKeys} from "./notifications"
 import {isOrgScoped} from "./orgScope"
 
+const client = new QueryClient()
+
+afterEach(() => {
+    client.clear()
+})
+
 function queryOf(key: readonly unknown[]): Query {
-    const client = new QueryClient()
     client.setQueryData(key, 1)
     const query = client.getQueryCache().find({queryKey: key, exact: true})
     if (query === undefined) throw new Error("no query")

@@ -95,6 +95,74 @@ describe("session store", () => {
         expect(store.getState().state).toEqual({status: "signed-in", session})
     })
 
+    it("lets a sign-out made while a sign-in is saved win, in memory and in the keychain", async () => {
+        const storage = new MemoryStorage()
+        const store = createSessionStore(storage)
+        const save = storage.set.bind(storage)
+        let signingOut: Promise<void> | undefined
+        storage.set = async (key: string, value: string): Promise<void> => {
+            await save(key, value)
+            signingOut ??= store.getState().signOut()
+        }
+        await store.getState().signIn(session)
+        expect(store.getState().state).toEqual({status: "signed-out"})
+        await signingOut
+        expect(store.getState().state).toEqual({status: "signed-out"})
+        expect(storage.items.has(SESSION_KEY)).toBe(false)
+    })
+
+    it("lets a sign-out made while the session is read at launch win", async () => {
+        const storage = new MemoryStorage()
+        storage.items.set(SESSION_KEY, JSON.stringify(session))
+        const store = createSessionStore(storage)
+        const read = storage.get.bind(storage)
+        let signingOut: Promise<void> | undefined
+        storage.get = async (key: string): Promise<string | undefined> => {
+            signingOut = store.getState().signOut()
+            return read(key)
+        }
+        await store.getState().hydrate()
+        await signingOut
+        expect(store.getState().state).toEqual({status: "signed-out"})
+        expect(storage.items.has(SESSION_KEY)).toBe(false)
+    })
+
+    it("keeps a sign-in made while an unreadable keychain is read at launch", async () => {
+        const storage = new MemoryStorage()
+        const store = createSessionStore(storage)
+        storage.get = (): Promise<string | undefined> => {
+            void store.getState().signIn(session)
+            return Promise.reject(new Error("locked"))
+        }
+        await store.getState().hydrate()
+        await store.getState().signIn(session)
+        expect(store.getState().state).toEqual({status: "signed-in", session})
+    })
+
+    it("drops a choice asked before a sign-out and a sign-in: it never lands on the next session", async () => {
+        const storage = new MemoryStorage()
+        const store = createSessionStore(storage)
+        await store.getState().signIn(session)
+        const other = {...session, token: "ost_2"}
+        const choice = store.getState().chooseOrg("org_globex")
+        const signingOut = store.getState().signOut()
+        const signingIn = store.getState().signIn(other)
+        await Promise.all([choice, signingOut, signingIn])
+        expect(store.getState().state).toEqual({status: "signed-in", session: other})
+        expect(storage.items.get(SESSION_KEY)).toBe(JSON.stringify(other))
+    })
+
+    it("blanks the token when removing it throws at once", async () => {
+        const storage = new MemoryStorage()
+        const store = createSessionStore(storage)
+        await store.getState().signIn(session)
+        storage.remove = (): Promise<void> => {
+            throw new Error("locked")
+        }
+        await store.getState().signOut()
+        expect(storage.items.get(SESSION_KEY)).toBe("")
+    })
+
     it("signs out even when the keychain refuses to remove the token, and blanks it instead", async () => {
         const storage = new MemoryStorage()
         const store = createSessionStore(storage)
