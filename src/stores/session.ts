@@ -23,7 +23,10 @@ export type SessionState =
 
 export interface SessionStore {
     readonly state: SessionState
-    /** Reads the stored session at launch; a missing or unreadable one means signed out. */
+    /**
+     * Reads the stored session at launch; a missing or unreadable one means signed out. Once the person has signed in or
+     * out, it changes nothing, in memory or in the keychain.
+     */
     hydrate(): Promise<void>
     signIn(session: Session): Promise<void>
     /** Keeps the organization the calls act in from now on; nothing happens signed out. */
@@ -54,7 +57,7 @@ export function createSessionStore(storage: SecureStorage): StoreApi<SessionStor
     }
     // A sign-out is the only change that shows at once, outside the turns: a change asked before it never shows after.
     let signOuts = 0
-    // A keychain write let go when it fails, even when it throws at once: what the person sees does not wait on it.
+    // A keychain write whose failure is ignored, even when it throws at once.
     const quietly = (write: () => Promise<void>): Promise<void> => Promise.resolve().then(write).catch(() => undefined)
     return createStore<SessionStore>()((set, get) => ({
         state: {status: "loading"},
@@ -69,10 +72,10 @@ export function createSessionStore(storage: SecureStorage): StoreApi<SessionStor
                     if (get().state.status === "loading") set({state: {status: "signed-out"}})
                     return
                 }
+                if (get().state.status !== "loading") return
                 const session = parseStored(stored)
                 if (session === undefined) await quietly(() => storage.remove(SESSION_KEY))
-                const launched: SessionState = session === undefined ? {status: "signed-out"} : {status: "signed-in", session}
-                if (get().state.status === "loading") set({state: launched})
+                set({state: session === undefined ? {status: "signed-out"} : {status: "signed-in", session}})
             }),
         signIn: (session) => {
             const asked = signOuts

@@ -138,6 +138,7 @@ describe("session store", () => {
         storage.get = (key: string): Promise<string | undefined> => Promise.resolve(storage.items.get(key))
         await store.getState().hydrate()
         expect(store.getState().state).toEqual({status: "signed-in", session})
+        expect(storage.items.get(SESSION_KEY)).toBe("not json")
     })
 
     it("drops a choice asked before a sign-out: it never lands on the next session", async () => {
