@@ -1,7 +1,10 @@
 import {z} from "zod"
-import {zListReceiptKeysResponse, zListReceiptsResponse, zReceipt} from "@/api/gen/zod.gen"
+import {zCheckAttestation, zListReceiptKeysResponse, zListReceiptsResponse, zReceipt} from "@/api/gen/zod.gen"
 
 export type ReceiptView = z.output<typeof zReceipt>
+
+/** Where a check run of a receipt comes from: the workstation's word, an Ostrom runner, or the CI. */
+export type CheckAttestation = z.output<typeof zCheckAttestation>
 
 /** A receipt as received: the untouched object, for the signature, and its typed view, for the screen. */
 export interface ReceiptEnvelope {

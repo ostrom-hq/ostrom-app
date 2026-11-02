@@ -1,9 +1,17 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import {useMemo} from "react"
-import type {ReceiptListItem} from "@/api/contract/receipts"
+import type {CheckAttestation, ReceiptListItem} from "@/api/contract/receipts"
 import type {ReceiptKey} from "@/domain/receipts/publicKey"
 import {useReceiptKeys, useReceipts} from "@/query/receipts"
 import {checkReceipt, type ReceiptCheck} from "./receiptCheck"
+
+/** A check the receipt reports, and where it ran: a run the workstation only declared proves nothing. */
+export interface ReceiptCheckRun {
+    readonly label: string
+    /** The server's words, shown as they are. */
+    readonly outcome: string
+    readonly attestation: CheckAttestation
+}
 
 /** One receipt of the history: what it says when the app can read it, and always what the phone found of its signature. */
 export type ReceiptRowModel =
@@ -25,6 +33,8 @@ export type ReceiptRowModel =
           readonly subject: string
           readonly at: string
           readonly check: ReceiptCheck
+          /** The check nodes of a workflow receipt, in its order. */
+          readonly checkRuns: readonly ReceiptCheckRun[]
       }
 
 export type HistoryState =
@@ -58,6 +68,10 @@ export function toReceiptRow(item: ReceiptListItem, index: number, check: Receip
         subject: `${view.subject.kind} ${view.subject.id}`,
         at: decision?.at ?? view.createdAt,
         check,
+        checkRuns: (view.nodes ?? [])
+            .filter((node) => node.kind === "check")
+            // A check signed before the field existed has none: it was the workstation's word.
+            .map((node) => ({label: node.label, outcome: node.outcome, attestation: node.attestation ?? "workstation_declared"})),
     }
 }
 
