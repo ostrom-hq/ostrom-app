@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: AGPL-3.0-only
-# Prepares a person on the real Ostrom server the e2e-real workflow started, as the console would: an e-mail sign-in
+# Prepares a person on the real Ostrom server ostrom-server's app-journey workflow started, as the console would: an e-mail sign-in
 # (the link read from the directory the server writes its mails to), an organization of their own, and a personal
 # token the E2E build signs in with (no GitHub on the runner). Prints `token=` (masked) and `login=` for GITHUB_OUTPUT.
 # Usage: scripts/real-server-session.sh <server origin> <mail directory>

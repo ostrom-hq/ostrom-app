@@ -105,16 +105,16 @@ emulator (device offline, `DeviceServerDiedException`), never on a failed assert
 | Organization isolation | Another organization's data never shows (CONVENTIONS.md section 16) | Missing: needs a second organization on a real server |
 | Receipts, history, activity, spending | Each screen opens and reads its data | Missing |
 
-Against the real server, the workflow `E2E real server` (`.github/workflows/e2e-real.yml`) starts the `edge` image of
-ostrom-server with PostgreSQL, signs a new person in by e-mail, gives them an organization and a personal token
-(`scripts/real-server-session.sh`), and builds the app with `EXPO_PUBLIC_OSTROM_REAL_E2E=1`: the real services, signed in
-with that token (`src/config/realServices.ts`). It runs the flows of `.maestro/real/`. Until the image can be pulled from
-this repository (Actions access of the package), they are skipped with a warning; the repository variable
-`OSTROM_APP_REQUIRE_REAL_SERVER=true` makes a skip fail.
+Against the real server, the workflow `App journey` of ostrom-server (`.github/workflows/app-journey.yml`, run on demand
+with this repository's ref; it lives there because that repository's token reads the server image) starts the
+`sha-<7>` image of ostrom-server main with PostgreSQL, signs a new person in by e-mail, gives them an organization and a
+personal token (`scripts/real-server-session.sh`), and builds this app with `EXPO_PUBLIC_OSTROM_REAL_E2E=1`: the real
+services, signed in with that token (`src/config/realServices.ts`). It runs the flows of `.maestro/real/` on an Android
+emulator of the same runner.
 
-| Flow (real server) | What it proves | Status |
+| Flow (real server) | What it proves | What it does not |
 |---|---|---|
-| `real/history.yaml` | Signed in on the real server: the History reads its receipts and keys (none yet), Settings shows the login | Skipped until the package access |
+| `real/journey.yaml` | Signed in on the real server: the inbox reads its yes queue (empty), Settings shows the login and the only organization, the History reads its receipts and keys (none yet) | The PKCE sign-in and the unlock (a personal token stands in), a request answered (none is pending) |
 
 ## Layout
 

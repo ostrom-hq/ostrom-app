@@ -1,0 +1,26 @@
+# Against the real Ostrom server (ostrom-server's app-journey workflow): signed in with the token the job made for a new
+# person of a new organization, the inbox reads that server's yes queue (empty), Settings shows who signed in and their
+# only organization, and the History reads its receipts and signing keys: none yet.
+appId: run.ostrom.app
+---
+- launchApp:
+    clearState: true
+- tapOn:
+    id: "login-github"
+- extendedWaitUntil:
+    visible: "Nothing waits for your yes right now."
+    timeout: 30000
+- takeScreenshot: real-inbox
+- tapOn: "Settings"
+- extendedWaitUntil:
+    visible: "${OSTROM_E2E_LOGIN}"
+    timeout: 20000
+- extendedWaitUntil:
+    visible: "acme-e2e"
+    timeout: 20000
+- takeScreenshot: real-settings
+- tapOn: "History"
+- extendedWaitUntil:
+    visible: "No receipt yet."
+    timeout: 30000
+- takeScreenshot: real-history

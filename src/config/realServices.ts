@@ -19,7 +19,7 @@ export function realServer(given: unknown): RealServer {
 
 /**
  * The services of the E2E build against a real Ostrom server (`EXPO_PUBLIC_OSTROM_REAL_E2E=1`, CI only, see
- * `metro.config.js` and `.github/workflows/e2e-real.yml`): the real services, HTTP client and repositories, except what
+ * `metro.config.js`, and ostrom-server's `.github/workflows/app-journey.yml`): the real services, HTTP client and repositories, except what
  * the emulator cannot do. The GitHub sign-in gives the token the CI made on that server, the fingerprint is confirmed
  * (no finger is enrolled), and push is unavailable.
  */
