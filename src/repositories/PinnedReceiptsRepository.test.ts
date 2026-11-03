@@ -2,8 +2,10 @@
 import * as ed from "@noble/ed25519"
 import {sha256} from "@noble/hashes/sha2.js"
 import type {ReceiptPublicKey} from "@/api/contract/receipts"
+import {bytesToHex} from "@/domain/receipts/bytes"
 import {keyRotationMessage} from "@/domain/receipts/keyRotation"
 import type {SecureStorage} from "@/services/storage/SecureStorage"
+import {bytesToBase64} from "@/test/base64"
 import {PinnedReceiptsRepository, RECEIPT_KEY_PINS} from "./PinnedReceiptsRepository"
 import type {ReceiptsRepository} from "./ReceiptsRepository"
 
@@ -16,10 +18,10 @@ const seed = (fill: number): Uint8Array => new Uint8Array(32).fill(fill)
 function served(fill: number, rotatedFrom?: number, signer: number | undefined = rotatedFrom): ReceiptPublicKey {
     const raw = ed.getPublicKey(seed(fill))
     const der = new Uint8Array([...SPKI_PREFIX, ...raw])
-    const kid = Buffer.from(sha256(der)).toString("hex").slice(0, 16)
-    const key: ReceiptPublicKey = {kid, alg: "Ed25519", publicKeyPem: `-----BEGIN PUBLIC KEY-----\n${Buffer.from(der).toString("base64")}\n-----END PUBLIC KEY-----\n`}
+    const kid = bytesToHex(sha256(der)).slice(0, 16)
+    const key: ReceiptPublicKey = {kid, alg: "Ed25519", publicKeyPem: `-----BEGIN PUBLIC KEY-----\n${bytesToBase64(der)}\n-----END PUBLIC KEY-----\n`}
     if (rotatedFrom === undefined || signer === undefined) return key
-    const signature = Buffer.from(ed.sign(keyRotationMessage({raw, kid}), seed(signer))).toString("base64")
+    const signature = bytesToBase64(ed.sign(keyRotationMessage({raw, kid}), seed(signer)))
     return {...key, rotation: {kid: served(rotatedFrom).kid, signature}}
 }
 

@@ -1,5 +1,12 @@
 import {z} from "zod"
-import {zCheckAttestation, zListReceiptKeysResponse, zListReceiptsResponse, zReceipt, zReceiptNode} from "@/api/gen/zod.gen"
+import {
+    zCheckAttestation,
+    zListReceiptKeysResponse,
+    zListReceiptsResponse,
+    zPublicKey,
+    zReceipt,
+    zReceiptNode,
+} from "@/api/gen/zod.gen"
 import {orElse} from "./orElse"
 
 const CheckAttestationSchema = orElse(zCheckAttestation, "unknown")
@@ -52,6 +59,14 @@ export const ReceiptPageSchema = zListReceiptsResponse
     .transform((page) => ({items: page.items.map(readReceipt), next: page.next}))
 export type ReceiptPage = z.output<typeof ReceiptPageSchema>
 
+/**
+ * How a new receipt key is handed over: the id of the key it replaces, and that key's Ed25519 signature (base64) over
+ * the new key (`keyRotationMessage`). An unreadable one is dropped, never the key.
+ */
+const KeyRotationSchema = z.object({kid: z.string().min(1), signature: z.string().min(1)})
+
 /** `GET /api/v1/receipts/keys`: the public keys of the instance that sign receipts. */
-export const ReceiptKeysSchema = zListReceiptKeysResponse
-export type ReceiptPublicKey = z.output<typeof zListReceiptKeysResponse>["keys"][number]
+export const ReceiptKeysSchema = zListReceiptKeysResponse.extend({
+    keys: z.array(zPublicKey.extend({rotation: KeyRotationSchema.catch(undefined).optional()})),
+})
+export type ReceiptPublicKey = z.output<typeof ReceiptKeysSchema>["keys"][number]
