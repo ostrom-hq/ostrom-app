@@ -5,8 +5,9 @@
 # moment ("adb: device offline", DeviceServerDiedException: runs 41035568416, 41038267977, 41041831225), mostly just
 # after it boots. So the device must answer adb, have finished booting and answer the package manager before each
 # flow (with one `adb reconnect` when it does not), and a warm-up flow runs first without counting.
-# A flow is run a second time only when its first failure is such an outage of the emulator, never when an assertion
-# of the flow failed: an app that fails now and then fails the job.
+# A flow is run again, twice at most, only when its failure is such an outage of the emulator (scripts/emulator-outage.sh),
+# each time once the device answers adb and has finished booting; never when an assertion of the flow failed or the app
+# crashed: an app that fails now and then fails the job. Each rerun is written to the job's summary with its signature.
 set -uo pipefail
 
 flows="${1:-.maestro}"
@@ -14,10 +15,9 @@ shift $(($# > 0 ? 1 : 0))
 
 # Waits at most this long for each condition.
 LIMIT_SECONDS=180
-# What Maestro and adb print when the emulator or Maestro's driver on it, not the app, is the problem. Read in the
-# flow's console, its JUnit report and Maestro's log of the flow, where the outage is written (the console only says "Failed", run
-# 41071045167); never in the device's logcat, where adb and the system print such words on their own.
-OUTAGE='device offline|DeviceServerDiedException|device not found|no devices/emulators found|Maestro driver did not start up in time|Failed to connect to /127\.0\.0\.1:7001|UNAVAILABLE: io exception|UNAVAILABLE: End of stream|Unable to connect to adb daemon'
+# Reruns of a flow after an outage of the emulator, at most.
+MAX_RERUNS=2
+classify="$(dirname "$0")/emulator-outage.sh"
 
 until_ok() {
     local deadline=$((SECONDS + LIMIT_SECONDS))
@@ -52,12 +52,21 @@ run() {
         --test-output-dir "maestro-output/$name-$attempt" "$@" "$flow" 2>&1 | tee "maestro-output/$name-$attempt.console"
 }
 
-# The first attempt failed because the emulator went away, not because the app did.
-outage() {
-    local logs=("maestro-output/$1-1/"*/*/logs/maestro.log)
-    # The JUnit report too: a device server that dies mid-command is written there alone, the console saying "Failed"
-    # and Maestro's log stopping short (app-journey run 41661088741).
-    grep -qsE "$OUTAGE" "maestro-output/$1-1.console" "maestro-report-$1-1.xml" "${logs[@]}"
+# Why attempt $2 of flow $1 failed: `retry <signature>` on an outage of the emulator, `fail <reason>` otherwise. Read in
+# its console, its JUnit report (a device server that dies mid-command is written there alone, the console saying
+# "Failed" and Maestro's log stopping short: app-journey run 41661088741) and Maestro's log of the flow; an emulator
+# that has not finished booting after the failure is written to its console first.
+verdict() {
+    local name="$1" attempt="$2"
+    local logs=("maestro-output/$name-$attempt/"*/*/logs/maestro.log)
+    booted || echo "emulator boot not completed: sys.boot_completed is not 1 after the failure" >> "maestro-output/$name-$attempt.console"
+    "$classify" "maestro-output/$name-$attempt.console" "maestro-report-$name-$attempt.xml" "${logs[@]}"
+}
+
+# A line of the log, and of the job's summary when there is one.
+note() {
+    echo "::warning::$1"
+    if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then echo "- $1" >> "$GITHUB_STEP_SUMMARY"; fi
 }
 
 # An emulator that stays away after a reconnect fails the job at once, rather than each flow waiting for it in turn.
@@ -81,18 +90,23 @@ for flow in "$flows"/*.yaml; do
     # A workspace configuration is not a flow.
     [ "$name" = "config" ] && continue
     steady_or_stop
-    if run "$flow" 1 "$@"; then continue; fi
-    if ! outage "$name"; then
-        echo "::error::$name failed (no outage of the emulator: not run again)"
-        failed=1
-        continue
-    fi
-    echo "::warning::$name failed on an outage of the emulator: adb reconnect, then run it again from a clean state"
-    adb reconnect offline
-    steady_or_stop
-    if ! run "$flow" 2 "$@"; then
-        echo "::error::$name failed twice"
-        failed=1
-    fi
+    attempt=1
+    until run "$flow" "$attempt" "$@"; do
+        why="$(verdict "$name" "$attempt")"
+        if [ "${why%% *}" != retry ]; then
+            echo "::error::$name failed: ${why#* } (not an outage of the emulator: not run again)"
+            failed=1
+            break
+        fi
+        if [ "$attempt" -gt "$MAX_RERUNS" ]; then
+            echo "::error::$name failed on an outage of the emulator $attempt times, the last: ${why#retry }"
+            failed=1
+            break
+        fi
+        note "$name: run again ($attempt of $MAX_RERUNS) after an outage of the emulator: \`${why#retry }\`"
+        adb reconnect offline
+        steady_or_stop
+        attempt=$((attempt + 1))
+    done
 done
 exit "$failed"
