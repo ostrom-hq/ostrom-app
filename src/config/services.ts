@@ -21,6 +21,7 @@ import {BiometricGateImpl} from "@/services/biometrics/BiometricGateImpl"
 import {PushServiceImpl} from "@/services/push/PushServiceImpl"
 import {GithubSignInImpl} from "@/services/signIn/GithubSignInImpl"
 import {SecureStorageImpl} from "@/services/storage/SecureStorageImpl"
+import {onBackground} from "@/services/unlock/onBackground"
 import {PhoneUnlockImpl} from "@/services/unlock/PhoneUnlockImpl"
 import {UnlockKeyStoreImpl} from "@/services/unlock/UnlockKeyStoreImpl"
 import {createSessionStore, type Session} from "@/stores/session"
@@ -88,7 +89,7 @@ export function createAppServices(options: AppServicesOptions = {}): AppServices
     return {
         sessionStore: createSessionStore(storage, {keepsServer: options.keepsServer ?? ((serverUrl) => keepsServer(serverUrl))}),
         biometrics,
-        unlock: new PhoneUnlockImpl({keys: new UnlockKeyStoreImpl(storage), biometrics}),
+        unlock: new PhoneUnlockImpl({keys: new UnlockKeyStoreImpl(storage), biometrics, leaving: onBackground}),
         push: new PushServiceImpl({projectId: easProjectId(Constants.expoConfig?.extra), platform: Platform.OS}),
         signIn: new GithubSignInImpl({
             openAuthSession: (url, redirectUri) => WebBrowser.openAuthSessionAsync(url, redirectUri),
