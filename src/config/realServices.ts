@@ -42,7 +42,8 @@ export function realServer(given: unknown): RealServer {
 export function createRealServerAppServices(server: RealServer): AppServices {
     const biometrics: BiometricGate = {confirm: () => Promise.resolve("confirmed")}
     return {
-        ...createAppServices(),
+        // Its own server only, which it reaches over HTTP in a release build.
+        ...createAppServices({keepsServer: (serverUrl) => serverUrl === server.serverUrl}),
         signIn: {
             signIn: () =>
                 Promise.resolve({
