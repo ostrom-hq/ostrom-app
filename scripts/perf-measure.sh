@@ -69,21 +69,36 @@ maestro test .maestro/common/warm-up.yaml > "$out/warm-up.console" 2>&1 || true
 flow .maestro/perf/sign-in-many.yaml
 
 : > "$out/starts.tsv"
-for run in $(seq 1 "$RUNS"); do
-    adb shell am force-stop "$APP"
-    adb logcat -c
-    total=$(adb shell am start-activity -W -n "$APP/.MainActivity" | tr -d '\r' | awk -F': ' '/TotalTime/ {print $2}')
+# One cold start, written to starts.tsv. Fails when adb lost the emulator on the way: an outage, not the app (Perf run
+# 41685033001, attempt 3: "adb: device offline" in the second start, after a first one that read no request at all).
+cold_start() {
+    local run="$1" total started useful log
+    adb shell am force-stop "$APP" && adb logcat -c || return 1
+    total=$(adb shell am start-activity -W -n "$APP/.MainActivity" | tr -d '\r' | awk -F': ' '/TotalTime/ {print $2}') || return 1
     if ! wait_for "ostrom.perf first-useful-screen"; then
-        adb logcat -d > "$out/logcat-start-$run.txt"
+        adb logcat -d > "$out/logcat-start-$run.txt" || true
+        return 1
+    fi
+    started=$(first_at "START u0 .*$APP") && useful=$(first_at "ostrom.perf first-useful-screen") || return 1
+    sleep 5
+    log=$(adb logcat -d) || return 1
+    { grep -o "ostrom.e2e request .*" <<< "$log" || true; } | sed 's/^ostrom.e2e request //' > "$out/requests-$run.txt"
+    [ -n "$total" ] && [ -n "$started" ] && [ -n "$useful" ] || return 1
+    printf '%s\t%s\t%s\t%s\n' "$run" "$total" "$(python3 -c "print(round(($useful - $started) * 1000))")" \
+        "$(wc -l < "$out/requests-$run.txt" | tr -d ' ')" >> "$out/starts.tsv"
+}
+
+for run in $(seq 1 "$RUNS"); do
+    cold_start "$run" && continue
+    # The emulator still answers: the app showed nothing useful, a real failure. Otherwise one more try, once back.
+    if [ "$(adb get-state 2> /dev/null)" = device ]; then
         echo "::error::no first useful screen within 60 s (run $run)"
         exit 1
     fi
-    started=$(first_at "START u0 .*$APP")
-    useful=$(first_at "ostrom.perf first-useful-screen")
-    sleep 5
-    adb logcat -d | grep -o "ostrom.e2e request .*" | sed 's/^ostrom.e2e request //' > "$out/requests-$run.txt" || true
-    printf '%s\t%s\t%s\t%s\n' "$run" "$total" "$(python3 -c "print(round(($useful - $started) * 1000))")" \
-        "$(wc -l < "$out/requests-$run.txt" | tr -d ' ')" >> "$out/starts.tsv"
+    echo "::warning::the emulator went away during cold start $run: once more, after a reconnect"
+    adb reconnect > /dev/null 2>&1 || true
+    timeout 120 adb wait-for-device
+    cold_start "$run" || { echo "::error::cold start $run failed twice"; exit 1; }
 done
 
 read -r width height < <(adb shell wm size | tr -d '\r' | awk -F'[ x]' '/Physical/ {print $3, $4}')
