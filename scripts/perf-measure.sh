@@ -32,7 +32,8 @@ flow() {
         if maestro test --test-output-dir "$out/maestro/$name-$attempt" "$1" > "$out/$name.console" 2>&1; then
             return 0
         fi
-        if [ "$attempt" = 1 ] && grep -qE "$OUTAGE" "$out/$name.console"; then
+        # Maestro writes the outage in its own log of the flow, the console only says "Failed" (run 41657636900).
+        if [ "$attempt" = 1 ] && grep -rqE "$OUTAGE" "$out/$name.console" "$out/maestro/$name-$attempt"; then
             adb reconnect > /dev/null 2>&1 || true
             adb wait-for-device
             continue
