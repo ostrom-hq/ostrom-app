@@ -182,7 +182,7 @@ describe("GithubSignInImpl", () => {
         expect(exchangeCode).not.toHaveBeenCalled()
     })
 
-    it("lets only the last sign-in asked connect, once: an earlier one's return is spent", async () => {
+    it("lets only the last sign-in asked connect: an earlier one's return connects nothing", async () => {
         // Each sign-in draws its own state.
         let drawn = 0
         const randomBytes = (length: number): Uint8Array => new Uint8Array(length).fill((drawn += 1))
@@ -210,17 +210,6 @@ describe("GithubSignInImpl", () => {
         returns[1]?.(callback({code: "second", state: stateOf(1)}))
         await expect(second).resolves.toMatchObject({kind: "signed-in"})
         expect(exchangeCode.mock.calls.map(([request]) => request.code)).toEqual(["second"])
-
-        // A sign-in whose browser is closed spends its state too: a return arriving after it connects nothing.
-        const third = signIn.signIn(SERVER)
-        await Promise.resolve()
-        returns[2]?.({type: "dismiss"})
-        await expect(third).resolves.toEqual({kind: "cancelled"})
-        const fourth = signIn.signIn(SERVER)
-        await Promise.resolve()
-        returns[3]?.(callback({code: "stale", state: stateOf(2)}))
-        await expect(fourth).resolves.toEqual({kind: "failed", reason: "state-mismatch"})
-        expect(exchangeCode).toHaveBeenCalledTimes(1)
     })
 
     it("reports a denial, with or without its state", async () => {

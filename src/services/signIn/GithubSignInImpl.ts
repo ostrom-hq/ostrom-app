@@ -43,8 +43,8 @@ function queryOfReturn(url: string): Record<string, string> | undefined {
 
 export class GithubSignInImpl implements GithubSignIn {
     /**
-     * The state of the last sign-in asked, until its browser comes back. Only that sign-in can connect, and only once: an
-     * earlier one's return, even with its own state, connects nothing (AUDIT-SECU-APP-2 A4).
+     * The state of the last sign-in asked, until its browser comes back. Only that sign-in can connect: an earlier one's
+     * return, even with its own valid state, connects nothing (AUDIT-SECU-APP-2 A4).
      */
     private awaited: string | undefined
 
@@ -61,7 +61,7 @@ export class GithubSignInImpl implements GithubSignIn {
         start.searchParams.set("code_challenge_method", "S256")
 
         const result = await this.dependencies.openAuthSession(start.toString(), REDIRECT_URI)
-        // Spent by its first return, whatever it is; a later sign-in has already replaced it.
+        // Cleared by its return, whatever it is; a later sign-in may have replaced it already.
         const asked = this.awaited === state
         if (asked) this.awaited = undefined
         if (!isSuccess(result)) return {kind: "cancelled"}
