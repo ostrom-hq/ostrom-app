@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+import {pkceChallenge} from "@/services/signIn/pkce"
 import {createMockServer} from "./mockServer"
 
 describe("createMockServer", () => {
@@ -10,6 +11,19 @@ describe("createMockServer", () => {
     it("decodes an id before looking it up", () => {
         const answer = createMockServer().handle({method: "GET", path: "/api/v1/approvals/appr%5F0001/view", query: {}, body: undefined})
         expect(answer.status).toBe(200)
+    })
+})
+
+describe("createMockServer and the code exchange", () => {
+    const exchange = (body: unknown): number =>
+        createMockServer().handle({method: "POST", path: "/api/v1/auth/mobile/token", query: {}, body}).status
+
+    it("takes a code of the E2E auth host only with the verifier of its challenge, for the app's return", () => {
+        const verifier = "v".repeat(43)
+        const code = `pkce:${pkceChallenge(verifier)}`
+        expect(exchange({code, codeVerifier: verifier, redirectUri: "ostrom://auth/callback"})).toBe(200)
+        expect(exchange({code, codeVerifier: "w".repeat(43), redirectUri: "ostrom://auth/callback"})).toBe(400)
+        expect(exchange({code, codeVerifier: verifier, redirectUri: "ostrom://elsewhere"})).toBe(400)
     })
 })
 
