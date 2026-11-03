@@ -5,6 +5,23 @@ import {createSessionStore, SESSION_KEY, type Session} from "./session"
 const session: Session = {serverUrl: "https://ostrom.test", token: "ost_1", user: {login: "rev-b"}}
 
 describe("session store", () => {
+    it("opens signed out on a kept session whose server this build does not keep, and forgets it", async () => {
+        const storage = new MemoryStorage()
+        storage.items.set(SESSION_KEY, JSON.stringify({...session, serverUrl: "http://10.0.2.2:4961"}))
+        const store = createSessionStore(storage, {keepsServer: (serverUrl) => serverUrl.startsWith("https://")})
+        await store.getState().hydrate()
+        expect(store.getState().state).toEqual({status: "signed-out"})
+        expect(storage.items.has(SESSION_KEY)).toBe(false)
+    })
+
+    it("opens on a kept session whose server this build keeps", async () => {
+        const storage = new MemoryStorage()
+        storage.items.set(SESSION_KEY, JSON.stringify(session))
+        const store = createSessionStore(storage, {keepsServer: (serverUrl) => serverUrl.startsWith("https://")})
+        await store.getState().hydrate()
+        expect(store.getState().state).toEqual({status: "signed-in", session})
+    })
+
     it("starts loading, then signed out when nothing is stored", async () => {
         const store = createSessionStore(new MemoryStorage())
         expect(store.getState().state).toEqual({status: "loading"})

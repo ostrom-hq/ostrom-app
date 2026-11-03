@@ -36,18 +36,34 @@ export interface SessionStore {
 
 export const SESSION_KEY = "ostrom.session"
 
-function parseStored(text: string | undefined): Session | undefined {
+export interface SessionStoreOptions {
+    /**
+     * Whether this build talks to the server of a session kept by an earlier one. A store build keeps an HTTPS server
+     * only (AUDIT-SECU-APP-2 A2): a session a development build kept on `http://` is dropped, not used in clear.
+     * Every server by default.
+     */
+    readonly keepsServer?: (serverUrl: string) => boolean
+}
+
+function keepsEveryServer(): boolean {
+    return true
+}
+
+function parseStored(text: string | undefined, keepsServer: (serverUrl: string) => boolean): Session | undefined {
     if (text === undefined) return undefined
     try {
         const parsed = SessionSchema.safeParse(JSON.parse(text))
-        return parsed.success ? parsed.data : undefined
+        return parsed.success && keepsServer(parsed.data.serverUrl) ? parsed.data : undefined
     } catch {
         return undefined
     }
 }
 
 /** The session, kept in the secure storage. Client state only: nothing from the server is copied here. */
-export function createSessionStore(storage: SecureStorage): StoreApi<SessionStore> {
+export function createSessionStore(
+    storage: SecureStorage,
+    {keepsServer = keepsEveryServer}: SessionStoreOptions = {},
+): StoreApi<SessionStore> {
     // The keychain is written one change at a time, in the order they were asked: the last asked is the one kept.
     let tail: Promise<unknown> = Promise.resolve()
     function inTurn<T>(change: () => Promise<T>): Promise<T> {
@@ -73,7 +89,8 @@ export function createSessionStore(storage: SecureStorage): StoreApi<SessionStor
                     return
                 }
                 if (get().state.status !== "loading") return
-                const session = parseStored(stored)
+                // Unreadable, or on a server this build does not keep: forgotten, and signed out.
+                const session = parseStored(stored, keepsServer)
                 if (session === undefined) await quietly(() => storage.remove(SESSION_KEY))
                 set({state: session === undefined ? {status: "signed-out"} : {status: "signed-in", session}})
             }),

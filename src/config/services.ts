@@ -22,6 +22,7 @@ import {SecureStorageImpl} from "@/services/storage/SecureStorageImpl"
 import {PhoneUnlockImpl} from "@/services/unlock/PhoneUnlockImpl"
 import {UnlockKeyStoreImpl} from "@/services/unlock/UnlockKeyStoreImpl"
 import {createSessionStore, type Session} from "@/stores/session"
+import {normalizeServerUrl} from "@/ui/screens/login/serverUrl"
 
 const ExtraSchema = z.object({eas: z.object({projectId: z.string().min(1)})})
 
@@ -58,12 +59,27 @@ export async function copyToClipboard(text: string): Promise<void> {
     await Clipboard.setStringAsync(text)
 }
 
+/**
+ * Whether this build talks to the server of a kept session: HTTPS, or HTTP on this computer in a development build, the
+ * rule of an address typed at sign-in (`normalizeServerUrl`).
+ *
+ * @param development Whether this is a development build (`__DEV__`, false in a release build).
+ */
+export function keepsServer(serverUrl: string, development: boolean = __DEV__): boolean {
+    return normalizeServerUrl(serverUrl, development) !== undefined
+}
+
+export interface AppServicesOptions {
+    /** The servers a session kept by an earlier build may be on; {@link keepsServer} by default. */
+    readonly keepsServer?: (serverUrl: string) => boolean
+}
+
 /** The composition root: the only place that picks the implementations. */
-export function createAppServices(): AppServices {
+export function createAppServices(options: AppServicesOptions = {}): AppServices {
     const storage = new SecureStorageImpl()
     const biometrics = new BiometricGateImpl()
     return {
-        sessionStore: createSessionStore(storage),
+        sessionStore: createSessionStore(storage, {keepsServer: options.keepsServer ?? ((serverUrl) => keepsServer(serverUrl))}),
         biometrics,
         unlock: new PhoneUnlockImpl({keys: new UnlockKeyStoreImpl(storage), biometrics}),
         push: new PushServiceImpl({projectId: easProjectId(Constants.expoConfig?.extra), platform: Platform.OS}),
