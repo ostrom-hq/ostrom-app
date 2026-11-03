@@ -52,6 +52,7 @@ function RootNavigator(): React.JSX.Element | null {
             <Stack.Protected guard={signedIn}>
                 <Stack.Screen name="(tabs)" />
                 <Stack.Screen name="request/[id]" options={{headerShown: true, title: t("request.title"), headerBackTitle: t("inbox.title")}} />
+                <Stack.Screen name="account" options={{headerShown: true, title: t("account.title"), headerBackTitle: t("settings.title")}} />
             </Stack.Protected>
             <Stack.Protected guard={!signedIn}>
                 <Stack.Screen name="login" />

@@ -8,6 +8,7 @@ import {AccountRepositoryImpl} from "./AccountRepositoryImpl"
 import {ActivityRepositoryImpl} from "./ActivityRepositoryImpl"
 import {ApprovalsRepositoryImpl} from "./ApprovalsRepositoryImpl"
 import {NotificationsRepositoryImpl} from "./NotificationsRepositoryImpl"
+import {ProfileRepositoryImpl} from "./ProfileRepositoryImpl"
 import {ReceiptsRepositoryImpl} from "./ReceiptsRepositoryImpl"
 import {SpendingRepositoryImpl} from "./SpendingRepositoryImpl"
 
@@ -227,5 +228,13 @@ describe("createMockApi", () => {
         server.resetHandlers(...createMockApi(other).handlers)
         const repository = new AccountRepositoryImpl(new HttpClientImpl({baseUrl: other, token: () => undefined}))
         await expect(repository.me()).resolves.toMatchObject({dev: {login: "rev-b"}})
+    })
+})
+
+describe("ProfileRepositoryImpl", () => {
+    it("reads the person's account and how they sign in, in no organization", async () => {
+        const account = await new ProfileRepositoryImpl(http).account()
+        expect(account).toMatchObject({login: "rev-b", displayName: "Reviewer B", providers: ["github"]})
+        expect(account.emails).toEqual([{email: "rev-b@acme.test", verified: true}])
     })
 })

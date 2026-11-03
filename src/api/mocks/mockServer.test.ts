@@ -54,6 +54,7 @@ describe("createMockServer and Ostrom-Org", () => {
         expect(server.handle(get("/api/v1/receipts/keys")).status).toBe(200)
         expect(server.handle(get("/api/v1/me/notifications")).status).toBe(200)
         expect(server.handle(get("/api/v1/auth/me")).status).toBe(200)
+        expect(server.handle(get("/api/v1/auth/me/account")).status).toBe(200)
     })
 
     it("lists the caller's organizations as server#64 does, without the header", () => {
