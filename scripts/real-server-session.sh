@@ -68,7 +68,8 @@ cookie_value() {
 }
 
 # GitHub's consent through the fake: start on the server (query $1), pick the login on the authorize page, come back
-# to the server's callback with the start's cookies. Prints the callback's response headers.
+# to the server's callback with the start's cookies. Prints the callback's response headers; its body goes to the file
+# $2, if given.
 github_sign_in() {
     local start authorize back callback
     start="$(headers "$server/api/v1/auth/github/start?$1")"
@@ -77,7 +78,7 @@ github_sign_in() {
     back="$(headers -X POST "$github/login/oauth/authorize" --data "${authorize#*\?}&login=$login")"
     callback="$(location "$back")"
     case "$callback" in "$server"/*) ;; *) fail "fake GitHub authorize → $(status "$back") ${callback:-no redirect}" ;; esac
-    headers -H "cookie: $(cookies "$start")" "$callback"
+    curl -sS -D - -o "${2:-/dev/null}" -H "cookie: $(cookies "$start")" "$callback" | tr -d '\r'
 }
 
 # The newest token of a link `<page>#token=` mailed to $1 (the server writes `To: …`, `Subject: …`, a blank line, the
@@ -164,8 +165,15 @@ no_approval="$(approval_of "$no_gate")" || fail "No pending approval of the phon
 verifier="$(openssl rand -base64 48 | tr '+/' '-_' | tr -d '=\n')"
 challenge="$(printf '%s' "$verifier" | openssl dgst -sha256 -binary | base64 | tr '+/' '-_' | tr -d '=\n')"
 state="state$run"
-signed="$(github_sign_in "redirect_uri=ostrom%3A%2F%2Fauth%2Fcallback&state=$state&code_challenge=$challenge&code_challenge_method=S256")"
+page="$(mktemp)"
+signed="$(github_sign_in "redirect_uri=ostrom%3A%2F%2Fauth%2Fcallback&state=$state&code_challenge=$challenge&code_challenge_method=S256" "$page")"
 back="$(location "$signed")"
+# A server that asks the person before going back to the app answers a page whose link is the deep link (rather than a
+# redirect to it): the person's tap, as in the in-app browser.
+if [ -z "$back" ]; then
+    back="$(grep -o 'href="ostrom://[^"]*"' "$page" | head -n 1 | sed -e 's/^href="//' -e 's/"$//' -e 's/&amp;/\&/g' || true)"
+fi
+rm -f "$page"
 case "$back" in "$redirect_uri?"*"state=$state"*) ;; *) fail "The app's sign-in came back to ${back:-nothing}" ;; esac
 code="$(printf '%s' "${back#*\?}" | tr '&' '\n' | grep '^code=' | cut -d= -f2- || true)"
 [ -n "$code" ] || fail "The app's sign-in came back without a code"
