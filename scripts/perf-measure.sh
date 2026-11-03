@@ -9,8 +9,11 @@
 #   out), both read in logcat on the emulator's clock;
 # - the calls made at launch: the E2E build logs each one (`ostrom.e2e request`), counted until 5 s after the first
 #   useful screen;
-# - each long list (inbox, activity, history: 500 more rows on a server of many.example): the time to show it, then 20
-#   flings, the frames rendered and janky (`dumpsys gfxinfo`) and the memory (`dumpsys meminfo`, total PSS).
+# - each long list (inbox, activity, history: 500 more rows on a server of many.example): what a person waits after the
+#   press of its tab, from the app's `ostrom.perf tab <name>` to its `ostrom.perf shown <list>` (the list laid out with
+#   its rows, the network calls included), on the phone's clock; never the Maestro flow's own duration, mostly the
+#   tool's start (about 10 s). The inbox is already shown by the cold starts: its time is the first useful screen. Then
+#   20 flings, the frames rendered and janky (`dumpsys gfxinfo`) and the memory (`dumpsys meminfo`, total PSS).
 # The emulator renders without a GPU: compare runs with each other, not with a phone.
 set -euo pipefail
 
@@ -59,10 +62,6 @@ wait_for() {
     done
 }
 
-now() {
-    date +%s.%N
-}
-
 adb install -r "$apk" > /dev/null
 # Maestro's driver often fails its very first flow just after the boot: a warm-up that does not count.
 maestro test .maestro/common/warm-up.yaml > "$out/warm-up.console" 2>&1 || true
@@ -103,9 +102,16 @@ done
 
 read -r width height < <(adb shell wm size | tr -d '\r' | awk -F'[ x]' '/Physical/ {print $3, $4}')
 for list in inbox activity history; do
-    begin=$(now)
+    adb logcat -c
     flow ".maestro/perf/open-$list.yaml"
-    shown=$(python3 -c "print(round(($(now) - $begin) * 1000))")
+    tap=""
+    if [ "$list" != inbox ]; then
+        pressed=$(first_at "ostrom.perf tab $list")
+        laid=$(first_at "ostrom.perf shown $list")
+        [ -n "$pressed" ] && [ -n "$laid" ] || { echo "::error::$list: no tab press or no list layout in logcat"; exit 1; }
+        tap=$(python3 -c "print(round(($laid - $pressed) * 1000))")
+        [ "$tap" -ge 0 ] || { echo "::error::$list: its list was laid out before its tab was pressed"; exit 1; }
+    fi
     adb shell dumpsys gfxinfo "$APP" reset > /dev/null
     for _ in $(seq 1 20); do
         adb shell input swipe $((width / 2)) $((height * 8 / 10)) $((width / 2)) $((height * 2 / 10)) 150
@@ -113,7 +119,7 @@ for list in inbox activity history; do
     sleep 2
     adb shell dumpsys gfxinfo "$APP" > "$out/gfxinfo-$list.txt"
     adb shell dumpsys meminfo "$APP" > "$out/meminfo-$list.txt"
-    echo "$shown" > "$out/shown-$list.txt"
+    echo "$tap" > "$out/tap-$list.txt"
 done
 
 python3 - "$out" "$apk" "$bundle" << 'PY'
@@ -138,7 +144,8 @@ for name in ("inbox", "activity", "history"):
     mem = open(os.path.join(out, f"meminfo-{name}.txt")).read()
     pss = number(r"TOTAL PSS:\s+(\d+)", mem) or number(r"^\s*TOTAL\s+(\d+)", mem)
     lists[name] = {
-        "shownMs": int(open(os.path.join(out, f"shown-{name}.txt")).read()),
+        # From the press of its tab to its list laid out, on the phone; None for the inbox, shown by the cold start.
+        "tapToListMs": int(tap) if (tap := open(os.path.join(out, f"tap-{name}.txt")).read().strip()) else None,
         "frames": number(r"Total frames rendered:\s+(\d+)", gfx, 0),
         "jankyFrames": number(r"Janky frames:\s+(\d+)", gfx, 0),
         "jankyPercent": number(r"Janky frames:\s+\d+\s+\(([\d.]+)%\)", gfx, 0),
@@ -174,7 +181,8 @@ rows = [
 ]
 for name, values in lists.items():
     rows.append(
-        f"| {name}: shown / janky / p90 / p99 / PSS | {values['shownMs']} ms / {values['jankyFrames']:.0f} of {values['frames']:.0f} "
+        f"| {name}: tap to list laid out / janky / p90 / p99 / PSS | "
+        f"{'first useful screen' if values['tapToListMs'] is None else str(values['tapToListMs']) + ' ms'} / {values['jankyFrames']:.0f} of {values['frames']:.0f} "
         f"({values['jankyPercent']}%) / {values['p90FrameMs']:.0f} ms / {values['p99FrameMs']:.0f} ms / {(values['pssKiB'] or 0) / 1024:.0f} MiB |"
     )
 rows += ["", "Calls at launch (run 1):", "", *[f"- `{line}`" for line in result["launchRequests"]["first"]]]

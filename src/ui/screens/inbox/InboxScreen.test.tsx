@@ -157,4 +157,11 @@ describe("toRow", () => {
         expect(toRow(viewOf(approval))).toMatchObject({detail: "dev-c", yours: true})
         expect(toRow(viewOf(approval, {self: false})).yours).toBe(false)
     })
+
+    it("lays out its list with nobody listening", async () => {
+        await launch(() => Promise.resolve(queueOf([approvals.pending])))
+        const list = await screen.findByTestId("inbox-list")
+        await fireEvent(list, "layout", {nativeEvent: {layout: {x: 0, y: 0, width: 400, height: 800}}})
+        expect(list).toBeOnTheScreen()
+    })
 })

@@ -226,4 +226,11 @@ describe("toReceiptRow", () => {
         await fireEvent(await screen.findByTestId("history-list"), "layout", {nativeEvent: {layout: {x: 0, y: 0, width: 400, height: 800}}})
         expect(onListShown).toHaveBeenCalledWith("history")
     })
+
+    it("lays out its list with nobody listening", async () => {
+        await show(jest.fn(() => page(golden)))
+        const list = await screen.findByTestId("history-list")
+        await fireEvent(list, "layout", {nativeEvent: {layout: {x: 0, y: 0, width: 400, height: 800}}})
+        expect(list).toBeOnTheScreen()
+    })
 })

@@ -68,4 +68,11 @@ describe("ActivityScreen", () => {
         await fireEvent(await screen.findByTestId("activity-list"), "layout", {nativeEvent: {layout: {x: 0, y: 0, width: 400, height: 800}}})
         expect(onListShown).toHaveBeenCalledWith("activity")
     })
+
+    it("lays out its list with nobody listening", async () => {
+        await launch(jest.fn(() => Promise.resolve(first)))
+        const list = await screen.findByTestId("activity-list")
+        await fireEvent(list, "layout", {nativeEvent: {layout: {x: 0, y: 0, width: 400, height: 800}}})
+        expect(list).toBeOnTheScreen()
+    })
 })
