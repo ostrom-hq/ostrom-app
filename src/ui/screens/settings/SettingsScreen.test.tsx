@@ -69,7 +69,7 @@ const granted: PushPermission = {kind: "granted", address: {pushToken: "Exponent
 describe("SettingsScreen", () => {
     it("leads to the person's account", async () => {
         await open()
-        fireEvent.press(screen.getByRole("button", {name: "My account"}))
+        await fireEvent.press(screen.getByRole("button", {name: "My account"}))
         expect(mockPush).toHaveBeenCalledWith("/account")
     })
 

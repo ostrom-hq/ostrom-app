@@ -51,7 +51,7 @@ describe("AccountScreen", () => {
     it("opens the person's account in the console", async () => {
         const {openUrl} = await open()
         await screen.findByText("Reviewer B")
-        fireEvent.press(screen.getByRole("button", {name: "Open my account in the console"}))
+        await fireEvent.press(screen.getByRole("button", {name: "Open my account in the console"}))
         await waitFor(() => {
             expect(openUrl).toHaveBeenCalledWith("https://ostrom.test/account")
         })
@@ -60,17 +60,17 @@ describe("AccountScreen", () => {
 
     it("gives the address to copy when the console does not open", async () => {
         const {copyText} = await open({opens: () => Promise.reject(new Error("no browser"))})
-        fireEvent.press(await screen.findByRole("button", {name: "Open my account in the console"}))
+        await fireEvent.press(await screen.findByRole("button", {name: "Open my account in the console"}))
         expect(await screen.findByTestId("account-console-url")).toHaveTextContent("https://ostrom.test/account")
-        fireEvent.press(screen.getByRole("button", {name: "Copy the address"}))
+        await fireEvent.press(screen.getByRole("button", {name: "Copy the address"}))
         expect(await screen.findByRole("button", {name: "Address copied"})).toBeOnTheScreen()
         expect(copyText).toHaveBeenCalledWith("https://ostrom.test/account")
     })
 
     it("keeps the address on screen when it cannot be copied either", async () => {
         await open({opens: () => Promise.reject(new Error("no browser")), copies: () => Promise.reject(new Error("no clipboard"))})
-        fireEvent.press(await screen.findByRole("button", {name: "Open my account in the console"}))
-        fireEvent.press(await screen.findByRole("button", {name: "Copy the address"}))
+        await fireEvent.press(await screen.findByRole("button", {name: "Open my account in the console"}))
+        await fireEvent.press(await screen.findByRole("button", {name: "Copy the address"}))
         await waitFor(() => {
             expect(screen.getByRole("button", {name: "Copy the address"})).toBeOnTheScreen()
         })
@@ -81,7 +81,7 @@ describe("AccountScreen", () => {
         const {services, openUrl} = await open()
         await screen.findByText("Reviewer B")
         await services.sessionStore.getState().signOut()
-        fireEvent.press(screen.getByRole("button", {name: "Open my account in the console"}))
+        await fireEvent.press(screen.getByRole("button", {name: "Open my account in the console"}))
         expect(openUrl).not.toHaveBeenCalled()
     })
 
@@ -92,7 +92,7 @@ describe("AccountScreen", () => {
         })
         expect(await screen.findByText("Your account could not be loaded.")).toBeOnTheScreen()
         fail = false
-        fireEvent.press(screen.getByRole("button", {name: "Try again"}))
+        await fireEvent.press(screen.getByRole("button", {name: "Try again"}))
         expect(await screen.findByText("Reviewer B")).toBeOnTheScreen()
         expect(read).toHaveBeenCalledTimes(2)
     })
