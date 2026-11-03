@@ -40,6 +40,11 @@ export interface AppServices {
     readonly openUrl: (url: string) => Promise<void>
     /** Puts text on the clipboard (a link to open by hand when it could not be opened). */
     readonly copyText: (text: string) => Promise<void>
+    /**
+     * Called when the first useful screen, the inbox list, is laid out. The E2E build logs it for the performance pass
+     * (`scripts/perf-measure.sh`); no other build sets it.
+     */
+    readonly onFirstUsefulScreen?: () => void
 }
 
 const ServicesContext = createContext<AppServices | undefined>(undefined)
