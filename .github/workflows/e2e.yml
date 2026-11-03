@@ -64,6 +64,10 @@ jobs:
         run: |
           curl -fsSL "https://get.maestro.mobile.dev" | bash
           echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+      # The E2E auth host stands for GitHub in the browser sign-in of .maestro/sign-in-return.yaml; the emulator
+      # reaches it at 10.0.2.2:4700. It runs until the end of the job.
+      - name: Start the E2E auth host
+        run: nohup python3 scripts/e2e-auth-host.py > e2e-auth-host.log 2>&1 &
       - name: Maestro flows on the emulator
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         with:
@@ -83,4 +87,5 @@ jobs:
           path: |
             maestro-report-*.xml
             maestro-output/
+            e2e-auth-host.log
           if-no-files-found: ignore

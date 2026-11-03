@@ -144,6 +144,37 @@ describe("easProjectId", () => {
 })
 
 describe("createMockAppServices", () => {
+    it("signs in through the browser and the E2E auth host on a server of browser.example, as GitHub would", async () => {
+        const open = jest.mocked(WebBrowser.openAuthSessionAsync)
+        open.mockImplementationOnce((url: string) => {
+            const start = new URL(url)
+            const code = `pkce:${start.searchParams.get("code_challenge") ?? ""}`
+            const state = start.searchParams.get("state") ?? ""
+            return Promise.resolve({type: "success", url: `ostrom://auth/callback?code=${code}&state=${state}`})
+        })
+        const services = createMockAppServices()
+
+        const outcome = await services.signIn.signIn("https://good.browser.example")
+
+        expect(outcome).toEqual({
+            kind: "signed-in",
+            session: {serverUrl: "https://good.browser.example", token: "ost_mock_token", user: {login: "rev-b"}, orgId: "org_acme"},
+            unlockKey: "mock-unlock-key",
+        })
+        const [startUrl, redirect] = open.mock.calls.at(-1) ?? []
+        const start = new URL(startUrl ?? "")
+        expect(`${start.origin}${start.pathname}`).toBe("http://10.0.2.2:4700/api/v1/auth/github/start")
+        expect(start.searchParams.get("mode")).toBe("good")
+        expect(start.searchParams.get("state")).toBe(ZERO_STATE)
+        expect(redirect).toBe("ostrom://auth/callback")
+    })
+
+    it("refuses on the device a return the app did not ask for, through the same path", async () => {
+        jest.mocked(WebBrowser.openAuthSessionAsync).mockResolvedValueOnce({type: "success", url: "ostrom://auth/callback?code=pkce:x&state=forged"})
+        const services = createMockAppServices()
+        await expect(services.signIn.signIn("https://forged.browser.example")).resolves.toEqual({kind: "failed", reason: "state-mismatch"})
+    })
+
     it("signs in on the address typed, without GitHub, and talks to the in-memory server", async () => {
         const services = createMockAppServices()
         const outcome = await services.signIn.signIn("https://ostrom.e2e")
