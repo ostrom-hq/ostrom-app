@@ -35,7 +35,7 @@ export function createReceiptChecks(keys: ReadonlyMap<string, ReceiptKey>): Rece
     const cached = (item: ReceiptListItem): ReceiptCheck | undefined => {
         if (!item.readable) return undefined
         const hit = kept.get(item.view.id)
-        return hit !== undefined && hit.content === JSON.stringify(item.raw) ? hit.check : undefined
+        return hit?.content === JSON.stringify(item.raw) ? hit.check : undefined
     }
     return {
         cached,
