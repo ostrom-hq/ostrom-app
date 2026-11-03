@@ -3,6 +3,7 @@ appId: run.ostrom.app
 ---
 - launchApp:
     clearState: true
+- runFlow: system-dialog.yaml
 - extendedWaitUntil:
     visible:
       id: "login-github"

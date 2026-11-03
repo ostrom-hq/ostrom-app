@@ -1,0 +1,9 @@
+# A dialog of the emulator's own system ("Pixel Launcher isn't responding", just after the boot: Perf run 41672651694,
+# twice) covers the app and fails its taps. It is told to wait, and the flow goes on; without it, nothing is done.
+appId: run.ostrom.app
+---
+- runFlow:
+    when:
+      visible: ".*isn't responding.*"
+    commands:
+      - tapOn: "Wait"
