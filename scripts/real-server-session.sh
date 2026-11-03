@@ -11,7 +11,8 @@
 #   invitation, and asks the two gates with a token of their own (`gates:ask`), which the job also reads them with.
 # - PARCOURS 3.5: one model call through the gateway, which the job's fake provider (ostrom-e2e src/fake-tokens.ts)
 #   bills $1.50, then a monthly budget of $0.01 that stops the calls: the next call is refused, the guard marks the
-#   budget passed, and the Spending tab lists it.
+#   budget passed, and the Spending tab lists it. Before it, the asker's own call, then a monthly budget of $0.01 of
+#   their own that stops their next call: the owner's Spending tab lists them by login (app-asker-<run>).
 # Masks the secrets in the job's log, and writes `token`, `unlock_key`, `login`, `yes_approval`, `no_approval`,
 # `yes_gate`, `no_gate`, `asker_token` and `repo` to $GITHUB_OUTPUT (standard output outside Actions).
 # Usage: scripts/real-server-session.sh <server origin> <mail directory> <fake GitHub origin>
@@ -156,21 +157,43 @@ account="$(jq -nc --arg id "acct-app-e2e-$run" '{provider: "claude", label: "Max
     accessToken: ("at-" + $id), refreshToken: ("rt-" + $id), expiresAt: (now + 28800 | todate)}')"
 api "${json[@]}" "${owner[@]}" -X POST "$server/api/v1/accounts" -d "$account" > /dev/null
 # A Messages call as Claude Code makes it, with its launch's token: the answer, then its status on the last line.
+# $1: the launch's token, the phone's person's by default.
 infer() {
     curl -sS -w '\n%{http_code}' -H "content-type: application/json" -H "anthropic-version: 2023-06-01" \
-        -H "x-api-key: $agent_token" -X POST "$server/api/v1/inference/v1/messages" \
+        -H "x-api-key: ${1:-$agent_token}" -X POST "$server/api/v1/inference/v1/messages" \
         -d '{"model":"claude-opus-5","max_tokens":1,"messages":[{"role":"user","content":"hello"}]}'
 }
 answer="$(infer)"
 [ "${answer##*$'\n'}" = 200 ] || fail "The model call → ${answer##*$'\n'} ${answer%$'\n'*}"
-# The gateway writes its ledger after it has answered: the month's spending is read until it shows, ten seconds at most.
-spent=0
-for _ in $(seq 1 20); do
-    spent="$(api "${json[@]}" "${owner[@]}" "$server/api/v1/spending?period=month" | jq -r '.totalUsd')"
-    awk -v usd="$spent" 'BEGIN { exit !(usd >= 1) }' && break
-    sleep 0.5
-done
-awk -v usd="$spent" 'BEGIN { exit !(usd >= 1) }' || fail "The month's spending is \$$spent after a call billed \$1.50"
+# The gateway writes its ledger after it has answered: the month's spending is read until it reaches $1 (one call
+# billed $1.50 by the fake provider), $2 for two calls, ten seconds at most.
+spent_at_least() {
+    local spent=0
+    for _ in $(seq 1 20); do
+        spent="$(api "${json[@]}" "${owner[@]}" "$server/api/v1/spending?period=month" | jq -r '.totalUsd')"
+        awk -v usd="$spent" -v min="$1" 'BEGIN { exit !(usd >= min) }' && return
+        sleep 0.5
+    done
+    fail "The month's spending is \$$spent after $1 call(s) billed \$1.50 each"
+}
+spent_at_least 1
+# The admin's side, before the organization's budget (which would refuse the asker's call first): the asker, a member,
+# launches and makes a call of their own, then a monthly budget of $0.01 of their own that stops the calls refuses their
+# next one. The app's flow looks for them by login on the owner's phone.
+asker_login="app-asker-$run"
+members="$(api "${json[@]}" "${owner[@]}" "$server/api/v1/orgs/$org/members")"
+asker_id="$(printf '%s' "$members" | jq -er --arg login "$asker_login" '[.items[] | select(.login == $login)][0].id')" \
+    || fail "No member $asker_login in $org: $(printf '%s' "$members" | jq -c '[.items[].login]')"
+asker_agent="$(api "${json[@]}" "${asker[@]}" -X POST "$server/api/v1/launches" -d "$launch" | jq -er '.agentToken')"
+echo "::add-mask::$asker_agent"
+answer="$(infer "$asker_agent")"
+[ "${answer##*$'\n'}" = 200 ] || fail "The asker's model call → ${answer##*$'\n'} ${answer%$'\n'*}"
+spent_at_least 2
+budget="$(jq -nc --arg id "$asker_id" '{scope: "member", subject: $id, usdPerMonth: 0.01, hardStop: true}')"
+api "${json[@]}" "${owner[@]}" -X PUT "$server/api/v1/budgets" -d "$budget" > /dev/null
+answer="$(infer "$asker_agent")"
+[ "${answer##*$'\n'}" = 429 ] && grep -q "Monthly budget reached" <<< "${answer%$'\n'*}" \
+    || fail "The asker's call past their budget → ${answer##*$'\n'} ${answer%$'\n'*}, not 429 « Monthly budget reached »"
 # The budget, now spent: the next call is refused before the provider until the month ends, and marks it passed.
 api "${json[@]}" "${owner[@]}" -X PUT "$server/api/v1/budgets" -d '{"scope":"organization","usdPerMonth":0.01,"hardStop":true}' > /dev/null
 answer="$(infer)"
