@@ -1,0 +1,30 @@
+# Chrome, opened by the app's sign-in, on the fake GitHub's authorize page (its first run passed when it shows, as in
+# browser-sign-in.yaml): signs in as ${LOGIN}, typed over the page's prefilled login.
+appId: run.ostrom.app
+---
+- extendedWaitUntil:
+    visible: "Authorize|Accept & continue|Use without an account|No thanks"
+    timeout: 60000
+- runFlow:
+    when:
+      visible: "Accept & continue"
+    commands:
+      - tapOn: "Accept & continue"
+- runFlow:
+    when:
+      visible: "Use without an account"
+    commands:
+      - tapOn: "Use without an account"
+- runFlow:
+    when:
+      visible: "No thanks"
+    commands:
+      - tapOn: "No thanks"
+- extendedWaitUntil:
+    visible: "Authorize"
+    timeout: 30000
+- tapOn: "octo-dev"
+- eraseText: 40
+- inputText: ${LOGIN}
+- hideKeyboard
+- tapOn: "Authorize"

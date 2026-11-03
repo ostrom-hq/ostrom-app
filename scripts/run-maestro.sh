@@ -15,9 +15,9 @@ shift $(($# > 0 ? 1 : 0))
 # Waits at most this long for each condition.
 LIMIT_SECONDS=180
 # What Maestro and adb print when the emulator or Maestro's driver on it, not the app, is the problem. Read in the
-# flow's console and in Maestro's log of the flow, where the outage is written (the console only says "Failed", run
+# flow's console, its JUnit report and Maestro's log of the flow, where the outage is written (the console only says "Failed", run
 # 41071045167); never in the device's logcat, where adb and the system print such words on their own.
-OUTAGE='device offline|DeviceServerDiedException|device not found|no devices/emulators found|Maestro driver did not start up in time|Failed to connect to /127\.0\.0\.1:7001|UNAVAILABLE: io exception'
+OUTAGE='device offline|DeviceServerDiedException|device not found|no devices/emulators found|Maestro driver did not start up in time|Failed to connect to /127\.0\.0\.1:7001|UNAVAILABLE: io exception|UNAVAILABLE: End of stream|Unable to connect to adb daemon'
 
 until_ok() {
     local deadline=$((SECONDS + LIMIT_SECONDS))
@@ -55,7 +55,9 @@ run() {
 # The first attempt failed because the emulator went away, not because the app did.
 outage() {
     local logs=("maestro-output/$1-1/"*/*/logs/maestro.log)
-    grep -qsE "$OUTAGE" "maestro-output/$1-1.console" "${logs[@]}"
+    # The JUnit report too: a device server that dies mid-command is written there alone, the console saying "Failed"
+    # and Maestro's log stopping short (app-journey run 41661088741).
+    grep -qsE "$OUTAGE" "maestro-output/$1-1.console" "maestro-report-$1-1.xml" "${logs[@]}"
 }
 
 # An emulator that stays away after a reconnect fails the job at once, rather than each flow waiting for it in turn.
