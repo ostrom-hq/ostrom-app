@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type {QueryClient} from "@tanstack/react-query"
-import {act, fireEvent, screen} from "@testing-library/react-native"
+import {act, fireEvent, screen, waitFor} from "@testing-library/react-native"
 import {
     ReceiptKeysSchema,
     type ReceiptListItem,
@@ -40,11 +40,23 @@ function view(overrides: Partial<ReceiptView>): ReceiptView {
     return {...first.view, ...overrides}
 }
 
+/**
+ * Each row checks its signature in a task of its own, after it shows: on a loaded CI runner, with coverage, the golden
+ * receipts take longer than `findBy`'s one second, and `findAllBy` answers at the first row, before the others.
+ */
+async function expectEvery(text: string, count: number): Promise<void> {
+    await waitFor(
+        () => {
+            expect(screen.getAllByText(text)).toHaveLength(count)
+        },
+        {timeout: 10_000},
+    )
+}
+
 describe("HistoryScreen", () => {
     it("verifies every golden receipt on the phone", async () => {
         await show(jest.fn(() => page(golden)))
-        const verified = await screen.findAllByText(`Signature verified on this phone · key ${receiptKey.kid}`)
-        expect(verified).toHaveLength(golden.length)
+        await expectEvery(`Signature verified on this phone · key ${receiptKey.kid}`, golden.length)
     })
 
     it("flags a receipt changed after signing, and one it cannot display", async () => {
@@ -55,7 +67,7 @@ describe("HistoryScreen", () => {
         const tampered: ReceiptListItem = {...first, raw: {...raw, initiator: "mallory"}}
         const unreadable: ReceiptListItem = {readable: false, raw: "a newer shape", detail: "newer shape"}
         await show(jest.fn(() => page([tampered, unreadable])))
-        expect(await screen.findByText("Signature rejected: the content changed after signing")).toBeOnTheScreen()
+        await expectEvery("Signature rejected: the content changed after signing", 1)
         expect(screen.getByText("A receipt this version of the app cannot display")).toBeOnTheScreen()
         expect(screen.getByText("Signature rejected: not a receipt")).toBeOnTheScreen()
     })
@@ -65,7 +77,7 @@ describe("HistoryScreen", () => {
             jest.fn(() => page(golden)),
             jest.fn(() => Promise.reject(new ApiError({kind: "network"}))),
         )
-        expect((await screen.findAllByText("Not verified: the instance key is unavailable")).length).toBe(golden.length)
+        await expectEvery("Not verified: the instance key is unavailable", golden.length)
     })
 
     it("never claims a verification with a key the server did not announce", async () => {
@@ -74,7 +86,7 @@ describe("HistoryScreen", () => {
             jest.fn(() => page(golden)),
             jest.fn(() => Promise.resolve(served.map((key) => ({...key, kid: "another-key"})))),
         )
-        expect((await screen.findAllByText("Not verified: the instance key is unavailable")).length).toBe(golden.length)
+        await expectEvery("Not verified: the instance key is unavailable", golden.length)
     })
 
     it("names the decision in the person's words, or says who it was signed for", async () => {
@@ -144,7 +156,7 @@ describe("HistoryScreen", () => {
             .mockResolvedValue(served)
         await show(list, keys)
         await fireEvent.press(await screen.findByRole("button", {name: "Try again"}))
-        expect((await screen.findAllByText(`Signature verified on this phone · key ${receiptKey.kid}`)).length).toBe(golden.length)
+        await expectEvery(`Signature verified on this phone · key ${receiptKey.kid}`, golden.length)
         expect(keys).toHaveBeenCalledTimes(2)
     })
 
@@ -154,7 +166,7 @@ describe("HistoryScreen", () => {
             .mockImplementationOnce(() => page(golden))
             .mockRejectedValue(new ApiError({kind: "network"}))
         const client = await show(list)
-        expect((await screen.findAllByText(`Signature verified on this phone · key ${receiptKey.kid}`)).length).toBe(golden.length)
+        await expectEvery(`Signature verified on this phone · key ${receiptKey.kid}`, golden.length)
         await act(async () => {
             await client.invalidateQueries()
         })
