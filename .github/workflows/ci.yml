@@ -26,12 +26,12 @@ jobs:
     # Three production bundle exports (store check) come on top of the tests.
     timeout-minutes: 35
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Read the pinned ostrom-core commit
         id: core
         run: echo "sha=$(tr -d '[:space:]' < contract/CORE_SHA)" >> "$GITHUB_OUTPUT"
       - name: Check out ostrom-core at that commit
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: ostrom-hq/ostrom-core
           ref: ${{ steps.core.outputs.sha }}
@@ -42,7 +42,7 @@ jobs:
           persist-credentials: false
       - name: The contract copy is ostrom-core's, byte for byte
         run: cmp contract/openapi.yaml .core/api/openapi.yaml
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
           cache: npm
@@ -59,3 +59,5 @@ jobs:
         run: npx expo config --type public > /dev/null
       - name: No store bundle carries the in-memory server
         run: scripts/check-store-bundle.sh
+      - name: Release configuration (pinned actions, Android permissions and clear text, iOS ATS)
+        run: scripts/check-release-config.sh
