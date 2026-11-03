@@ -154,7 +154,7 @@ export function useRequestViewModel(id: string): RequestViewModel {
                         setDeclining(false)
                     } catch (error) {
                         // The answer's own invalidation reads the request again (`useAnswer`).
-                        setProblem(decisionProblem(error, askedByMe))
+                        setProblem(decisionProblem(error))
                     }
                 } else if (outcome !== "cancelled") {
                     setProblem(biometricProblem(outcome))
@@ -162,7 +162,7 @@ export function useRequestViewModel(id: string): RequestViewModel {
                 setSending(undefined)
             })()
         },
-        [approval, open, mayApprove, pinned, changed, unlock, account, t, mutateAsync, askedByMe, sessionStore],
+        [approval, open, mayApprove, pinned, changed, unlock, account, t, mutateAsync, sessionStore],
     )
 
     const state: RequestScreenState =
