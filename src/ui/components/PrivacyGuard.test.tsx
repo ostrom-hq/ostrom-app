@@ -1,17 +1,18 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import {act, render, screen} from "@testing-library/react-native"
 import {AppState, type AppStateStatus, Text} from "react-native"
+import {type FakeAppState, fakeAppState} from "@/test/appState"
 import {PrivacyGuard} from "./PrivacyGuard"
 
 describe("PrivacyGuard", () => {
     let listener: (status: AppStateStatus) => void
     let remove: jest.Mock
     let subscribe: jest.SpiedFunction<typeof AppState.addEventListener>
-    let current: jest.ReplaceProperty<typeof AppState.currentState>
+    let current: FakeAppState
 
     /** The app moves to a state, as React Native says it: the state, then the event. */
     const move = (status: AppStateStatus): void => {
-        current.replaceValue(status)
+        current.set(status)
         listener(status)
     }
 
@@ -22,7 +23,7 @@ describe("PrivacyGuard", () => {
             listener = handler
             return {remove}
         })
-        current = jest.replaceProperty(AppState, "currentState", "active")
+        current = fakeAppState("active")
     })
 
     afterEach(() => {
@@ -62,7 +63,7 @@ describe("PrivacyGuard", () => {
     )
 
     it("covers from the start when the app opens behind another", async () => {
-        current.replaceValue("background")
+        current.set("background")
         await render(guarded)
         expect(screen.getByTestId("privacy-cover")).toBeOnTheScreen()
     })
@@ -71,7 +72,7 @@ describe("PrivacyGuard", () => {
         // The state moves between the first render and the subscription: the subscription reads it again.
         subscribe.mockImplementation((_type, handler: (status: AppStateStatus) => void) => {
             listener = handler
-            current.replaceValue("background")
+            current.set("background")
             return {remove}
         })
         await render(guarded)
@@ -79,7 +80,7 @@ describe("PrivacyGuard", () => {
     })
 
     it("leaves the screens visible in a state that says nothing of the front", async () => {
-        current.replaceValue("unknown")
+        current.set("unknown")
         await render(guarded)
         expect(screen.queryByTestId("privacy-cover")).toBeNull()
     })

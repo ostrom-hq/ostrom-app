@@ -6,6 +6,7 @@ import type {ApprovalQueue} from "@/api/contract/approvals"
 import {ApiError} from "@/api/http/ApiError"
 import type {PhoneUnlock} from "@/services/unlock/PhoneUnlock"
 import {SESSION_KEY} from "@/stores/session"
+import {fakeAppState} from "@/test/appState"
 import {approvals, fakeRepositories, fakeServices, MemoryStorage, testSession, viewOf} from "@/test/fakeServices"
 import {testQueryClient} from "@/test/renderWithServices"
 import {TabsLayout} from "@/ui/navigation/TabsLayout"
@@ -116,19 +117,19 @@ describe("AppRoot", () => {
             listeners.push(handler)
             return {remove: jest.fn()}
         })
-        const current = jest.replaceProperty(AppState, "currentState", "active")
+        const current = fakeAppState("active")
         try {
             await launch(keptSession())
             expect(await screen.findByText("Nothing waits for your yes right now.")).toBeOnTheScreen()
             expect(screen.queryByTestId("privacy-cover")).toBeNull()
             await act(() => {
-                current.replaceValue("inactive")
+                current.set("inactive")
                 for (const listener of listeners) listener("inactive")
             })
             expect(screen.getByTestId("privacy-cover")).toBeOnTheScreen()
             expect(screen.queryByText("Nothing waits for your yes right now.")).toBeNull()
             await act(() => {
-                current.replaceValue("active")
+                current.set("active")
                 for (const listener of listeners) listener("active")
             })
             expect(screen.queryByTestId("privacy-cover")).toBeNull()
