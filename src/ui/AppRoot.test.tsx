@@ -5,6 +5,7 @@ import type {ApprovalQueue} from "@/api/contract/approvals"
 import {ApiError} from "@/api/http/ApiError"
 import type {PhoneUnlock} from "@/services/unlock/PhoneUnlock"
 import {SESSION_KEY} from "@/stores/session"
+import {fakeAppState} from "@/test/appState"
 import {approvals, fakeRepositories, fakeServices, MemoryStorage, testSession, viewOf} from "@/test/fakeServices"
 import {testQueryClient} from "@/test/renderWithServices"
 import {TabsLayout} from "@/ui/navigation/TabsLayout"
@@ -107,6 +108,26 @@ describe("AppRoot", () => {
         })
         expect(await screen.findByText("Merge PR #6 into main")).toBeOnTheScreen()
         expect(client.getQueryData(["account", "organizations"])).toEqual([{id: "org_globex", name: "globex"}])
+    })
+
+    it("covers the request in the app switcher's picture: nothing of it shows while the app is not in front", async () => {
+        const appState = fakeAppState("active")
+        try {
+            await launch(keptSession())
+            expect(await screen.findByText("Nothing waits for your yes right now.")).toBeOnTheScreen()
+            expect(screen.queryByTestId("privacy-cover")).toBeNull()
+            await act(() => {
+                appState.move("inactive")
+            })
+            expect(screen.getByTestId("privacy-cover")).toBeOnTheScreen()
+            expect(screen.queryByText("Nothing waits for your yes right now.")).toBeNull()
+            await act(() => {
+                appState.move("active")
+            })
+            expect(screen.queryByTestId("privacy-cover")).toBeNull()
+        } finally {
+            appState.restore()
+        }
     })
 
     it("keeps the unlock key at a launch that opens signed out: the session it belongs to may still be kept", async () => {
