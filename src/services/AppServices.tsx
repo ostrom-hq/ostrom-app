@@ -45,6 +45,13 @@ export interface AppServices {
      * (`scripts/perf-measure.sh`); no other build sets it.
      */
     readonly onFirstUsefulScreen?: () => void
+    /**
+     * Called when a tab is pressed, with its route's name (`index`, `history`, `activity`…). The E2E build logs it: the
+     * performance pass times a list from this press to its layout, on the phone's clock; no other build sets it.
+     */
+    readonly onTabPress?: (tab: string) => void
+    /** Called when a long list (inbox, activity, history) is laid out with its rows; logged by the E2E build, as above. */
+    readonly onListShown?: (list: "inbox" | "activity" | "history") => void
 }
 
 const ServicesContext = createContext<AppServices | undefined>(undefined)

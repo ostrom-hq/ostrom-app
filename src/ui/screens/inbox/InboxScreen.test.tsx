@@ -5,7 +5,7 @@ import {renderRouter} from "expo-router/testing-library"
 import type {ReactNode} from "react"
 import type {Approval, ApprovalQueue} from "@/api/contract/approvals"
 import {ApiError} from "@/api/http/ApiError"
-import {ServicesProvider} from "@/services/AppServices"
+import {type AppServices, ServicesProvider} from "@/services/AppServices"
 import {approvals, fakeRepositories, fakeServices, signedInServices, viewOf} from "@/test/fakeServices"
 import {testQueryClient} from "@/test/renderWithServices"
 import {InboxScreen} from "./InboxScreen"
@@ -21,10 +21,11 @@ async function launch(
     signedIn = true,
     client = testQueryClient(),
     onFirstUsefulScreen?: () => void,
+    onListShown?: AppServices["onListShown"],
 ): Promise<ReturnType<typeof renderRouter>> {
     const repositories = fakeRepositories({approvals: {queue, view: jest.fn(), answer: jest.fn()}})
     const signed = signedIn ? await signedInServices({repositories}) : fakeServices({repositories})
-    const services = onFirstUsefulScreen === undefined ? signed : {...signed, onFirstUsefulScreen}
+    const services = {...signed, ...(onFirstUsefulScreen === undefined ? {} : {onFirstUsefulScreen}), ...(onListShown === undefined ? {} : {onListShown})}
     const wrapper = ({children}: {children: ReactNode}): React.JSX.Element => (
         <ServicesProvider services={services}>
             <QueryClientProvider client={client}>{children}</QueryClientProvider>
@@ -52,10 +53,12 @@ describe("InboxScreen", () => {
 
     it("tells the services when the list, the first useful screen, is laid out", async () => {
         const onFirstUsefulScreen = jest.fn()
-        await launch(() => Promise.resolve(queueOf([approvals.pending])), true, testQueryClient(), onFirstUsefulScreen)
+        const onListShown = jest.fn()
+        await launch(() => Promise.resolve(queueOf([approvals.pending])), true, testQueryClient(), onFirstUsefulScreen, onListShown)
         const list = await screen.findByTestId("inbox-list")
         await fireEvent(list, "layout", {nativeEvent: {layout: {x: 0, y: 0, width: 400, height: 800}}})
         expect(onFirstUsefulScreen).toHaveBeenCalled()
+        expect(onListShown).toHaveBeenCalledWith("inbox")
     })
 
     it("calls nothing mine once the session is gone", async () => {

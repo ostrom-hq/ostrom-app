@@ -11,6 +11,7 @@ import {
 } from "@/api/contract/receipts"
 import {ApiError} from "@/api/http/ApiError"
 import {receiptKey, receipts} from "@/api/mocks/fixtures"
+import type {AppServices} from "@/services/AppServices"
 import {fakeRepositories, signedInServices} from "@/test/fakeServices"
 import {renderWithServices} from "@/test/renderWithServices"
 import {lightTheme} from "@/ui/theme/theme"
@@ -27,11 +28,12 @@ function page(items: readonly ReceiptListItem[]): Promise<ReceiptPage> {
 async function show(
     list: jest.Mock<Promise<ReceiptPage>, []>,
     keys: jest.Mock<Promise<readonly ReceiptPublicKey[]>, []> = jest.fn(() => Promise.resolve(served)),
+    extra: Partial<AppServices> = {},
 ): Promise<QueryClient> {
     const services = await signedInServices({
         repositories: fakeRepositories({receipts: {list, get: jest.fn(), keys}}),
     })
-    return renderWithServices(<HistoryScreen />, services)
+    return renderWithServices(<HistoryScreen />, {...services, ...extra})
 }
 
 function view(overrides: Partial<ReceiptView>): ReceiptView {
@@ -216,5 +218,12 @@ describe("toReceiptRow", () => {
     it("lists no check for a receipt without nodes", () => {
         const row = toReceiptRow({readable: true, raw: {}, view: view({nodes: undefined})}, 0, {kind: "no-key"})
         expect(row).toMatchObject({readable: true, checkRuns: []})
+    })
+
+    it("tells the services when its list is laid out, for the performance pass", async () => {
+        const onListShown = jest.fn()
+        await show(jest.fn(() => page(golden)), undefined, {onListShown})
+        await fireEvent(await screen.findByTestId("history-list"), "layout", {nativeEvent: {layout: {x: 0, y: 0, width: 400, height: 800}}})
+        expect(onListShown).toHaveBeenCalledWith("history")
     })
 })

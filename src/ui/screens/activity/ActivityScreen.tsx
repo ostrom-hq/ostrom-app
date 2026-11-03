@@ -72,6 +72,7 @@ export function ActivityScreen(): React.JSX.Element {
         case "ready":
             body = (
                 <FlatList
+                    testID="activity-list"
                     data={state.items}
                     keyExtractor={(item) => item.id}
                     contentContainerStyle={styles.list}

@@ -7,7 +7,7 @@ import {type ActivityPage, ActivityPageSchema} from "@/api/contract/activity"
 import {ApiError} from "@/api/http/ApiError"
 import type {ActivityRepository} from "@/repositories/ActivityRepository"
 import {activity, olderActivity} from "@/api/mocks/fixtures"
-import {ServicesProvider} from "@/services/AppServices"
+import {type AppServices, ServicesProvider} from "@/services/AppServices"
 import {fakeRepositories, signedInServices} from "@/test/fakeServices"
 import {testQueryClient} from "@/test/renderWithServices"
 import {ActivityScreen} from "./ActivityScreen"
@@ -15,8 +15,8 @@ import {ActivityScreen} from "./ActivityScreen"
 const first = ActivityPageSchema.parse(activity)
 const older = ActivityPageSchema.parse(olderActivity)
 
-async function launch(page: ActivityRepository["page"]): Promise<ReturnType<typeof renderRouter>> {
-    const services = await signedInServices({repositories: fakeRepositories({activity: {page}})})
+async function launch(page: ActivityRepository["page"], extra: Partial<AppServices> = {}): Promise<ReturnType<typeof renderRouter>> {
+    const services = {...(await signedInServices({repositories: fakeRepositories({activity: {page}})})), ...extra}
     const client = testQueryClient()
     const wrapper = ({children}: {children: ReactNode}): React.JSX.Element => (
         <ServicesProvider services={services}>
@@ -60,5 +60,12 @@ describe("ActivityScreen", () => {
         await launch(page)
         await fireEvent.press(await screen.findByRole("button", {name: "Try again"}))
         expect(await screen.findByText("No activity yet.")).toBeOnTheScreen()
+    })
+
+    it("tells the services when its list is laid out, for the performance pass", async () => {
+        const onListShown = jest.fn()
+        await launch(jest.fn(() => Promise.resolve(first)), {onListShown})
+        await fireEvent(await screen.findByTestId("activity-list"), "layout", {nativeEvent: {layout: {x: 0, y: 0, width: 400, height: 800}}})
+        expect(onListShown).toHaveBeenCalledWith("activity")
     })
 })
