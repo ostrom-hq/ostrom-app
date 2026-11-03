@@ -269,4 +269,11 @@ describe("servicesForBuild", () => {
         expect(servicesForBuild().signIn).toBeInstanceOf(GithubSignInImpl)
         expect(await e2eServicesForBuild().signIn.signIn("https://ostrom.e2e")).toMatchObject({kind: "signed-in"})
     })
+
+    it("writes the E2E build's performance lines to the console, where logcat reads them", () => {
+        const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined)
+        e2eServicesForBuild().onFirstUsefulScreen?.()
+        expect(warn).toHaveBeenCalledWith("ostrom.perf first-useful-screen")
+        warn.mockRestore()
+    })
 })
