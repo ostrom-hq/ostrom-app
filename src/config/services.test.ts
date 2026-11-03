@@ -5,12 +5,14 @@ import * as Linking from "expo-linking"
 import * as WebBrowser from "expo-web-browser"
 import {ApprovalsRepositoryImpl} from "@/repositories/ApprovalsRepositoryImpl"
 import {GithubSignInImpl} from "@/services/signIn/GithubSignInImpl"
+import {SecureStorageImpl} from "@/services/storage/SecureStorageImpl"
+import {SESSION_KEY} from "@/stores/session"
 import {servicesForBuild} from "./buildServices"
 import {servicesForBuild as e2eServicesForBuild} from "./buildServicesE2e"
 import {servicesForBuild as realServicesForBuild} from "./buildServicesReal"
 import {createMockAppServices} from "./mockServices"
 import {createRealServerAppServices, realServer} from "./realServices"
-import {createAppServices, easProjectId, repositoriesFor} from "./services"
+import {createAppServices, easProjectId, keepsServer, repositoriesFor} from "./services"
 
 // 16 zero bytes in base64url: the state the sign-in draws with the mocked random source.
 const ZERO_STATE = "AAAAAAAAAAAAAAAAAAAAAA"
@@ -66,6 +68,67 @@ describe("createAppServices", () => {
         const [url, init] = fetch.mock.calls[0] ?? []
         expect(url).toBe("https://ostrom.test/api/v1/auth/me")
         expect(init?.headers).toMatchObject({authorization: "Bearer ost_1", "ostrom-org": "org_acme"})
+    })
+})
+
+describe("keepsServer", () => {
+    it("keeps an HTTPS server in any build, and HTTP on this computer only in a development build", () => {
+        expect(keepsServer("https://ostrom.acme.dev", false)).toBe(true)
+        expect(keepsServer("http://10.0.2.2:4961", false)).toBe(false)
+        expect(keepsServer("http://localhost:4961", false)).toBe(false)
+        expect(keepsServer("http://10.0.2.2:4961", true)).toBe(true)
+        expect(keepsServer("http://ostrom.acme.dev", true)).toBe(false)
+    })
+})
+
+describe("the session kept at launch", () => {
+    const spies: {mockRestore: () => void}[] = []
+
+    /** A session kept in the keychain by an earlier build, on the given server; its removal is spied on. */
+    function keptOn(serverUrl: string): jest.SpiedFunction<SecureStorageImpl["remove"]> {
+        for (const spy of spies.splice(0)) spy.mockRestore()
+        const stored = JSON.stringify({serverUrl, token: "ost_1", user: {login: "rev-b"}})
+        spies.push(jest.spyOn(SecureStorageImpl.prototype, "get").mockImplementation((key) => Promise.resolve(key === SESSION_KEY ? stored : undefined)))
+        const remove = jest.spyOn(SecureStorageImpl.prototype, "remove").mockResolvedValue()
+        spies.push(remove)
+        return remove
+    }
+
+    beforeEach(() => {
+        // A store build.
+        Reflect.set(globalThis, "__DEV__", false)
+    })
+
+    afterEach(() => {
+        Reflect.set(globalThis, "__DEV__", true)
+        for (const spy of spies.splice(0)) spy.mockRestore()
+    })
+
+    it("is dropped by a store build when its server is not HTTPS: an older development build kept it", async () => {
+        const remove = keptOn("http://10.0.2.2:4961")
+        const services = createAppServices()
+        await services.sessionStore.getState().hydrate()
+        expect(services.sessionStore.getState().state).toEqual({status: "signed-out"})
+        expect(remove).toHaveBeenCalledWith(SESSION_KEY)
+    })
+
+    it("is kept by a store build on an HTTPS server", async () => {
+        keptOn("https://ostrom.acme.dev")
+        const services = createAppServices()
+        await services.sessionStore.getState().hydrate()
+        expect(services.sessionStore.getState().state).toMatchObject({status: "signed-in"})
+    })
+
+    it("is kept by the real-server E2E build on its own server only", async () => {
+        const server = realServer({serverUrl: "http://10.0.2.2:4600", token: "osm_ci", login: "e2e", unlockKey: "key_ci"})
+        keptOn("http://10.0.2.2:4600")
+        const own = createRealServerAppServices(server)
+        await own.sessionStore.getState().hydrate()
+        expect(own.sessionStore.getState().state).toMatchObject({status: "signed-in"})
+        keptOn("http://10.0.2.2:4961")
+        const other = createRealServerAppServices(server)
+        await other.sessionStore.getState().hydrate()
+        expect(other.sessionStore.getState().state).toEqual({status: "signed-out"})
     })
 })
 
