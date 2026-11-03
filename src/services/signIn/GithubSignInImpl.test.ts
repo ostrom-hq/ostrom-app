@@ -162,6 +162,67 @@ describe("GithubSignInImpl", () => {
         await expect(signIn.signIn(SERVER)).resolves.toEqual({kind: "failed", reason: "state-mismatch"})
     })
 
+    it("connects nothing when the browser comes back to another address than the app's", async () => {
+        const exchangeCode = jest.fn()
+        const signIn = new GithubSignInImpl({
+            openAuthSession: browser((start) => ({
+                type: "success",
+                url: `ostrom://request/r_1?code=c&state=${start.searchParams.get("state") ?? ""}`,
+            })),
+            randomBytes: bytes,
+            accountOf: () => account(exchangeCode),
+        })
+        await expect(signIn.signIn(SERVER)).resolves.toEqual({kind: "failed", reason: "state-mismatch"})
+        const unreadable = new GithubSignInImpl({
+            openAuthSession: browser(() => ({type: "success", url: "not a url"})),
+            randomBytes: bytes,
+            accountOf: () => account(exchangeCode),
+        })
+        await expect(unreadable.signIn(SERVER)).resolves.toEqual({kind: "failed", reason: "state-mismatch"})
+        expect(exchangeCode).not.toHaveBeenCalled()
+    })
+
+    it("lets only the last sign-in asked connect, once: an earlier one's return is spent", async () => {
+        // Each sign-in draws its own state.
+        let drawn = 0
+        const randomBytes = (length: number): Uint8Array => new Uint8Array(length).fill((drawn += 1))
+        const returns: ((result: AuthSessionResult) => void)[] = []
+        const starts: URL[] = []
+        const openAuthSession = jest.fn(
+            (url: string, _redirectUri: string) =>
+                new Promise<AuthSessionResult>((resolve) => {
+                    starts.push(new URL(url))
+                    returns.push(resolve)
+                }),
+        )
+        const exchangeCode = jest.fn((_request: TokenExchangeRequest) => Promise.resolve({token: "ost_1", user: {login: "rev-b"}}))
+        const signIn = new GithubSignInImpl({openAuthSession, randomBytes, accountOf: () => account(exchangeCode)})
+        const stateOf = (index: number): string => starts[index]?.searchParams.get("state") ?? ""
+
+        const first = signIn.signIn(SERVER)
+        const second = signIn.signIn(SERVER)
+        await Promise.resolve()
+        expect(stateOf(0)).not.toBe(stateOf(1))
+
+        // The first browser comes back with its own, valid, state: the app asked for another sign-in since.
+        returns[0]?.(callback({code: "first", state: stateOf(0)}))
+        await expect(first).resolves.toEqual({kind: "failed", reason: "state-mismatch"})
+        returns[1]?.(callback({code: "second", state: stateOf(1)}))
+        await expect(second).resolves.toMatchObject({kind: "signed-in"})
+        expect(exchangeCode.mock.calls.map(([request]) => request.code)).toEqual(["second"])
+
+        // A sign-in whose browser is closed spends its state too: a return arriving after it connects nothing.
+        const third = signIn.signIn(SERVER)
+        await Promise.resolve()
+        returns[2]?.({type: "dismiss"})
+        await expect(third).resolves.toEqual({kind: "cancelled"})
+        const fourth = signIn.signIn(SERVER)
+        await Promise.resolve()
+        returns[3]?.(callback({code: "stale", state: stateOf(2)}))
+        await expect(fourth).resolves.toEqual({kind: "failed", reason: "state-mismatch"})
+        expect(exchangeCode).toHaveBeenCalledTimes(1)
+    })
+
     it("reports a denial, with or without its state", async () => {
         const denied = new GithubSignInImpl({
             openAuthSession: browser((start) => callback({error: "access_denied", state: start.searchParams.get("state") ?? ""})),

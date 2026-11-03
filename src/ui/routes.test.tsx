@@ -11,6 +11,7 @@ import Index from "@/app/(tabs)/index"
 import Settings from "@/app/(tabs)/settings"
 import Spending from "@/app/(tabs)/spending"
 import Login from "@/app/login"
+import {redirectSystemPath} from "@/app/+native-intent"
 
 jest.mock("expo-notifications", () => ({setNotificationHandler: jest.fn()}))
 jest.mock("expo-secure-store", () => ({
@@ -37,6 +38,10 @@ describe("RootLayout", () => {
             {initialUrl: "/"},
         )
         expect(await screen.findByRole("button", {name: "Continue with GitHub"})).toBeOnTheScreen()
+    })
+
+    it("hands the system's links to the rule that keeps the sign-in return off the screens", () => {
+        expect(redirectSystemPath({path: "ostrom://auth/callback?code=c&state=s", initial: false})).toBeNull()
     })
 
     it("puts a deep-linked request on top of the tabs", () => {
