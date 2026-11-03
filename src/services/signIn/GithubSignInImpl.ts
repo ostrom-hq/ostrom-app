@@ -25,12 +25,35 @@ function isSuccess(result: AuthSessionResult): result is {readonly type: "succes
     return result.type === "success" && "url" in result
 }
 
+/** The query of a return to {@link REDIRECT_URI}; undefined for any other address, or one that cannot be read. */
+function queryOfReturn(url: string): Record<string, string> | undefined {
+    let returned: URL
+    try {
+        returned = new URL(url)
+    } catch {
+        return undefined
+    }
+    if (url.split(/[?#]/, 1)[0] !== REDIRECT_URI) return undefined
+    const query: Record<string, string> = {}
+    returned.searchParams.forEach((value, key) => {
+        query[key] = value
+    })
+    return query
+}
+
 export class GithubSignInImpl implements GithubSignIn {
+    /**
+     * The state of the last sign-in asked, until its browser comes back. Only that sign-in can connect, and only once: an
+     * earlier one's return, even with its own state, connects nothing (AUDIT-SECU-APP-2 A4).
+     */
+    private awaited: string | undefined
+
     constructor(private readonly dependencies: GithubSignInDependencies) {}
 
     async signIn(serverUrl: string): Promise<SignInOutcome> {
         const pkce = createPkce(this.dependencies.randomBytes)
         const state = base64Url(this.dependencies.randomBytes(16))
+        this.awaited = state
         const start = new URL("/api/v1/auth/github/start", serverUrl)
         start.searchParams.set("redirect_uri", REDIRECT_URI)
         start.searchParams.set("state", state)
@@ -38,11 +61,12 @@ export class GithubSignInImpl implements GithubSignIn {
         start.searchParams.set("code_challenge_method", "S256")
 
         const result = await this.dependencies.openAuthSession(start.toString(), REDIRECT_URI)
+        // Spent by its first return, whatever it is; a later sign-in has already replaced it.
+        const asked = this.awaited === state
+        if (asked) this.awaited = undefined
         if (!isSuccess(result)) return {kind: "cancelled"}
-        const query: Record<string, string> = {}
-        new URL(result.url).searchParams.forEach((value, key) => {
-            query[key] = value
-        })
+        const query = queryOfReturn(result.url)
+        if (query === undefined || !asked) return {kind: "failed", reason: "state-mismatch"}
         const callback = CallbackSchema.safeParse(query)
         if (!callback.success) return {kind: "failed", reason: "denied"}
         // A refusal carries nothing to exchange: it is reported as such, with or without its state.
