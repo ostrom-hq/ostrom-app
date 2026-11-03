@@ -53,6 +53,8 @@ jobs:
         run: npm run typecheck
       - name: Lint
         run: npm run lint
+      - name: The emulator outage classifier (a run again only on an outage, never on an assertion or a crash)
+        run: scripts/emulator-outage.test.sh
       - name: Test, 100 % coverage
         run: npm run test:ci
       - name: Expo config is valid

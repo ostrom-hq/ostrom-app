@@ -24,27 +24,51 @@ RUNS="${PERF_RUNS:-5}"
 out="${PERF_OUT:-perf}"
 mkdir -p "$out"
 
-# What Maestro prints when the emulator, not the app, is the problem (the same list as scripts/run-maestro.sh).
-OUTAGE='device offline|DeviceServerDiedException|device not found|no devices/emulators found|Maestro driver did not start up in time|Failed to connect to /127\.0\.0\.1:7001|UNAVAILABLE: io exception'
+# Reruns of a flow after an outage of the emulator, at most (scripts/emulator-outage.sh says which failure is one).
+MAX_RERUNS=2
 
-# Runs one flow; a second time only when its first failure is such an outage, never when the flow's assertion failed.
+booted() {
+    [ "$(adb shell getprop sys.boot_completed 2> /dev/null | tr -d '\r')" = "1" ]
+}
+
+# The device answers adb and has finished booting, 180 s at most for each.
+ready() {
+    local deadline
+    timeout 180 adb wait-for-device || return 1
+    deadline=$((SECONDS + 180))
+    until booted; do
+        if [ "$SECONDS" -ge "$deadline" ]; then return 1; fi
+        sleep 2
+    done
+}
+
+# A line of the log, and of the job's summary when there is one.
+note() {
+    echo "::warning::$1"
+    if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then echo "- $1" >> "$GITHUB_STEP_SUMMARY"; fi
+}
+
+# Runs one flow (then Maestro's own arguments, such as `-e NAME=value`). Run again, twice at most, only when its failure
+# is an outage of the emulator, once the device answers and has booted; never when an assertion failed or the app
+# crashed.
 flow() {
-    local name attempt
+    local name attempt why logs
     name="$(basename "$1" .yaml)"
-    for attempt in 1 2; do
-        if maestro test --test-output-dir "$out/maestro/$name-$attempt" "$1" > "$out/$name.console" 2>&1; then
+    for attempt in $(seq 1 $((MAX_RERUNS + 1))); do
+        if maestro test --test-output-dir "$out/maestro/$name-$attempt" "${@:2}" "$1" > "$out/$name.console" 2>&1; then
             return 0
         fi
+        booted || echo "emulator boot not completed: sys.boot_completed is not 1 after the failure" >> "$out/$name.console"
         # Maestro writes the outage in its own log of the flow, the console only says "Failed" (run 41657636900).
-        if [ "$attempt" = 1 ] && grep -rqE "$OUTAGE" "$out/$name.console" "$out/maestro/$name-$attempt"; then
-            adb reconnect > /dev/null 2>&1 || true
-            adb wait-for-device
-            continue
-        fi
-        break
+        mapfile -t logs < <(find "$out/maestro/$name-$attempt" -name maestro.log 2> /dev/null)
+        why="$(scripts/emulator-outage.sh "$out/$name.console" "${logs[@]}")"
+        [ "${why%% *}" = retry ] && [ "$attempt" -le "$MAX_RERUNS" ] || break
+        note "$name: run again ($attempt of $MAX_RERUNS) after an outage of the emulator: \`${why#retry }\`"
+        adb reconnect > /dev/null 2>&1 || true
+        ready || break
     done
     cat "$out/$name.console"
-    echo "::error::$name failed"
+    echo "::error::$name failed: ${why#* }"
     exit 1
 }
 
@@ -96,7 +120,7 @@ for run in $(seq 1 "$RUNS"); do
     fi
     echo "::warning::the emulator went away during cold start $run: once more, after a reconnect"
     adb reconnect > /dev/null 2>&1 || true
-    timeout 120 adb wait-for-device
+    ready
     cold_start "$run" || { echo "::error::cold start $run failed twice"; exit 1; }
 done
 
