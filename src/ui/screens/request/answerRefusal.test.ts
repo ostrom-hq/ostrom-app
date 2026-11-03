@@ -14,14 +14,14 @@ const selfApproval = zSelfApprovalRefused.parse({
 const forbidden = zForbidden.parse({error: {type: "forbidden", message: "Not an approver of this request"}})
 
 /** What the app makes of a 403 the server answers to a yes, through the real HTTP client and repository. */
-async function problemOfAnswer(body: unknown, askedByMe: boolean): Promise<DecisionProblem> {
+async function problemOfAnswer(body: unknown): Promise<DecisionProblem> {
     const fetch = (): Promise<Response> =>
         Promise.resolve(new Response(JSON.stringify(body), {status: 403, headers: {"content-type": "application/json"}}))
     const approvals = new ApprovalsRepositoryImpl(new HttpClientImpl({baseUrl: "https://ostrom.example", token: () => "ost_t", fetch}))
     try {
         await approvals.answer("appr_0001", "approve", "sha256:shown")
     } catch (error) {
-        return decisionProblem(error, askedByMe)
+        return decisionProblem(error)
     }
     throw new Error("the 403 was taken as an answer")
 }
@@ -31,9 +31,8 @@ describe("a 403 to a yes, told apart by error.type as the contract says", () => 
         ["step_up_required", stepUp, "step-up"],
         ["self_approval_refused", selfApproval, "self-approval"],
         ["forbidden", forbidden, "forbidden"],
-    ])("%s reads the same whoever asked", async (_type, body, expected) => {
-        await expect(problemOfAnswer(body, false)).resolves.toBe(expected)
-        await expect(problemOfAnswer(body, true)).resolves.toBe(expected)
+    ])("%s reads as its type says, whoever asked", async (_type, body, expected) => {
+        await expect(problemOfAnswer(body)).resolves.toBe(expected)
     })
 
     it("the other writes' 403 is one of two bodies, and only error.type says which", () => {
