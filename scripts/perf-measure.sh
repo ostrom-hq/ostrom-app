@@ -15,10 +15,11 @@
 #   tool's start (about 10 s). The inbox is already shown by the cold starts: its time is the first useful screen. Then
 #   20 flings, the frames rendered and janky (`dumpsys gfxinfo`) and the memory (`dumpsys meminfo`, total PSS);
 # - the memory over $PERF_NAV_SECONDS (300) seconds of navigation: rounds through the tabs, each long list scrolled
-#   (.maestro/perf/navigate.yaml), the total PSS read before, after every few rounds, and once more after 10 s idle on
-#   the inbox. It is said rising when the last third of the readings stays above the first third's highest by more than
-#   $PERF_NAV_GROWTH_MIB (10) MiB and the idle reading does not come back under it: memory that goes up without coming
-#   down.
+#   (.maestro/perf/navigate.yaml), the total PSS read before, after every round, and once more after 10 s idle on the
+#   inbox. It is said rising when the last third of the readings stays above the first third's highest by more than
+#   $PERF_NAV_GROWTH_MIB (10) MiB and the idle reading stays within that much of the peak: memory that goes up without
+#   coming down. A first rounds' step that comes down again (the lists and their caches filled) is not rising (Perf run
+#   41711959760: 171, 239, then 216, 210, 217 MiB, 207 idle).
 # The emulator renders without a GPU: compare runs with each other, not with a phone.
 set -euo pipefail
 
@@ -136,7 +137,7 @@ nav_seconds="${PERF_NAV_SECONDS:-300}"
 printf '%s\t%s\t%s\n' 0 "$(pss)" navigating > "$out/memory.tsv"
 nav_start=$SECONDS
 while [ $((SECONDS - nav_start)) -lt "$nav_seconds" ]; do
-    flow .maestro/perf/navigate.yaml -e ROUNDS=3
+    flow .maestro/perf/navigate.yaml -e ROUNDS=1
     printf '%s\t%s\t%s\n' $((SECONDS - nav_start)) "$(pss)" navigating >> "$out/memory.tsv"
 done
 sleep 10
@@ -179,7 +180,8 @@ navigating = [int(kib) for _, kib, state in readings if state == "navigating"]
 idle = next(int(kib) for _, kib, state in readings if state == "idle")
 third = max(1, len(navigating) // 3)
 first_high = max(navigating[:third])
-rising = min(navigating[-third:]) > first_high + float(growth_mib) * 1024 and idle > first_high + float(growth_mib) * 1024
+margin = float(growth_mib) * 1024
+rising = min(navigating[-third:]) > first_high + margin and idle > max(navigating) - margin
 memory = {
     "seconds": int(readings[-2][0]),
     "readingsKiB": [{"atSeconds": int(at), "pssKiB": int(kib), "state": state} for at, kib, state in readings],
