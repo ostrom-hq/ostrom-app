@@ -84,6 +84,13 @@ describe("PushServiceImpl", () => {
         expect(mocked.deleteNotificationChannelAsync).toHaveBeenCalledWith("requests")
     })
 
+    it("registers even when the public channel of earlier builds cannot be removed", async () => {
+        mocked.getPermissionsAsync.mockResolvedValue(permission(true))
+        mocked.getExpoPushTokenAsync.mockResolvedValue({type: "expo", data: "t"})
+        mocked.deleteNotificationChannelAsync.mockRejectedValueOnce(new Error("no channel"))
+        await expect(new PushServiceImpl({projectId: PROJECT, platform: "android"}).register()).resolves.toEqual({kind: "granted", address: {pushToken: "t", platform: "android"}})
+    })
+
     it("takes its notifications off the screen when asked, at sign-out (AUDIT-SECU-APP-2 N3)", async () => {
         await new PushServiceImpl({projectId: PROJECT, platform: "ios"}).clearShown()
         expect(mocked.dismissAllNotificationsAsync).toHaveBeenCalled()
