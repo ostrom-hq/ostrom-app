@@ -96,5 +96,13 @@ function problemOf(status: number, body: unknown): ApiError {
     if (status === 401) return new ApiError(error.success ? {kind: "unauthorized", type: error.data.error.type} : {kind: "unauthorized"})
     if (status >= 500) return new ApiError({kind: "server", status})
     if (!error.success) return new ApiError({kind: "unexpected-status", status})
-    return new ApiError({kind: "refused", status, type: error.data.error.type, message: error.data.error.message})
+    const {type, message} = error.data.error
+    const bound = RequestBoundSchema.safeParse(body).success
+    return new ApiError(bound ? {kind: "refused", status, type, message, requestBound: true} : {kind: "refused", status, type, message})
 }
+
+/**
+ * `error.requestBound` of a `step_up_required` (core#121, planned until the server serves it): the app unlocks again
+ * for this request. Read on its own, the contract's `ErrorDetail` not having it.
+ */
+const RequestBoundSchema = z.object({error: z.object({requestBound: z.literal(true)})})

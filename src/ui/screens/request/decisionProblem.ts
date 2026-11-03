@@ -13,6 +13,8 @@ export type DecisionProblem =
     | "unlock-offline"
     /** The yes needs a sign-in less than 5 minutes old: the console, just opened on the request, takes it. */
     | "step-up"
+    /** The server did not take the phone's unlock for this yes (too old, or used): saying yes again unlocks again. */
+    | "unlock-again"
     /** The person asked for this, and someone else can approve it: the server never takes that yes. */
     | "self-approval"
     /** The person is in several organizations and this session names none (409 `org_required`). */
@@ -68,7 +70,7 @@ export function decisionProblem(error: unknown): DecisionProblem {
             if (problem.type === "shown_digest_mismatch") return "changed"
             if (problem.type === "org_required") return "org-required"
             if (problem.status === 409) return "already-decided"
-            if (problem.status === 403 && problem.type === "step_up_required") return "step-up"
+            if (problem.status === 403 && problem.type === "step_up_required") return problem.requestBound === true ? "unlock-again" : "step-up"
             if (problem.status === 403 && problem.type === "self_approval_refused") return "self-approval"
             if (problem.status === 403) return "forbidden"
             return "failed"
