@@ -30,10 +30,11 @@
 ## What this is
 
 The phone is where a person says yes. A push notification says a request is waiting; the app shows its evidence
-(commits, repository, checks, who asked), and the yes or the no is given after the phone is unlocked (Face ID or the
-device biometrics). A yes from the phone requires a recent unlock, bound to that request and used once: the server
-checks the unlock, it never sees the biometrics themselves. It also verifies signed receipts offline, on the phone, and will show the history, the agents' activity and the
-spending map. React Native with Expo and expo-router, TypeScript at its strictest.
+(commits, repository, checks, who asked), and the person answers. A yes from the phone requires a recent unlock of the
+app (Face ID or the device biometrics): the server checks that unlock, never the biometrics themselves. Today it
+accepts an unlock from the last five minutes; binding the unlock to the request it answers, for a single use, is in
+progress. The app also verifies signed receipts offline, on the phone, and will show the history, the agents'
+activity and the spending map. React Native with Expo and expo-router, TypeScript at its strictest.
 
 ## Quick start
 
@@ -71,7 +72,7 @@ Ostrom is before its first public release, and the app is not in the stores yet.
 | --- | --- |
 | Offline verification of signed receipts (Ed25519, canonical JSON) | Available |
 | Typed HTTP client, repositories, mocks of the API | Available |
-| Approval inbox, push notifications, yes or no after a recent unlock bound to the request | In progress |
+| Approval inbox, push notifications, yes after a recent unlock (bound to its request: in progress) | In progress |
 | History, agent activity, spending map | Planned |
 
 ## Development
