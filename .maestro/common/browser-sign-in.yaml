@@ -2,6 +2,11 @@
 # (scripts/e2e-auth-host.py), and its link comes back to the app on ostrom://auth/callback, as GitHub's "Authorize" does.
 appId: run.ostrom.app
 ---
+# The tap puts the cursor in the middle of the prefilled address, and eraseText only deletes what comes before it:
+# the second tap lands after the short rest, which the second erase clears.
+- tapOn:
+    id: "login-server"
+- eraseText: 200
 - tapOn:
     id: "login-server"
 - eraseText: 200
