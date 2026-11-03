@@ -3,7 +3,7 @@ import * as Crypto from "expo-crypto"
 import * as WebBrowser from "expo-web-browser"
 import * as fixtures from "@/api/mocks/fixtures"
 import {mockFetch} from "@/api/mocks/mockFetch"
-import {createMockServer, MOCK_UNLOCK_KEY} from "@/api/mocks/mockServer"
+import {createMockServer, MOCK_UNLOCK_KEY, type MockServer} from "@/api/mocks/mockServer"
 import {HttpClientImpl} from "@/api/http/HttpClientImpl"
 import {AccountRepositoryImpl} from "@/repositories/AccountRepositoryImpl"
 import type {AppServices} from "@/services/AppServices"
@@ -36,6 +36,16 @@ export function throughE2eAuthHost(url: string): string {
     return `${E2E_AUTH_HOST}${start.toString().slice(start.origin.length)}`
 }
 
+type Fetch = typeof globalThis.fetch
+
+/** How long the lists of a server of `many.example` are, for the performance pass. */
+export const MANY = 500
+
+export interface MockAppServicesOptions {
+    /** Where the E2E build writes what the performance pass reads in logcat: each call, and the first useful screen. */
+    readonly log?: (line: string) => void
+}
+
 /**
  * The services of the E2E build: no Ostrom server runs on the CI runner, so the app talks to the in-memory server of
  * `api/mocks`, through the real HTTP client, repositories and screens. Only what the emulator cannot do is replaced:
@@ -45,13 +55,26 @@ export function throughE2eAuthHost(url: string): string {
  * `browser.example`, the sign-in is the real one, down to the system browser and the `ostrom://` return, with the E2E
  * auth host for GitHub (AUDIT-SECU-APP-2 A4, proved on the emulator).
  */
-export function createMockAppServices(): AppServices {
-    const fetch = mockFetch(createMockServer())
+export function createMockAppServices({log}: MockAppServicesOptions = {}): AppServices {
+    /** The in-memory server's fetch, each call written to the log when there is one. */
+    const fetchOf = (server: MockServer): Fetch => {
+        const answer = mockFetch(server)
+        return (input, init) => {
+            const request = new Request(input, init)
+            log?.(`ostrom.e2e request ${request.method} ${new URL(request.url).pathname}`)
+            return answer(input, init)
+        }
+    }
+    const fewFetch = fetchOf(createMockServer())
+    // A server of many.example has lists of MANY rows, made the first time it is asked for.
+    let manyFetch: Fetch | undefined
+    const fetchFor = (serverUrl: string): Fetch =>
+        new URL(serverUrl).hostname.endsWith("many.example") ? (manyFetch ??= fetchOf(createMockServer({many: MANY}))) : fewFetch
     const biometrics: BiometricGate = {confirm: () => Promise.resolve("confirmed")}
     const browserSignIn = new GithubSignInImpl({
         openAuthSession: (url, redirectUri) => WebBrowser.openAuthSessionAsync(throughE2eAuthHost(url), redirectUri),
         randomBytes: (length) => Crypto.getRandomBytes(length),
-        accountOf: (serverUrl, token) => new AccountRepositoryImpl(new HttpClientImpl({baseUrl: serverUrl, token: () => token, fetch})),
+        accountOf: (serverUrl, token) => new AccountRepositoryImpl(new HttpClientImpl({baseUrl: serverUrl, token: () => token, fetch: fewFetch})),
     })
     return {
         sessionStore: createSessionStore(new SecureStorageImpl()),
@@ -74,9 +97,10 @@ export function createMockAppServices(): AppServices {
         },
         repositoriesFor: (session) =>
             repositoriesOver(
-                new HttpClientImpl({baseUrl: session.serverUrl, token: () => session.token, org: () => session.orgId, fetch}),
+                new HttpClientImpl({baseUrl: session.serverUrl, token: () => session.token, org: () => session.orgId, fetch: fetchFor(session.serverUrl)}),
             ),
         openUrl: openOutside,
         copyText: copyToClipboard,
+        ...(log === undefined ? {} : {onFirstUsefulScreen: () => log("ostrom.perf first-useful-screen")}),
     }
 }
