@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import {SpendReportSchema} from "@/api/contract/spending"
 import {spending} from "@/api/mocks/fixtures"
-import {breakdownOf, budgetOf} from "./useSpendingViewModel"
+import {breakdownOf, budgetOf, exceededOf, loginOf} from "./useSpendingViewModel"
 
 const report = SpendReportSchema.parse(spending)
 
@@ -29,5 +29,50 @@ describe("breakdownOf", () => {
     it("draws no bar when nothing was spent", () => {
         expect(breakdownOf("byRepo", [{key: "a", label: "a", usd: 0, sessions: 0}]).lines[0]?.share).toBe(0)
         expect(breakdownOf("byPerson", []).lines).toEqual([])
+    })
+})
+
+describe("exceededOf", () => {
+    const since = "2026-11-03T09:00:00.000Z"
+    const over = SpendReportSchema.parse({
+        ...spending,
+        byPerson: [
+            {key: "m-rev-b", label: "rev-b", usd: 6, sessions: 3},
+            {key: "m-dev-a", label: "dev-a", usd: 120, sessions: 9},
+        ],
+        exceeded: [
+            {scope: "member", subject: "m-rev-b", period: "day", usd: 5, hardStop: false, since},
+            {scope: "member", subject: "m-dev-a", period: "month", usd: 100, hardStop: true, since},
+            {scope: "member", subject: "m-gone", period: "month", usd: 50, hardStop: false, since},
+            {scope: "organization", period: "month", usd: 250, hardStop: true, since},
+            {scope: "org", period: "day", usd: 20, hardStop: false, since},
+        ],
+    })
+
+    it("names each budget passed: mine, another person's by their login, the organization's", () => {
+        expect(exceededOf(over, "rev-b")).toEqual([
+            {who: {kind: "me"}, period: "day", usd: 5, stops: false},
+            {who: {kind: "member", name: "dev-a"}, period: "month", usd: 100, stops: true},
+            {who: {kind: "member", name: undefined}, period: "month", usd: 50, stops: false},
+            {who: {kind: "organization"}, period: "month", usd: 250, stops: true},
+            {who: {kind: "organization"}, period: "day", usd: 20, stops: false},
+        ])
+    })
+
+    it("is mine only when the login is mine", () => {
+        expect(exceededOf(over, "dev-a")[0]).toEqual({who: {kind: "member", name: "rev-b"}, period: "day", usd: 5, stops: false})
+    })
+
+    it("has nothing passed when the server lists none, or does not say", () => {
+        expect(exceededOf({...over, exceeded: []}, "rev-b")).toEqual([])
+        expect(exceededOf(report, "rev-b")).toEqual([])
+    })
+})
+
+describe("loginOf", () => {
+    it("is the signed-in person's login, and nobody's otherwise", () => {
+        expect(loginOf({status: "signed-in", session: {serverUrl: "https://ostrom.test", token: "ost_1", user: {login: "rev-b"}}})).toBe("rev-b")
+        expect(loginOf({status: "signed-out"})).toBeUndefined()
+        expect(loginOf({status: "loading"})).toBeUndefined()
     })
 })

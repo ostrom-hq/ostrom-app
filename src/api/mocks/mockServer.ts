@@ -257,7 +257,7 @@ export function createMockServer({memberships = [fixtures.acme.id], many = 0}: M
             },
         ),
         route("GET", "/api/v1/activity", ({query}) => ok(query["before"] === undefined ? activity : fixtures.olderActivity)),
-        route("GET", "/api/v1/spending", () => ok(fixtures.spending)),
+        route("GET", "/api/v1/spending", () => ok(fixtures.spendingOverBudget)),
         route(
             "POST",
             "/api/v1/push-devices",

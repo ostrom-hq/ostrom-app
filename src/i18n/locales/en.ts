@@ -66,6 +66,30 @@ export const en = {
         byPerson: "By person",
         sessions: "Sessions: {{n}}",
         none: "Nothing spent.",
+        exceeded: {
+            title: "Over budget",
+            me: {
+                day: "You are past your daily budget of {{usd}}",
+                month: "You are past your monthly budget of {{usd}}",
+            },
+            member: {
+                day: "{{name}} is past their daily budget of {{usd}}",
+                month: "{{name}} is past their monthly budget of {{usd}}",
+            },
+            someone: {
+                day: "A member is past their daily budget of {{usd}}",
+                month: "A member is past their monthly budget of {{usd}}",
+            },
+            organization: {
+                day: "The organization is past its daily budget of {{usd}}",
+                month: "The organization is past its monthly budget of {{usd}}",
+            },
+            stops: {
+                day: "The model calls are refused until the day ends.",
+                month: "The model calls are refused until the month ends.",
+            },
+            goesOn: "The model calls go on: the overrun is only flagged.",
+        },
     },
     settings: {
         title: "Settings",
