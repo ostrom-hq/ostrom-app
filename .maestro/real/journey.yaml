@@ -115,6 +115,9 @@ appId: run.ostrom.app
     timeout: 30000
 - assertVisible: "The organization is past its monthly budget of \\$0\\.01"
 - assertVisible: "The model calls are refused until the month ends\\."
+# The admin's side: the asker (app-asker-<run>, the same run as the phone's app-owner-<run>), refused by a monthly budget
+# of their own after a call, is listed by login to the organization's owner.
+- assertVisible: "${OSTROM_E2E_LOGIN.replace('app-owner-', 'app-asker-')} is past their monthly budget of \\$0\\.01"
 - assertNotVisible: "The spending could not be loaded."
 - takeScreenshot: real-spending
 
