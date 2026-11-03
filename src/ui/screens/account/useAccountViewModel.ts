@@ -22,7 +22,8 @@ export interface AccountViewModel {
     readonly openConsole: () => void
     /** The console did not open: its address, to copy and open by hand. */
     readonly consoleLink: {readonly url: string; readonly copied: boolean} | undefined
-    readonly copyConsoleLink: () => void
+    /** Copies the address the screen shows (the one `consoleLink` holds). */
+    readonly copyConsoleLink: (url: string) => void
 }
 
 export function useAccountViewModel(): AccountViewModel {
@@ -56,9 +57,7 @@ export function useAccountViewModel(): AccountViewModel {
             )
         },
         consoleLink,
-        copyConsoleLink: () => {
-            if (consoleLink === undefined) return
-            const {url} = consoleLink
+        copyConsoleLink: (url) => {
             void copyText(url).then(
                 () => {
                     setConsoleLink({url, copied: true})

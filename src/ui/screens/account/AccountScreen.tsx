@@ -20,7 +20,13 @@ function ConsoleLink({model}: {model: AccountViewModel}): React.JSX.Element | nu
             <Text selectable style={[styles.body, {color: colors.text}]} testID="account-console-url">
                 {link.url}
             </Text>
-            <Button label={link.copied ? t("request.copied") : t("request.copyLink")} onPress={model.copyConsoleLink} testID="account-copy-console" />
+            <Button
+                label={link.copied ? t("request.copied") : t("request.copyLink")}
+                onPress={() => {
+                    model.copyConsoleLink(link.url)
+                }}
+                testID="account-copy-console"
+            />
         </>
     )
 }
