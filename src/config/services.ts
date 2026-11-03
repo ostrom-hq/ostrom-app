@@ -12,6 +12,7 @@ import {AccountRepositoryImpl} from "@/repositories/AccountRepositoryImpl"
 import {ActivityRepositoryImpl} from "@/repositories/ActivityRepositoryImpl"
 import {ApprovalsRepositoryImpl} from "@/repositories/ApprovalsRepositoryImpl"
 import {NotificationsRepositoryImpl} from "@/repositories/NotificationsRepositoryImpl"
+import {PinnedReceiptsRepository} from "@/repositories/PinnedReceiptsRepository"
 import {ReceiptsRepositoryImpl} from "@/repositories/ReceiptsRepositoryImpl"
 import {SpendingRepositoryImpl} from "@/repositories/SpendingRepositoryImpl"
 import type {AppServices, Repositories} from "@/services/AppServices"
@@ -34,7 +35,11 @@ export function easProjectId(extra: unknown): string | undefined {
 
 /** The repositories of a session: every call carries its token, and its organization when the server named one. */
 export function repositoriesFor(session: Session): Repositories {
-    return repositoriesOver(new HttpClientImpl({baseUrl: session.serverUrl, token: () => session.token, org: () => session.orgId}))
+    const repositories = repositoriesOver(
+        new HttpClientImpl({baseUrl: session.serverUrl, token: () => session.token, org: () => session.orgId}),
+    )
+    // Receipts are verified only with the keys this phone kept for the server (AUDIT-SECU-APP-2 A5).
+    return {...repositories, receipts: new PinnedReceiptsRepository(repositories.receipts, new SecureStorageImpl(), session.serverUrl)}
 }
 
 /** The repositories over one HTTP client. */

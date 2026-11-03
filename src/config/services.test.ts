@@ -4,6 +4,7 @@ import * as Crypto from "expo-crypto"
 import * as Linking from "expo-linking"
 import * as WebBrowser from "expo-web-browser"
 import {ApprovalsRepositoryImpl} from "@/repositories/ApprovalsRepositoryImpl"
+import {PinnedReceiptsRepository} from "@/repositories/PinnedReceiptsRepository"
 import {GithubSignInImpl} from "@/services/signIn/GithubSignInImpl"
 import {SecureStorageImpl} from "@/services/storage/SecureStorageImpl"
 import {SESSION_KEY} from "@/stores/session"
@@ -64,6 +65,8 @@ describe("createAppServices", () => {
         Object.defineProperty(globalThis, "fetch", {value: fetch, configurable: true, writable: true})
         const repositories = repositoriesFor({serverUrl: "https://ostrom.test", token: "ost_1", user: {login: "rev-b"}, orgId: "org_acme"})
         expect(repositories.approvals).toBeInstanceOf(ApprovalsRepositoryImpl)
+        // The receipt keys go through the keys this phone kept for the server (AUDIT-SECU-APP-2 A5).
+        expect(repositories.receipts).toBeInstanceOf(PinnedReceiptsRepository)
         await expect(repositories.account.me()).resolves.toMatchObject({dev: {login: "rev-b"}})
         const [url, init] = fetch.mock.calls[0] ?? []
         expect(url).toBe("https://ostrom.test/api/v1/auth/me")
