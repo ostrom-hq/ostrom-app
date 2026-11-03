@@ -12,7 +12,7 @@ interface Harness {
     readonly keys: MemoryUnlockKeyStore
     readonly confirm: jest.Mock<Promise<BiometricOutcome>, [string]>
     readonly account: AccountRepository
-    readonly serverUnlock: jest.Mock<Promise<Unlock>, [string, string?]>
+    readonly serverUnlock: jest.Mock<Promise<Unlock>, [key: string, requestId?: string | undefined]>
     readonly clock: {now: number}
 }
 
