@@ -67,6 +67,30 @@ export const fr: TranslationShape = {
         byPerson: "Par personne",
         sessions: "Sessions : {{n}}",
         none: "Aucune dépense.",
+        exceeded: {
+            title: "Budget dépassé",
+            me: {
+                day: "Tu as dépassé ton budget du jour de {{usd}}",
+                month: "Tu as dépassé ton budget du mois de {{usd}}",
+            },
+            member: {
+                day: "{{name}} a dépassé son budget du jour de {{usd}}",
+                month: "{{name}} a dépassé son budget du mois de {{usd}}",
+            },
+            someone: {
+                day: "Un membre a dépassé son budget du jour de {{usd}}",
+                month: "Un membre a dépassé son budget du mois de {{usd}}",
+            },
+            organization: {
+                day: "L'organisation a dépassé son budget du jour de {{usd}}",
+                month: "L'organisation a dépassé son budget du mois de {{usd}}",
+            },
+            stops: {
+                day: "Les appels au modèle sont refusés jusqu'à la fin du jour.",
+                month: "Les appels au modèle sont refusés jusqu'à la fin du mois.",
+            },
+            goesOn: "Les appels au modèle continuent : le dépassement est seulement signalé.",
+        },
     },
     settings: {
         title: "Réglages",

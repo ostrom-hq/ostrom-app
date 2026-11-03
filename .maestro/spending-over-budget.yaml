@@ -1,0 +1,14 @@
+# The phone's person (rev-b) past their own monthly budget: the Spending tab says so, and that the calls go on.
+# Maestro matches text as a regular expression: `$` and `.` are escaped.
+appId: run.ostrom.app
+---
+- runFlow: common/sign-in.yaml
+- tapOn: "Spending"
+- scrollUntilVisible:
+    element:
+      id: "spending-exceeded"
+    direction: DOWN
+- assertVisible: "Over budget"
+- assertVisible: "You are past your monthly budget of \\$30\\.00"
+- assertVisible: "The model calls go on: the overrun is only flagged."
+- takeScreenshot: spending-over-budget

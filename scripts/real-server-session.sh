@@ -9,6 +9,9 @@
 #   the E2E build is given that session.
 # - The asker signs in by e-mail (the link read from the directory the server writes its mails to), accepts the
 #   invitation, and asks the two gates with a token of their own (`gates:ask`), which the job also reads them with.
+# - PARCOURS 3.5: one model call through the gateway, which the job's fake provider (ostrom-e2e src/fake-tokens.ts)
+#   bills $1.50, then a monthly budget of $0.01 that stops the calls: the next call is refused, the guard marks the
+#   budget passed, and the Spending tab lists it.
 # Masks the secrets in the job's log, and writes `token`, `unlock_key`, `login`, `yes_approval`, `no_approval`,
 # `yes_gate`, `no_gate`, `asker_token` and `repo` to $GITHUB_OUTPUT (standard output outside Actions).
 # Usage: scripts/real-server-session.sh <server origin> <mail directory> <fake GitHub origin>
@@ -143,6 +146,36 @@ workflow="$(jq -nc --arg id "app-e2e-$run" --arg login "$login" --arg repo "$rep
       nodes: [{id: "push-main", kind: "gate", label: "Push to main", approvers: [$login],
                actions: [{class: "push-main", label: "Push to the main branch", patterns: [], repos: [$repo]}]}]}')"
 api "${json[@]}" "${owner[@]}" -X POST "$server/api/v1/workflows" -d "$workflow" > /dev/null
+
+# PARCOURS 3.5, before the requests so that they stay the newest of the Activity tab. A launch of the phone's person
+# and a shared Claude account of the organization, whose access token holds for hours (no refresh on the way).
+launch="$(jq -nc --arg repo "$repo" '{agent: "claude", repo: $repo}')"
+agent_token="$(api "${json[@]}" "${owner[@]}" -X POST "$server/api/v1/launches" -d "$launch" | jq -er '.agentToken')"
+echo "::add-mask::$agent_token"
+account="$(jq -nc --arg id "acct-app-e2e-$run" '{provider: "claude", label: "Max of the app journey", providerAccountId: $id,
+    accessToken: ("at-" + $id), refreshToken: ("rt-" + $id), expiresAt: (now + 28800 | todate)}')"
+api "${json[@]}" "${owner[@]}" -X POST "$server/api/v1/accounts" -d "$account" > /dev/null
+# A Messages call as Claude Code makes it, with its launch's token: the answer, then its status on the last line.
+infer() {
+    curl -sS -w '\n%{http_code}' -H "content-type: application/json" -H "anthropic-version: 2023-06-01" \
+        -H "x-api-key: $agent_token" -X POST "$server/api/v1/inference/v1/messages" \
+        -d '{"model":"claude-opus-5","max_tokens":1,"messages":[{"role":"user","content":"hello"}]}'
+}
+answer="$(infer)"
+[ "${answer##*$'\n'}" = 200 ] || fail "The model call → ${answer##*$'\n'} ${answer%$'\n'*}"
+# The gateway writes its ledger after it has answered: the month's spending is read until it shows, ten seconds at most.
+spent=0
+for _ in $(seq 1 20); do
+    spent="$(api "${json[@]}" "${owner[@]}" "$server/api/v1/spending?period=month" | jq -r '.totalUsd')"
+    awk -v usd="$spent" 'BEGIN { exit !(usd >= 1) }' && break
+    sleep 0.5
+done
+awk -v usd="$spent" 'BEGIN { exit !(usd >= 1) }' || fail "The month's spending is \$$spent after a call billed \$1.50"
+# The budget, now spent: the next call is refused before the provider until the month ends, and marks it passed.
+api "${json[@]}" "${owner[@]}" -X PUT "$server/api/v1/budgets" -d '{"scope":"organization","usdPerMonth":0.01,"hardStop":true}' > /dev/null
+answer="$(infer)"
+[ "${answer##*$'\n'}" = 429 ] && grep -q "Monthly budget reached" <<< "${answer%$'\n'*}" \
+    || fail "The call past the budget → ${answer##*$'\n'} ${answer%$'\n'*}, not 429 « Monthly budget reached »"
 
 # Two pushes to main, asked by the asker: one for the yes, one for the no.
 ask() {

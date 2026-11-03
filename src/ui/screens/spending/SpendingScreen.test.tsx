@@ -54,4 +54,38 @@ describe("SpendingScreen", () => {
         await fireEvent.press(await screen.findByRole("button", {name: "Try again"}))
         expect(await screen.findByText("$182.40")).toBeOnTheScreen()
     })
+
+    it("says which budgets are passed, whose, and whether the model calls stop", async () => {
+        const since = "2026-11-03T09:00:00.000Z"
+        const over: SpendReport = SpendReportSchema.parse({
+            ...spending,
+            byPerson: [
+                {key: "m-rev-b", label: "rev-b", usd: 6, sessions: 3},
+                {key: "m-dev-a", label: "dev-a", usd: 120, sessions: 9},
+            ],
+            exceeded: [
+                {scope: "member", subject: "m-rev-b", period: "day", usd: 5, hardStop: false, since},
+                {scope: "member", subject: "m-dev-a", period: "month", usd: 100, hardStop: true, since},
+                {scope: "member", subject: "m-gone", period: "day", usd: 50, hardStop: true, since},
+                {scope: "organization", period: "month", usd: 250, hardStop: false, since},
+            ],
+        })
+        await show(jest.fn(() => Promise.resolve(over)))
+        const passed = await screen.findByTestId("spending-exceeded")
+        expect(passed).toHaveTextContent(/Over budget/)
+        expect(screen.getByText("You are past your daily budget of $5.00")).toBeOnTheScreen()
+        expect(screen.getByText("dev-a is past their monthly budget of $100.00")).toBeOnTheScreen()
+        expect(screen.getByText("A member is past their daily budget of $50.00")).toBeOnTheScreen()
+        expect(screen.getByText("The organization is past its monthly budget of $250.00")).toBeOnTheScreen()
+        expect(screen.getAllByText("The model calls go on: the overrun is only flagged.")).toHaveLength(2)
+        expect(screen.getByText("The model calls are refused until the month ends.")).toBeOnTheScreen()
+        expect(screen.getByText("The model calls are refused until the day ends.")).toBeOnTheScreen()
+    })
+
+    it("says nothing about budgets passed when none is", async () => {
+        await show(jest.fn(() => Promise.resolve(month)))
+        await screen.findByText("$182.40")
+        expect(screen.queryByTestId("spending-exceeded")).toBeNull()
+        expect(screen.queryByText(/ is past /)).toBeNull()
+    })
 })
