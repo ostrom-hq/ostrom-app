@@ -154,6 +154,7 @@ export function createMockServer({memberships = [fixtures.acme.id]}: MockServerO
 
     const routes: readonly Route[] = [
         route("GET", "/api/v1/auth/me", () => ok(fixtures.me)),
+        route("GET", "/api/v1/auth/me/account", () => ok(fixtures.account)),
         // As server#64 serves it: slug and role besides what the app reads, no picture without a GitHub organization.
         route("GET", "/api/v1/me/organizations", () =>
             ok({
