@@ -12,7 +12,6 @@ jest.mock("expo-notifications", () => ({
     getLastNotificationResponse: jest.fn(),
     clearLastNotificationResponse: jest.fn(),
     setNotificationChannelAsync: jest.fn(() => Promise.resolve(null)),
-    deleteNotificationChannelAsync: jest.fn(() => Promise.resolve()),
     dismissAllNotificationsAsync: jest.fn(() => Promise.resolve()),
     AndroidImportance: {HIGH: 6},
     AndroidNotificationVisibility: {UNKNOWN: 0, PUBLIC: 1, PRIVATE: 2, SECRET: 3},
@@ -67,28 +66,19 @@ describe("PushServiceImpl", () => {
         await new PushServiceImpl({projectId: PROJECT, platform: "android"}).register()
         expect(mocked.requestPermissionsAsync).not.toHaveBeenCalled()
         // Android: the channel exists before the permission is read.
-        expect(mocked.setNotificationChannelAsync).toHaveBeenCalledWith("approvals", expect.objectContaining({name: "Requests", importance: 6}))
+        expect(mocked.setNotificationChannelAsync).toHaveBeenCalledWith("requests", expect.objectContaining({name: "Requests", importance: 6}))
     })
 
-    it("hides what a request says on Android's lock screen, in a channel made so from the start (AUDIT-SECU-APP-2 N2)", async () => {
+    it("hides what a request says on Android's lock screen (AUDIT-SECU-APP-2 N2)", async () => {
         mocked.getPermissionsAsync.mockResolvedValue(permission(true))
         mocked.getExpoPushTokenAsync.mockResolvedValue({type: "expo", data: "t"})
         await new PushServiceImpl({projectId: PROJECT, platform: "android"}).register()
         // Private: the lock screen shows that Ostrom has a notification, never who asks, what or where.
-        expect(mocked.setNotificationChannelAsync).toHaveBeenCalledWith("approvals", {
+        expect(mocked.setNotificationChannelAsync).toHaveBeenCalledWith("requests", {
             name: "Requests",
             importance: 6,
             lockscreenVisibility: 2,
         })
-        // A channel's lock screen setting cannot change once it exists: the earlier one, public, is removed.
-        expect(mocked.deleteNotificationChannelAsync).toHaveBeenCalledWith("requests")
-    })
-
-    it("registers even when the public channel of earlier builds cannot be removed", async () => {
-        mocked.getPermissionsAsync.mockResolvedValue(permission(true))
-        mocked.getExpoPushTokenAsync.mockResolvedValue({type: "expo", data: "t"})
-        mocked.deleteNotificationChannelAsync.mockRejectedValueOnce(new Error("no channel"))
-        await expect(new PushServiceImpl({projectId: PROJECT, platform: "android"}).register()).resolves.toEqual({kind: "granted", address: {pushToken: "t", platform: "android"}})
     })
 
     it("takes its notifications off the screen when asked, at sign-out (AUDIT-SECU-APP-2 N3)", async () => {

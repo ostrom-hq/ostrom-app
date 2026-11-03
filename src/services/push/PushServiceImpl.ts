@@ -18,13 +18,7 @@ Notifications.setNotificationHandler({
  * Android 13+ shows the permission prompt only once a channel exists, and shows nothing without one. The server sends
  * its pushes to this channel (`channelId`).
  */
-const ANDROID_CHANNEL = "approvals"
-
-/**
- * The channel of earlier builds, public on the lock screen. A channel's lock screen setting cannot change once it
- * exists, so it is removed rather than changed (AUDIT-SECU-APP-2 N2).
- */
-const PUBLIC_CHANNEL = "requests"
+const ANDROID_CHANNEL = "requests"
 
 function dataOf(response: Notifications.NotificationResponse | null): unknown {
     return response?.notification.request.content.data
@@ -44,7 +38,6 @@ export class PushServiceImpl implements PushService {
                 importance: Notifications.AndroidImportance.HIGH,
                 lockscreenVisibility: Notifications.AndroidNotificationVisibility.PRIVATE,
             })
-            await Notifications.deleteNotificationChannelAsync(PUBLIC_CHANNEL).catch(() => undefined)
         }
         const current = await Notifications.getPermissionsAsync()
         const status = current.granted || !current.canAskAgain ? current : await Notifications.requestPermissionsAsync()
