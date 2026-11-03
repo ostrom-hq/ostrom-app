@@ -44,7 +44,7 @@ export function AccountScreen(): React.JSX.Element {
             details = (
                 <>
                     <Text style={[styles.body, {color: colors.textMuted}]}>{t("account.error")}</Text>
-                    <Button label={t("common.retry")} onPress={model.retry} />
+                    <Button label={t("common.retry")} onPress={model.retry} busy={state.retrying} />
                 </>
             )
             break
@@ -54,10 +54,10 @@ export function AccountScreen(): React.JSX.Element {
                 <>
                     <Field label={t("account.login")} value={account.login} />
                     <Field label={t("account.name")} value={account.displayName} />
-                    {account.emails.map(({email}) => (
-                        <Field key={email} label={t("account.email")} value={email} />
+                    {account.emails.map(({email, verified}) => (
+                        <Field key={email} label={verified ? t("account.email") : t("account.emailUnverified")} value={email} />
                     ))}
-                    <Text style={[styles.label, {color: colors.textMuted}]}>{t("account.github")}</Text>
+                    <Text style={[styles.body, {color: colors.textMuted}]}>{t("account.github")}</Text>
                     <Text style={[styles.body, {color: colors.text}]} testID={githubLinked ? "account-github-linked" : "account-github-not-linked"}>
                         {githubLinked ? t("account.githubLinked") : t("account.githubNotLinked")}
                     </Text>
@@ -86,5 +86,4 @@ const styles = StyleSheet.create({
     container: {flex: 1},
     content: {padding: space[4], gap: space[4]},
     body: {fontSize: fontSize[14]},
-    label: {fontSize: fontSize[14]},
 })

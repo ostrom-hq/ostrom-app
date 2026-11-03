@@ -43,6 +43,13 @@ describe("AccountScreen", () => {
         expect(screen.getByTestId("account-github-linked")).toHaveTextContent(/Your GitHub is linked/)
     })
 
+    it("tells an e-mail not verified yet apart", async () => {
+        await open({answer: () => Promise.resolve({...linked, emails: [...linked.emails, {email: "b@globex.test", verified: false}]})})
+        expect(await screen.findByText("b@globex.test")).toBeOnTheScreen()
+        expect(screen.getByText("E-mail (not verified)")).toBeOnTheScreen()
+        expect(screen.getByText("E-mail")).toBeOnTheScreen()
+    })
+
     it("says a GitHub not linked yet is linked from the console", async () => {
         await open({answer: () => Promise.resolve({...linked, providers: ["email"]})})
         expect(await screen.findByTestId("account-github-not-linked")).toHaveTextContent(/Link it from your account in the console/)

@@ -101,6 +101,7 @@ export const en = {
         login: "Login",
         name: "Name",
         email: "E-mail",
+        emailUnverified: "E-mail (not verified)",
         github: "GitHub",
         githubLinked: "Your GitHub is linked: a gate knows which pull requests are yours.",
         githubNotLinked:

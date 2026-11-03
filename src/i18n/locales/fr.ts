@@ -102,6 +102,7 @@ export const fr: TranslationShape = {
         login: "Identifiant",
         name: "Nom",
         email: "E-mail",
+        emailUnverified: "E-mail (non vérifié)",
         github: "GitHub",
         githubLinked: "Ton GitHub est lié : une porte sait quelles pull requests sont les tiennes.",
         githubNotLinked:
