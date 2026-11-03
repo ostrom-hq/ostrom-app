@@ -1,34 +1,18 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import {act, render, screen} from "@testing-library/react-native"
-import {AppState, type AppStateStatus, Text} from "react-native"
+import {type AppStateStatus, Text} from "react-native"
 import {type FakeAppState, fakeAppState} from "@/test/appState"
 import {PrivacyGuard} from "./PrivacyGuard"
 
 describe("PrivacyGuard", () => {
-    let listener: (status: AppStateStatus) => void
-    let remove: jest.Mock
-    let subscribe: jest.SpiedFunction<typeof AppState.addEventListener>
-    let current: FakeAppState
-
-    /** The app moves to a state, as React Native says it: the state, then the event. */
-    const move = (status: AppStateStatus): void => {
-        current.set(status)
-        listener(status)
-    }
+    let appState: FakeAppState
 
     beforeEach(() => {
-        listener = () => undefined
-        remove = jest.fn()
-        subscribe = jest.spyOn(AppState, "addEventListener").mockImplementation((_type, handler: (status: AppStateStatus) => void) => {
-            listener = handler
-            return {remove}
-        })
-        current = fakeAppState("active")
+        appState = fakeAppState("active")
     })
 
     afterEach(() => {
-        subscribe.mockRestore()
-        current.restore()
+        appState.restore()
     })
 
     const guarded = (
@@ -48,14 +32,14 @@ describe("PrivacyGuard", () => {
         async (status) => {
             await render(guarded)
             await act(() => {
-                move(status)
+                appState.move(status)
             })
             expect(screen.getByTestId("privacy-cover")).toBeOnTheScreen()
             expect(screen.getByText("Ostrom")).toBeOnTheScreen()
             // Hidden from the accessibility tree: the default query no longer finds the covered text.
             expect(screen.queryByText("git push origin main")).toBeNull()
             await act(() => {
-                move("active")
+                appState.move("active")
             })
             expect(screen.queryByTestId("privacy-cover")).toBeNull()
             expect(screen.getByText("git push origin main")).toBeOnTheScreen()
@@ -63,31 +47,30 @@ describe("PrivacyGuard", () => {
     )
 
     it("covers from the start when the app opens behind another", async () => {
-        current.set("background")
+        appState.set("background")
         await render(guarded)
         expect(screen.getByTestId("privacy-cover")).toBeOnTheScreen()
     })
 
     it("reads a change made before it listens", async () => {
-        // The state moves between the first render and the subscription: the subscription reads it again.
-        subscribe.mockImplementation((_type, handler: (status: AppStateStatus) => void) => {
-            listener = handler
-            current.set("background")
-            return {remove}
+        // The state moves between the first render and the subscription: React reads it again once subscribed.
+        appState.onSubscribe(() => {
+            appState.set("background")
         })
         await render(guarded)
         expect(screen.getByTestId("privacy-cover")).toBeOnTheScreen()
     })
 
     it("leaves the screens visible in a state that says nothing of the front", async () => {
-        current.set("unknown")
+        appState.set("unknown")
         await render(guarded)
         expect(screen.queryByTestId("privacy-cover")).toBeNull()
     })
 
     it("stops listening when it leaves", async () => {
         const {unmount} = await render(guarded)
+        expect(appState.listening()).toBe(1)
         await unmount()
-        expect(remove).toHaveBeenCalledTimes(1)
+        expect(appState.listening()).toBe(0)
     })
 })

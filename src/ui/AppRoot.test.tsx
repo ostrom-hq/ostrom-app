@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import {act, fireEvent, screen} from "@testing-library/react-native"
-import {AppState, type AppStateStatus} from "react-native"
 import {renderRouter} from "expo-router/testing-library"
 import type {ApprovalQueue} from "@/api/contract/approvals"
 import {ApiError} from "@/api/http/ApiError"
@@ -112,30 +111,22 @@ describe("AppRoot", () => {
     })
 
     it("covers the request in the app switcher's picture: nothing of it shows while the app is not in front", async () => {
-        const listeners: ((status: AppStateStatus) => void)[] = []
-        const subscribe = jest.spyOn(AppState, "addEventListener").mockImplementation((_type, handler) => {
-            listeners.push(handler)
-            return {remove: jest.fn()}
-        })
-        const current = fakeAppState("active")
+        const appState = fakeAppState("active")
         try {
             await launch(keptSession())
             expect(await screen.findByText("Nothing waits for your yes right now.")).toBeOnTheScreen()
             expect(screen.queryByTestId("privacy-cover")).toBeNull()
             await act(() => {
-                current.set("inactive")
-                for (const listener of listeners) listener("inactive")
+                appState.move("inactive")
             })
             expect(screen.getByTestId("privacy-cover")).toBeOnTheScreen()
             expect(screen.queryByText("Nothing waits for your yes right now.")).toBeNull()
             await act(() => {
-                current.set("active")
-                for (const listener of listeners) listener("active")
+                appState.move("active")
             })
             expect(screen.queryByTestId("privacy-cover")).toBeNull()
         } finally {
-            subscribe.mockRestore()
-            current.restore()
+            appState.restore()
         }
     })
 
