@@ -124,11 +124,12 @@ describe("PinnedReceiptsRepository", () => {
     })
 
     it("passes the receipts through", async () => {
-        const inner = serving()
-        const repository = new PinnedReceiptsRepository(inner, new Storage(), SERVER)
+        const list = jest.fn<ReturnType<ReceiptsRepository["list"]>, []>()
+        const get = jest.fn<ReturnType<ReceiptsRepository["get"]>, [string]>()
+        const repository = new PinnedReceiptsRepository({list, get, keys: jest.fn()}, new Storage(), SERVER)
         await repository.list()
         await repository.get("r_1")
-        expect(inner.list).toHaveBeenCalledTimes(1)
-        expect(inner.get).toHaveBeenCalledWith("r_1")
+        expect(list).toHaveBeenCalledTimes(1)
+        expect(get).toHaveBeenCalledWith("r_1")
     })
 })
