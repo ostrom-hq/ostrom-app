@@ -132,6 +132,7 @@ export const fr: TranslationShape = {
         verified: "Signature vérifiée sur ce téléphone · clé {{kid}}",
         rejected: "Signature refusée : {{reason}}",
         noKey: "Non vérifié : la clé de l'instance est indisponible",
+        checking: "Vérification de la signature sur ce téléphone…",
         reasons: {
             "not-an-object": "ce n'est pas un reçu",
             "missing-signature": "pas de signature",

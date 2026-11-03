@@ -131,6 +131,7 @@ export const en = {
         verified: "Signature verified on this phone · key {{kid}}",
         rejected: "Signature rejected: {{reason}}",
         noKey: "Not verified: the instance key is unavailable",
+        checking: "Checking the signature on this phone…",
         reasons: {
             "not-an-object": "not a receipt",
             "missing-signature": "no signature",

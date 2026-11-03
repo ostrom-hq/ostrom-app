@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import {useMemo} from "react"
+import {useEffect, useMemo, useState} from "react"
 import type {CheckAttestation, ReceiptListItem, ReceiptView} from "@/api/contract/receipts"
 import type {ReceiptKey} from "@/domain/receipts/publicKey"
 import {useReceiptKeys, useReceipts} from "@/query/receipts"
-import {checkReceipt, type ReceiptCheck} from "./receiptCheck"
+import {CHECKING, createReceiptChecks, keysFingerprint, type ReceiptChecks, type ShownCheck} from "./receiptChecks"
+import {scheduleCheck} from "./scheduleCheck"
 
 /**
  * A check the receipt reports, and where it ran. A run the workstation only declared proves nothing, and neither does
@@ -41,7 +42,7 @@ export type ReceiptRowModel =
           /** Its position: the app cannot read it, so it has no id to show. */
           readonly key: string
           readonly readable: false
-          readonly check: ReceiptCheck
+          readonly check: ShownCheck
       }
     | {
           readonly key: string
@@ -54,17 +55,27 @@ export type ReceiptRowModel =
           readonly by: string
           readonly subject: string
           readonly at: string
-          readonly check: ReceiptCheck
+          readonly check: ShownCheck
           /** The check nodes of a workflow receipt, in its order. */
           readonly checkRuns: readonly ReceiptCheckRun[]
       }
+
+/** A receipt of the list, checked only when its row is shown. */
+export interface ReceiptSource {
+    /** The receipt's id, or its position when the app cannot read it. */
+    readonly key: string
+    readonly index: number
+    readonly item: ReceiptListItem
+}
 
 export type HistoryState =
     | {readonly kind: "loading"}
     | {readonly kind: "error"}
     | {
           readonly kind: "ready"
-          readonly rows: readonly ReceiptRowModel[]
+          readonly rows: readonly ReceiptSource[]
+          /** The checks with the instance keys of now, kept by receipt until the keys change. */
+          readonly checks: ReceiptChecks
           /** The last refresh failed: these are the receipts read before. */
           readonly stale: boolean
       }
@@ -75,7 +86,7 @@ export interface HistoryViewModel {
     readonly refresh: () => void
 }
 
-export function toReceiptRow(item: ReceiptListItem, index: number, check: ReceiptCheck): ReceiptRowModel {
+export function toReceiptRow(item: ReceiptListItem, index: number, check: ShownCheck): ReceiptRowModel {
     if (!item.readable) {
         return {key: `unreadable-${String(index)}`, readable: false, check}
     }
@@ -96,7 +107,11 @@ export function toReceiptRow(item: ReceiptListItem, index: number, check: Receip
 
 const NO_KEYS: ReadonlyMap<string, ReceiptKey> = new Map()
 
-/** The signed receipts, each one checked on this phone against the instance keys. */
+function sourceOf(item: ReceiptListItem, index: number): ReceiptSource {
+    return {key: item.readable ? item.view.id : `unreadable-${String(index)}`, index, item}
+}
+
+/** The signed receipts; each one is checked on this phone against the instance keys when its row is shown. */
 export function useHistoryViewModel(): HistoryViewModel {
     const receipts = useReceipts()
     const key = useReceiptKeys()
@@ -104,14 +119,14 @@ export function useHistoryViewModel(): HistoryViewModel {
     // The key settles once; until then rows wait, so that no receipt shows as unverified for a moment.
     const keySettled = key.isSuccess || key.isError
     const keys = key.data ?? NO_KEYS
-    // A signature check is a hash and an Ed25519 verification: done again only when the receipts or the keys change.
-    const rows = useMemo(
-        () => data?.items.map((item, index) => toReceiptRow(item, index, checkReceipt(item, keys))),
-        [data, keys],
-    )
+    const rows = useMemo(() => data?.items.map(sourceOf), [data])
+    // The checks are kept while the keys stay the same, and forgotten when they change (a rotation).
+    const fingerprint = keysFingerprint(keys)
+    const [kept, setKept] = useState(() => ({fingerprint, checks: createReceiptChecks(keys)}))
+    if (kept.fingerprint !== fingerprint) setKept({fingerprint, checks: createReceiptChecks(keys)})
     const state: HistoryState =
         rows !== undefined && keySettled
-            ? {kind: "ready", rows, stale: isError}
+            ? {kind: "ready", rows, checks: kept.checks, stale: isError}
             : isError
               ? {kind: "error"}
               : {kind: "loading"}
@@ -124,4 +139,20 @@ export function useHistoryViewModel(): HistoryViewModel {
             void key.refetch()
         },
     }
+}
+
+/**
+ * What a row shows of its receipt's signature: the result kept for it, else neutral until the check that runs after
+ * the row's first frame. A result found with other keys is never shown.
+ */
+export function useShownCheck(item: ReceiptListItem, checks: ReceiptChecks): ShownCheck {
+    const [done, setDone] = useState<{readonly item: ReceiptListItem; readonly checks: ReceiptChecks; readonly check: ShownCheck}>()
+    const found = done?.item === item && done.checks === checks ? done.check : checks.cached(item)
+    useEffect(() => {
+        if (found !== undefined) return undefined
+        return scheduleCheck(() => {
+            setDone({item, checks, check: checks.check(item)})
+        })
+    }, [found, item, checks])
+    return found ?? CHECKING
 }

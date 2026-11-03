@@ -9,18 +9,27 @@ import {TAB_EDGES} from "@/ui/navigation/tabEdges"
 import type {ThemeColors} from "@/ui/theme/theme"
 import {fontSize, radius, space} from "@/ui/theme/tokens"
 import {useTheme} from "@/ui/theme/useTheme"
-import type {ReceiptCheck} from "./receiptCheck"
-import {isProven, type ReceiptCheckRun, type ReceiptRowModel, useHistoryViewModel} from "./useHistoryViewModel"
+import type {ReceiptChecks, ShownCheck} from "./receiptChecks"
+import {
+    isProven,
+    type ReceiptCheckRun,
+    type ReceiptSource,
+    toReceiptRow,
+    useHistoryViewModel,
+    useShownCheck,
+} from "./useHistoryViewModel"
 
-function CheckLine({check}: {check: ReceiptCheck}): React.JSX.Element {
+function CheckLine({check}: {check: ShownCheck}): React.JSX.Element {
     const {t} = useTranslation()
     const {colors} = useTheme()
     const [text, color] = lineOf(check, t, colors)
     return <Text style={[styles.check, {color}]}>{text}</Text>
 }
 
-function lineOf(check: ReceiptCheck, t: ReturnType<typeof useTranslation>["t"], colors: ThemeColors): readonly [string, string] {
+function lineOf(check: ShownCheck, t: ReturnType<typeof useTranslation>["t"], colors: ThemeColors): readonly [string, string] {
     switch (check.kind) {
+        case "checking":
+            return [t("history.checking"), colors.textMuted]
         case "verified":
             return [t("history.verified", {kid: check.kid}), colors.success]
         case "rejected":
@@ -51,9 +60,12 @@ function CheckRunLine({run}: {run: ReceiptCheckRun}): React.JSX.Element {
     )
 }
 
-function ReceiptRow({row}: {row: ReceiptRowModel}): React.JSX.Element {
+/** One receipt, checked on this phone once its row is shown: neutral until then. */
+function ReceiptRow({source, checks}: {source: ReceiptSource; checks: ReceiptChecks}): React.JSX.Element {
     const {t, i18n} = useTranslation()
     const {colors} = useTheme()
+    const check = useShownCheck(source.item, checks)
+    const row = toReceiptRow(source.item, source.index, check)
     const style = [styles.row, {backgroundColor: colors.surface, borderColor: colors.border}]
     if (!row.readable) {
         return (
@@ -107,6 +119,7 @@ export function HistoryScreen(): React.JSX.Element {
         case "ready":
             body = (
                 <FlatList
+                    testID="history-list"
                     data={state.rows}
                     // Index first: two receipts with the same id (a server bug) still get a row each.
                     keyExtractor={(row, index) => `${String(index)}:${row.key}`}
@@ -124,7 +137,7 @@ export function HistoryScreen(): React.JSX.Element {
                         </View>
                     }
                     ListEmptyComponent={<Text style={[styles.body, {color: colors.textMuted}]}>{t("history.empty")}</Text>}
-                    renderItem={({item}) => <ReceiptRow row={item} />}
+                    renderItem={({item}) => <ReceiptRow source={item} checks={state.checks} />}
                 />
             )
             break
