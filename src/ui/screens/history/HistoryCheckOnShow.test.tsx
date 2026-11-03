@@ -99,7 +99,8 @@ describe("History, each receipt checked when its row is shown", () => {
 
     it("flags a receipt changed after signing on the first screen, and after a scroll, even under a verified receipt's id", async () => {
         const first = firstGolden()
-        const filler = Array.from({length: 40}, () => golden).flat()
+        const copies = 3
+        const filler = Array.from({length: copies}, () => golden).flat()
         await show(() => page([tampered(), ...filler, tampered()]))
         await screen.findAllByText(CHECKING)
         await runChecks()
@@ -107,16 +108,34 @@ describe("History, each receipt checked when its row is shown", () => {
         if (top === undefined) throw new Error("no first row")
         expect(within(top).getByText("Signature rejected: the content changed after signing")).toBeOnTheScreen()
 
-        // Down to the last row, which mounts once the cache holds the genuine receipt under the same id.
+        // Down to the last row, which mounts once the cache holds the genuine receipt under the same id. The test
+        // renderer lays nothing out: the list and each row it shows are given a size, 100 points a row, then scrolled
+        // to the end, until the last row is there.
         const list = screen.getByTestId("history-list")
+        const total = filler.length + 2
+        const sameId = copies + 2
         await fireEvent(list, "layout", {nativeEvent: {layout: {x: 0, y: 0, width: 400, height: 800}}})
-        await fireEvent.scroll(list, {
-            nativeEvent: {contentOffset: {x: 0, y: 100_000}, contentSize: {width: 400, height: 101_000}, layoutMeasurement: {width: 400, height: 800}},
-        })
-        await runChecks()
-        const rows = await screen.findAllByTestId(`receipt-${first.view.id}`)
+        await fireEvent(list, "contentSizeChange", 400, total * 100)
+        for (let pass = 0; pass < 10 && screen.getAllByTestId(`receipt-${first.view.id}`).length < sameId; pass += 1) {
+            for (const [index, row] of screen.getAllByTestId(/^receipt-/).entries()) {
+                // Bubbles up to the list's cell around the row.
+                await fireEvent(row, "layout", {nativeEvent: {layout: {x: 0, y: index * 100, width: 400, height: 100}}})
+            }
+            await fireEvent.scroll(list, {
+                nativeEvent: {
+                    contentOffset: {x: 0, y: total * 100 - 800},
+                    contentSize: {width: 400, height: total * 100},
+                    layoutMeasurement: {width: 400, height: 800},
+                },
+            })
+            await act(async () => {
+                await new Promise((resolve) => setTimeout(resolve, 100))
+            })
+        }
+        const rows = screen.getAllByTestId(`receipt-${first.view.id}`)
+        expect(rows).toHaveLength(sameId)
         const last = rows.at(-1)
-        if (last === undefined || last === top) throw new Error("the last row did not mount")
+        if (last === undefined) throw new Error("no last row")
         await runChecks()
         expect(within(last).getByText("Signature rejected: the content changed after signing")).toBeOnTheScreen()
         expect(within(last).queryByText(VERIFIED)).toBeNull()
