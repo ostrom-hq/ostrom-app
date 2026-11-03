@@ -517,12 +517,13 @@ export const zBillingWebhookAck = z.object({
     outcome: z.enum([
         'processed',
         'duplicate',
-        'ignored'
+        'ignored',
+        'ignored_unknown_org'
     ])
 });
 
 /**
- * A spending limit
+ * A subject's spending limits, per calendar month and per day (UTC). A day starts at 00:00 UTC, a month on the 1st at 00:00 UTC; the spend is the model gateway's measured cost
  */
 export const zBudget = z.object({
     scope: z.string(),
@@ -749,7 +750,8 @@ export const zDeviceCode = z.object({
     userCode: z.string(),
     verificationUri: z.string(),
     interval: z.int(),
-    expiresIn: z.int()
+    expiresIn: z.int(),
+    verificationUriComplete: z.string().optional()
 });
 
 /**
@@ -830,6 +832,22 @@ export const zApproval = z.object({
     action: zApprovalAction.optional(),
     diffStats: zDiffStats.optional(),
     diffTruncated: z.boolean().optional()
+});
+
+/**
+ * 403 other than step_up_required: `forbidden` (a token without the scope, a member without the role, a credential the route does not admit), or a finer key (`email_link_other_browser`, `installation_not_yours`, `probe_not_yours`, `cutover_owner_required`)
+ */
+export const zForbidden = z.object({
+    error: z.object({
+        type: z.enum([
+            'forbidden',
+            'email_link_other_browser',
+            'installation_not_yours',
+            'probe_not_yours',
+            'cutover_owner_required'
+        ]),
+        message: z.string()
+    })
 });
 
 /**
@@ -1130,6 +1148,21 @@ export const zInvitationToken = z.object({
 });
 
 /**
+ * A JSON-RPC 2.0 error, as the MCP relay answers it
+ */
+export const zJsonRpcError = z.object({
+    jsonrpc: z.enum(['2.0']),
+    id: z.union([
+        z.string(),
+        z.int()
+    ]).nullish(),
+    error: z.object({
+        code: z.int(),
+        message: z.string()
+    })
+});
+
+/**
  * The consent page of a started link
  */
 export const zLinkStarted = z.object({
@@ -1222,7 +1255,10 @@ export const zMcpCall = z.object({
     sessionId: z.string().optional(),
     launchId: z.string().optional(),
     durationMs: z.int().optional(),
-    ok: z.boolean()
+    ok: z.boolean(),
+    outcome: z.string().optional(),
+    responseBytes: z.int().optional(),
+    policyId: z.string().optional()
 });
 
 /**
@@ -1421,9 +1457,10 @@ export const zOrgInvites = z.object({
 });
 
 /**
- * A member as `/api/v1/orgs/{org}/members` serves it (no member id there)
+ * A member as `/api/v1/orgs/{org}/members` serves it
  */
 export const zOrgMember = z.object({
+    id: z.uuid(),
     login: z.string(),
     name: z.string(),
     avatarUrl: z.string(),
@@ -1468,7 +1505,8 @@ export const zOrgView = z.object({
     slug: z.string(),
     name: z.string(),
     role: z.string(),
-    createdAt: z.iso.datetime()
+    createdAt: z.iso.datetime(),
+    timeZone: z.string().optional()
 });
 
 /**
@@ -1497,7 +1535,8 @@ export const zMe = z.object({
     dev: zDev,
     member: zMember.optional(),
     organization: zOrganization.optional(),
-    capabilities: z.array(z.string())
+    capabilities: z.array(z.string()),
+    csrfToken: z.string().optional()
 });
 
 /**
@@ -1649,12 +1688,21 @@ export const zProfile = z.object({
 });
 
 /**
+ * How a receipt key was handed over by the key it replaces. Absent on a key handed over by nobody (the first key, or a key changed without its previous one). A reader that pinned the previous key trusts this one only if `signature` verifies; it follows a chain of rotations key by key
+ */
+export const zKeyRotation = z.object({
+    kid: z.string(),
+    signature: z.string()
+});
+
+/**
  * A public key of the instance
  */
 export const zPublicKey = z.object({
     kid: z.string(),
     alg: z.string(),
-    publicKeyPem: z.string()
+    publicKeyPem: z.string(),
+    rotation: zKeyRotation.optional()
 });
 
 /**
@@ -2045,7 +2093,9 @@ export const zSession = z.object({
     tools: z.int().optional(),
     costUsd: z.number().optional(),
     exitCode: z.int().optional(),
-    runId: z.string().optional()
+    runId: z.string().optional(),
+    ended: z.boolean().optional(),
+    lost: z.boolean().optional()
 });
 
 /**
@@ -2053,7 +2103,8 @@ export const zSession = z.object({
  */
 export const zSessionResponse = z.object({
     session: zSession,
-    receipt: zReceipt.optional()
+    receipt: zReceipt.optional(),
+    reopened: z.boolean().optional()
 });
 
 /**
@@ -2083,7 +2134,28 @@ export const zSharedAccount = z.object({
     sharedWith: z.array(z.string()),
     pool: z.string().optional(),
     dailyAllocationUsd: z.number().optional(),
-    paused: z.boolean()
+    paused: z.boolean(),
+    email: z.string().optional(),
+    providerAccountId: z.string().optional(),
+    mine: z.boolean().optional(),
+    priority: z.int().optional(),
+    limits: z.object({
+        maxConcurrent: z.int().optional(),
+        utilizationCeiling: z.number().optional(),
+        monthlyBudgetMicros: z.int().optional(),
+        dailyBudgetMicros: z.int().optional(),
+        allowedMembers: z.array(z.string()).optional()
+    }).optional(),
+    cooldownUntil: z.string().optional(),
+    windows: z.array(z.object({
+        window: z.string().optional(),
+        utilization: z.number().optional(),
+        resetsAt: z.string().optional(),
+        observedAt: z.string().optional()
+    })).optional(),
+    inFlight: z.int().optional(),
+    spentMicros: z.int().optional(),
+    createdAt: z.string().optional()
 });
 
 /**
@@ -2133,6 +2205,18 @@ export const zSkill = z.object({
 });
 
 /**
+ * A budget spent past its limit in its current day or month
+ */
+export const zExceededBudget = z.object({
+    scope: z.string(),
+    subject: z.string().optional(),
+    period: z.enum(['day', 'month']),
+    usd: z.number(),
+    hardStop: z.boolean(),
+    since: z.iso.datetime()
+});
+
+/**
  * Spending of one day
  */
 export const zSpendingDay = z.object({
@@ -2162,7 +2246,8 @@ export const zSpending = z.object({
     byAgent: z.array(zSpendingLine),
     byRepo: z.array(zSpendingLine),
     byPerson: z.array(zSpendingLine),
-    daily: z.array(zSpendingDay)
+    daily: z.array(zSpendingDay),
+    exceeded: z.array(zExceededBudget).optional()
 });
 
 /**
@@ -2185,8 +2270,19 @@ export const zStartSessionRequest = z.object({
  * 403 step_up_required: a yes, and a sensitive write from the console or the app (a personal token, a service key, a sign-in link, an invitation, a role, a member removed, a transfer, a secret, an MCP server, its assignments, policies and settings, the model keys), need a sign-in less than 5 minutes old (a sign-in of unknown age is refused too); sign in again, then send it again. A no never needs it, and an API token is never asked: it has no sign-in to renew
  */
 export const zStepUpRequired = z.object({
-    error: zErrorDetail
+    error: z.object({
+        type: z.enum(['step_up_required']),
+        message: z.string()
+    })
 });
+
+/**
+ * A 403 of a write that may need a fresh sign-in: `step_up_required` (sign in again, then send it again) or `forbidden`, told apart by `error.type`
+ */
+export const zStepUpOrForbidden = z.union([
+    zStepUpRequired,
+    zForbidden
+]);
 
 /**
  * A list of strings suggested by the analysis, with what proves it
@@ -4863,7 +4959,8 @@ export const zRotateAutomationSecretPath = z.object({
  * OK
  */
 export const zRotateAutomationSecretResponse = z.object({
-    secret: z.string()
+    secret: z.string(),
+    previousSecretValidUntil: z.string().optional()
 });
 
 export const zTestAutomationBody = z.object({
@@ -4952,7 +5049,7 @@ export const zCreateWaitHeaders = z.object({
 });
 
 /**
- * OK
+ * A replay of the same `Idempotency-Key`, answered with `Idempotency-Replayed: true`: the wait first created
  */
 export const zCreateWaitResponse = zWait;
 
@@ -5208,7 +5305,17 @@ export const zGetMcpUsageHeaders = z.object({
  */
 export const zGetMcpUsageResponse = z.object({
     byServer: z.record(z.string(), z.int()),
-    byTool: z.record(z.string(), z.int())
+    byTool: z.record(z.string(), z.int()),
+    rows: z.array(z.object({
+        dev: z.string().optional(),
+        server: z.string().optional(),
+        calls: z.int().optional(),
+        lists: z.int().optional(),
+        errors: z.int().optional(),
+        denied: z.int().optional(),
+        bytes: z.int().optional(),
+        durationMs: z.int().optional()
+    })).optional()
 });
 
 export const zListSecretsHeaders = z.object({
