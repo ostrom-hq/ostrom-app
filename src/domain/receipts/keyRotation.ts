@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 import * as ed from "@noble/ed25519"
 import {sha512} from "@noble/hashes/sha2.js"
 import {utf8ToBytes} from "@noble/hashes/utils.js"
