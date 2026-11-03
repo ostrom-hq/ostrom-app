@@ -120,9 +120,13 @@ org="$(api "${json[@]}" "${owner[@]}" -X POST "$server/api/v1/orgs" -d '{"name":
 api "${json[@]}" "${owner[@]}" -X POST "$server/api/v1/orgs/$org/members/invites" -d "{\"invites\":[{\"email\":\"$asker_email\",\"role\":\"member\"}]}" > /dev/null
 
 # The asker: e-mail sign-in, the invitation accepted, a token that asks and reads gates and reads receipts.
-api "${json[@]}" -X POST "$server/api/v1/auth/email" -d "{\"email\":\"$asker_email\"}" > /dev/null
+# The link is taken only with the cookie its request set (`ostrom_email_link`, server#176): the request's cookies go
+# back with the verification, as the browser that asked would send them.
+requested="$(headers "${json[@]}" -X POST "$server/api/v1/auth/email" -d "{\"email\":\"$asker_email\"}")"
+case "$(status "$requested")" in 2*) ;; *) fail "/api/v1/auth/email → $(status "$requested")" ;; esac
 link="$(mailed_token "$asker_email" "/auth/email")"
-signed="$(headers "${json[@]}" -X POST "$server/api/v1/auth/email/verify" -d "{\"token\":\"$link\"}")"
+signed="$(headers "${json[@]}" -H "cookie: $(cookies "$requested")" -X POST "$server/api/v1/auth/email/verify" -d "{\"token\":\"$link\"}")"
+case "$(status "$signed")" in 2*) ;; *) fail "/api/v1/auth/email/verify → $(status "$signed") (403 email_link_other_browser: the request's cookie did not come back)" ;; esac
 lines="$(browser_of "$signed" "The e-mail sign-in")"
 mapfile -d '' -t asker < <(header_args "$lines")
 invitation="$(mailed_token "$asker_email" "/invite")"
