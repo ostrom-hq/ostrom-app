@@ -200,7 +200,8 @@ describe("RequestScreen", () => {
         await renderWithServices(<RequestScreen id="appr_0001" />, services)
         await fireEvent.press(await screen.findByRole("button", {name: "Approve"}))
         expect(await screen.findByText(/Ostrom did not take this phone's proof that it is you/)).toBeOnTheScreen()
-        expect(unlock).toHaveBeenCalledWith(expect.stringContaining("Merge PR #6"), expect.anything(), {always: true})
+        // A yes unlocks for its own request (Q-APP-STEPUP-RISK).
+        expect(unlock).toHaveBeenCalledWith(expect.stringContaining("Merge PR #6"), expect.anything(), {always: true, requestId: "appr_0001"})
         expect(answer).not.toHaveBeenCalled()
     })
 
@@ -374,6 +375,16 @@ describe("RequestScreen", () => {
         await fireEvent.press(screen.getByRole("button", {name: "Open the console"}))
         expect(openUrl).toHaveBeenCalledWith("https://ostrom.test/yes/appr_0001")
         expect(screen.queryByText(/step_up_required/)).toBeNull()
+    })
+
+    it("asks to say yes again, not the console, when the server did not take the phone's unlock for this yes", async () => {
+        const openUrl = jest.fn((_url: string) => Promise.resolve())
+        const bound = new ApiError({kind: "refused", status: 403, type: "step_up_required", message: "", requestBound: true})
+        await open(approvals.pending, {refuse: bound, openUrl})
+        await fireEvent.press(screen.getByRole("button", {name: "Approve"}))
+        expect(await screen.findByText(/did not take this phone's unlock for this yes/)).toBeOnTheScreen()
+        expect(screen.queryByRole("button", {name: "Open the console"})).toBeNull()
+        expect(screen.getByRole("button", {name: "Approve"})).toBeEnabled()
     })
 
     it("shows the console's address to copy when the console cannot be opened", async () => {
