@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import {type Account, AccountSchema} from "@/api/contract/account"
 import type {HttpClient} from "@/api/http/HttpClient"
 import type {ProfileRepository} from "./ProfileRepository"
