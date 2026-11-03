@@ -10,6 +10,7 @@ declare const process: {
         readonly EXPO_PUBLIC_OSTROM_E2E_TOKEN?: string | undefined
         readonly EXPO_PUBLIC_OSTROM_E2E_LOGIN?: string | undefined
         readonly EXPO_PUBLIC_OSTROM_E2E_UNLOCK_KEY?: string | undefined
+        readonly EXPO_PUBLIC_OSTROM_E2E_SIGN_IN?: string | undefined
     }
 }
 
@@ -22,6 +23,8 @@ export function servicesForBuild(): AppServices {
             token: process.env.EXPO_PUBLIC_OSTROM_E2E_TOKEN,
             login: process.env.EXPO_PUBLIC_OSTROM_E2E_LOGIN,
             unlockKey: process.env.EXPO_PUBLIC_OSTROM_E2E_UNLOCK_KEY,
-        }),
+        },
+        process.env.EXPO_PUBLIC_OSTROM_E2E_SIGN_IN,
+        ),
     )
 }
