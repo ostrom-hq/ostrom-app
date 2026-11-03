@@ -3,8 +3,8 @@
 # unlock key; another member of their organization asked two pushes to main that wait for them. The app reads the
 # real yes queue, says yes to one (biometrics, then the unlock on the server) and no to the other, then shows both
 # signed receipts, verified on the phone, the organization's activity (the yes, the no and the two requests) and its
-# spending (nothing yet, against the $50 monthly budget the job set). The job checks the gates and receipts through
-# the API afterwards.
+# spending, past the organization's budget (PARCOURS 3.5). The job checks the gates and receipts through the API
+# afterwards.
 appId: run.ostrom.app
 ---
 - launchApp:
@@ -107,14 +107,14 @@ appId: run.ostrom.app
 - assertNotVisible: "The activity could not be loaded."
 - takeScreenshot: real-activity
 
-# Its spending (`GET /spending`): read from the server, a total of $0.00 and nothing spent by a new organization.
+# Its spending (`GET /spending`), read from the server (PARCOURS 3.5): the job's model call billed $1.50, then the
+# organization's $0.01 monthly budget that stops the calls refused the next one. The tab lists the budget passed.
 - tapOn: "Spending"
 - extendedWaitUntil:
-    visible: "\\$0\\.00"
+    visible: "Over budget"
     timeout: 30000
-- assertVisible: "Nothing spent."
-# The budget the job set (PUT /budgets, the organization's $50 a month): what was spent against it.
-- assertVisible: "0 % of the \\$50\\.00 budget"
+- assertVisible: "The organization is past its monthly budget of \\$0\\.01"
+- assertVisible: "The model calls are refused until the month ends\\."
 - assertNotVisible: "The spending could not be loaded."
 - takeScreenshot: real-spending
 
