@@ -102,6 +102,12 @@ export function createMockAppServices({log}: MockAppServicesOptions = {}): AppSe
             ),
         openUrl: openOutside,
         copyText: copyToClipboard,
-        ...(log === undefined ? {} : {onFirstUsefulScreen: () => log("ostrom.perf first-useful-screen")}),
+        ...(log === undefined
+            ? {}
+            : {
+                  onFirstUsefulScreen: () => {
+                      log("ostrom.perf first-useful-screen")
+                  },
+              }),
     }
 }
