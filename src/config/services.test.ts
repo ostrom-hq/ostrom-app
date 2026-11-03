@@ -222,6 +222,30 @@ describe("createRealServerAppServices", () => {
         expect(unsubscribe).not.toThrow()
     })
 
+    it("signs in through the browser to its own server, whatever address is typed, in a build given no session (AUDIT-SECU-APP-2 N1)", async () => {
+        const fetch = jest.fn(() => Promise.reject(new TypeError("offline")))
+        Object.defineProperty(globalThis, "fetch", {value: fetch, configurable: true, writable: true})
+        jest.mocked(WebBrowser.openAuthSessionAsync).mockClear()
+        const services = createRealServerAppServices(realServer({serverUrl: "http://127.0.0.1:4600"}, "browser"))
+
+        // The server's real sign-in, down to the code exchange: nothing is given.
+        expect(await services.signIn.signIn("https://app.ostrom.run")).toEqual({kind: "failed", reason: "exchange-failed"})
+        expect(WebBrowser.openAuthSessionAsync).toHaveBeenCalledWith(
+            expect.stringContaining("http://127.0.0.1:4600/api/v1/auth/github/start?redirect_uri="),
+            "ostrom://auth/callback",
+        )
+        expect(fetch).toHaveBeenCalledWith("http://127.0.0.1:4600/api/v1/auth/mobile/token", expect.anything())
+        expect(await services.biometrics.confirm("Approve")).toBe("confirmed")
+        expect(await services.push.register()).toEqual({kind: "unavailable"})
+    })
+
+    it("stops a browser build given a session, or no server", () => {
+        expect(() => realServer({serverUrl: "http://127.0.0.1:4600", token: "osm_ci", login: "e2e"}, "browser")).toThrow(
+            /takes no session, and is given EXPO_PUBLIC_OSTROM_E2E_TOKEN, EXPO_PUBLIC_OSTROM_E2E_LOGIN$/,
+        )
+        expect(() => realServer({serverUrl: "not a url"}, "browser")).toThrow(/needs EXPO_PUBLIC_OSTROM_E2E_SERVER$/)
+    })
+
     it("stops at once when the build was not given its server, token and login", () => {
         expect(() => realServer({token: "osm_ci", login: "e2e", unlockKey: "key_ci"})).toThrow(
             /needs EXPO_PUBLIC_OSTROM_E2E_SERVER$/,
