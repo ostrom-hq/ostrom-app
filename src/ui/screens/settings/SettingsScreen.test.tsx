@@ -10,6 +10,9 @@ import {renderWithServices} from "@/test/renderWithServices"
 import {phoneTimeZone, SettingsScreen} from "./SettingsScreen"
 import {defaultQuietHours} from "./useSettingsViewModel"
 
+const mockPush = jest.fn()
+jest.mock("expo-router", () => ({useRouter: () => ({push: mockPush})}))
+
 const initial = NotificationSettingsSchema.parse(notificationSettings)
 
 interface Harness {
@@ -64,6 +67,12 @@ async function open({
 const granted: PushPermission = {kind: "granted", address: {pushToken: "ExponentPushToken[abc]", platform: "ios"}}
 
 describe("SettingsScreen", () => {
+    it("leads to the person's account", async () => {
+        await open()
+        await fireEvent.press(screen.getByRole("button", {name: "My account"}))
+        expect(mockPush).toHaveBeenCalledWith("/account")
+    })
+
     it("shows the account and the notification settings", async () => {
         await open()
         expect(screen.getByText("rev-b")).toBeOnTheScreen()

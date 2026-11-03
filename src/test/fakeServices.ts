@@ -60,6 +60,7 @@ export function fakeRepositories(overrides: Partial<Repositories> = {}): Reposit
             settings: unexpected("notifications.settings"),
             saveSettings: unexpected("notifications.saveSettings"),
         },
+        profile: {account: unexpected("profile.account")},
         receipts: {list: unexpected("receipts.list"), get: unexpected("receipts.get"), keys: unexpected("receipts.keys")},
         spending: {report: unexpected("spending.report")},
         ...overrides,

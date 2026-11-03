@@ -8,6 +8,7 @@ import {
     zRegisterPushDeviceBody,
     zSetNotificationPreferencesBody,
 } from "@/api/gen/zod.gen"
+import {pkceChallenge} from "@/services/signIn/pkce"
 import * as fixtures from "./fixtures"
 
 type ApprovalInput = z.input<typeof ApprovalSchema>
@@ -153,6 +154,7 @@ export function createMockServer({memberships = [fixtures.acme.id]}: MockServerO
 
     const routes: readonly Route[] = [
         route("GET", "/api/v1/auth/me", () => ok(fixtures.me)),
+        route("GET", "/api/v1/auth/me/account", () => ok(fixtures.account)),
         // As server#64 serves it: slug and role besides what the app reads, no picture without a GitHub organization.
         route("GET", "/api/v1/me/organizations", () =>
             ok({
@@ -168,7 +170,13 @@ export function createMockServer({memberships = [fixtures.acme.id]}: MockServerO
             "/api/v1/auth/mobile/token",
             ({body}) => {
                 const parsed = zMobileTokenBody.safeParse(body)
-                return parsed.success && parsed.data.code === "good-code"
+                // `good-code` for the unit tests; `pkce:<challenge>` from the E2E auth host (scripts/e2e-auth-host.py),
+                // taken only with the verifier of that challenge, as the server does.
+                const fromBrowser =
+                    parsed.success &&
+                    parsed.data.redirectUri === "ostrom://auth/callback" &&
+                    parsed.data.code === `pkce:${pkceChallenge(parsed.data.codeVerifier)}`
+                return parsed.success && (parsed.data.code === "good-code" || fromBrowser)
                     ? ok({token: "ost_mock_token", user: {login: caller}, unlockKey: MOCK_UNLOCK_KEY})
                     : refusal(400, "invalid_request", "Unknown code")
             },
