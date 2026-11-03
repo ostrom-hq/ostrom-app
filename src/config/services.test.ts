@@ -175,6 +175,21 @@ describe("createMockAppServices", () => {
         await expect(services.signIn.signIn("https://forged.browser.example")).resolves.toEqual({kind: "failed", reason: "state-mismatch"})
     })
 
+    it("logs each call and the first useful screen for the performance pass, and serves long lists on many.example", async () => {
+        const log = jest.fn()
+        const services = createMockAppServices({log})
+        const session = {serverUrl: "https://many.example", token: "ost_mock_token", user: {login: "rev-b"}, orgId: "org_acme"}
+        const queue = await services.repositoriesFor(session).approvals.queue()
+        expect(queue.pending.length).toBeGreaterThan(500)
+        // The same long server for the next call.
+        expect((await services.repositoriesFor(session).activity.page()).items.length).toBeGreaterThan(500)
+        expect(log).toHaveBeenCalledWith("ostrom.e2e request GET /api/v1/approvals/queue")
+        services.onFirstUsefulScreen?.()
+        expect(log).toHaveBeenLastCalledWith("ostrom.perf first-useful-screen")
+        // Without a log, nothing to call.
+        expect(createMockAppServices().onFirstUsefulScreen).toBeUndefined()
+    })
+
     it("signs in on the address typed, without GitHub, and talks to the in-memory server", async () => {
         const services = createMockAppServices()
         const outcome = await services.signIn.signIn("https://ostrom.e2e")

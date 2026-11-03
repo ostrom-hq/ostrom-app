@@ -20,9 +20,11 @@ async function launch(
     queue: () => Promise<ApprovalQueue>,
     signedIn = true,
     client = testQueryClient(),
+    onFirstUsefulScreen?: () => void,
 ): Promise<ReturnType<typeof renderRouter>> {
     const repositories = fakeRepositories({approvals: {queue, view: jest.fn(), answer: jest.fn()}})
-    const services = signedIn ? await signedInServices({repositories}) : fakeServices({repositories})
+    const signed = signedIn ? await signedInServices({repositories}) : fakeServices({repositories})
+    const services = onFirstUsefulScreen === undefined ? signed : {...signed, onFirstUsefulScreen}
     const wrapper = ({children}: {children: ReactNode}): React.JSX.Element => (
         <ServicesProvider services={services}>
             <QueryClientProvider client={client}>{children}</QueryClientProvider>
@@ -46,6 +48,14 @@ describe("InboxScreen", () => {
         expect(screen.queryByRole("button", {name: "Approve"})).toBeNull()
         await fireEvent.press(screen.getByRole("button", {name: "Merge PR #6 into main"}))
         expect(router.getPathname()).toBe("/request/appr_0001")
+    })
+
+    it("tells the services when the list, the first useful screen, is laid out", async () => {
+        const onFirstUsefulScreen = jest.fn()
+        await launch(() => Promise.resolve(queueOf([approvals.pending])), true, testQueryClient(), onFirstUsefulScreen)
+        const list = await screen.findByTestId("inbox-list")
+        await fireEvent(list, "layout", {nativeEvent: {layout: {x: 0, y: 0, width: 400, height: 800}}})
+        expect(onFirstUsefulScreen).toHaveBeenCalled()
     })
 
     it("calls nothing mine once the session is gone", async () => {

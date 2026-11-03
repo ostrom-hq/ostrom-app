@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+import {z} from "zod"
 import {pkceChallenge} from "@/services/signIn/pkce"
 import {createMockServer} from "./mockServer"
 
@@ -24,6 +25,21 @@ describe("createMockServer and the code exchange", () => {
         expect(exchange({code, codeVerifier: verifier, redirectUri: "ostrom://auth/callback"})).toBe(200)
         expect(exchange({code, codeVerifier: "w".repeat(43), redirectUri: "ostrom://auth/callback"})).toBe(400)
         expect(exchange({code, codeVerifier: verifier, redirectUri: "ostrom://elsewhere"})).toBe(400)
+    })
+})
+
+describe("createMockServer with many rows", () => {
+    const get = (server: ReturnType<typeof createMockServer>, path: string): unknown =>
+        server.handle({method: "GET", path, query: {}, body: undefined}).body
+
+    it("adds as many waiting requests, activity rows and receipts as asked, for the performance pass", () => {
+        const server = createMockServer({many: 12})
+        const queue = z.object({pending: z.array(z.unknown())}).parse(get(server, "/api/v1/approvals/queue"))
+        const fewQueue = z.object({pending: z.array(z.unknown())}).parse(get(createMockServer(), "/api/v1/approvals/queue"))
+        expect(queue.pending.length - fewQueue.pending.length).toBe(12)
+        const listOf = (path: string, mock = server): number => z.object({items: z.array(z.unknown())}).parse(get(mock, path)).items.length
+        expect(listOf("/api/v1/activity") - listOf("/api/v1/activity", createMockServer())).toBe(12)
+        expect(listOf("/api/v1/receipts") - listOf("/api/v1/receipts", createMockServer())).toBe(12)
     })
 })
 
