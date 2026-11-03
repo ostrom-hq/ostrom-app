@@ -109,8 +109,8 @@ describe("History, each receipt checked when its row is shown", () => {
 
         // Down to the last row, which mounts once the cache holds the genuine receipt under the same id.
         const list = screen.getByTestId("history-list")
-        fireEvent(list, "layout", {nativeEvent: {layout: {x: 0, y: 0, width: 400, height: 800}}})
-        fireEvent.scroll(list, {
+        await fireEvent(list, "layout", {nativeEvent: {layout: {x: 0, y: 0, width: 400, height: 800}}})
+        await fireEvent.scroll(list, {
             nativeEvent: {contentOffset: {x: 0, y: 100_000}, contentSize: {width: 400, height: 101_000}, layoutMeasurement: {width: 400, height: 800}},
         })
         await runChecks()
