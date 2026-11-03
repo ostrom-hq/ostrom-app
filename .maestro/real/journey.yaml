@@ -114,3 +114,23 @@ appId: run.ostrom.app
 - assertVisible: "Nothing spent."
 - assertNotVisible: "The spending could not be loaded."
 - takeScreenshot: real-spending
+
+# The person's own account (`GET /auth/me/account`, in no organization): the phone's person signed in with GitHub, so
+# their GitHub is linked; the sessions and workstations are managed in the console, which the app opens.
+- tapOn: "Settings"
+- scrollUntilVisible:
+    element:
+      id: "settings-my-account"
+    direction: DOWN
+    timeout: 20000
+- tapOn:
+    id: "settings-my-account"
+- extendedWaitUntil:
+    visible:
+      id: "account-github-linked"
+    timeout: 30000
+- assertVisible: "${OSTROM_E2E_LOGIN}"
+- assertVisible:
+    id: "account-open-console"
+- assertNotVisible: "Your account could not be loaded."
+- takeScreenshot: real-account

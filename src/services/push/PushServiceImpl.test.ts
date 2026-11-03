@@ -12,7 +12,9 @@ jest.mock("expo-notifications", () => ({
     getLastNotificationResponse: jest.fn(),
     clearLastNotificationResponse: jest.fn(),
     setNotificationChannelAsync: jest.fn(() => Promise.resolve(null)),
+    dismissAllNotificationsAsync: jest.fn(() => Promise.resolve()),
     AndroidImportance: {HIGH: 6},
+    AndroidNotificationVisibility: {UNKNOWN: 0, PUBLIC: 1, PRIVATE: 2, SECRET: 3},
 }))
 
 const mocked = jest.mocked(Notifications)
@@ -64,7 +66,24 @@ describe("PushServiceImpl", () => {
         await new PushServiceImpl({projectId: PROJECT, platform: "android"}).register()
         expect(mocked.requestPermissionsAsync).not.toHaveBeenCalled()
         // Android: the channel exists before the permission is read.
-        expect(mocked.setNotificationChannelAsync).toHaveBeenCalledWith("requests", {name: "Requests", importance: 6})
+        expect(mocked.setNotificationChannelAsync).toHaveBeenCalledWith("requests", expect.objectContaining({name: "Requests", importance: 6}))
+    })
+
+    it("hides what a request says on Android's lock screen (AUDIT-SECU-APP-2 N2)", async () => {
+        mocked.getPermissionsAsync.mockResolvedValue(permission(true))
+        mocked.getExpoPushTokenAsync.mockResolvedValue({type: "expo", data: "t"})
+        await new PushServiceImpl({projectId: PROJECT, platform: "android"}).register()
+        // Private: the lock screen shows that Ostrom has a notification, never who asks, what or where.
+        expect(mocked.setNotificationChannelAsync).toHaveBeenCalledWith("requests", {
+            name: "Requests",
+            importance: 6,
+            lockscreenVisibility: 2,
+        })
+    })
+
+    it("takes its notifications off the screen when asked, at sign-out (AUDIT-SECU-APP-2 N3)", async () => {
+        await new PushServiceImpl({projectId: PROJECT, platform: "ios"}).clearShown()
+        expect(mocked.dismissAllNotificationsAsync).toHaveBeenCalled()
     })
 
     it("respects a no, without asking again when the system forbids it", async () => {

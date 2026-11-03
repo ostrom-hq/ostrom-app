@@ -7,6 +7,7 @@ import type {AccountRepository} from "@/repositories/AccountRepository"
 import type {ActivityRepository} from "@/repositories/ActivityRepository"
 import type {ApprovalsRepository} from "@/repositories/ApprovalsRepository"
 import type {NotificationsRepository} from "@/repositories/NotificationsRepository"
+import type {ProfileRepository} from "@/repositories/ProfileRepository"
 import type {ReceiptsRepository} from "@/repositories/ReceiptsRepository"
 import type {SpendingRepository} from "@/repositories/SpendingRepository"
 import type {Session, SessionState, SessionStore} from "@/stores/session"
@@ -21,6 +22,7 @@ export interface Repositories {
     readonly activity: ActivityRepository
     readonly approvals: ApprovalsRepository
     readonly notifications: NotificationsRepository
+    readonly profile: ProfileRepository
     readonly receipts: ReceiptsRepository
     readonly spending: SpendingRepository
 }
@@ -74,6 +76,7 @@ export const SIGNED_OUT_REPOSITORIES: Repositories = {
     activity: {page: refuse},
     approvals: {queue: refuse, view: refuse, answer: refuse},
     notifications: {registerDevice: refuse, unregisterDevice: refuse, settings: refuse, saveSettings: refuse},
+    profile: {account: refuse},
     receipts: {list: refuse, get: refuse, keys: refuse},
     spending: {report: refuse},
 }

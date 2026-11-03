@@ -13,6 +13,7 @@ import {ActivityRepositoryImpl} from "@/repositories/ActivityRepositoryImpl"
 import {ApprovalsRepositoryImpl} from "@/repositories/ApprovalsRepositoryImpl"
 import {NotificationsRepositoryImpl} from "@/repositories/NotificationsRepositoryImpl"
 import {PinnedReceiptsRepository} from "@/repositories/PinnedReceiptsRepository"
+import {ProfileRepositoryImpl} from "@/repositories/ProfileRepositoryImpl"
 import {ReceiptsRepositoryImpl} from "@/repositories/ReceiptsRepositoryImpl"
 import {SpendingRepositoryImpl} from "@/repositories/SpendingRepositoryImpl"
 import type {AppServices, Repositories} from "@/services/AppServices"
@@ -20,6 +21,7 @@ import {BiometricGateImpl} from "@/services/biometrics/BiometricGateImpl"
 import {PushServiceImpl} from "@/services/push/PushServiceImpl"
 import {GithubSignInImpl} from "@/services/signIn/GithubSignInImpl"
 import {SecureStorageImpl} from "@/services/storage/SecureStorageImpl"
+import {onBackground} from "@/services/unlock/onBackground"
 import {PhoneUnlockImpl} from "@/services/unlock/PhoneUnlockImpl"
 import {UnlockKeyStoreImpl} from "@/services/unlock/UnlockKeyStoreImpl"
 import {createSessionStore, type Session} from "@/stores/session"
@@ -49,6 +51,7 @@ export function repositoriesOver(http: HttpClient): Repositories {
         activity: new ActivityRepositoryImpl(http),
         approvals: new ApprovalsRepositoryImpl(http),
         notifications: new NotificationsRepositoryImpl(http),
+        profile: new ProfileRepositoryImpl(http),
         receipts: new ReceiptsRepositoryImpl(http),
         spending: new SpendingRepositoryImpl(http),
     }
@@ -86,7 +89,7 @@ export function createAppServices(options: AppServicesOptions = {}): AppServices
     return {
         sessionStore: createSessionStore(storage, {keepsServer: options.keepsServer ?? ((serverUrl) => keepsServer(serverUrl))}),
         biometrics,
-        unlock: new PhoneUnlockImpl({keys: new UnlockKeyStoreImpl(storage), biometrics}),
+        unlock: new PhoneUnlockImpl({keys: new UnlockKeyStoreImpl(storage), biometrics, leaving: onBackground}),
         push: new PushServiceImpl({projectId: easProjectId(Constants.expoConfig?.extra), platform: Platform.OS}),
         signIn: new GithubSignInImpl({
             openAuthSession: (url, redirectUri) => WebBrowser.openAuthSessionAsync(url, redirectUri),

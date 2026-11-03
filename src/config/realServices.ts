@@ -58,6 +58,7 @@ export function createRealServerAppServices(server: RealServer): AppServices {
             register: () => Promise.resolve({kind: "unavailable"}),
             onOpen: () => () => undefined,
             launchData: () => Promise.resolve(undefined),
+            clearShown: () => Promise.resolve(),
         },
     }
 }

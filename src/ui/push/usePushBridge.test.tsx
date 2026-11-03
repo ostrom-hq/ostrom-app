@@ -35,6 +35,7 @@ async function launch(launchData: unknown, read: () => Promise<unknown> = () => 
                 return unsubscribe
             },
             launchData: read,
+            clearShown: () => Promise.resolve(),
         },
     })
     const client = testQueryClient()

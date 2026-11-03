@@ -20,4 +20,9 @@ export interface PushService {
     onOpen(listener: (data: unknown) => void): () => void
     /** The data of the notification that launched the app, if one did. */
     launchData(): Promise<unknown>
+    /**
+     * Takes this app's notifications off the screen, the lock screen included: at sign-out, nothing of the account
+     * stays shown (AUDIT-SECU-APP-2 N3).
+     */
+    clearShown(): Promise<void>
 }

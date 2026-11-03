@@ -94,6 +94,7 @@ export function createMockAppServices({log}: MockAppServicesOptions = {}): AppSe
             register: () => Promise.resolve({kind: "unavailable"}),
             onOpen: () => () => undefined,
             launchData: () => Promise.resolve(undefined),
+            clearShown: () => Promise.resolve(),
         },
         repositoriesFor: (session) =>
             repositoriesOver(

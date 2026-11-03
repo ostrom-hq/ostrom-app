@@ -14,7 +14,10 @@ Notifications.setNotificationHandler({
         Promise.resolve({shouldShowBanner: true, shouldShowList: true, shouldPlaySound: true, shouldSetBadge: false}),
 })
 
-/** Android 13+ shows the permission prompt only once a channel exists, and shows nothing without one. */
+/**
+ * Android 13+ shows the permission prompt only once a channel exists, and shows nothing without one. The server sends
+ * its pushes to this channel (`channelId`).
+ */
 const ANDROID_CHANNEL = "requests"
 
 function dataOf(response: Notifications.NotificationResponse | null): unknown {
@@ -28,9 +31,12 @@ export class PushServiceImpl implements PushService {
         const {projectId, platform} = this.config
         if (projectId === undefined || (platform !== "ios" && platform !== "android")) return {kind: "unavailable"}
         if (platform === "android") {
+            // Private on a locked phone: it says Ostrom has a notification, never who asks, what or where
+            // (AUDIT-SECU-APP-2 N2). The phone shows the rest once unlocked.
             await Notifications.setNotificationChannelAsync(ANDROID_CHANNEL, {
                 name: "Requests",
                 importance: Notifications.AndroidImportance.HIGH,
+                lockscreenVisibility: Notifications.AndroidNotificationVisibility.PRIVATE,
             })
         }
         const current = await Notifications.getPermissionsAsync()
@@ -59,5 +65,9 @@ export class PushServiceImpl implements PushService {
         const response = Notifications.getLastNotificationResponse()
         if (response !== null) Notifications.clearLastNotificationResponse()
         return Promise.resolve(dataOf(response))
+    }
+
+    clearShown(): Promise<void> {
+        return Notifications.dismissAllNotificationsAsync()
     }
 }

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+import {useRouter} from "expo-router"
 import {useTranslation} from "react-i18next"
 import {ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View} from "react-native"
 import {SafeAreaView} from "react-native-safe-area-context"
@@ -42,6 +43,7 @@ export function phoneTimeZone(): string {
 export function SettingsScreen(): React.JSX.Element {
     const {t, i18n} = useTranslation()
     const {colors} = useTheme()
+    const router = useRouter()
     const vm = useSettingsViewModel(i18n.language, phoneTimeZone())
     const {state} = vm
 
@@ -97,6 +99,13 @@ export function SettingsScreen(): React.JSX.Element {
                 <Section title={t("settings.account")}>
                     {vm.login === undefined ? null : <Field label={t("settings.login")} value={vm.login} />}
                     {vm.serverUrl === undefined ? null : <Field label={t("settings.server")} value={vm.serverUrl} />}
+                    <Button
+                        label={t("settings.myAccount")}
+                        onPress={() => {
+                            router.push("/account")
+                        }}
+                        testID="settings-my-account"
+                    />
                 </Section>
                 <OrganizationSection />
                 <Section title={t("settings.notifications")}>

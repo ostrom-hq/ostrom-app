@@ -1,6 +1,6 @@
 import type {z} from "zod"
 import type {ActivityPageSchema} from "@/api/contract/activity"
-import type {MeSchema} from "@/api/contract/account"
+import type {AccountSchema, MeSchema} from "@/api/contract/account"
 import type {ApprovalSchema} from "@/api/contract/approvals"
 import type {NotificationSettingsSchema} from "@/api/contract/notifications"
 import type {SpendReportSchema} from "@/api/contract/spending"
@@ -20,6 +20,18 @@ export const me: z.input<typeof MeSchema> = {
     organization: acme,
     member: {id: "6f1c2a4e-8b3d-4c5e-9f70-1a2b3c4d5e6f", login: "rev-b", name: "Reviewer B", avatarUrl: "https://avatars.test/rev-b", role: "member"},
     capabilities: ["approvals.answer"],
+}
+
+/** The caller's account (`GET /auth/me/account`): signed up with GitHub, one verified e-mail. */
+export const account: z.input<typeof AccountSchema> = {
+    id: "6f1c2a4e-8b3d-4c5e-9f70-1a2b3c4d5e6f",
+    login: "rev-b",
+    displayName: "Reviewer B",
+    primaryEmail: "rev-b@acme.test",
+    avatarUrl: "https://avatars.test/rev-b",
+    createdAt: "2026-09-01T09:00:00Z",
+    emails: [{email: "rev-b@acme.test", verified: true}],
+    providers: ["github"],
 }
 
 export const pendingApproval: z.input<typeof ApprovalSchema> = {

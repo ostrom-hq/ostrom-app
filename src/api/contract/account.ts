@@ -1,5 +1,5 @@
 import {z} from "zod"
-import {zAuthUser, zMe, type zMobileTokenBody, zMobileTokenResponse} from "@/api/gen/zod.gen"
+import {zAccount, zAuthUser, zMe, type zMobileTokenBody, zMobileTokenResponse} from "@/api/gen/zod.gen"
 
 export const UserSchema = zAuthUser
 export type User = z.output<typeof zAuthUser>
@@ -7,6 +7,10 @@ export type User = z.output<typeof zAuthUser>
 /** `GET /api/v1/auth/me`: who the token belongs to, their membership and organisation. */
 export const MeSchema = zMe
 export type Me = z.output<typeof zMe>
+
+/** `GET /api/v1/auth/me/account`: the person's account, their e-mails and how they sign in (scope `profile:read`). */
+export const AccountSchema = zAccount
+export type Account = z.output<typeof zAccount>
 
 /**
  * `POST /api/v1/auth/mobile/token`: the one-time code the server put in the `ostrom://auth/callback` deep link,

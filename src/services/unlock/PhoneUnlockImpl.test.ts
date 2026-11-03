@@ -16,6 +16,13 @@ interface Harness {
     readonly clock: {now: number}
 }
 
+/** What the unlock asked to hear when the app goes to the background; `leave` plays it. */
+let leaving: (() => void)[] = []
+
+function leave(): void {
+    for (const listener of leaving) listener()
+}
+
 function harness(server: (key: string) => Promise<Unlock> = () => Promise.resolve({authenticatedAt: "2026-10-30T12:00:00Z"})): Harness {
     const keys = new MemoryUnlockKeyStore()
     const confirm = jest.fn((_prompt: string) => Promise.resolve<BiometricOutcome>("confirmed"))
@@ -28,11 +35,34 @@ function harness(server: (key: string) => Promise<Unlock> = () => Promise.resolv
         unlock: serverUnlock,
         logout: jest.fn(),
     }
-    const unlock = new PhoneUnlockImpl({keys, biometrics: {confirm}, now: () => clock.now})
+    const unlock = new PhoneUnlockImpl({
+        keys,
+        biometrics: {confirm},
+        now: () => clock.now,
+        leaving: (listener) => {
+            leaving.push(listener)
+        },
+    })
     return {unlock, keys, confirm, account, serverUnlock, clock}
 }
 
 describe("PhoneUnlockImpl", () => {
+    beforeEach(() => {
+        leaving = []
+    })
+
+    it("asks the biometrics again for a low-risk answer once the app has been left (AUDIT-SECU-APP-2 N4)", async () => {
+        const {unlock, keys, account, clock} = harness()
+        await unlock.keep("key-1")
+        const read = jest.spyOn(keys, "read")
+        expect(await unlock.unlock("Approve", account, {always: false})).toBe("confirmed")
+        clock.now += 1_000
+        // The phone left in another hand, the app in the background: the fresh unlock was for the person who left it.
+        leave()
+        expect(await unlock.unlock("Approve", account, {always: false})).toBe("confirmed")
+        expect(read).toHaveBeenCalledTimes(2)
+    })
+
     it("without a key, asks the biometrics when the answer needs them, and nothing for a low-risk one", async () => {
         const {unlock, confirm, account, serverUnlock} = harness()
         confirm.mockResolvedValueOnce("cancelled")

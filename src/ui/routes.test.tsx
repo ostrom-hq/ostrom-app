@@ -4,6 +4,7 @@ import {renderRouter} from "expo-router/testing-library"
 // Kept out of src/app/: Expo Router bundles every file of that folder as a route, tests included.
 import RootLayout, {unstable_settings} from "@/app/_layout"
 import RequestById from "@/app/request/[id]"
+import Account from "@/app/account"
 import Tabs from "@/app/(tabs)/_layout"
 import Activity from "@/app/(tabs)/activity"
 import History from "@/app/(tabs)/history"
@@ -34,6 +35,7 @@ describe("RootLayout", () => {
                 "(tabs)/settings": Settings,
                 login: Login,
                 "request/[id]": RequestById,
+                account: Account,
             },
             {initialUrl: "/"},
         )
