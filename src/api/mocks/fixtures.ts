@@ -174,6 +174,12 @@ export const spending: z.input<typeof SpendReportSchema> = {
     ],
 }
 
+/** What the in-memory server answers: rev-b, the phone's person, past their own monthly budget, which only warns. */
+export const spendingOverBudget: z.input<typeof SpendReportSchema> = {
+    ...spending,
+    exceeded: [{scope: "member", subject: "rev-b", period: "month", usd: 30, hardStop: false, since: "2026-11-03T09:00:00.000Z"}],
+}
+
 export const notificationSettings: z.input<typeof NotificationSettingsSchema> = {
     requests: true,
     decisions: true,

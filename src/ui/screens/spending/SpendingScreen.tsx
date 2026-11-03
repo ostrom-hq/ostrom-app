@@ -10,7 +10,7 @@ import {formatUsd} from "@/ui/format/money"
 import {TAB_EDGES} from "@/ui/navigation/tabEdges"
 import {fontSize, radius, space} from "@/ui/theme/tokens"
 import {useTheme} from "@/ui/theme/useTheme"
-import {type Breakdown, type Budget, useSpendingViewModel} from "./useSpendingViewModel"
+import {type Breakdown, type Budget, type ExceededLine, useSpendingViewModel} from "./useSpendingViewModel"
 
 const PERIODS: readonly SpendPeriod[] = ["week", "month"]
 
@@ -51,6 +51,34 @@ function BudgetBar({budget}: {budget: Budget}): React.JSX.Element {
             <Text style={[styles.detail, {color: budget.warning ? colors.warningText : colors.textMuted}]}>
                 {t("spending.ofBudget", {percent: Math.round(budget.ratio * 100), budget: formatUsd(budget.usd, i18n.language)})}
             </Text>
+        </View>
+    )
+}
+
+function ExceededSection({lines}: {lines: readonly ExceededLine[]}): React.JSX.Element {
+    const {t, i18n} = useTranslation()
+    const {colors} = useTheme()
+    return (
+        <View testID="spending-exceeded" style={styles.exceeded}>
+            <Text style={[styles.label, {color: colors.warningText}]}>{t("spending.exceeded.title")}</Text>
+            {/* The index keeps two members apart that the period's lines do not name. */}
+            {lines.map((line, index) => {
+                const usd = formatUsd(line.usd, i18n.language)
+                const who =
+                    line.who.kind === "member"
+                        ? line.who.name === undefined
+                            ? t(`spending.exceeded.someone.${line.period}`, {usd})
+                            : t(`spending.exceeded.member.${line.period}`, {usd, name: line.who.name})
+                        : t(`spending.exceeded.${line.who.kind}.${line.period}`, {usd})
+                return (
+                    <View key={`${String(index)}-${line.period}`} style={styles.line}>
+                        <Text style={[styles.detail, {color: colors.text}]}>{who}</Text>
+                        <Text style={[styles.detail, {color: colors.textMuted}]}>
+                            {line.stops ? t(`spending.exceeded.stops.${line.period}`) : t("spending.exceeded.goesOn")}
+                        </Text>
+                    </View>
+                )
+            })}
         </View>
     )
 }
@@ -104,6 +132,7 @@ export function SpendingScreen(): React.JSX.Element {
                         </Text>
                         {state.budget === undefined ? null : <BudgetBar budget={state.budget} />}
                     </View>
+                    {state.exceeded.length === 0 ? null : <ExceededSection lines={state.exceeded} />}
                     {state.breakdowns.map((breakdown) => (
                         <BreakdownSection key={breakdown.key} breakdown={breakdown} />
                     ))}
@@ -132,6 +161,7 @@ const styles = StyleSheet.create({
     total: {gap: space[2]},
     totalAmount: {fontSize: fontSize[40], fontWeight: "800", letterSpacing: -1.2},
     budget: {gap: space[1]},
+    exceeded: {gap: space[2]},
     track: {height: 6, borderRadius: radius.pill, overflow: "hidden"},
     fill: {height: 6},
     line: {gap: space[1]},

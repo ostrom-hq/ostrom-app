@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import {SpendReportSchema} from "@/api/contract/spending"
 import {spending} from "@/api/mocks/fixtures"
-import {breakdownOf, budgetOf, exceededOf} from "./useSpendingViewModel"
+import {breakdownOf, budgetOf, exceededOf, loginOf} from "./useSpendingViewModel"
 
 const report = SpendReportSchema.parse(spending)
 
@@ -66,5 +66,13 @@ describe("exceededOf", () => {
     it("has nothing passed when the server lists none, or does not say", () => {
         expect(exceededOf({...over, exceeded: []}, "rev-b")).toEqual([])
         expect(exceededOf(report, "rev-b")).toEqual([])
+    })
+})
+
+describe("loginOf", () => {
+    it("is the signed-in person's login, and nobody's otherwise", () => {
+        expect(loginOf({status: "signed-in", session: {serverUrl: "https://ostrom.test", token: "ost_1", user: {login: "rev-b"}}})).toBe("rev-b")
+        expect(loginOf({status: "signed-out"})).toBeUndefined()
+        expect(loginOf({status: "loading"})).toBeUndefined()
     })
 })

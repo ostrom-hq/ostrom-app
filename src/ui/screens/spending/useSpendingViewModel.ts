@@ -2,6 +2,8 @@
 import {useState} from "react"
 import type {SpendLine, SpendPeriod, SpendReport} from "@/api/contract/spending"
 import {useSpending} from "@/query/spending"
+import {useSessionState} from "@/services/AppServices"
+import type {SessionState} from "@/stores/session"
 import {isPresent} from "@/ui/format/presence"
 
 /** Above this share of the budget the total turns amber: budget is the only use of amber (brand rule). */
@@ -22,7 +24,13 @@ export interface Breakdown {
 export type SpendingState =
     | {readonly kind: "loading"}
     | {readonly kind: "error"}
-    | {readonly kind: "ready"; readonly totalUsd: number; readonly budget: Budget | undefined; readonly breakdowns: readonly Breakdown[]}
+    | {
+          readonly kind: "ready"
+          readonly totalUsd: number
+          readonly budget: Budget | undefined
+          readonly exceeded: readonly ExceededLine[]
+          readonly breakdowns: readonly Breakdown[]
+      }
 
 export interface SpendingViewModel {
     readonly period: SpendPeriod
@@ -51,9 +59,24 @@ export interface ExceededLine {
     readonly stops: boolean
 }
 
-/** The budgets passed, as the server lists them. Stub: the red run of the tests, before the code. */
-export function exceededOf(_report: SpendReport, _myLogin: string | undefined): readonly ExceededLine[] {
-    return []
+/**
+ * The budgets passed, in the server's order (`Spending.exceeded`, the first reached first). A member's budget names its
+ * member by id: the login comes from `byPerson`, whose key is the same id; a member with no line in the period is
+ * left unnamed.
+ */
+export function exceededOf(report: SpendReport, myLogin: string | undefined): readonly ExceededLine[] {
+    const names = new Map(report.byPerson.map((line) => [line.key, line.label]))
+    return (report.exceeded ?? []).map((budget) => {
+        const name = budget.subject === undefined ? undefined : names.get(budget.subject)
+        const who: ExceededWho =
+            budget.scope === "member" ? (name !== undefined && name === myLogin ? {kind: "me"} : {kind: "member", name}) : {kind: "organization"}
+        return {who, period: budget.period, usd: budget.usd, stops: budget.hardStop}
+    })
+}
+
+/** The signed-in person's login: what tells their own budget from another person's. */
+export function loginOf(state: SessionState): string | undefined {
+    return state.status === "signed-in" ? state.session.user.login : undefined
 }
 
 /** Each line with its share of the biggest one, for the bars; biggest first. */
@@ -66,12 +89,14 @@ export function breakdownOf(key: Breakdown["key"], lines: readonly SpendLine[]):
 export function useSpendingViewModel(): SpendingViewModel {
     const [period, setPeriod] = useState<SpendPeriod>("month")
     const {data, isError, refetch} = useSpending(period)
+    const myLogin = loginOf(useSessionState())
     const state: SpendingState =
         data !== undefined
             ? {
                   kind: "ready",
                   totalUsd: data.totalUsd,
                   budget: budgetOf(data),
+                  exceeded: exceededOf(data, myLogin),
                   breakdowns: [breakdownOf("byAgent", data.byAgent), breakdownOf("byRepo", data.byRepo), breakdownOf("byPerson", data.byPerson)],
               }
             : isError
