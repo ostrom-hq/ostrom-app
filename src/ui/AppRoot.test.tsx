@@ -3,6 +3,7 @@ import {act, fireEvent, screen} from "@testing-library/react-native"
 import {renderRouter} from "expo-router/testing-library"
 import type {ApprovalQueue} from "@/api/contract/approvals"
 import {ApiError} from "@/api/http/ApiError"
+import type {PushService} from "@/services/push/PushService"
 import type {PhoneUnlock} from "@/services/unlock/PhoneUnlock"
 import {SESSION_KEY} from "@/stores/session"
 import {fakeAppState} from "@/test/appState"
@@ -25,11 +26,13 @@ async function launch(
     queue: () => Promise<ApprovalQueue> = () => Promise.resolve(EMPTY),
     withTestClient = true,
     unlock?: PhoneUnlock,
+    push?: PushService,
 ): Promise<void> {
     const services = fakeServices({
         storage,
         repositories: fakeRepositories({approvals: {queue, view: jest.fn(), answer: jest.fn()}}),
         ...(unlock === undefined ? {} : {unlock}),
+        ...(push === undefined ? {} : {push}),
     })
     const root = withTestClient ? <AppRoot services={services} queryClient={testQueryClient()} /> : <AppRoot services={services} />
     await renderRouter(
@@ -147,6 +150,33 @@ describe("AppRoot", () => {
         expect(await screen.findByRole("button", {name: "Continue with GitHub"})).toBeOnTheScreen()
         expect(storage.items.has(SESSION_KEY)).toBe(false)
         expect(forget).toHaveBeenCalled()
+    })
+
+    it("takes the account's notifications off the screen at sign-out, the server's included (AUDIT-SECU-APP-2 N3)", async () => {
+        // Even a tray that cannot be cleared does not hold the sign-out.
+        const clearShown = jest.fn(() => Promise.reject(new Error("no notification service")))
+        const push: PushService = {
+            register: () => Promise.resolve({kind: "unavailable"}),
+            onOpen: () => () => undefined,
+            launchData: () => Promise.resolve(undefined),
+            clearShown,
+        }
+        await launch(keptSession(), () => Promise.reject(new ApiError({kind: "unauthorized"})), false, undefined, push)
+        expect(await screen.findByRole("button", {name: "Continue with GitHub"})).toBeOnTheScreen()
+        expect(clearShown).toHaveBeenCalled()
+    })
+
+    it("leaves the notifications shown at a launch that opens signed out", async () => {
+        const clearShown = jest.fn(() => Promise.resolve())
+        const push: PushService = {
+            register: () => Promise.resolve({kind: "unavailable"}),
+            onOpen: () => () => undefined,
+            launchData: () => Promise.resolve(undefined),
+            clearShown,
+        }
+        await launch(new MemoryStorage(), undefined, true, undefined, push)
+        expect(await screen.findByRole("button", {name: "Continue with GitHub"})).toBeOnTheScreen()
+        expect(clearShown).not.toHaveBeenCalled()
     })
 })
 

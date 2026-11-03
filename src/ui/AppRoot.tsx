@@ -14,7 +14,7 @@ import {useTheme} from "@/ui/theme/useTheme"
 /** The routes, guarded by the session: signed out, only the login screen exists. */
 function RootNavigator(): React.JSX.Element | null {
     const {t} = useTranslation()
-    const {sessionStore, unlock} = useServices()
+    const {sessionStore, unlock, push} = useServices()
     const queryClient = useQueryClient()
     const state = useSessionState()
     useEffect(() => {
@@ -29,8 +29,12 @@ function RootNavigator(): React.JSX.Element | null {
         if (state.status === "signed-out") queryClient.clear()
         // Nor prove anything for it: every sign-out, the person's and the server's (401), forgets the unlock key. A
         // launch that opens signed out (a keychain not readable yet) keeps it, with the session it belongs to.
-        if (signedOut) void unlock.forget().catch(() => undefined)
-    }, [state.status, queryClient, unlock])
+        // Nor stay on its screen: the notifications it was shown go too, lock screen included (AUDIT-SECU-APP-2 N3).
+        if (signedOut) {
+            void unlock.forget().catch(() => undefined)
+            void push.clearShown().catch(() => undefined)
+        }
+    }, [state.status, queryClient, unlock, push])
     const inSession = state.status === "signed-in"
     const orgId = inSession ? state.session.orgId : undefined
     // The organization of the session the screens read in; none before a launch or a sign-in reads anything.

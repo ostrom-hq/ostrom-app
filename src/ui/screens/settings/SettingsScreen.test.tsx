@@ -47,7 +47,7 @@ async function open({
     const unregisterDevice = jest.fn(unregister)
     const logout = jest.fn(revoke)
     const services = await signedInServices({
-        push: {register: () => Promise.resolve(permission), onOpen: () => () => undefined, launchData: () => Promise.resolve(undefined)},
+        push: {register: () => Promise.resolve(permission), onOpen: () => () => undefined, launchData: () => Promise.resolve(undefined), clearShown: () => Promise.resolve()},
         repositories: fakeRepositories({
             account: {
                 me: jest.fn(),

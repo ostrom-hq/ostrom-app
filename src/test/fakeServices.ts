@@ -92,6 +92,7 @@ export function fakeServices(options: FakeServicesOptions = {}): AppServices {
             register: () => Promise.resolve({kind: "unavailable"}),
             onOpen: () => () => undefined,
             launchData: () => Promise.resolve(undefined),
+            clearShown: () => Promise.resolve(),
         },
         repositoriesFor: () => repositories,
         openUrl: options.openUrl ?? (() => Promise.resolve()),
