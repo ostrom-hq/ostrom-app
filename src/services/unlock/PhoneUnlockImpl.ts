@@ -13,6 +13,11 @@ export interface PhoneUnlockDependencies {
     readonly biometrics: BiometricGate
     /** The clock, in milliseconds; the phone's by default. */
     readonly now?: () => number
+    /**
+     * Subscribes to the app going to the background (`onBackground` in the app); never by default. A low-risk yes
+     * without biometrics is for the person still in the app: leaving it ends that (AUDIT-SECU-APP-2 N4).
+     */
+    readonly leaving?: (listener: () => void) => void
 }
 
 /** The server's own no to the key, in the contract's error body: a proxy's bare 403 is no word on the key. */
@@ -29,7 +34,11 @@ export class PhoneUnlockImpl implements PhoneUnlock {
     /** Counts the sessions (a key kept, a key forgotten): an unlock started in one proves nothing for the next. */
     private session = 0
 
-    constructor(private readonly dependencies: PhoneUnlockDependencies) {}
+    constructor(private readonly dependencies: PhoneUnlockDependencies) {
+        dependencies.leaving?.(() => {
+            this.unlockedAt = undefined
+        })
+    }
 
     keep(unlockKey: string): Promise<void> {
         this.session += 1

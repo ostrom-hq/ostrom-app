@@ -16,6 +16,13 @@ interface Harness {
     readonly clock: {now: number}
 }
 
+/** What the unlock asked to hear when the app goes to the background; `leave` plays it. */
+let leaving: (() => void)[] = []
+
+function leave(): void {
+    for (const listener of leaving) listener()
+}
+
 function harness(server: (key: string) => Promise<Unlock> = () => Promise.resolve({authenticatedAt: "2026-10-30T12:00:00Z"})): Harness {
     const keys = new MemoryUnlockKeyStore()
     const confirm = jest.fn((_prompt: string) => Promise.resolve<BiometricOutcome>("confirmed"))
@@ -28,15 +35,15 @@ function harness(server: (key: string) => Promise<Unlock> = () => Promise.resolv
         unlock: serverUnlock,
         logout: jest.fn(),
     }
-    const unlock = new PhoneUnlockImpl({keys, biometrics: {confirm}, now: () => clock.now, leaving: (listener) => leaving.push(listener)})
+    const unlock = new PhoneUnlockImpl({
+        keys,
+        biometrics: {confirm},
+        now: () => clock.now,
+        leaving: (listener) => {
+            leaving.push(listener)
+        },
+    })
     return {unlock, keys, confirm, account, serverUnlock, clock}
-}
-
-/** What the unlock asked to hear when the app goes to the background; `leave` plays it. */
-let leaving: (() => void)[] = []
-
-function leave(): void {
-    for (const listener of leaving) listener()
 }
 
 describe("PhoneUnlockImpl", () => {
