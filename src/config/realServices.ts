@@ -20,9 +20,11 @@ const SessionBuildSchema = z.object({
  */
 const BrowserBuildSchema = z.object({
     serverUrl: z.url(),
-    token: z.undefined(),
-    login: z.undefined(),
-    unlockKey: z.undefined(),
+    // Absent, or present and undefined (Expo inlines an unset variable as undefined): optional, as Zod 4 requires a key
+    // whose schema is not.
+    token: z.undefined().optional(),
+    login: z.undefined().optional(),
+    unlockKey: z.undefined().optional(),
 })
 
 /** The server, and the session the CI made there unless the build signs in through the browser. */
