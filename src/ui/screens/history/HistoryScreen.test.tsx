@@ -187,6 +187,19 @@ describe("HistoryScreen", () => {
         expect(await screen.findByText("No receipt yet.")).toBeOnTheScreen()
         expect(keys).toHaveBeenCalledTimes(2)
     })
+    it("tells the services when its list is laid out, for the performance pass", async () => {
+        const onListShown = jest.fn()
+        await show(jest.fn(() => page(golden)), undefined, {onListShown})
+        await fireEvent(await screen.findByTestId("history-list"), "layout", {nativeEvent: {layout: {x: 0, y: 0, width: 400, height: 800}}})
+        expect(onListShown).toHaveBeenCalledWith("history")
+    })
+
+    it("lays out its list with nobody listening", async () => {
+        await show(jest.fn(() => page(golden)))
+        const list = await screen.findByTestId("history-list")
+        await fireEvent(list, "layout", {nativeEvent: {layout: {x: 0, y: 0, width: 400, height: 800}}})
+        expect(list).toBeOnTheScreen()
+    })
 })
 
 describe("toReceiptRow", () => {
@@ -220,17 +233,4 @@ describe("toReceiptRow", () => {
         expect(row).toMatchObject({readable: true, checkRuns: []})
     })
 
-    it("tells the services when its list is laid out, for the performance pass", async () => {
-        const onListShown = jest.fn()
-        await show(jest.fn(() => page(golden)), undefined, {onListShown})
-        await fireEvent(await screen.findByTestId("history-list"), "layout", {nativeEvent: {layout: {x: 0, y: 0, width: 400, height: 800}}})
-        expect(onListShown).toHaveBeenCalledWith("history")
-    })
-
-    it("lays out its list with nobody listening", async () => {
-        await show(jest.fn(() => page(golden)))
-        const list = await screen.findByTestId("history-list")
-        await fireEvent(list, "layout", {nativeEvent: {layout: {x: 0, y: 0, width: 400, height: 800}}})
-        expect(list).toBeOnTheScreen()
-    })
 })
