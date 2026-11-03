@@ -10,7 +10,7 @@
 # - The asker signs in by e-mail (the link read from the directory the server writes its mails to), accepts the
 #   invitation, and asks the two gates with a token of their own (`gates:ask`), which the job also reads them with.
 # Masks the secrets in the job's log, and writes `token`, `unlock_key`, `login`, `yes_approval`, `no_approval`,
-# `yes_gate`, `no_gate` and `asker_token` to $GITHUB_OUTPUT (standard output outside Actions).
+# `yes_gate`, `no_gate`, `asker_token` and `repo` to $GITHUB_OUTPUT (standard output outside Actions).
 # Usage: scripts/real-server-session.sh <server origin> <mail directory> <fake GitHub origin>
 # Linux only (bash 4.4 or later, GNU coreutils), as on the CI runner. A refused call prints the server's answer.
 set -euo pipefail
@@ -120,9 +120,13 @@ org="$(api "${json[@]}" "${owner[@]}" -X POST "$server/api/v1/orgs" -d '{"name":
 api "${json[@]}" "${owner[@]}" -X POST "$server/api/v1/orgs/$org/members/invites" -d "{\"invites\":[{\"email\":\"$asker_email\",\"role\":\"member\"}]}" > /dev/null
 
 # The asker: e-mail sign-in, the invitation accepted, a token that asks and reads gates and reads receipts.
-api "${json[@]}" -X POST "$server/api/v1/auth/email" -d "{\"email\":\"$asker_email\"}" > /dev/null
+# The link is taken only with the cookie its request set (`ostrom_email_link`, server#176): the request's cookies go
+# back with the verification, as the browser that asked would send them.
+requested="$(headers "${json[@]}" -X POST "$server/api/v1/auth/email" -d "{\"email\":\"$asker_email\"}")"
+case "$(status "$requested")" in 2*) ;; *) fail "/api/v1/auth/email → $(status "$requested")" ;; esac
 link="$(mailed_token "$asker_email" "/auth/email")"
-signed="$(headers "${json[@]}" -X POST "$server/api/v1/auth/email/verify" -d "{\"token\":\"$link\"}")"
+signed="$(headers "${json[@]}" -H "cookie: $(cookies "$requested")" -X POST "$server/api/v1/auth/email/verify" -d "{\"token\":\"$link\"}")"
+case "$(status "$signed")" in 2*) ;; *) fail "/api/v1/auth/email/verify → $(status "$signed") (403 email_link_other_browser: the request's cookie did not come back)" ;; esac
 lines="$(browser_of "$signed" "The e-mail sign-in")"
 mapfile -d '' -t asker < <(header_args "$lines")
 invitation="$(mailed_token "$asker_email" "/invite")"
@@ -178,6 +182,7 @@ echo "::add-mask::$unlock_key"
     echo "token=$token"
     echo "unlock_key=$unlock_key"
     echo "login=$login"
+    echo "repo=$repo"
     echo "yes_approval=$yes_approval"
     echo "no_approval=$no_approval"
     echo "yes_gate=$yes_gate"
