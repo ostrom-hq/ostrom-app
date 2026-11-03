@@ -32,7 +32,8 @@ const BROWSER_SERVERS = ".browser.example"
 export function throughE2eAuthHost(url: string): string {
     const start = new URL(url)
     start.searchParams.set("mode", start.hostname.replace(/\..*$/, ""))
-    return `${E2E_AUTH_HOST}${start.pathname}${start.search}`
+    // React Native's URL gives the changed query in toString() only, not in `search`.
+    return `${E2E_AUTH_HOST}${start.toString().slice(start.origin.length)}`
 }
 
 /**

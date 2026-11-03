@@ -6,6 +6,9 @@ appId: run.ostrom.app
     id: "login-server"
 - eraseText: 200
 - inputText: ${SERVER}
+# The address as typed, whole: a character lost by the emulator's keyboard would sign in without the browser.
+- assertVisible:
+    text: ${SERVER}
 - hideKeyboard
 - tapOn:
     id: "login-github"
