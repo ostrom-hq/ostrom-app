@@ -11,8 +11,9 @@ import type {ReceiptsRepository} from "./ReceiptsRepository"
 /** The receipt keys this phone keeps, by server address, then by key id: the raw key in hex. */
 export const RECEIPT_KEY_PINS = "ostrom.receiptKeyPins"
 
-const PinsSchema = z.record(z.string(), z.record(z.string(), z.string()))
-type Pins = z.output<typeof PinsSchema>
+// Each server's pins are read on their own: one unreadable entry never touches the others.
+const StoredSchema = z.record(z.string(), z.unknown())
+const ServerPinsSchema = z.record(z.string(), z.string().regex(/^[0-9a-f]{64}$/))
 
 /** A served Ed25519 key whose id is the one announced; undefined for any other. */
 function usableKey(served: ReceiptPublicKey): ReceiptKey | undefined {
@@ -25,20 +26,22 @@ function usableKey(served: ReceiptPublicKey): ReceiptKey | undefined {
     }
 }
 
-function readPins(text: string | undefined): Pins {
+/** Every server's pins as stored, or undefined when the keychain holds something that is not a JSON object. */
+function readStored(text: string | undefined): Record<string, unknown> | undefined {
     if (text === undefined) return {}
     try {
-        const parsed = PinsSchema.safeParse(JSON.parse(text))
-        return parsed.success ? parsed.data : {}
+        const parsed = StoredSchema.safeParse(JSON.parse(text))
+        return parsed.success ? parsed.data : undefined
     } catch {
-        return {}
+        return undefined
     }
 }
 
 /**
- * The receipts of a server, verified only with the keys this phone kept from its first view of that server
- * (AUDIT-SECU-APP-2 A5, S2-18). A key that appears later is used only when a kept key signed its rotation; otherwise
- * the receipts it signs read as signed with an unknown key, never as verified.
+ * The receipts of a server, verified only with the keys this phone kept from its first view of that server and that the
+ * server still serves (AUDIT-SECU-APP-2 A5, S2-18). A key that appears later is used only when a kept key signed its
+ * rotation; otherwise the receipts it signs read as signed with an unknown key, never as verified. Pins that cannot be
+ * read fail closed: no key is used. A kept key is never revoked: a key that leaked can still sign a rotation.
  */
 export class PinnedReceiptsRepository implements ReceiptsRepository {
     constructor(
@@ -60,8 +63,11 @@ export class PinnedReceiptsRepository implements ReceiptsRepository {
             const key = usableKey(candidate)
             return key === undefined ? [] : [{candidate, key}]
         })
-        const pins = readPins(await this.storage.get(RECEIPT_KEY_PINS))
-        const kept = new Map(Object.entries(pins[this.serverUrl] ?? {}))
+        const stored = readStored(await this.storage.get(RECEIPT_KEY_PINS))
+        const entry = stored?.[this.serverUrl]
+        const pins = entry === undefined ? {} : ServerPinsSchema.safeParse(entry).data
+        if (stored === undefined || pins === undefined) return []
+        const kept = new Map(Object.entries(pins))
         const firstView = kept.size === 0
         const trusted = new Map(kept)
         if (firstView) for (const {key} of served) trusted.set(key.kid, bytesToHex(key.raw))
@@ -81,7 +87,7 @@ export class PinnedReceiptsRepository implements ReceiptsRepository {
         if (trusted.size > kept.size) {
             // Not kept: this view still uses its keys, and the next one is a first view again.
             await this.storage
-                .set(RECEIPT_KEY_PINS, JSON.stringify({...pins, [this.serverUrl]: Object.fromEntries(trusted)}))
+                .set(RECEIPT_KEY_PINS, JSON.stringify({...stored, [this.serverUrl]: Object.fromEntries(trusted)}))
                 .catch(() => undefined)
         }
         // Compared by raw key, not only by its 16-hex id.

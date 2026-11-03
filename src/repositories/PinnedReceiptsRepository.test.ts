@@ -100,13 +100,27 @@ describe("PinnedReceiptsRepository", () => {
         expect(kids(await repository.keys())).toEqual([served(1).kid])
     })
 
-    it("reads unreadable pins as a first view, and still answers when the keychain refuses to keep them", async () => {
+    it("uses no key when its pins cannot be read, and leaves the other servers' pins as they are", async () => {
         const storage = new Storage()
         storage.items.set(RECEIPT_KEY_PINS, "{")
-        expect(kids(await new PinnedReceiptsRepository(serving([served(1)]), storage, SERVER).keys())).toEqual([served(1).kid])
-        storage.items.set(RECEIPT_KEY_PINS, JSON.stringify({[SERVER]: "not a map"}))
+        expect(await new PinnedReceiptsRepository(serving([served(1)]), storage, SERVER).keys()).toEqual([])
+        storage.items.set(RECEIPT_KEY_PINS, "[1]")
+        expect(await new PinnedReceiptsRepository(serving([served(1)]), storage, SERVER).keys()).toEqual([])
+        // This server's pins are not raw keys in hex: nothing is used, nothing is rewritten.
+        const corrupt = JSON.stringify({[SERVER]: {[served(1).kid]: "not hex"}})
+        storage.items.set(RECEIPT_KEY_PINS, corrupt)
+        expect(await new PinnedReceiptsRepository(serving([served(1)]), storage, SERVER).keys()).toEqual([])
+        expect(storage.items.get(RECEIPT_KEY_PINS)).toBe(corrupt)
+        // Another server's first view keeps it as it is.
+        expect(kids(await new PinnedReceiptsRepository(serving([served(2)]), storage, "https://other.dev").keys())).toEqual([served(2).kid])
+        expect(JSON.parse(storage.items.get(RECEIPT_KEY_PINS) ?? "")).toMatchObject({[SERVER]: {[served(1).kid]: "not hex"}})
+    })
+
+    it("still answers with the keys of its first view when the keychain refuses to keep them", async () => {
+        const storage = new Storage()
         storage.refuseWrites = true
         expect(kids(await new PinnedReceiptsRepository(serving([served(2)]), storage, SERVER).keys())).toEqual([served(2).kid])
+        expect(storage.items.has(RECEIPT_KEY_PINS)).toBe(false)
     })
 
     it("passes the receipts through", async () => {

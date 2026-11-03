@@ -37,7 +37,7 @@ export function repositoriesFor(session: Session): Repositories {
     const repositories = repositoriesOver(
         new HttpClientImpl({baseUrl: session.serverUrl, token: () => session.token, org: () => session.orgId}),
     )
-    // The receipt keys this phone kept for the server, not only the ones it serves now (AUDIT-SECU-APP-2 A5).
+    // Receipts are verified only with the keys this phone kept for the server (AUDIT-SECU-APP-2 A5).
     return {...repositories, receipts: new PinnedReceiptsRepository(repositories.receipts, new SecureStorageImpl(), session.serverUrl)}
 }
 

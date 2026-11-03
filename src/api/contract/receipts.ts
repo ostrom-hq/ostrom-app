@@ -67,6 +67,6 @@ const KeyRotationSchema = z.object({kid: z.string().min(1), signature: z.string(
 
 /** `GET /api/v1/receipts/keys`: the public keys of the instance that sign receipts. */
 export const ReceiptKeysSchema = zListReceiptKeysResponse.extend({
-    keys: z.array(zPublicKey.extend({rotation: KeyRotationSchema.catch(undefined).optional()})),
+    keys: z.array(zPublicKey.extend({rotation: KeyRotationSchema.optional().catch(undefined)})),
 })
 export type ReceiptPublicKey = z.output<typeof ReceiptKeysSchema>["keys"][number]
