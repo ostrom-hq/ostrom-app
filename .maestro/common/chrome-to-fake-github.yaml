@@ -1,9 +1,11 @@
 # Chrome, opened by the app's sign-in, on the fake GitHub's authorize page (its first run passed when it shows, as in
-# browser-sign-in.yaml): signs in as ${LOGIN}, typed over the page's prefilled login.
+# browser-sign-in.yaml): signs in as ${LOGIN}, typed over the page's prefilled login. The page is known by its heading,
+# not by its button: on a warm Chrome (a flow's second sign-in) the page's autofocused login opens the keyboard over
+# the Authorize button, which shows again once the keyboard is hidden.
 appId: run.ostrom.app
 ---
 - extendedWaitUntil:
-    visible: "Authorize|Accept & continue|Use without an account|No thanks"
+    visible: "Authorize Ostrom|Accept & continue|Use without an account|No thanks"
     timeout: 60000
 - runFlow:
     when:
@@ -21,7 +23,7 @@ appId: run.ostrom.app
     commands:
       - tapOn: "No thanks"
 - extendedWaitUntil:
-    visible: "Authorize"
+    visible: "Authorize Ostrom"
     timeout: 30000
 - tapOn: "octo-dev"
 - eraseText: 40
