@@ -1,0 +1,34 @@
+# The real sign-in of the E2E build on a server of browser.example: the system browser opens the E2E auth host
+# (scripts/e2e-auth-host.py), and its link comes back to the app on ostrom://auth/callback, as GitHub's "Authorize" does.
+appId: run.ostrom.app
+---
+- tapOn:
+    id: "login-server"
+- eraseText: 200
+- inputText: ${SERVER}
+- hideKeyboard
+- tapOn:
+    id: "login-github"
+# Chrome's first run, on a new emulator: passed when it shows.
+- extendedWaitUntil:
+    visible: "Back to Ostrom|Accept & continue|Use without an account|No thanks"
+    timeout: 60000
+- runFlow:
+    when:
+      visible: "Accept & continue"
+    commands:
+      - tapOn: "Accept & continue"
+- runFlow:
+    when:
+      visible: "Use without an account"
+    commands:
+      - tapOn: "Use without an account"
+- runFlow:
+    when:
+      visible: "No thanks"
+    commands:
+      - tapOn: "No thanks"
+- extendedWaitUntil:
+    visible: "Back to Ostrom"
+    timeout: 30000
+- tapOn: "Back to Ostrom"
