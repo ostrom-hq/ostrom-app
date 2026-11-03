@@ -117,7 +117,7 @@ the gates are approved and rejected and that each receipt verifies.
 
 | Flow (real server) | What it proves | What it does not |
 |---|---|---|
-| `real/journey.yaml` | On the real server: the inbox reads the yes queue, a yes (biometrics, `POST /auth/mobile/unlock`, the answer) and a no with its reason go through, Settings shows the login and the only organization, the History shows the signed receipts verified on the phone, Activity shows the requests on the job's repository, Spending reads the organization's spending ($0.00, nothing yet) | The app's own browser hop of the sign-in (the job makes the session by the same routes); a real fingerprint (the build confirms it: no finger is enrolled on the emulator) |
+| `real/journey.yaml` | On the real server: the inbox reads the yes queue, a yes (biometrics, `POST /auth/mobile/unlock`, the answer) and a no with its reason go through, Settings shows the login and the only organization, the History shows the signed receipts verified on the phone, Activity shows the phone's yes and no and the two requests, Spending reads the organization's spending ($0.00, nothing yet) | The app's own browser hop of the sign-in (the job makes the session by the same routes); a real fingerprint (the build confirms it: no finger is enrolled on the emulator) |
 
 ## Layout
 

@@ -2,9 +2,8 @@
 # GitHub as the app does (PKCE to its deep link, `POST /auth/mobile/token`) and gave the build that session and its
 # unlock key; another member of their organization asked two pushes to main that wait for them. The app reads the
 # real yes queue, says yes to one (biometrics, then the unlock on the server) and no to the other, then shows both
-# signed receipts, verified on the phone, the organization's activity (the requests, on the repository of the
-# job) and its spending (nothing yet). The job checks the gates and receipts through the API
-# afterwards.
+# signed receipts, verified on the phone, the organization's activity (the yes, the no and the two requests) and its
+# spending (nothing yet). The job checks the gates and receipts through the API afterwards.
 appId: run.ostrom.app
 ---
 - launchApp:
@@ -94,15 +93,14 @@ appId: run.ostrom.app
 - assertNotVisible: "Not verified.*"
 - takeScreenshot: real-history
 
-# The organization's activity (`GET /activity`): at least the two requests, on the job's repository. A row's details
-# read "<who> · <repo> · <when>": the separators around the repository keep an empty OSTROM_E2E_REPO from matching any
-# text.
+# The organization's activity (`GET /activity`): the phone's yes and no, said by its person, and the two requests.
 - tapOn: "Activity"
 - extendedWaitUntil:
-    visible: ".* · ${OSTROM_E2E_REPO} · .*"
+    visible: "${OSTROM_E2E_LOGIN} said yes to: .*"
     timeout: 30000
+- assertVisible: "${OSTROM_E2E_LOGIN} said no to: .*"
 - assertVisible:
-    text: ".* · ${OSTROM_E2E_REPO} · .*"
+    text: ".* asked for a yes: .*"
     index: 1
 - assertNotVisible: "No activity yet."
 - assertNotVisible: "The activity could not be loaded."
