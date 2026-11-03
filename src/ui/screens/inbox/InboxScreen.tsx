@@ -3,6 +3,7 @@ import {useRouter} from "expo-router"
 import {useTranslation} from "react-i18next"
 import {ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, View} from "react-native"
 import {SafeAreaView} from "react-native-safe-area-context"
+import {useServices} from "@/services/AppServices"
 import {Button} from "@/ui/components/Button"
 import {ScreenTitle} from "@/ui/components/ScreenTitle"
 import {StatusBadge} from "@/ui/components/StatusBadge"
@@ -41,6 +42,7 @@ export function InboxScreen(): React.JSX.Element {
     const {colors} = useTheme()
     const router = useRouter()
     const {state, refreshing, refresh} = useInboxViewModel()
+    const {onFirstUsefulScreen} = useServices()
     const open = (id: string): void => {
         router.push(`/request/${encodeURIComponent(id)}`)
     }
@@ -69,6 +71,7 @@ export function InboxScreen(): React.JSX.Element {
                 <FlatList
                     data={state.rows}
                     testID="inbox-list"
+                    onLayout={onFirstUsefulScreen}
                     keyExtractor={(row) => row.id}
                     contentContainerStyle={styles.list}
                     refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.signal} />}

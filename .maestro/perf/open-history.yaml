@@ -1,0 +1,10 @@
+# The performance pass (scripts/perf-measure.sh): the History tab, with its long list shown, ready to be scrolled.
+appId: run.ostrom.app
+---
+- launchApp:
+    stopApp: false
+- tapOn: "History"
+- extendedWaitUntil:
+    visible:
+      id: "receipt-.*"
+    timeout: 60000

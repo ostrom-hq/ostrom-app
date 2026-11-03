@@ -770,17 +770,32 @@ export type BillingUsage = {
 
 export type BillingWebhookAck = {
     received: boolean;
-    outcome: 'processed' | 'duplicate' | 'ignored';
+    outcome: 'processed' | 'duplicate' | 'ignored' | 'ignored_unknown_org';
 };
 
 /**
- * A spending limit
+ * A subject's spending limits, per calendar month and per day (UTC). A day starts at 00:00 UTC, a month on the 1st at 00:00 UTC; the spend is the model gateway's measured cost
  */
 export type Budget = {
+    /**
+     * `organization` (also `org`) or `member`
+     */
     scope: string;
+    /**
+     * For `member`: the member's `id` (`OrgMember.id`); absent, every member without limits of their own
+     */
     subject?: string;
+    /**
+     * The monthly limit in US dollars; absent, none
+     */
     usdPerMonth?: number;
+    /**
+     * The daily limit in US dollars; absent, none
+     */
     usdPerDay?: number;
+    /**
+     * True: a reached limit refuses the model calls until its period ends (`InferenceRefused`, `Monthly budget reached` or `Daily budget reached`). False: the calls go on; the overrun is written once per period to the organization's audit log (`budget.exceeded`) and listed in `Spending.exceeded`
+     */
     hardStop: boolean;
 };
 
@@ -1120,6 +1135,10 @@ export type DeviceCode = {
     verificationUri: string;
     interval: number;
     expiresIn: number;
+    /**
+     * The verification page with the code filled in
+     */
+    verificationUriComplete?: string;
 };
 
 /**
@@ -1164,6 +1183,19 @@ export type Evidence = {
     label: string;
     value: string;
     url?: string;
+};
+
+/**
+ * 403 other than step_up_required: `forbidden` (a token without the scope, a member without the role, a credential the route does not admit), or a finer key (`email_link_other_browser`, `installation_not_yours`, `probe_not_yours`, `cutover_owner_required`, `self_approval_refused`: the server names the other approvers in `message` only, without the `others` of `SelfApprovalRefused`)
+ */
+export type Forbidden = {
+    /**
+     * `ErrorDetail`, its `type` any 403 key but `step_up_required`
+     */
+    error: {
+        type: 'forbidden' | 'email_link_other_browser' | 'installation_not_yours' | 'probe_not_yours' | 'cutover_owner_required' | 'self_approval_refused';
+        message: string;
+    };
 };
 
 /**
@@ -1595,6 +1627,21 @@ export type InvitationToken = {
 };
 
 /**
+ * A JSON-RPC 2.0 error, as the MCP relay answers it
+ */
+export type JsonRpcError = {
+    jsonrpc: '2.0';
+    /**
+     * The request's id; null when it could not be read
+     */
+    id?: string | number | null;
+    error: {
+        code: number;
+        message: string;
+    };
+};
+
+/**
  * The consent page of a started link
  */
 export type LinkStarted = {
@@ -1722,6 +1769,18 @@ export type McpCall = {
     launchId?: string;
     durationMs?: number;
     ok: boolean;
+    /**
+     * `OK`, `DENIED`, `UPSTREAM_ERROR`…
+     */
+    outcome?: string;
+    /**
+     * The upstream answer's size
+     */
+    responseBytes?: number;
+    /**
+     * The argument policy that refused the call
+     */
+    policyId?: string;
 };
 
 /**
@@ -1828,6 +1887,10 @@ export type Me = {
     member?: Member;
     organization?: Organization;
     capabilities: Array<string>;
+    /**
+     * For a browser session, the token to send in `X-CSRF-Token` on state-changing requests
+     */
+    csrfToken?: string;
 };
 
 /**
@@ -1913,6 +1976,11 @@ export type AccountEmail = {
     email: string;
     verified: boolean;
 };
+
+/**
+ * A 403 of a write that may need a fresh sign-in: `step_up_required` (sign in again, then send it again) or `forbidden`, told apart by `error.type`
+ */
+export type StepUpOrForbidden = StepUpRequired | Forbidden;
 
 export type TokenScope = {
     /**
@@ -2114,9 +2182,13 @@ export type OrgInvites = {
 };
 
 /**
- * A member as `/api/v1/orgs/{org}/members` serves it (no member id there)
+ * A member as `/api/v1/orgs/{org}/members` serves it
  */
 export type OrgMember = {
+    /**
+     * The member's id, stable across their tokens and sessions: the `subject` of their `Budget`
+     */
+    id: string;
     login: string;
     name: string;
     /**
@@ -2136,6 +2208,10 @@ export type OrgMember = {
  */
 export type OrgMemberList = {
     items: Array<OrgMember>;
+    /**
+     * The `after` of the next page; absent when no member follows
+     */
+    next?: string;
 };
 
 /**
@@ -2174,6 +2250,10 @@ export type OrgView = {
      */
     role: string;
     createdAt: string;
+    /**
+     * The organization's IANA time zone, `UTC` by default
+     */
+    timeZone?: string;
 };
 
 /**
@@ -2336,6 +2416,21 @@ export type PublicKey = {
     kid: string;
     alg: string;
     publicKeyPem: string;
+    rotation?: KeyRotation;
+};
+
+/**
+ * How a receipt key was handed over by the key it replaces. Absent on a key handed over by nobody (the first key, or a key changed without its previous one). A reader that pinned the previous key trusts this one only if `signature` verifies; it follows a chain of rotations key by key
+ */
+export type KeyRotation = {
+    /**
+     * The id of the key this key replaces
+     */
+    kid: string;
+    /**
+     * The replaced key's Ed25519 signature, in base64, over the UTF-8 text `ostrom-receipt-key-rotation/v1\n` followed by the lowercase hex of this key's 32 raw bytes (the end of its SPKI DER)
+     */
+    signature: string;
 };
 
 /**
@@ -2704,6 +2799,14 @@ export type Session = {
     costUsd?: number;
     exitCode?: number;
     runId?: string;
+    /**
+     * True once ended (the answer to a sign of life)
+     */
+    ended?: boolean;
+    /**
+     * True when closed for lack of a sign of life; its launcher reopens a segment
+     */
+    lost?: boolean;
 };
 
 /**
@@ -2755,6 +2858,10 @@ export type SessionPackage = {
 export type SessionResponse = {
     session: Session;
     receipt?: Receipt;
+    /**
+     * For `reopenSession`, false when the segment was already open
+     */
+    reopened?: boolean;
 };
 
 /**
@@ -2783,10 +2890,46 @@ export type SharedAccount = {
     label: string;
     owner: string;
     status: string;
+    /**
+     * Whom it is lent to, sorted together: the logins of its members and `group:<id>` for each group it is lent to. Empty for the whole organization, and for a member who is neither an admin nor its owner.
+     */
     sharedWith: Array<string>;
     pool?: string;
     dailyAllocationUsd?: number;
     paused: boolean;
+    email?: string;
+    providerAccountId?: string;
+    /**
+     * True when the caller enrolled it
+     */
+    mine?: boolean;
+    priority?: number;
+    limits?: {
+        maxConcurrent?: number;
+        utilizationCeiling?: number;
+        monthlyBudgetMicros?: number;
+        dailyBudgetMicros?: number;
+        allowedMembers?: Array<string>;
+    };
+    /**
+     * Until when the account rests after the provider limited it
+     */
+    cooldownUntil?: string;
+    /**
+     * The provider's quota windows, as last observed
+     */
+    windows?: Array<{
+        window?: string;
+        utilization?: number;
+        resetsAt?: string;
+        observedAt?: string;
+    }>;
+    /**
+     * Requests in flight
+     */
+    inFlight?: number;
+    spentMicros?: number;
+    createdAt?: string;
 };
 
 /**
@@ -2876,6 +3019,37 @@ export type Spending = {
     byRepo: Array<SpendingLine>;
     byPerson: Array<SpendingLine>;
     daily: Array<SpendingDay>;
+    /**
+     * The budgets the reader sees spent past their limit today or this month, whatever `period`: all of the organization's for whoever sees its whole spending, the reader's own otherwise; empty when none
+     */
+    exceeded?: Array<ExceededBudget>;
+};
+
+/**
+ * A budget spent past its limit in its current day or month
+ */
+export type ExceededBudget = {
+    /**
+     * `organization` or `member`
+     */
+    scope: string;
+    /**
+     * For `member`: the member's `id`
+     */
+    subject?: string;
+    period: 'day' | 'month';
+    /**
+     * The limit in US dollars
+     */
+    usd: number;
+    /**
+     * Whether it stops the calls; false, it only warns and the calls go on
+     */
+    hardStop: boolean;
+    /**
+     * When the server saw it reached
+     */
+    since: string;
 };
 
 /**
@@ -2916,7 +3090,13 @@ export type StartSessionRequest = {
  * 403 step_up_required: a yes, and a sensitive write from the console or the app (a personal token, a service key, a sign-in link, an invitation, a role, a member removed, a transfer, a secret, an MCP server, its assignments, policies and settings, the model keys), need a sign-in less than 5 minutes old (a sign-in of unknown age is refused too); sign in again, then send it again. A no never needs it, and an API token is never asked: it has no sign-in to renew
  */
 export type StepUpRequired = {
-    error: ErrorDetail;
+    /**
+     * `ErrorDetail`, its `type` `step_up_required`
+     */
+    error: {
+        type: 'step_up_required';
+        message: string;
+    };
 };
 
 /**
@@ -3875,6 +4055,15 @@ export type OauthLoginCallbackData = {
     url: '/api/v1/auth/{provider}/callback';
 };
 
+export type OauthLoginCallbackResponses = {
+    /**
+     * A mobile sign-in's code: the page that names who signed in and links to the app's deep link (`ostrom://auth/callback?code=&state=`), on the person's tap; no script, never framed or cached
+     */
+    200: string;
+};
+
+export type OauthLoginCallbackResponse = OauthLoginCallbackResponses[keyof OauthLoginCallbackResponses];
+
 export type LinkSignInProviderData = {
     body?: never;
     path: {
@@ -3980,6 +4169,10 @@ export type StartDeviceLoginErrors = {
      * A refusal
      */
     404: ApiError;
+    /**
+     * A refusal
+     */
+    429: ApiError;
 };
 
 export type StartDeviceLoginError = StartDeviceLoginErrors[keyof StartDeviceLoginErrors];
@@ -4053,7 +4246,7 @@ export type AnswerDeviceLoginErrors = {
     /**
      * step_up_required (approving `ostrom login --admin` needs a sign-in less than 5 minutes old; sign in again, then answer again; a denial and the ordinary `ostrom login` are not asked for it), or forbidden (the key is `error.type`)
      */
-    403: StepUpRequired | ApiError;
+    403: StepUpOrForbidden;
     /**
      * A refusal
      */
@@ -4152,6 +4345,10 @@ export type LauncherLoginErrors = {
      * A refusal
      */
     400: ApiError;
+    /**
+     * A refusal
+     */
+    401: ApiError;
     /**
      * A refusal
      */
@@ -4701,7 +4898,7 @@ export type CreateSignInLinkErrors = {
     /**
      * step_up_required (a write from the console needs a sign-in less than 5 minutes old; sign in again, then send it again), or forbidden (the key is `error.type`)
      */
-    403: StepUpRequired | ApiError;
+    403: StepUpOrForbidden;
     /**
      * A refusal
      */
@@ -4858,7 +5055,7 @@ export type CreateTokenErrors = {
     /**
      * step_up_required (a write from the console needs a sign-in less than 5 minutes old; sign in again, then send it again), or forbidden (the key is `error.type`)
      */
-    403: StepUpRequired | ApiError;
+    403: StepUpOrForbidden;
 };
 
 export type CreateTokenError = CreateTokenErrors[keyof CreateTokenErrors];
@@ -4924,7 +5121,7 @@ export type RotateTokenErrors = {
     /**
      * step_up_required (a write from the console needs a sign-in less than 5 minutes old; sign in again, then send it again), or forbidden (the key is `error.type`)
      */
-    403: StepUpRequired | ApiError;
+    403: StepUpOrForbidden;
     /**
      * A refusal
      */
@@ -5027,7 +5224,7 @@ export type CreateServiceKeyErrors = {
     /**
      * step_up_required (a write from the console needs a sign-in less than 5 minutes old; sign in again, then send it again), or forbidden (the key is `error.type`)
      */
-    403: StepUpRequired | ApiError;
+    403: StepUpOrForbidden;
     /**
      * A refusal
      */
@@ -5889,6 +6086,10 @@ export type CreateOrgErrors = {
     /**
      * A refusal
      */
+    402: ApiError;
+    /**
+     * A refusal
+     */
     403: ApiError;
     /**
      * A refusal
@@ -6061,7 +6262,7 @@ export type TransferOrgErrors = {
     /**
      * step_up_required (a write from the console needs a sign-in less than 5 minutes old; sign in again, then send it again), or forbidden (the key is `error.type`)
      */
-    403: StepUpRequired | ApiError;
+    403: StepUpOrForbidden;
     /**
      * A refusal
      */
@@ -6133,11 +6334,24 @@ export type ListOrgMembersData = {
          */
         org: string;
     };
-    query?: never;
+    query?: {
+        /**
+         * The most members of the page. Without it, up to 1000: the whole team of every organization today
+         */
+        limit?: number;
+        /**
+         * The `next` of the previous page: the members who joined after this one
+         */
+        after?: string;
+    };
     url: '/api/v1/orgs/{org}/members';
 };
 
 export type ListOrgMembersErrors = {
+    /**
+     * A refusal
+     */
+    400: ApiError;
     /**
      * A refusal
      */
@@ -6185,9 +6399,13 @@ export type InviteOrgMembersErrors = {
      */
     401: ApiError;
     /**
+     * A refusal
+     */
+    402: ApiError;
+    /**
      * step_up_required (a write from the console needs a sign-in less than 5 minutes old; sign in again, then send it again), or forbidden (the key is `error.type`)
      */
-    403: StepUpRequired | ApiError;
+    403: StepUpOrForbidden;
     /**
      * A refusal
      */
@@ -6234,7 +6452,7 @@ export type RemoveOrgMemberErrors = {
     /**
      * step_up_required (a write from the console needs a sign-in less than 5 minutes old; sign in again, then send it again), or forbidden (the key is `error.type`)
      */
-    403: StepUpRequired | ApiError;
+    403: StepUpOrForbidden;
     /**
      * A refusal
      */
@@ -6320,7 +6538,7 @@ export type UpdateOrgMemberErrors = {
     /**
      * step_up_required (a write from the console needs a sign-in less than 5 minutes old; sign in again, then send it again), or forbidden (the key is `error.type`)
      */
-    403: StepUpRequired | ApiError;
+    403: StepUpOrForbidden;
     /**
      * A refusal
      */
@@ -6404,7 +6622,7 @@ export type CreateInvitationLinkErrors = {
     /**
      * step_up_required (a write from the console needs a sign-in less than 5 minutes old; sign in again, then send it again), or forbidden (the key is `error.type`)
      */
-    403: StepUpRequired | ApiError;
+    403: StepUpOrForbidden;
     /**
      * A refusal
      */
@@ -6939,6 +7157,10 @@ export type ListReposErrors = {
      * A refusal
      */
     409: ApiError;
+    /**
+     * A refusal
+     */
+    503: ApiError;
 };
 
 export type ListReposError = ListReposErrors[keyof ListReposErrors];
@@ -7549,6 +7771,10 @@ export type AskGateErrors = {
      * A refusal
      */
     409: ApiError;
+    /**
+     * A refusal
+     */
+    503: ApiError;
 };
 
 export type AskGateError = AskGateErrors[keyof AskGateErrors];
@@ -7603,6 +7829,10 @@ export type GetGateErrors = {
      * A refusal
      */
     409: ApiError;
+    /**
+     * A refusal
+     */
+    429: ApiError;
 };
 
 export type GetGateError = GetGateErrors[keyof GetGateErrors];
@@ -8260,7 +8490,7 @@ export type AnswerApprovalErrors = {
     /**
      * self_approval_refused, step_up_required, or not an approver (the key is `error.type`)
      */
-    403: SelfApprovalRefused | StepUpRequired;
+    403: SelfApprovalRefused | StepUpRequired | Forbidden;
     /**
      * A refusal
      */
@@ -8363,7 +8593,7 @@ export type AnswerGovernanceConfirmationErrors = {
     /**
      * step_up_required (sign in again, then confirm), or forbidden (a token, not an owner or admin)
      */
-    403: StepUpRequired | ApiError;
+    403: StepUpOrForbidden;
     /**
      * A refusal
      */
@@ -10579,6 +10809,10 @@ export type RotateAutomationSecretResponses = {
      */
     200: {
         secret: string;
+        /**
+         * Until when the previous secret still signs, when one was replaced
+         */
+        previousSecretValidUntil?: string;
     };
 };
 
@@ -10845,6 +11079,10 @@ export type CreateWaitErrors = {
 export type CreateWaitError = CreateWaitErrors[keyof CreateWaitErrors];
 
 export type CreateWaitResponses = {
+    /**
+     * A replay of the same `Idempotency-Key`, answered with `Idempotency-Replayed: true`: the wait first created
+     */
+    200: Wait;
     /**
      * OK
      */
@@ -11143,7 +11381,7 @@ export type CreateMcpServerErrors = {
     /**
      * step_up_required (a write from the console needs a sign-in less than 5 minutes old; sign in again, then send it again), or forbidden (the key is `error.type`)
      */
-    403: StepUpRequired | ApiError;
+    403: StepUpOrForbidden;
     /**
      * A refusal
      */
@@ -11192,7 +11430,7 @@ export type DeleteMcpServerErrors = {
     /**
      * step_up_required (a write from the console needs a sign-in less than 5 minutes old; sign in again, then send it again), or forbidden (the key is `error.type`)
      */
-    403: StepUpRequired | ApiError;
+    403: StepUpOrForbidden;
     /**
      * A refusal
      */
@@ -11241,7 +11479,7 @@ export type SaveMcpServerErrors = {
     /**
      * step_up_required (a write from the console needs a sign-in less than 5 minutes old; sign in again, then send it again), or forbidden (the key is `error.type`)
      */
-    403: StepUpRequired | ApiError;
+    403: StepUpOrForbidden;
     /**
      * A refusal
      */
@@ -11343,7 +11581,7 @@ export type UnassignMcpServerErrors = {
     /**
      * step_up_required (a write from the console needs a sign-in less than 5 minutes old; sign in again, then send it again), or forbidden (the key is `error.type`)
      */
-    403: StepUpRequired | ApiError;
+    403: StepUpOrForbidden;
     /**
      * A refusal
      */
@@ -11396,7 +11634,7 @@ export type AssignMcpServerErrors = {
     /**
      * step_up_required (a write from the console needs a sign-in less than 5 minutes old; sign in again, then send it again), or forbidden (the key is `error.type`)
      */
-    403: StepUpRequired | ApiError;
+    403: StepUpOrForbidden;
     /**
      * A refusal
      */
@@ -11494,7 +11732,7 @@ export type CreateMcpArgumentPolicyErrors = {
     /**
      * step_up_required (a write from the console needs a sign-in less than 5 minutes old; sign in again, then send it again), or forbidden (the key is `error.type`)
      */
-    403: StepUpRequired | ApiError;
+    403: StepUpOrForbidden;
     /**
      * A refusal
      */
@@ -11544,7 +11782,7 @@ export type DeleteMcpArgumentPolicyErrors = {
     /**
      * step_up_required (a write from the console needs a sign-in less than 5 minutes old; sign in again, then send it again), or forbidden (the key is `error.type`)
      */
-    403: StepUpRequired | ApiError;
+    403: StepUpOrForbidden;
     /**
      * A refusal
      */
@@ -11638,7 +11876,7 @@ export type PutMcpSettingsErrors = {
     /**
      * step_up_required (a write from the console needs a sign-in less than 5 minutes old; sign in again, then send it again), or forbidden (the key is `error.type`)
      */
-    403: StepUpRequired | ApiError;
+    403: StepUpOrForbidden;
     /**
      * A refusal
      */
@@ -11677,9 +11915,9 @@ export type RelayMcpData = {
 
 export type RelayMcpErrors = {
     /**
-     * A refusal
+     * A JSON-RPC error from the relay (a malformed message, an unknown tool or server), or a refusal before the relay (`ApiError`)
      */
-    400: ApiError;
+    400: JsonRpcError | ApiError;
     /**
      * A refusal
      */
@@ -11689,13 +11927,17 @@ export type RelayMcpErrors = {
      */
     403: ApiError;
     /**
-     * A refusal
+     * A JSON-RPC error from the relay (a malformed message, an unknown tool or server), or a refusal before the relay (`ApiError`)
      */
-    404: ApiError;
+    404: JsonRpcError | ApiError;
     /**
      * A refusal
      */
     409: ApiError;
+    /**
+     * A refusal
+     */
+    413: ApiError;
 };
 
 export type RelayMcpError = RelayMcpErrors[keyof RelayMcpErrors];
@@ -11705,6 +11947,10 @@ export type RelayMcpResponses = {
      * OK
      */
     200: unknown;
+    /**
+     * Accepted, without a body (a JSON-RPC notification or response sent to the server)
+     */
+    202: unknown;
 };
 
 export type ListMcpCallsData = {
@@ -11810,6 +12056,19 @@ export type GetMcpUsageResponses = {
         byTool: {
             [key: string]: number;
         };
+        /**
+         * Details by member and server
+         */
+        rows?: Array<{
+            dev?: string;
+            server?: string;
+            calls?: number;
+            lists?: number;
+            errors?: number;
+            denied?: number;
+            bytes?: number;
+            durationMs?: number;
+        }>;
     };
 };
 
@@ -11890,7 +12149,7 @@ export type CreateSecretErrors = {
     /**
      * step_up_required (a write from the console needs a sign-in less than 5 minutes old; sign in again, then send it again), or forbidden (the key is `error.type`)
      */
-    403: StepUpRequired | ApiError;
+    403: StepUpOrForbidden;
     /**
      * A refusal
      */
@@ -11939,7 +12198,7 @@ export type DeleteSecretErrors = {
     /**
      * step_up_required (a write from the console needs a sign-in less than 5 minutes old; sign in again, then send it again), or forbidden (the key is `error.type`)
      */
-    403: StepUpRequired | ApiError;
+    403: StepUpOrForbidden;
     /**
      * A refusal
      */
@@ -11988,7 +12247,7 @@ export type RotateSecretErrors = {
     /**
      * step_up_required (a write from the console needs a sign-in less than 5 minutes old; sign in again, then send it again), or forbidden (the key is `error.type`)
      */
-    403: StepUpRequired | ApiError;
+    403: StepUpOrForbidden;
     /**
      * A refusal
      */
@@ -12105,7 +12364,7 @@ export type InferenceMessagesErrors = {
      */
     409: ApiError;
     /**
-     * Too many requests, in the provider's own error shape, which satisfies `ApiError` (`error.type`, `error.message`). Refused by the budgets before any provider is called: `error.type` `rate_limit_error` on the Messages endpoint, `insufficient_quota` on the OpenAI-compatible ones, which also carry `error.code` `budget_exhausted` or `budget_insufficient`; `error.message` starts with one of two fixed phrases a client can match on (`LedgerSpendGuard.EXHAUSTED` and `.INSUFFICIENT` in ostrom-server). `Monthly budget reached: ...`: a monthly limit of the organization or of the member is spent; `Retry-After` gives the seconds until the month ends (UTC), when the limit resets. `Budget left too low for this call: ...`: the limit is not spent, but what is left after the calls in flight cannot cover what this call may cost (its output price times the largest of its `max_tokens`, `max_output_tokens` and `max_completion_tokens`, 32 000 when it names none, at most 1 000 000; plus its estimated input; nothing for a model without a price); the message says what is left and what the call may cost, with no `Retry-After`: lower the call's output bound, or retry once the calls in flight finish. Every shared account busy or at its limit: `rate_limit_error`, or `rate_limit_exceeded` with `error.code` `no_capacity`, with `Retry-After` when the gateway knows when one frees up. A provider's own 429, once no other account can take the call, is relayed as the provider sent it, with its `Retry-After` and rate-limit headers
+     * Too many requests, in the provider's own error shape, which satisfies `ApiError` (`error.type`, `error.message`). Refused by the budgets before any provider is called: `error.type` `rate_limit_error` on the Messages endpoint, `insufficient_quota` on the OpenAI-compatible ones, which also carry `error.code` `budget_exhausted` or `budget_insufficient`; `error.message` starts with one of three fixed phrases a client can match on (`LedgerSpendGuard.EXHAUSTED`, `.EXHAUSTED_TODAY` and `.INSUFFICIENT` in ostrom-server). `Monthly budget reached: ...`: a monthly limit of the organization or of the member is spent; `Retry-After` gives the seconds until the month ends (UTC), when the limit resets. `Daily budget reached: ...`: a daily limit is spent; `Retry-After` gives the seconds until the day ends (00:00 UTC). Only a limit with `hardStop` refuses a call. `Budget left too low for this call: ...`: the limit is not spent, but what is left after the calls in flight cannot cover what this call may cost (its output price times the largest of its `max_tokens`, `max_output_tokens` and `max_completion_tokens`, 32 000 when it names none, at most 1 000 000; plus its estimated input; nothing for a model without a price); the message says what is left and what the call may cost, with no `Retry-After`: lower the call's output bound, or retry once the calls in flight finish. Every shared account busy or at its limit: `rate_limit_error`, or `rate_limit_exceeded` with `error.code` `no_capacity`, with `Retry-After` when the gateway knows when one frees up. A provider's own 429, once no other account can take the call, is relayed as the provider sent it, with its `Retry-After` and rate-limit headers
      */
     429: ApiError;
     /**
@@ -12162,7 +12421,7 @@ export type InferenceResponsesErrors = {
      */
     409: ApiError;
     /**
-     * Too many requests, in the provider's own error shape, which satisfies `ApiError` (`error.type`, `error.message`). Refused by the budgets before any provider is called: `error.type` `rate_limit_error` on the Messages endpoint, `insufficient_quota` on the OpenAI-compatible ones, which also carry `error.code` `budget_exhausted` or `budget_insufficient`; `error.message` starts with one of two fixed phrases a client can match on (`LedgerSpendGuard.EXHAUSTED` and `.INSUFFICIENT` in ostrom-server). `Monthly budget reached: ...`: a monthly limit of the organization or of the member is spent; `Retry-After` gives the seconds until the month ends (UTC), when the limit resets. `Budget left too low for this call: ...`: the limit is not spent, but what is left after the calls in flight cannot cover what this call may cost (its output price times the largest of its `max_tokens`, `max_output_tokens` and `max_completion_tokens`, 32 000 when it names none, at most 1 000 000; plus its estimated input; nothing for a model without a price); the message says what is left and what the call may cost, with no `Retry-After`: lower the call's output bound, or retry once the calls in flight finish. Every shared account busy or at its limit: `rate_limit_error`, or `rate_limit_exceeded` with `error.code` `no_capacity`, with `Retry-After` when the gateway knows when one frees up. A provider's own 429, once no other account can take the call, is relayed as the provider sent it, with its `Retry-After` and rate-limit headers
+     * Too many requests, in the provider's own error shape, which satisfies `ApiError` (`error.type`, `error.message`). Refused by the budgets before any provider is called: `error.type` `rate_limit_error` on the Messages endpoint, `insufficient_quota` on the OpenAI-compatible ones, which also carry `error.code` `budget_exhausted` or `budget_insufficient`; `error.message` starts with one of three fixed phrases a client can match on (`LedgerSpendGuard.EXHAUSTED`, `.EXHAUSTED_TODAY` and `.INSUFFICIENT` in ostrom-server). `Monthly budget reached: ...`: a monthly limit of the organization or of the member is spent; `Retry-After` gives the seconds until the month ends (UTC), when the limit resets. `Daily budget reached: ...`: a daily limit is spent; `Retry-After` gives the seconds until the day ends (00:00 UTC). Only a limit with `hardStop` refuses a call. `Budget left too low for this call: ...`: the limit is not spent, but what is left after the calls in flight cannot cover what this call may cost (its output price times the largest of its `max_tokens`, `max_output_tokens` and `max_completion_tokens`, 32 000 when it names none, at most 1 000 000; plus its estimated input; nothing for a model without a price); the message says what is left and what the call may cost, with no `Retry-After`: lower the call's output bound, or retry once the calls in flight finish. Every shared account busy or at its limit: `rate_limit_error`, or `rate_limit_exceeded` with `error.code` `no_capacity`, with `Retry-After` when the gateway knows when one frees up. A provider's own 429, once no other account can take the call, is relayed as the provider sent it, with its `Retry-After` and rate-limit headers
      */
     429: ApiError;
     /**
@@ -12219,7 +12478,7 @@ export type InferenceChatCompletionsErrors = {
      */
     409: ApiError;
     /**
-     * Too many requests, in the provider's own error shape, which satisfies `ApiError` (`error.type`, `error.message`). Refused by the budgets before any provider is called: `error.type` `rate_limit_error` on the Messages endpoint, `insufficient_quota` on the OpenAI-compatible ones, which also carry `error.code` `budget_exhausted` or `budget_insufficient`; `error.message` starts with one of two fixed phrases a client can match on (`LedgerSpendGuard.EXHAUSTED` and `.INSUFFICIENT` in ostrom-server). `Monthly budget reached: ...`: a monthly limit of the organization or of the member is spent; `Retry-After` gives the seconds until the month ends (UTC), when the limit resets. `Budget left too low for this call: ...`: the limit is not spent, but what is left after the calls in flight cannot cover what this call may cost (its output price times the largest of its `max_tokens`, `max_output_tokens` and `max_completion_tokens`, 32 000 when it names none, at most 1 000 000; plus its estimated input; nothing for a model without a price); the message says what is left and what the call may cost, with no `Retry-After`: lower the call's output bound, or retry once the calls in flight finish. Every shared account busy or at its limit: `rate_limit_error`, or `rate_limit_exceeded` with `error.code` `no_capacity`, with `Retry-After` when the gateway knows when one frees up. A provider's own 429, once no other account can take the call, is relayed as the provider sent it, with its `Retry-After` and rate-limit headers
+     * Too many requests, in the provider's own error shape, which satisfies `ApiError` (`error.type`, `error.message`). Refused by the budgets before any provider is called: `error.type` `rate_limit_error` on the Messages endpoint, `insufficient_quota` on the OpenAI-compatible ones, which also carry `error.code` `budget_exhausted` or `budget_insufficient`; `error.message` starts with one of three fixed phrases a client can match on (`LedgerSpendGuard.EXHAUSTED`, `.EXHAUSTED_TODAY` and `.INSUFFICIENT` in ostrom-server). `Monthly budget reached: ...`: a monthly limit of the organization or of the member is spent; `Retry-After` gives the seconds until the month ends (UTC), when the limit resets. `Daily budget reached: ...`: a daily limit is spent; `Retry-After` gives the seconds until the day ends (00:00 UTC). Only a limit with `hardStop` refuses a call. `Budget left too low for this call: ...`: the limit is not spent, but what is left after the calls in flight cannot cover what this call may cost (its output price times the largest of its `max_tokens`, `max_output_tokens` and `max_completion_tokens`, 32 000 when it names none, at most 1 000 000; plus its estimated input; nothing for a model without a price); the message says what is left and what the call may cost, with no `Retry-After`: lower the call's output bound, or retry once the calls in flight finish. Every shared account busy or at its limit: `rate_limit_error`, or `rate_limit_exceeded` with `error.code` `no_capacity`, with `Retry-After` when the gateway knows when one frees up. A provider's own 429, once no other account can take the call, is relayed as the provider sent it, with its `Retry-After` and rate-limit headers
      */
     429: ApiError;
     /**
@@ -12364,7 +12623,7 @@ export type SetInferenceSettingsErrors = {
     /**
      * step_up_required (a write from the console needs a sign-in less than 5 minutes old; sign in again, then send it again), or forbidden (the key is `error.type`)
      */
-    403: StepUpRequired | ApiError;
+    403: StepUpOrForbidden;
     /**
      * A refusal
      */
@@ -13706,6 +13965,10 @@ export type CreateCloudSessionErrors = {
     /**
      * A refusal
      */
+    402: ApiError;
+    /**
+     * A refusal
+     */
     403: ApiError;
     /**
      * A refusal
@@ -14081,6 +14344,10 @@ export type CloudRunnerHeartbeatErrors = {
      * A refusal
      */
     409: ApiError;
+    /**
+     * A refusal
+     */
+    413: ApiError;
 };
 
 export type CloudRunnerHeartbeatError = CloudRunnerHeartbeatErrors[keyof CloudRunnerHeartbeatErrors];
@@ -14495,7 +14762,7 @@ export type GetArtifactContentData = {
 
 export type GetArtifactContentErrors = {
     /**
-     * A refusal
+     * Not found, or not readable with this ticket, in plain text without detail (`no-store`): the content origin answers no JSON. The same path asked of the API origin is not served there, and gets the API's JSON `ApiError`
      */
     404: ApiError;
 };
@@ -15057,6 +15324,10 @@ export type CreateArtifactTicketResponses = {
      * OK
      */
     200: ArtifactTicket;
+    /**
+     * Created
+     */
+    201: ArtifactTicket;
 };
 
 export type CreateArtifactTicketResponse = CreateArtifactTicketResponses[keyof CreateArtifactTicketResponses];
@@ -15116,6 +15387,9 @@ export type EnrollSharedAccountData = {
         provider: string;
         label: string;
         credentialSecret: string;
+        /**
+         * Whom it is lent to: members by login, and groups as `group:<id>` (the id of a group of `/api/v1/groups`). Empty: the whole organization. Only groups named: their members who are not paused, no one else. A group of another organization, or a malformed id, is refused (400).
+         */
         sharedWith?: Array<string>;
         dailyAllocationUsd?: number;
     };
@@ -15215,6 +15489,9 @@ export type RemoveSharedAccountResponse = RemoveSharedAccountResponses[keyof Rem
 
 export type UpdateSharedAccountData = {
     body: {
+        /**
+         * Whom it is lent to: members by login, and groups as `group:<id>` (the id of a group of `/api/v1/groups`). Empty: the whole organization. Only groups named: their members who are not paused, no one else. A group of another organization, or a malformed id, is refused (400).
+         */
         sharedWith?: Array<string>;
         dailyAllocationUsd?: number;
         paused?: boolean;
@@ -16741,6 +17018,10 @@ export type GetBillingErrors = {
      * A refusal
      */
     401: ApiError;
+    /**
+     * A refusal
+     */
+    403: ApiError;
     /**
      * A refusal
      */

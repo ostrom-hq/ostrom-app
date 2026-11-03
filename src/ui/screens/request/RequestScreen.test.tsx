@@ -421,7 +421,7 @@ describe("RequestScreen", () => {
     })
 
     it("says in clear that the request is mine, and why the server refused my yes", async () => {
-        await open(approvals.self, {refuse: refused(403, "forbidden")})
+        await open(approvals.self, {refuse: refused(403, "self_approval_refused")})
         expect(screen.getByText("You asked for this. Ostrom takes your yes only if nobody else can give it.")).toBeOnTheScreen()
         await fireEvent.press(screen.getByRole("button", {name: "Approve"}))
         expect(await screen.findByText("Someone else can approve this request, so your own yes is not taken.")).toBeOnTheScreen()

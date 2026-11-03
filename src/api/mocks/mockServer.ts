@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type {z} from "zod"
+import type {ActivityPageSchema} from "@/api/contract/activity"
 import type {ApprovalSchema, ApprovalViewSchema} from "@/api/contract/approvals"
 import type {MyOrganizationsSchema} from "@/api/contract/organizations"
 import {
@@ -29,6 +30,11 @@ export interface MockRequest {
 export interface MockServerOptions {
     /** The caller's active memberships: one by default (`acme`), so the header may be left out. */
     readonly memberships?: readonly string[]
+    /**
+     * Lists this long on top of the fixtures, for the performance pass (`scripts/perf-measure.sh`): waiting requests,
+     * activity rows and receipts (the signed fixtures, again and again, so that each one is verified for real).
+     */
+    readonly many?: number
 }
 
 /** The answer: a status and a JSON body, or none (204). */
@@ -71,6 +77,31 @@ interface Route {
  */
 const IN_ORG = /^\/api\/v1\/(push-devices|activity|spending|approvals|receipts(?!\/keys))(?=\/|$)/
 
+const pad = (index: number): string => String(index).padStart(4, "0")
+
+/** Waiting requests for the performance pass, each one a merge of its own pull request. */
+function manyApprovals(count: number): ApprovalInput[] {
+    return Array.from({length: count}, (_, index) => ({
+        ...fixtures.pendingApproval,
+        id: `appr_many_${pad(index)}`,
+        title: `Merge PR #${String(100 + index)} into main`,
+        repo: index % 2 === 0 ? "acme/acme-api" : "acme/acme-web",
+    }))
+}
+
+/** Activity rows for the performance pass, an hour apart, without a next page. */
+function manyActivity(count: number): z.input<typeof ActivityPageSchema>["items"] {
+    return Array.from({length: count}, (_, index) => ({
+        id: `act_many_${pad(index)}`,
+        at: new Date(Date.UTC(2026, 9, 29, 0) - index * 3_600_000).toISOString(),
+        kind: "gate.requested",
+        actor: {kind: "agent", name: "claude-code"},
+        summary: `claude-code asks to merge PR #${String(100 + index)}`,
+        repo: "acme/acme-api",
+        approvalId: `appr_many_${pad(index)}`,
+    }))
+}
+
 /** A route of the contract; `:id` is one path segment. */
 function route(method: string, pattern: string, respond: Route["respond"]): Route {
     return {method, path: new RegExp(`^${pattern.replace(":id", "([^/]+)")}$`), inOrg: IN_ORG.test(pattern), respond}
@@ -84,7 +115,7 @@ function route(method: string, pattern: string, respond: Route["respond"]): Rout
  * (`step_up_required`). A route of the caller's organization reads `Ostrom-Org` as the server does: without it, the
  * one membership, or 409 `org_required` when there are several; an organization the caller is not in, 404.
  */
-export function createMockServer({memberships = [fixtures.acme.id]}: MockServerOptions = {}): MockServer {
+export function createMockServer({memberships = [fixtures.acme.id], many = 0}: MockServerOptions = {}): MockServer {
     const approvals = new Map<string, ApprovalInput>(
         [
             fixtures.pendingApproval,
@@ -92,8 +123,11 @@ export function createMockServer({memberships = [fixtures.acme.id]}: MockServerO
             fixtures.deployApproval,
             fixtures.stepUpApproval,
             fixtures.decidedApproval,
+            ...manyApprovals(many),
         ].map((approval) => [approval.id, approval]),
     )
+    const receipts = [...fixtures.receipts, ...Array.from({length: many}, (_, index) => fixtures.receipts[index % fixtures.receipts.length])]
+    const activity = many === 0 ? fixtures.activity : {items: [...fixtures.activity.items, ...manyActivity(many)]}
     let settings = fixtures.notificationSettings
     const caller = fixtures.me.dev.login
 
@@ -211,7 +245,7 @@ export function createMockServer({memberships = [fixtures.acme.id]}: MockServerO
         ),
         route("POST", "/api/v1/approvals/:id/answer", ({body}, id) => answer(id, body)),
         route("GET", "/api/v1/receipts/keys", () => ok({keys: [fixtures.receiptKey]})),
-        route("GET", "/api/v1/receipts", () => ok({items: fixtures.receipts})),
+        route("GET", "/api/v1/receipts", () => ok({items: receipts})),
         route(
             "GET",
             "/api/v1/receipts/:id",
@@ -222,7 +256,7 @@ export function createMockServer({memberships = [fixtures.acme.id]}: MockServerO
                 return receipt === undefined ? refusal(404, "not_found", "No such receipt") : ok(receipt)
             },
         ),
-        route("GET", "/api/v1/activity", ({query}) => ok(query["before"] === undefined ? fixtures.activity : fixtures.olderActivity)),
+        route("GET", "/api/v1/activity", ({query}) => ok(query["before"] === undefined ? activity : fixtures.olderActivity)),
         route("GET", "/api/v1/spending", () => ok(fixtures.spending)),
         route(
             "POST",

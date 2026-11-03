@@ -1,0 +1,22 @@
+# The performance pass (scripts/perf-measure.sh): signs in on a server of many.example, whose lists have 500 more rows.
+appId: run.ostrom.app
+---
+- launchApp:
+    clearState: true
+# Two taps and erases: the first tap puts the cursor in the middle of the prefilled address (see browser-sign-in.yaml).
+- tapOn:
+    id: "login-server"
+- eraseText: 200
+- tapOn:
+    id: "login-server"
+- eraseText: 200
+- inputText: "https://perf.many.example"
+- assertVisible:
+    text: "https://perf.many.example"
+- hideKeyboard
+- tapOn:
+    id: "login-github"
+- extendedWaitUntil:
+    visible:
+      id: "inbox-list"
+    timeout: 30000

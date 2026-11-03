@@ -4,5 +4,11 @@ import {createMockAppServices} from "./mockServices"
 
 /** The services of the E2E build (`EXPO_PUBLIC_OSTROM_MOCK=1`, see `metro.config.js`): the in-memory server's. */
 export function servicesForBuild(): AppServices {
-    return createMockAppServices()
+    // Logged for the performance pass, read in logcat (scripts/perf-measure.sh). `warn`: a level the lint allows, which a
+    // release build keeps in logcat.
+    return createMockAppServices({
+        log: (line) => {
+            console.warn(line)
+        },
+    })
 }

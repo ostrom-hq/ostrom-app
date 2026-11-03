@@ -56,10 +56,11 @@ export function unlockProblem(error: unknown): DecisionProblem {
 
 /**
  * The server answers with the code of its `ErrorKind` (`conflict`, `forbidden`…), and `shown_digest_mismatch` when
- * the request changed. A 403 is `step_up_required` (a fresh sign-in is needed for a yes, contract 0.1.140) or, on a
- * request the person asked for, the self-approval refusal of the contract.
+ * the request changed. A 403 is told apart by `error.type` alone (contract core 1651cdc): `step_up_required` (a fresh
+ * sign-in is needed for a yes), `self_approval_refused` (the asker answered while another approver exists), or any other
+ * key, a "not allowed", whoever asked.
  */
-export function decisionProblem(error: unknown, askedByMe: boolean): DecisionProblem {
+export function decisionProblem(error: unknown): DecisionProblem {
     if (!(error instanceof ApiError)) return "failed"
     const {problem} = error
     switch (problem.kind) {
@@ -69,7 +70,7 @@ export function decisionProblem(error: unknown, askedByMe: boolean): DecisionPro
             if (problem.status === 409) return "already-decided"
             if (problem.status === 403 && problem.type === "step_up_required") return "step-up"
             if (problem.status === 403 && problem.type === "self_approval_refused") return "self-approval"
-            if (problem.status === 403) return askedByMe ? "self-approval" : "forbidden"
+            if (problem.status === 403) return "forbidden"
             return "failed"
         case "network":
         case "timeout":

@@ -55,3 +55,6 @@
 - name: "autorelease: tagged"
   color: "EEE9EA"
   description: "release-please: released"
+- name: "perf"
+  color: "EEE9EA"
+  description: "Runs the performance pass (workflow Perf) on the pull request"
