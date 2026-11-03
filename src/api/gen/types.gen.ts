@@ -1186,14 +1186,14 @@ export type Evidence = {
 };
 
 /**
- * 403 other than step_up_required: `forbidden` (a token without the scope, a member without the role, a credential the route does not admit), or a finer key (`email_link_other_browser`, `installation_not_yours`, `probe_not_yours`, `cutover_owner_required`)
+ * 403 other than step_up_required: `forbidden` (a token without the scope, a member without the role, a credential the route does not admit), or a finer key (`email_link_other_browser`, `installation_not_yours`, `probe_not_yours`, `cutover_owner_required`, `self_approval_refused`: the server names the other approvers in `message` only, without the `others` of `SelfApprovalRefused`)
  */
 export type Forbidden = {
     /**
      * `ErrorDetail`, its `type` any 403 key but `step_up_required`
      */
     error: {
-        type: 'forbidden' | 'email_link_other_browser' | 'installation_not_yours' | 'probe_not_yours' | 'cutover_owner_required';
+        type: 'forbidden' | 'email_link_other_browser' | 'installation_not_yours' | 'probe_not_yours' | 'cutover_owner_required' | 'self_approval_refused';
         message: string;
     };
 };
@@ -2208,6 +2208,10 @@ export type OrgMember = {
  */
 export type OrgMemberList = {
     items: Array<OrgMember>;
+    /**
+     * The `after` of the next page; absent when no member follows
+     */
+    next?: string;
 };
 
 /**
@@ -4050,6 +4054,15 @@ export type OauthLoginCallbackData = {
     };
     url: '/api/v1/auth/{provider}/callback';
 };
+
+export type OauthLoginCallbackResponses = {
+    /**
+     * A mobile sign-in's code: the page that names who signed in and links to the app's deep link (`ostrom://auth/callback?code=&state=`), on the person's tap; no script, never framed or cached
+     */
+    200: string;
+};
+
+export type OauthLoginCallbackResponse = OauthLoginCallbackResponses[keyof OauthLoginCallbackResponses];
 
 export type LinkSignInProviderData = {
     body?: never;
@@ -6321,11 +6334,24 @@ export type ListOrgMembersData = {
          */
         org: string;
     };
-    query?: never;
+    query?: {
+        /**
+         * The most members of the page. Without it, up to 1000: the whole team of every organization today
+         */
+        limit?: number;
+        /**
+         * The `next` of the previous page: the members who joined after this one
+         */
+        after?: string;
+    };
     url: '/api/v1/orgs/{org}/members';
 };
 
 export type ListOrgMembersErrors = {
+    /**
+     * A refusal
+     */
+    400: ApiError;
     /**
      * A refusal
      */
@@ -14736,9 +14762,9 @@ export type GetArtifactContentData = {
 
 export type GetArtifactContentErrors = {
     /**
-     * Not found, or not readable with this ticket, in plain text without detail (`no-store`): the content origin answers no JSON
+     * Not found, or not readable with this ticket, in plain text without detail (`no-store`): the content origin answers no JSON. The same path asked of the API origin is not served there, and gets the API's JSON `ApiError`
      */
-    404: string;
+    404: ApiError;
 };
 
 export type GetArtifactContentError = GetArtifactContentErrors[keyof GetArtifactContentErrors];

@@ -835,7 +835,7 @@ export const zApproval = z.object({
 });
 
 /**
- * 403 other than step_up_required: `forbidden` (a token without the scope, a member without the role, a credential the route does not admit), or a finer key (`email_link_other_browser`, `installation_not_yours`, `probe_not_yours`, `cutover_owner_required`)
+ * 403 other than step_up_required: `forbidden` (a token without the scope, a member without the role, a credential the route does not admit), or a finer key (`email_link_other_browser`, `installation_not_yours`, `probe_not_yours`, `cutover_owner_required`, `self_approval_refused`: the server names the other approvers in `message` only, without the `others` of `SelfApprovalRefused`)
  */
 export const zForbidden = z.object({
     error: z.object({
@@ -844,7 +844,8 @@ export const zForbidden = z.object({
             'email_link_other_browser',
             'installation_not_yours',
             'probe_not_yours',
-            'cutover_owner_required'
+            'cutover_owner_required',
+            'self_approval_refused'
         ]),
         message: z.string()
     })
@@ -1473,7 +1474,8 @@ export const zOrgMember = z.object({
  * The members
  */
 export const zOrgMemberList = z.object({
-    items: z.array(zOrgMember)
+    items: z.array(zOrgMember),
+    next: z.string().optional()
 });
 
 /**
@@ -3213,6 +3215,11 @@ export const zOauthLoginCallbackQuery = z.object({
     error: z.string().optional()
 });
 
+/**
+ * A mobile sign-in's code: the page that names who signed in and links to the app's deep link (`ostrom://auth/callback?code=&state=`), on the person's tap; no script, never framed or cached
+ */
+export const zOauthLoginCallbackResponse = z.string();
+
 export const zLinkSignInProviderPath = z.object({
     provider: z.string()
 });
@@ -3736,6 +3743,11 @@ export const zLeaveOrgResponse = z.void();
 
 export const zListOrgMembersPath = z.object({
     org: z.string()
+});
+
+export const zListOrgMembersQuery = z.object({
+    limit: z.int().gte(1).lte(1000).optional().default(1000),
+    after: z.uuid().optional()
 });
 
 /**

@@ -38,6 +38,8 @@ describe("a 403 to a yes, told apart by error.type as the contract says", () => 
     it("the other writes' 403 is one of two bodies, and only error.type says which", () => {
         expect(zStepUpOrForbidden.parse(stepUp)).toEqual(stepUp)
         expect(zStepUpOrForbidden.parse(forbidden)).toEqual(forbidden)
-        expect(zStepUpOrForbidden.safeParse({error: {type: "self_approval_refused", message: ""}}).success).toBe(false)
+        // The self-approval refusal is one of Forbidden's keys (core d077130): still told apart by its type alone.
+        expect(zStepUpOrForbidden.parse({error: {type: "self_approval_refused", message: ""}})).toMatchObject({error: {type: "self_approval_refused"}})
+        expect(zStepUpOrForbidden.safeParse({error: {type: "conflict", message: ""}}).success).toBe(false)
     })
 })

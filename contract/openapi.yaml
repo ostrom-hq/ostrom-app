@@ -448,7 +448,8 @@ paths:
       tags:
       - auth
       summary: "Where the provider sends the browser back: sets the session cookies and redirects to the console (or to
-        `/login?error=`)"
+        `/login?error=`). For a sign-in the phone app started, an error redirects to the app's deep link; a code is
+        answered as a page whose link to the deep link the person taps"
       parameters:
       - name: provider
         in: path
@@ -473,6 +474,13 @@ paths:
           type: string
       security: []
       responses:
+        '200':
+          description: "A mobile sign-in's code: the page that names who signed in and links to the app's deep link
+            (`ostrom://auth/callback?code=&state=`), on the person's tap; no script, never framed or cached"
+          content:
+            text/html:
+              schema:
+                type: string
         '302':
           description: "Redirect"
   /api/v1/auth/{provider}/link:
@@ -1093,7 +1101,7 @@ paths:
           content:
             application/json:
               schema:
-                oneOf:
+                anyOf:
                 - $ref: '#/components/schemas/EmailLinkOtherBrowser'
                 - $ref: '#/components/schemas/ApiError'
         '404':
@@ -2301,7 +2309,7 @@ paths:
       x-ostrom-status: served
       tags:
       - organization
-      summary: "The members (scope `orgs:read`)"
+      summary: "The members (scope `orgs:read`), oldest first, a page at a time"
       parameters:
       - name: org
         in: path
@@ -2309,6 +2317,22 @@ paths:
         description: "The organization's id or short name"
         schema:
           type: string
+      - name: limit
+        in: query
+        required: false
+        description: "The most members of the page. Without it, up to 1000: the whole team of every organization today"
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 1000
+          default: 1000
+      - name: after
+        in: query
+        required: false
+        description: "The `next` of the previous page: the members who joined after this one"
+        schema:
+          type: string
+          format: uuid
       responses:
         '200':
           description: "OK"
@@ -2316,6 +2340,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/OrgMemberList'
+        '400':
+          $ref: '#/components/responses/Error'
         '401':
           $ref: '#/components/responses/Error'
         '403':
@@ -8820,11 +8846,15 @@ paths:
                 format: binary
         '404':
           description: 'Not found, or not readable with this ticket, in plain text without detail (`no-store`):
-            the content origin answers no JSON'
+            the content origin answers no JSON. The same path asked of the API origin is not served there, and gets
+            the API''s JSON `ApiError`'
           content:
             text/plain:
               schema:
                 type: string
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
   /l/{slug}/{path}:
     get:
       operationId: getArtifactLinkContent
@@ -12757,7 +12787,8 @@ components:
       type: object
       description: '403 other than step_up_required: `forbidden` (a token without the scope, a member without the
         role, a credential the route does not admit), or a finer key (`email_link_other_browser`,
-        `installation_not_yours`, `probe_not_yours`, `cutover_owner_required`)'
+        `installation_not_yours`, `probe_not_yours`, `cutover_owner_required`, `self_approval_refused`: the server
+        names the other approvers in `message` only, without the `others` of `SelfApprovalRefused`)'
       properties:
         error:
           type: object
@@ -12765,7 +12796,8 @@ components:
           properties:
             type:
               type: string
-              enum: [forbidden, email_link_other_browser, installation_not_yours, probe_not_yours, cutover_owner_required]
+              enum: [forbidden, email_link_other_browser, installation_not_yours, probe_not_yours, cutover_owner_required,
+                self_approval_refused]
             message:
               type: string
           required:
@@ -14317,6 +14349,9 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/OrgMember'
+        next:
+          type: string
+          description: "The `after` of the next page; absent when no member follows"
       required:
       - items
       x-ostrom-kotlin: pending
