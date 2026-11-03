@@ -3,7 +3,8 @@
 # unlock key; another member of their organization asked two pushes to main that wait for them. The app reads the
 # real yes queue, says yes to one (biometrics, then the unlock on the server) and no to the other, then shows both
 # signed receipts, verified on the phone, the organization's activity (the yes, the no and the two requests) and its
-# spending (nothing yet). The job checks the gates and receipts through the API afterwards.
+# spending (nothing yet, against the $50 monthly budget the job set). The job checks the gates and receipts through
+# the API afterwards.
 appId: run.ostrom.app
 ---
 - launchApp:
@@ -112,6 +113,8 @@ appId: run.ostrom.app
     visible: "\\$0\\.00"
     timeout: 30000
 - assertVisible: "Nothing spent."
+# The budget the job set (PUT /budgets, the organization's $50 a month): what was spent against it.
+- assertVisible: "0 % of the \\$50\\.00 budget"
 - assertNotVisible: "The spending could not be loaded."
 - takeScreenshot: real-spending
 

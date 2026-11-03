@@ -9,6 +9,7 @@
 #   the E2E build is given that session.
 # - The asker signs in by e-mail (the link read from the directory the server writes its mails to), accepts the
 #   invitation, and asks the two gates with a token of their own (`gates:ask`), which the job also reads them with.
+# - The organization gets a monthly budget of $50 that only warns (`PUT /api/v1/budgets`), for the Spending tab.
 # Masks the secrets in the job's log, and writes `token`, `unlock_key`, `login`, `yes_approval`, `no_approval`,
 # `yes_gate`, `no_gate`, `asker_token` and `repo` to $GITHUB_OUTPUT (standard output outside Actions).
 # Usage: scripts/real-server-session.sh <server origin> <mail directory> <fake GitHub origin>
@@ -143,6 +144,9 @@ workflow="$(jq -nc --arg id "app-e2e-$run" --arg login "$login" --arg repo "$rep
       nodes: [{id: "push-main", kind: "gate", label: "Push to main", approvers: [$login],
                actions: [{class: "push-main", label: "Push to the main branch", patterns: [], repos: [$repo]}]}]}')"
 api "${json[@]}" "${owner[@]}" -X POST "$server/api/v1/workflows" -d "$workflow" > /dev/null
+
+# The organization's monthly budget, that only warns: the Spending tab shows what was spent against it (PARCOURS 3.5).
+api "${json[@]}" "${owner[@]}" -X PUT "$server/api/v1/budgets" -d '{"scope":"organization","usdPerMonth":50,"hardStop":false}' > /dev/null
 
 # Two pushes to main, asked by the asker: one for the yes, one for the no.
 ask() {
