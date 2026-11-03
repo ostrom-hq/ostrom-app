@@ -108,6 +108,12 @@ export function createMockAppServices({log}: MockAppServicesOptions = {}): AppSe
                   onFirstUsefulScreen: () => {
                       log("ostrom.perf first-useful-screen")
                   },
+                  onTabPress: (tab) => {
+                      log(`ostrom.perf tab ${tab}`)
+                  },
+                  onListShown: (list) => {
+                      log(`ostrom.perf shown ${list}`)
+                  },
               }),
     }
 }

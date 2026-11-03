@@ -2,6 +2,7 @@
 import {useTranslation} from "react-i18next"
 import {ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, View} from "react-native"
 import {SafeAreaView} from "react-native-safe-area-context"
+import {useServices} from "@/services/AppServices"
 import {Button} from "@/ui/components/Button"
 import {ScreenTitle} from "@/ui/components/ScreenTitle"
 import {formatDateTime} from "@/ui/format/dateTime"
@@ -102,6 +103,7 @@ export function HistoryScreen(): React.JSX.Element {
     const {t} = useTranslation()
     const {colors} = useTheme()
     const {state, refreshing, refresh} = useHistoryViewModel()
+    const {onListShown} = useServices()
 
     let body: React.JSX.Element
     switch (state.kind) {
@@ -120,6 +122,9 @@ export function HistoryScreen(): React.JSX.Element {
             body = (
                 <FlatList
                     testID="history-list"
+                    onLayout={() => {
+                        onListShown?.("history")
+                    }}
                     data={state.rows}
                     // Index first: two receipts with the same id (a server bug) still get a row each.
                     keyExtractor={(row, index) => `${String(index)}:${row.key}`}

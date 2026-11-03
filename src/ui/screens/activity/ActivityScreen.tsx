@@ -4,6 +4,7 @@ import {useTranslation} from "react-i18next"
 import {ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, View} from "react-native"
 import {SafeAreaView} from "react-native-safe-area-context"
 import type {ActivityItem} from "@/api/contract/activity"
+import {useServices} from "@/services/AppServices"
 import {Button} from "@/ui/components/Button"
 import {ScreenTitle} from "@/ui/components/ScreenTitle"
 import {formatDateTime} from "@/ui/format/dateTime"
@@ -52,6 +53,7 @@ export function ActivityScreen(): React.JSX.Element {
     const {colors} = useTheme()
     const router = useRouter()
     const {state, refreshing, refresh, loadMore} = useActivityViewModel()
+    const {onListShown} = useServices()
     const open = (approvalId: string): void => {
         router.push(`/request/${encodeURIComponent(approvalId)}`)
     }
@@ -72,6 +74,10 @@ export function ActivityScreen(): React.JSX.Element {
         case "ready":
             body = (
                 <FlatList
+                    testID="activity-list"
+                    onLayout={() => {
+                        onListShown?.("activity")
+                    }}
                     data={state.items}
                     keyExtractor={(item) => item.id}
                     contentContainerStyle={styles.list}
