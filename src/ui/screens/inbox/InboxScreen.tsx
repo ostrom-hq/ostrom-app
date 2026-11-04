@@ -42,7 +42,7 @@ export function InboxScreen(): React.JSX.Element {
     const {colors} = useTheme()
     const router = useRouter()
     const {state, refreshing, refresh} = useInboxViewModel()
-    const {onFirstUsefulScreen} = useServices()
+    const {onFirstUsefulScreen, onListShown} = useServices()
     const open = (id: string): void => {
         router.push(`/request/${encodeURIComponent(id)}`)
     }
@@ -71,7 +71,10 @@ export function InboxScreen(): React.JSX.Element {
                 <FlatList
                     data={state.rows}
                     testID="inbox-list"
-                    onLayout={onFirstUsefulScreen}
+                    onLayout={() => {
+                        onFirstUsefulScreen?.()
+                        onListShown?.("inbox")
+                    }}
                     keyExtractor={(row) => row.id}
                     contentContainerStyle={styles.list}
                     refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.signal} />}

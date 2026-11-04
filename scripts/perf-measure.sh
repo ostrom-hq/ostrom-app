@@ -9,8 +9,11 @@
 #   out), both read in logcat on the emulator's clock;
 # - the calls made at launch: the E2E build logs each one (`ostrom.e2e request`), counted until 5 s after the first
 #   useful screen;
-# - each long list (inbox, activity, history: 500 more rows on a server of many.example): the time to show it, then 20
-#   flings, the frames rendered and janky (`dumpsys gfxinfo`) and the memory (`dumpsys meminfo`, total PSS).
+# - each long list (inbox, activity, history: 500 more rows on a server of many.example): what a person waits after the
+#   press of its tab, from the app's `ostrom.perf tab <name>` to its `ostrom.perf shown <list>` (the list laid out with
+#   its rows, the network calls included), on the phone's clock; never the Maestro flow's own duration, mostly the
+#   tool's start (about 10 s). The inbox is already shown by the cold starts: its time is the first useful screen. Then
+#   20 flings, the frames rendered and janky (`dumpsys gfxinfo`) and the memory (`dumpsys meminfo`, total PSS).
 # The emulator renders without a GPU: compare runs with each other, not with a phone.
 set -euo pipefail
 
@@ -21,27 +24,51 @@ RUNS="${PERF_RUNS:-5}"
 out="${PERF_OUT:-perf}"
 mkdir -p "$out"
 
-# What Maestro prints when the emulator, not the app, is the problem (the same list as scripts/run-maestro.sh).
-OUTAGE='device offline|DeviceServerDiedException|device not found|no devices/emulators found|Maestro driver did not start up in time|Failed to connect to /127\.0\.0\.1:7001|UNAVAILABLE: io exception'
+# Reruns of a flow after an outage of the emulator, at most (scripts/emulator-outage.sh says which failure is one).
+MAX_RERUNS=2
 
-# Runs one flow; a second time only when its first failure is such an outage, never when the flow's assertion failed.
+booted() {
+    [ "$(adb shell getprop sys.boot_completed 2> /dev/null | tr -d '\r')" = "1" ]
+}
+
+# The device answers adb and has finished booting, 180 s at most for each.
+ready() {
+    local deadline
+    timeout 180 adb wait-for-device || return 1
+    deadline=$((SECONDS + 180))
+    until booted; do
+        if [ "$SECONDS" -ge "$deadline" ]; then return 1; fi
+        sleep 2
+    done
+}
+
+# A line of the log, and of the job's summary when there is one.
+note() {
+    echo "::warning::$1"
+    if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then echo "- $1" >> "$GITHUB_STEP_SUMMARY"; fi
+}
+
+# Runs one flow (then Maestro's own arguments, such as `-e NAME=value`). Run again, twice at most, only when its failure
+# is an outage of the emulator, once the device answers and has booted; never when an assertion failed or the app
+# crashed.
 flow() {
-    local name attempt
+    local name attempt why logs
     name="$(basename "$1" .yaml)"
-    for attempt in 1 2; do
-        if maestro test --test-output-dir "$out/maestro/$name-$attempt" "$1" > "$out/$name.console" 2>&1; then
+    for attempt in $(seq 1 $((MAX_RERUNS + 1))); do
+        if maestro test --test-output-dir "$out/maestro/$name-$attempt" "${@:2}" "$1" > "$out/$name.console" 2>&1; then
             return 0
         fi
+        booted || echo "emulator boot not completed: sys.boot_completed is not 1 after the failure" >> "$out/$name.console"
         # Maestro writes the outage in its own log of the flow, the console only says "Failed" (run 41657636900).
-        if [ "$attempt" = 1 ] && grep -rqE "$OUTAGE" "$out/$name.console" "$out/maestro/$name-$attempt"; then
-            adb reconnect > /dev/null 2>&1 || true
-            adb wait-for-device
-            continue
-        fi
-        break
+        mapfile -t logs < <(find "$out/maestro/$name-$attempt" -name maestro.log 2> /dev/null)
+        why="$(scripts/emulator-outage.sh "$out/$name.console" "${logs[@]}")"
+        [ "${why%% *}" = retry ] && [ "$attempt" -le "$MAX_RERUNS" ] || break
+        note "$name: run again ($attempt of $MAX_RERUNS) after an outage of the emulator: \`${why#retry }\`"
+        adb reconnect > /dev/null 2>&1 || true
+        ready || break
     done
     cat "$out/$name.console"
-    echo "::error::$name failed"
+    echo "::error::$name failed: ${why#* }"
     exit 1
 }
 
@@ -59,38 +86,56 @@ wait_for() {
     done
 }
 
-now() {
-    date +%s.%N
-}
-
 adb install -r "$apk" > /dev/null
 # Maestro's driver often fails its very first flow just after the boot: a warm-up that does not count.
 maestro test .maestro/common/warm-up.yaml > "$out/warm-up.console" 2>&1 || true
 flow .maestro/perf/sign-in-many.yaml
 
 : > "$out/starts.tsv"
-for run in $(seq 1 "$RUNS"); do
-    adb shell am force-stop "$APP"
-    adb logcat -c
-    total=$(adb shell am start-activity -W -n "$APP/.MainActivity" | tr -d '\r' | awk -F': ' '/TotalTime/ {print $2}')
+# One cold start, written to starts.tsv. Fails when adb lost the emulator on the way: an outage, not the app (Perf run
+# 41685033001, attempt 3: "adb: device offline" in the second start, after a first one that read no request at all).
+cold_start() {
+    local run="$1" total started useful log
+    adb shell am force-stop "$APP" && adb logcat -c || return 1
+    total=$(adb shell am start-activity -W -n "$APP/.MainActivity" | tr -d '\r' | awk -F': ' '/TotalTime/ {print $2}') || return 1
     if ! wait_for "ostrom.perf first-useful-screen"; then
-        adb logcat -d > "$out/logcat-start-$run.txt"
+        adb logcat -d > "$out/logcat-start-$run.txt" || true
+        return 1
+    fi
+    started=$(first_at "START u0 .*$APP") && useful=$(first_at "ostrom.perf first-useful-screen") || return 1
+    sleep 5
+    log=$(adb logcat -d) || return 1
+    { grep -o "ostrom.e2e request .*" <<< "$log" || true; } | sed 's/^ostrom.e2e request //' > "$out/requests-$run.txt"
+    [ -n "$total" ] && [ -n "$started" ] && [ -n "$useful" ] || return 1
+    printf '%s\t%s\t%s\t%s\n' "$run" "$total" "$(python3 -c "print(round(($useful - $started) * 1000))")" \
+        "$(wc -l < "$out/requests-$run.txt" | tr -d ' ')" >> "$out/starts.tsv"
+}
+
+for run in $(seq 1 "$RUNS"); do
+    cold_start "$run" && continue
+    # The emulator still answers: the app showed nothing useful, a real failure. Otherwise one more try, once back.
+    if [ "$(adb get-state 2> /dev/null)" = device ]; then
         echo "::error::no first useful screen within 60 s (run $run)"
         exit 1
     fi
-    started=$(first_at "START u0 .*$APP")
-    useful=$(first_at "ostrom.perf first-useful-screen")
-    sleep 5
-    adb logcat -d | grep -o "ostrom.e2e request .*" | sed 's/^ostrom.e2e request //' > "$out/requests-$run.txt" || true
-    printf '%s\t%s\t%s\t%s\n' "$run" "$total" "$(python3 -c "print(round(($useful - $started) * 1000))")" \
-        "$(wc -l < "$out/requests-$run.txt" | tr -d ' ')" >> "$out/starts.tsv"
+    echo "::warning::the emulator went away during cold start $run: once more, after a reconnect"
+    adb reconnect > /dev/null 2>&1 || true
+    ready
+    cold_start "$run" || { echo "::error::cold start $run failed twice"; exit 1; }
 done
 
 read -r width height < <(adb shell wm size | tr -d '\r' | awk -F'[ x]' '/Physical/ {print $3, $4}')
 for list in inbox activity history; do
-    begin=$(now)
+    adb logcat -c
     flow ".maestro/perf/open-$list.yaml"
-    shown=$(python3 -c "print(round(($(now) - $begin) * 1000))")
+    tap=""
+    if [ "$list" != inbox ]; then
+        pressed=$(first_at "ostrom.perf tab $list")
+        laid=$(first_at "ostrom.perf shown $list")
+        [ -n "$pressed" ] && [ -n "$laid" ] || { echo "::error::$list: no tab press or no list layout in logcat"; exit 1; }
+        tap=$(python3 -c "print(round(($laid - $pressed) * 1000))")
+        [ "$tap" -ge 0 ] || { echo "::error::$list: its list was laid out before its tab was pressed"; exit 1; }
+    fi
     adb shell dumpsys gfxinfo "$APP" reset > /dev/null
     for _ in $(seq 1 20); do
         adb shell input swipe $((width / 2)) $((height * 8 / 10)) $((width / 2)) $((height * 2 / 10)) 150
@@ -98,7 +143,7 @@ for list in inbox activity history; do
     sleep 2
     adb shell dumpsys gfxinfo "$APP" > "$out/gfxinfo-$list.txt"
     adb shell dumpsys meminfo "$APP" > "$out/meminfo-$list.txt"
-    echo "$shown" > "$out/shown-$list.txt"
+    echo "$tap" > "$out/tap-$list.txt"
 done
 
 python3 - "$out" "$apk" "$bundle" << 'PY'
@@ -123,7 +168,8 @@ for name in ("inbox", "activity", "history"):
     mem = open(os.path.join(out, f"meminfo-{name}.txt")).read()
     pss = number(r"TOTAL PSS:\s+(\d+)", mem) or number(r"^\s*TOTAL\s+(\d+)", mem)
     lists[name] = {
-        "shownMs": int(open(os.path.join(out, f"shown-{name}.txt")).read()),
+        # From the press of its tab to its list laid out, on the phone; None for the inbox, shown by the cold start.
+        "tapToListMs": int(tap) if (tap := open(os.path.join(out, f"tap-{name}.txt")).read().strip()) else None,
         "frames": number(r"Total frames rendered:\s+(\d+)", gfx, 0),
         "jankyFrames": number(r"Janky frames:\s+(\d+)", gfx, 0),
         "jankyPercent": number(r"Janky frames:\s+\d+\s+\(([\d.]+)%\)", gfx, 0),
@@ -159,7 +205,8 @@ rows = [
 ]
 for name, values in lists.items():
     rows.append(
-        f"| {name}: shown / janky / p90 / p99 / PSS | {values['shownMs']} ms / {values['jankyFrames']:.0f} of {values['frames']:.0f} "
+        f"| {name}: tap to list laid out / janky / p90 / p99 / PSS | "
+        f"{'first useful screen' if values['tapToListMs'] is None else str(values['tapToListMs']) + ' ms'} / {values['jankyFrames']:.0f} of {values['frames']:.0f} "
         f"({values['jankyPercent']}%) / {values['p90FrameMs']:.0f} ms / {values['p99FrameMs']:.0f} ms / {(values['pssKiB'] or 0) / 1024:.0f} MiB |"
     )
 rows += ["", "Calls at launch (run 1):", "", *[f"- `{line}`" for line in result["launchRequests"]["first"]]]

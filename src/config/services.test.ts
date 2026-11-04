@@ -186,8 +186,14 @@ describe("createMockAppServices", () => {
         expect(log).toHaveBeenCalledWith("ostrom.e2e request GET /api/v1/approvals/queue")
         services.onFirstUsefulScreen?.()
         expect(log).toHaveBeenLastCalledWith("ostrom.perf first-useful-screen")
+        services.onTabPress?.("activity")
+        expect(log).toHaveBeenLastCalledWith("ostrom.perf tab activity")
+        services.onListShown?.("activity")
+        expect(log).toHaveBeenLastCalledWith("ostrom.perf shown activity")
         // Without a log, nothing to call.
         expect(createMockAppServices().onFirstUsefulScreen).toBeUndefined()
+        expect(createMockAppServices().onTabPress).toBeUndefined()
+        expect(createMockAppServices().onListShown).toBeUndefined()
     })
 
     it("signs in on the address typed, without GitHub, and talks to the in-memory server", async () => {

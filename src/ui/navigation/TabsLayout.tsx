@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import {Tabs} from "expo-router"
 import {useTranslation} from "react-i18next"
+import {useServices} from "@/services/AppServices"
 import {usePushBridge} from "@/ui/push/usePushBridge"
 import {useTheme} from "@/ui/theme/useTheme"
 
@@ -8,9 +9,16 @@ import {useTheme} from "@/ui/theme/useTheme"
 export function TabsLayout(): React.JSX.Element {
     const {t} = useTranslation()
     const {colors} = useTheme()
+    const {onTabPress} = useServices()
     usePushBridge()
     return (
         <Tabs
+            // The performance pass times a list from this press (the E2E build only: no other build listens).
+            screenListeners={({route}) => ({
+                tabPress: () => {
+                    onTabPress?.(route.name)
+                },
+            })}
             screenOptions={{
                 headerShown: false,
                 // Garnet is kept for a human being awaited: the selected tab is ink, not garnet.
