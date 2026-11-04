@@ -13,7 +13,13 @@
 #   press of its tab, from the app's `ostrom.perf tab <name>` to its `ostrom.perf shown <list>` (the list laid out with
 #   its rows, the network calls included), on the phone's clock; never the Maestro flow's own duration, mostly the
 #   tool's start (about 10 s). The inbox is already shown by the cold starts: its time is the first useful screen. Then
-#   20 flings, the frames rendered and janky (`dumpsys gfxinfo`) and the memory (`dumpsys meminfo`, total PSS).
+#   20 flings, the frames rendered and janky (`dumpsys gfxinfo`) and the memory (`dumpsys meminfo`, total PSS);
+# - the memory over $PERF_NAV_SECONDS (300) seconds of navigation: rounds through the tabs, each long list scrolled
+#   (.maestro/perf/navigate.yaml), the total PSS read before, after every round, and once more after 10 s idle on the
+#   inbox. It is said rising when the last third of the readings stays above the first third's highest by more than
+#   $PERF_NAV_GROWTH_MIB (10) MiB and the idle reading stays within that much of the peak: memory that goes up without
+#   coming down. A first rounds' step that comes down again (the lists and their caches filled) is not rising (Perf run
+#   41711959760: 171, 239, then 216, 210, 217 MiB, 207 idle).
 # The emulator renders without a GPU: compare runs with each other, not with a phone.
 set -euo pipefail
 
@@ -24,27 +30,51 @@ RUNS="${PERF_RUNS:-5}"
 out="${PERF_OUT:-perf}"
 mkdir -p "$out"
 
-# What Maestro prints when the emulator, not the app, is the problem (the same list as scripts/run-maestro.sh).
-OUTAGE='device offline|DeviceServerDiedException|device not found|no devices/emulators found|Maestro driver did not start up in time|Failed to connect to /127\.0\.0\.1:7001|UNAVAILABLE: io exception'
+# Reruns of a flow after an outage of the emulator, at most (scripts/emulator-outage.sh says which failure is one).
+MAX_RERUNS=2
 
-# Runs one flow; a second time only when its first failure is such an outage, never when the flow's assertion failed.
+booted() {
+    [ "$(adb shell getprop sys.boot_completed 2> /dev/null | tr -d '\r')" = "1" ]
+}
+
+# The device answers adb and has finished booting, 180 s at most for each.
+ready() {
+    local deadline
+    timeout 180 adb wait-for-device || return 1
+    deadline=$((SECONDS + 180))
+    until booted; do
+        if [ "$SECONDS" -ge "$deadline" ]; then return 1; fi
+        sleep 2
+    done
+}
+
+# A line of the log, and of the job's summary when there is one.
+note() {
+    echo "::warning::$1"
+    if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then echo "- $1" >> "$GITHUB_STEP_SUMMARY"; fi
+}
+
+# Runs one flow (then Maestro's own arguments, such as `-e NAME=value`). Run again, twice at most, only when its failure
+# is an outage of the emulator, once the device answers and has booted; never when an assertion failed or the app
+# crashed.
 flow() {
-    local name attempt
+    local name attempt why logs
     name="$(basename "$1" .yaml)"
-    for attempt in 1 2; do
-        if maestro test --test-output-dir "$out/maestro/$name-$attempt" "$1" > "$out/$name.console" 2>&1; then
+    for attempt in $(seq 1 $((MAX_RERUNS + 1))); do
+        if maestro test --test-output-dir "$out/maestro/$name-$attempt" "${@:2}" "$1" > "$out/$name.console" 2>&1; then
             return 0
         fi
+        booted || echo "emulator boot not completed: sys.boot_completed is not 1 after the failure" >> "$out/$name.console"
         # Maestro writes the outage in its own log of the flow, the console only says "Failed" (run 41657636900).
-        if [ "$attempt" = 1 ] && grep -rqE "$OUTAGE" "$out/$name.console" "$out/maestro/$name-$attempt"; then
-            adb reconnect > /dev/null 2>&1 || true
-            adb wait-for-device
-            continue
-        fi
-        break
+        mapfile -t logs < <(find "$out/maestro/$name-$attempt" -name maestro.log 2> /dev/null)
+        why="$(scripts/emulator-outage.sh "$out/$name.console" "${logs[@]}")"
+        [ "${why%% *}" = retry ] && [ "$attempt" -le "$MAX_RERUNS" ] || break
+        note "$name: run again ($attempt of $MAX_RERUNS) after an outage of the emulator: \`${why#retry }\`"
+        adb reconnect > /dev/null 2>&1 || true
+        ready || break
     done
     cat "$out/$name.console"
-    echo "::error::$name failed"
+    echo "::error::$name failed: ${why#* }"
     exit 1
 }
 
@@ -96,7 +126,7 @@ for run in $(seq 1 "$RUNS"); do
     fi
     echo "::warning::the emulator went away during cold start $run: once more, after a reconnect"
     adb reconnect > /dev/null 2>&1 || true
-    timeout 120 adb wait-for-device
+    ready
     cold_start "$run" || { echo "::error::cold start $run failed twice"; exit 1; }
 done
 
@@ -122,10 +152,24 @@ for list in inbox activity history; do
     echo "$tap" > "$out/tap-$list.txt"
 done
 
-python3 - "$out" "$apk" "$bundle" << 'PY'
+# The app's total PSS, in KiB.
+pss() {
+    adb shell dumpsys meminfo "$APP" | tr -d '\r' | awk '/TOTAL PSS:/ {print $3; exit} /^ *TOTAL +[0-9]/ {print $2; exit}'
+}
+nav_seconds="${PERF_NAV_SECONDS:-300}"
+printf '%s\t%s\t%s\n' 0 "$(pss)" navigating > "$out/memory.tsv"
+nav_start=$SECONDS
+while [ $((SECONDS - nav_start)) -lt "$nav_seconds" ]; do
+    flow .maestro/perf/navigate.yaml -e ROUNDS=1
+    printf '%s\t%s\t%s\n' $((SECONDS - nav_start)) "$(pss)" navigating >> "$out/memory.tsv"
+done
+sleep 10
+printf '%s\t%s\t%s\n' $((SECONDS - nav_start)) "$(pss)" idle >> "$out/memory.tsv"
+
+python3 - "$out" "$apk" "$bundle" "${PERF_NAV_GROWTH_MIB:-10}" << 'PY'
 import json, os, re, statistics, sys
 
-out, apk, bundle = sys.argv[1:4]
+out, apk, bundle, growth_mib = sys.argv[1:5]
 starts = [line.split("\t") for line in open(os.path.join(out, "starts.tsv")).read().split("\n") if line]
 
 
@@ -154,6 +198,22 @@ for name in ("inbox", "activity", "history"):
         "pssKiB": pss,
     }
 
+readings = [line.split("\t") for line in open(os.path.join(out, "memory.tsv")).read().split("\n") if line]
+navigating = [int(kib) for _, kib, state in readings if state == "navigating"]
+idle = next(int(kib) for _, kib, state in readings if state == "idle")
+third = max(1, len(navigating) // 3)
+first_high = max(navigating[:third])
+margin = float(growth_mib) * 1024
+rising = min(navigating[-third:]) > first_high + margin and idle > max(navigating) - margin
+memory = {
+    "seconds": int(readings[-2][0]),
+    "readingsKiB": [{"atSeconds": int(at), "pssKiB": int(kib), "state": state} for at, kib, state in readings],
+    "startKiB": navigating[0],
+    "peakKiB": max(navigating),
+    "idleKiB": idle,
+    "rising": rising,
+}
+
 requests = open(os.path.join(out, "requests-1.txt")).read().split("\n")
 result = {
     "apkBytes": os.path.getsize(apk),
@@ -166,6 +226,7 @@ result = {
     },
     "launchRequests": {"count": median([int(run[3]) for run in starts]), "first": [line for line in requests if line]},
     "lists": lists,
+    "memoryOverNavigation": memory,
 }
 json.dump(result, open(os.path.join(out, "perf.json"), "w"), indent=2)
 
@@ -185,6 +246,11 @@ for name, values in lists.items():
         f"{'first useful screen' if values['tapToListMs'] is None else str(values['tapToListMs']) + ' ms'} / {values['jankyFrames']:.0f} of {values['frames']:.0f} "
         f"({values['jankyPercent']}%) / {values['p90FrameMs']:.0f} ms / {values['p99FrameMs']:.0f} ms / {(values['pssKiB'] or 0) / 1024:.0f} MiB |"
     )
+rows.append(
+    f"| Memory over {memory['seconds']} s of navigation: start / peak / idle after / verdict | "
+    f"{memory['startKiB'] / 1024:.0f} MiB / {memory['peakKiB'] / 1024:.0f} MiB / {memory['idleKiB'] / 1024:.0f} MiB / "
+    f"{'rising, not coming down' if memory['rising'] else 'steady'} |"
+)
 rows += ["", "Calls at launch (run 1):", "", *[f"- `{line}`" for line in result["launchRequests"]["first"]]]
 open(os.path.join(out, "summary.md"), "w").write("\n".join(rows) + "\n")
 print("\n".join(rows))

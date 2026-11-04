@@ -232,6 +232,7 @@ export const fr: TranslationShape = {
             "unlock-refused": "Ostrom n'a pas pris la preuve que c'est toi sur ce téléphone. Rien n'est parti : déconnecte-toi, puis reconnecte-toi.",
             "unlock-offline": "Le serveur n'a pas pu être joint. Rien n'est parti : réessaie.",
             "step-up": "Ostrom veut une connexion récente pour ce oui : confirme-le dans la console.",
+            "unlock-again": "Ostrom n'a pas pris le déverrouillage du téléphone pour ce oui : il était trop ancien. Rien n'est parti : redis oui.",
             "org-required":
                 "Tu es membre de plusieurs organisations, et Ostrom doit savoir pour laquelle est cette réponse : choisis-la dans les Réglages, ou réponds dans la console.",
             "self-approval": "Quelqu'un d'autre peut approuver cette demande : ton propre oui n'est pas pris.",
