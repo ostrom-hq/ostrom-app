@@ -5,7 +5,7 @@ import type {BiometricGate} from "@/services/biometrics/BiometricGate"
 import type {PhoneUnlock, UnlockOptions, UnlockOutcome} from "./PhoneUnlock"
 import type {UnlockKeyStore} from "./UnlockKeyStore"
 
-/** The server takes an answer 5 minutes after an unlock; the app unlocks again one minute before. */
+/** The server takes a no 5 minutes after an unlock; the app unlocks again one minute before. A yes always unlocks. */
 export const FRESH_UNLOCK_MS = 4 * 60 * 1000
 
 export interface PhoneUnlockDependencies {
@@ -46,14 +46,15 @@ export class PhoneUnlockImpl implements PhoneUnlock {
         return this.dependencies.keys.save(unlockKey)
     }
 
-    async unlock(prompt: string, account: AccountRepository, {always}: UnlockOptions): Promise<UnlockOutcome> {
+    async unlock(prompt: string, account: AccountRepository, {always, requestId}: UnlockOptions): Promise<UnlockOutcome> {
         const {keys, biometrics, now = phoneNow} = this.dependencies
         const asked = this.session
         // No key (a server before the unlock, or a session kept before it): the app's own check, as before.
         const withoutKey = (): Promise<UnlockOutcome> => (always ? biometrics.confirm(prompt) : Promise.resolve("confirmed"))
         if (!(await keys.has())) return withoutKey()
         const at = this.unlockedAt
-        if (!always && at !== undefined && now() - at < FRESH_UNLOCK_MS) return "confirmed"
+        // A yes names its request: an unlock made for another, or for none, is no proof of it for the server.
+        if (!always && requestId === undefined && at !== undefined && now() - at < FRESH_UNLOCK_MS) return "confirmed"
         const read = await keys.read(prompt)
         switch (read.kind) {
             case "none":
@@ -65,7 +66,7 @@ export class PhoneUnlockImpl implements PhoneUnlock {
                 return read.kind
             case "key": {
                 try {
-                    await account.unlock(read.key)
+                    await (requestId === undefined ? account.unlock(read.key) : account.unlock(read.key, requestId))
                 } catch (error) {
                     // Only the server's no refuses the key. Offline, a 5xx or an expired session is the answer's own
                     // problem, said as such by the screen.

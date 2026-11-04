@@ -3,12 +3,14 @@ import {ApiError, type ApiProblem} from "@/api/http/ApiError"
 import {biometricProblem, type DecisionProblem, decisionProblem, unlockProblem} from "./decisionProblem"
 
 const refused = (status: number, type: string): ApiProblem => ({kind: "refused", status, type, message: ""})
+const boundRefusal: ApiProblem = {kind: "refused", status: 403, type: "step_up_required", message: "", requestBound: true}
 
 const CASES: readonly (readonly [ApiProblem, DecisionProblem])[] = [
     [refused(409, "shown_digest_mismatch"), "changed"],
     [refused(409, "conflict"), "already-decided"],
     [refused(409, "org_required"), "org-required"],
     [refused(403, "step_up_required"), "step-up"],
+    [boundRefusal, "unlock-again"],
     [refused(403, "self_approval_refused"), "self-approval"],
     [refused(403, "forbidden"), "forbidden"],
     [refused(400, "invalid_request"), "failed"],

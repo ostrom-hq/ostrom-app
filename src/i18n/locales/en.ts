@@ -231,6 +231,7 @@ export const en = {
             "unlock-refused": "Ostrom did not take this phone's proof that it is you. Nothing was sent: sign out, then sign in again.",
             "unlock-offline": "The server could not be reached. Nothing was sent: try again.",
             "step-up": "Ostrom wants a fresh sign-in for this yes: confirm it in the console.",
+            "unlock-again": "Ostrom did not take this phone's unlock for this yes: it was too old. Nothing was sent: say yes again.",
             "org-required":
                 "You are a member of several organizations, and Ostrom needs to know which one this answer is for: choose it in Settings, or answer in the console.",
             "self-approval": "Someone else can approve this request, so your own yes is not taken.",

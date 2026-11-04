@@ -121,6 +121,23 @@ describe("HttpClientImpl", () => {
         })
     })
 
+    it("says when a step-up refusal asks for an unlock bound to the request (Q-APP-STEPUP-RISK)", async () => {
+        const stepUp = {type: "step_up_required", message: "unlock again"}
+        server.use(http.get(`${BASE}/api/ping`, () => HttpResponse.json({error: {...stepUp, requestBound: true}}, {status: 403})))
+        expect(await problemOf(client().send({method: "GET", path: "/api/ping", response: Pong}))).toEqual({
+            kind: "refused",
+            status: 403,
+            ...stepUp,
+            requestBound: true,
+        })
+        server.use(http.get(`${BASE}/api/ping`, () => HttpResponse.json({error: {...stepUp, requestBound: false}}, {status: 403})))
+        expect(await problemOf(client().send({method: "GET", path: "/api/ping", response: Pong}))).toEqual({
+            kind: "refused",
+            status: 403,
+            ...stepUp,
+        })
+    })
+
     it("keeps the server's key on a 401 that gives one", async () => {
         server.use(
             http.post(`${BASE}/api/ping`, () =>

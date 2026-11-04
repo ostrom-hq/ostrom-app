@@ -159,6 +159,19 @@ describe("AccountRepositoryImpl", () => {
         expect(await refusal(account.unlock("another-key"))).toBe("forbidden")
     })
 
+    it("names the request a yes is for in the unlock, and nothing for a no (Q-APP-STEPUP-RISK)", async () => {
+        const bodies: unknown[] = []
+        server.use(
+            httpMock.post(`${MOCK_BASE_URL}/api/v1/auth/mobile/unlock`, async ({request}) => {
+                bodies.push(await request.json())
+                return HttpResponse.json({authenticatedAt: "2026-11-03T20:00:00Z"})
+            }),
+        )
+        await account.unlock("mock-unlock-key", "appr_0001")
+        await account.unlock("mock-unlock-key")
+        expect(bodies).toEqual([{unlockKey: "mock-unlock-key", requestId: "appr_0001"}, {unlockKey: "mock-unlock-key"}])
+    })
+
     it("revokes the token of the session", async () => {
         await expect(account.logout()).resolves.toBeUndefined()
     })
