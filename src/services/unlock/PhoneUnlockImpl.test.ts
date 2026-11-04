@@ -12,7 +12,7 @@ interface Harness {
     readonly keys: MemoryUnlockKeyStore
     readonly confirm: jest.Mock<Promise<BiometricOutcome>, [string]>
     readonly account: AccountRepository
-    readonly serverUnlock: jest.Mock<Promise<Unlock>, [string]>
+    readonly serverUnlock: jest.Mock<Promise<Unlock>, [key: string, requestId?: string | undefined]>
     readonly clock: {now: number}
 }
 
@@ -23,7 +23,7 @@ function leave(): void {
     for (const listener of leaving) listener()
 }
 
-function harness(server: (key: string) => Promise<Unlock> = () => Promise.resolve({authenticatedAt: "2026-10-30T12:00:00Z"})): Harness {
+function harness(server: (key: string, requestId?: string) => Promise<Unlock> = () => Promise.resolve({authenticatedAt: "2026-10-30T12:00:00Z"})): Harness {
     const keys = new MemoryUnlockKeyStore()
     const confirm = jest.fn((_prompt: string) => Promise.resolve<BiometricOutcome>("confirmed"))
     const serverUnlock = jest.fn(server)
@@ -49,6 +49,17 @@ function harness(server: (key: string) => Promise<Unlock> = () => Promise.resolv
 describe("PhoneUnlockImpl", () => {
     beforeEach(() => {
         leaving = []
+    })
+
+    it("unlocks a yes for its own request every time, even right after an unlock (Q-APP-STEPUP-RISK)", async () => {
+        const {unlock, keys, account, serverUnlock} = harness()
+        await unlock.keep("key-1")
+        const read = jest.spyOn(keys, "read")
+        expect(await unlock.unlock("Decline", account, {always: false})).toBe("confirmed")
+        expect(serverUnlock).toHaveBeenLastCalledWith("key-1")
+        expect(await unlock.unlock("Approve", account, {always: false, requestId: "appr_0001"})).toBe("confirmed")
+        expect(read).toHaveBeenCalledTimes(2)
+        expect(serverUnlock).toHaveBeenLastCalledWith("key-1", "appr_0001")
     })
 
     it("asks the biometrics again for a low-risk answer once the app has been left (AUDIT-SECU-APP-2 N4)", async () => {

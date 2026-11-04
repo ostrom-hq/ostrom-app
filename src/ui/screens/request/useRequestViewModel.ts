@@ -134,7 +134,8 @@ export function useRequestViewModel(id: string): RequestViewModel {
                     outcome = await unlock.unlock(
                         t(answer === "approve" ? "request.confirm.approve" : "request.confirm.decline", {title: approval.title}),
                         account,
-                        {always: needsBiometrics(approval)},
+                        // A yes unlocks for this request: one biometric, one yes (Q-APP-STEPUP-RISK).
+                        answer === "approve" ? {always: needsBiometrics(approval), requestId: approval.id} : {always: needsBiometrics(approval)},
                     )
                 } catch (error) {
                     // Offline, a 5xx, the keychain: the unlock comes first, so nothing was sent. A session already left

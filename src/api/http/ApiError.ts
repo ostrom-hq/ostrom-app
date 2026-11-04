@@ -6,8 +6,17 @@ export type ApiProblem =
     | {readonly kind: "timeout"}
     /** The token is missing, expired or revoked: sign in again. `type` is the server's key when it gave one. */
     | {readonly kind: "unauthorized"; readonly type?: string}
-    /** The server refused on purpose; `type` is the stable key of CONVENTIONS § 3.3 (`self_approval_refused`…). */
-    | {readonly kind: "refused"; readonly status: number; readonly type: string; readonly message: string}
+    /**
+     * The server refused on purpose; `type` is the stable key of CONVENTIONS § 3.3 (`self_approval_refused`…).
+     * `requestBound`: a `step_up_required` that only an unlock made for this very request lifts (Q-APP-STEPUP-RISK).
+     */
+    | {
+          readonly kind: "refused"
+          readonly status: number
+          readonly type: string
+          readonly message: string
+          readonly requestBound?: true
+      }
     /** A 4xx without the contract's error body (a proxy, a missing route). */
     | {readonly kind: "unexpected-status"; readonly status: number}
     /** The server failed (5xx). */

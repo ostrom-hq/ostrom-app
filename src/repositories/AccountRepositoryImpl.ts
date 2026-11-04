@@ -28,8 +28,9 @@ export class AccountRepositoryImpl implements AccountRepository {
         return this.http.send({method: "POST", path: "/api/v1/auth/mobile/token", body: request, response: SessionTokenSchema})
     }
 
-    unlock(unlockKey: string): Promise<Unlock> {
-        return this.http.send({method: "POST", path: "/api/v1/auth/mobile/unlock", body: {unlockKey}, response: UnlockSchema})
+    unlock(unlockKey: string, requestId?: string): Promise<Unlock> {
+        const body = requestId === undefined ? {unlockKey} : {unlockKey, requestId}
+        return this.http.send({method: "POST", path: "/api/v1/auth/mobile/unlock", body, response: UnlockSchema})
     }
 
     /** Whatever the server answers with a success (204, `{}`) means the token is revoked. */
