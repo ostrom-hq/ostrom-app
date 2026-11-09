@@ -95,6 +95,28 @@ export type AnswerApprovalRequest = {
 };
 
 /**
+ * An error in Anthropic's shape, as the Messages endpoint of the gateway answers it
+ */
+export type AnthropicError = {
+    type: 'error';
+    error: {
+        /**
+         * Anthropic's error type (`authentication_error`, `permission_error`, `rate_limit_error`…)
+         */
+        type: string;
+        message: string;
+    };
+};
+
+/**
+ * One `data:` of a Messages stream, as Anthropic sends it and the gateway relays it
+ */
+export type AnthropicStreamEvent = {
+    type: 'message_start' | 'content_block_start' | 'content_block_delta' | 'content_block_stop' | 'message_delta' | 'message_stop' | 'ping' | 'error';
+    [key: string]: unknown;
+};
+
+/**
  * The error body of every refusal
  */
 export type ApiError = {
@@ -164,10 +186,14 @@ export type ApprovalCallerView = {
     login: string;
     self: boolean;
     /**
-     * Whether the person may answer: their role, being an approver, not their own gate. It does not wait for a fresh sign-in or the phone's unlock: a locked app reads `true`, and its yes is refused at the answer with 403 `step_up_required` until `unlockMobileApp`
+     * Whether the person may answer: their role, being an approver, not their own gate. It does not wait for a fresh sign-in or the phone's unlock: a locked app reads `true`, and its yes is refused at the answer with 403 `step_up_required` until `unlockMobileApp` (planned: for a high-risk yes, an unlock bound to this approval, `unlockMobileApp.requestId`)
      */
     canApprove: boolean;
     reason?: string;
+    /**
+     * The key of `reason` when the server names one, the `error.type` the answer would get: `github_link_required` when the caller must link their GitHub account before a yes (a never-self-approve policy, and a pull request whose author linked no Ostrom person; a no stays open), `self_approval_refused` when their linked GitHub account is the pull request's author. Absent for any other reason. Planned: the server does not send it yet
+     */
+    reasonType?: 'github_link_required' | 'self_approval_refused';
     selfApproval?: boolean;
 };
 
@@ -374,6 +400,34 @@ export type ArtifactVersion = {
     entry: string;
     createdAt: string;
     createdBy: string;
+};
+
+/**
+ * What the CLI does when none of Ostrom's hooks runs in the agent's session
+ */
+export type HooksCheck = {
+    /**
+     * How long it waits for the first hook before it concludes none runs
+     */
+    afterSeconds: number;
+    /**
+     * Whether it then stops the agent, true when the organization enforces at least one gate
+     */
+    stopAgent: boolean;
+};
+
+/**
+ * What the CLI saw: none of Ostrom's hooks ran in the agent's session
+ */
+export type HooksMissingRequest = {
+    /**
+     * How long the CLI waited for the first hook
+     */
+    waitedSeconds: number;
+    /**
+     * Whether the CLI stopped the agent
+     */
+    stopped: boolean;
 };
 
 /**
@@ -778,11 +832,11 @@ export type BillingWebhookAck = {
  */
 export type Budget = {
     /**
-     * `organization` (also `org`) or `member`
+     * `organization` (also `org`), `member`, or `workflow` (planned: the server answers 400 to it until it serves it)
      */
     scope: string;
     /**
-     * For `member`: the member's `id` (`OrgMember.id`); absent, every member without limits of their own
+     * For `member`: the member's `id` (`OrgMember.id`); absent, every member without limits of their own. For `workflow` (planned): the workflow's `id` (`Workflow.id`), required; the spend is that of the model calls of the launches that play it (`workflowId` of `createLaunch`)
      */
     subject?: string;
     /**
@@ -810,6 +864,24 @@ export type BudgetOverride = {
     reason: string;
     createdBy: string;
     revokedAt?: string;
+};
+
+/**
+ * What a server speaks and serves (`capabilities`). `apiVersion` changes only when `/api/v1` breaks compatibility; additive changes keep it. Feature keys are `<domain>.v<n>` (`ServerFeatures` in ostrom-core): `artifacts.v1`, `audit.v1`, `automations.v1`, `billing.v1`, `budgets.v1`, `gates.v1`, `github.v1`, `governance.v1`, `import.teamcode.v1`, `inference.v1`, `mcp.v1`, `notifications.v1`, `notifications.push.v1`, `packages.v1`, `receipts.v1`, `reports.v1`, `rules.v1`, `runners.v1`, `runners.cloud.v1`, `secrets.v1`, `sessions.v1`, `sharing.v1`, `slack.v1`, `usage.v1`, `waits.v1`, `workflows.v1`, `license.v1`. A client ignores a key it does not know.
+ */
+export type Capabilities = {
+    /**
+     * The version of the `/api/v1` contract the server speaks (1)
+     */
+    apiVersion: number;
+    /**
+     * The server's release version (`1.4.0`, or `0.0.0-edge.<time>.<sha>` for a build of `main`)
+     */
+    serverVersion: string;
+    /**
+     * The features served and configured on this instance, by key
+     */
+    features: Array<string>;
 };
 
 /**
@@ -1100,9 +1172,9 @@ export type DeviceAnswer = {
  */
 export type DeviceLoginStart = {
     /**
-     * Every one of them, or the request is malformed (400). Absent or empty: the ordinary sign-in
+     * Exactly `policy:write`, `harness:write` and `gates:policy`, or those three and `budgets:write` (planned, Q-CLI-BUDGETS); any other set is malformed (400). Absent or empty: the ordinary sign-in. The three alone stay accepted from an older CLI, whose token then writes no budget; a server that does not take `budgets:write` yet answers 400 to the four, and the CLI asks again with the three
      */
-    scopes?: Array<'policy:write' | 'harness:write' | 'gates:policy'>;
+    scopes?: Array<'policy:write' | 'harness:write' | 'gates:policy' | 'budgets:write'>;
 };
 
 /**
@@ -1186,14 +1258,14 @@ export type Evidence = {
 };
 
 /**
- * 403 other than step_up_required: `forbidden` (a token without the scope, a member without the role, a credential the route does not admit), or a finer key (`email_link_other_browser`, `installation_not_yours`, `probe_not_yours`, `cutover_owner_required`, `self_approval_refused`: the server names the other approvers in `message` only, without the `others` of `SelfApprovalRefused`)
+ * 403 other than step_up_required: `forbidden` (a token without the scope, a member without the role, a credential the route does not admit), or a finer key (`email_link_other_browser`, `installation_not_yours`, `probe_not_yours`, `cutover_owner_required`, `self_approval_refused`: the server names the other approvers in `message` only, without the `others` of `SelfApprovalRefused`; `github_link_required`: a yes under a never-self-approve policy, on a pull request whose author linked no Ostrom person, from an answerer who linked no GitHub account)
  */
 export type Forbidden = {
     /**
      * `ErrorDetail`, its `type` any 403 key but `step_up_required`
      */
     error: {
-        type: 'forbidden' | 'email_link_other_browser' | 'installation_not_yours' | 'probe_not_yours' | 'cutover_owner_required' | 'self_approval_refused';
+        type: 'forbidden' | 'email_link_other_browser' | 'installation_not_yours' | 'probe_not_yours' | 'cutover_owner_required' | 'self_approval_refused' | 'github_link_required';
         message: string;
     };
 };
@@ -1218,6 +1290,32 @@ export type GateAction = {
      * Catalogue only: the gate that covers the action in this repository; `null` when none does
      */
     gate?: GateRef | null;
+};
+
+/**
+ * A gated action the hook refused on the workstation, without asking the server
+ */
+export type GateLocalDenial = {
+    /**
+     * The session segment the agent ran in (404 unknown, 409 closed, as `askGate`)
+     */
+    sessionId: string;
+    /**
+     * The action class of the gate (`push-main`...)
+     */
+    class: string;
+    /**
+     * Why the hook refused without asking: `redirected`, the push redirects git away from the repository the gate covers (`--git-dir`, another checkout); `unreadable`, the push cannot be read; `unknown_landing`, the branches it lands on cannot be told; `dynamic_command`, a program named by a variable or a substitution; `git_setting`, the command changes a setting that decides where a push goes; `foreign_repository`, the command acts in another repository than the session's; `policy_held`, the session's gate policy could not be verified, so every action is held
+     */
+    reason: 'redirected' | 'unreadable' | 'unknown_landing' | 'dynamic_command' | 'git_setting' | 'foreign_repository' | 'policy_held';
+    /**
+     * The command as the hook normalized it, secrets removed (the server removes them again)
+     */
+    command: string;
+    /**
+     * The repository of the session, `owner/name`
+     */
+    repo?: string;
 };
 
 /**
@@ -1355,10 +1453,10 @@ export type GitHubConnection = 'github-app' | 'gh-token';
 /**
  * The governance write a confirmation holds: the operation that opened it
  */
-export type GovernanceChangeKind = 'rules.create' | 'rules.update' | 'rules.delete' | 'rules.bulk' | 'gates.policy' | 'models.policy' | 'workflows.create' | 'workflows.save' | 'workflows.delete';
+export type GovernanceChangeKind = 'rules.create' | 'rules.update' | 'rules.delete' | 'rules.bulk' | 'gates.policy' | 'models.policy' | 'workflows.create' | 'workflows.save' | 'workflows.delete' | 'members.role' | 'members.remove' | 'members.invite' | 'members.link' | 'budgets.set';
 
 /**
- * A governance write made with a CLI token, held until an owner or an admin confirms it on the console. `before` and `after` are what the change replaces and what it writes, as the read routes show them (JSON null for nothing: a creation has no `before`, a deletion no `after`)
+ * A governance write made with a person's API token, held until an owner or an admin confirms it on the console. `before` and `after` are what the change replaces and what it writes, as the read routes show them (JSON null for nothing: a creation has no `before`, a deletion no `after`)
  */
 export type GovernanceConfirmation = {
     id: string;
@@ -1373,7 +1471,7 @@ export type GovernanceConfirmation = {
      */
     path: string;
     /**
-     * The governance scope the write uses (`policy:write`, `harness:write`, `gates:policy`)
+     * The governance scope the write uses (`policy:write`, `harness:write`, `gates:policy`, `orgs:write`; `budgets:write`, planned)
      */
     scope: string;
     /**
@@ -1390,9 +1488,13 @@ export type GovernanceConfirmation = {
     after: unknown;
     requestedBy: GovernanceConfirmationPerson;
     /**
-     * The person's token that asked: `admin` when it holds a governance scope (`ostrom login --admin`), `device` otherwise (`ostrom login`, a personal token). An agent, a runner or a service key never opens one
+     * The kind of the person's token that asked, by its `Token.kind`: `api_token` for a `personal` token, whatever its scopes, always with `token`; otherwise `admin` for the token of `ostrom login --admin` (it holds a governance scope) and `device` for the CLI's token (`ostrom login`, kind `cli`). The phone app's token, an agent, a runner or a service key never opens one. A client shows this kind first, from this field, before any name
      */
-    credential: 'admin' | 'device';
+    credential: 'admin' | 'device' | 'api_token';
+    /**
+     * The personal token that asked, always present when `credential` is `api_token` and absent otherwise. Its name is a copy taken when it asked, chosen by the token's owner; the token may have been renamed, revoked or have expired since. Its owner revokes it in Tokens (`revokeToken`)
+     */
+    token?: GovernanceConfirmationToken;
     createdAt: string;
     expiresAt: string;
     /**
@@ -1401,7 +1503,7 @@ export type GovernanceConfirmation = {
     answeredBy?: GovernanceConfirmationPerson;
     answeredAt?: string;
     /**
-     * What the write returned once confirmed (absent when it returns nothing, as a deletion)
+     * What the write returned once confirmed (absent when it returns nothing, as a deletion). A secret in it is shown once, to the person who asked: for `members.link`, their first read with a token returns `{url, invitation}`, then the result is `{invitation, shown: true}`. No console session reads the `url`, the asker's included; a first answer lost on the way is not shown again (revoke the link and create another).
      */
     result?: unknown;
     /**
@@ -1417,7 +1519,7 @@ export type GovernanceConfirmationAnswerRequest = {
 };
 
 /**
- * The 202 of a governance write made with a CLI token: nothing was written. An owner or an admin confirms it at `confirmUrl` before `expiresAt` (15 minutes); the CLI waits on `getGovernanceConfirmation`. The same change asked again by the same person while it waits answers the same confirmation
+ * The 202 of a governance write made with a person's API token: nothing was written. An owner or an admin confirms it at `confirmUrl` before `expiresAt` (15 minutes); the CLI waits on `getGovernanceConfirmation`. The same change asked again by the same person while it waits answers the same confirmation
  */
 export type GovernanceConfirmationPending = {
     confirmationId: string;
@@ -1438,6 +1540,20 @@ export type GovernanceConfirmationPerson = {
      */
     login?: string;
     name?: string;
+};
+
+/**
+ * A person's personal token, without its secret
+ */
+export type GovernanceConfirmationToken = {
+    /**
+     * The token's id, as `listTokens` shows it while the token lives
+     */
+    id: string;
+    /**
+     * The name its owner gave it, without a control or an invisible formatting character. It is the owner's text, never an identity: a client shows it as plain text, quoted, after the kind `credential` names, never alone (a token named `ostrom login` is still a personal token)
+     */
+    name: string;
 };
 
 /**
@@ -1788,7 +1904,7 @@ export type McpCall = {
  */
 export type McpServer = {
     /**
-     * 1 to 64 characters; `servers`, `settings`, `calls` and `usage` are reserved (they are paths of this API)
+     * 1 to 64 characters; `servers`, `settings`, `calls` and `usage` are reserved (they are paths of this API), and so is a name agents would see as one of Ostrom's own MCP servers, which every agent already has (`ostrom`, `ostrom-workflow` and `workflow`, since the launcher labels a server `ostrom-<name>` and keeps a name that starts with `ostrom`), whatever their case and surrounding spaces; a reserved name is refused with a 400
      */
     name: string;
     /**
@@ -1978,6 +2094,43 @@ export type AccountEmail = {
 };
 
 /**
+ * One `data:` of a chat completions stream, as the OpenAI-compatible provider sends it and the gateway relays it; the stream ends with `data: [DONE]`
+ */
+export type OpenAiChatCompletionChunk = {
+    object?: 'chat.completion.chunk';
+    choices: Array<{
+        [key: string]: unknown;
+    }>;
+    [key: string]: unknown;
+};
+
+/**
+ * An error in OpenAI's shape, as the OpenAI-compatible endpoints of the gateway answer it
+ */
+export type OpenAiError = {
+    error: {
+        message: string;
+        /**
+         * OpenAI's error type (`invalid_request_error`, `insufficient_quota`…)
+         */
+        type: string;
+        /**
+         * The gateway's refusal, in lower case (`budget_exhausted`, `no_capacity`…)
+         */
+        code?: string | null;
+        param?: string | null;
+    };
+};
+
+/**
+ * One `data:` of a Responses stream (`response.created`, `response.output_text.delta`, `response.completed`, `error`…), as OpenAI sends it and the gateway relays it
+ */
+export type OpenAiResponsesStreamEvent = {
+    type: string;
+    [key: string]: unknown;
+};
+
+/**
  * A 403 of a write that may need a fresh sign-in: `step_up_required` (sign in again, then send it again) or `forbidden`, told apart by `error.type`
  */
 export type StepUpOrForbidden = StepUpRequired | Forbidden;
@@ -2029,7 +2182,35 @@ export type MyBudget = {
      */
     exhausted: boolean;
     exhaustedScope?: 'org' | 'member';
+    /**
+     * The period `limitMicros`, `spentMicros`, `remainingMicros` and `resetsAt` count: `day` when the caller's own limit that stops is daily and the nearest to be spent, `month` otherwise. Absent, read `month`. Planned: the server does not send it yet
+     */
+    period?: 'day' | 'month';
 };
+
+/**
+ * What a `check` node decides in a server's run (planned: the server does not play check nodes yet). It reads one value of a step the run visited before, never an expression: no language, no evaluation of code. Only a `check` node has a condition; a `check` node without one is a session's check (its `run`), which a server's run does not play: the run fails. The visit ends with the outcome `true` or `false` (no output), and the run follows the edge whose `on` is that outcome; every edge out of a check node with a condition says `on: "true"` or `on: "false"` (none defaults to `next`), and an outcome without its edge fails the run. Values are compared as texts, exactly: a JSON string without its quotes, a number or a boolean as written in the output (`1.0` is not `1`; the string `"true"` and the boolean `true` both read `true`), an object or an array as its compact JSON text. No value: a step not visited, a visit without output, an output that is not JSON or not of the segment's kind (an object for `.<key>`, an array for `[<index>]`), a missing key or index, a JSON `null`. `exists` is false on no value; `equals`, `notEquals` and `matches` do not evaluate on no value, nor on a text over 10 000 characters: the run fails, with the reason, and never takes a branch by default. Checked when the workflow is saved: 400 `invalid_request` for a condition on a node that is not a `check`, a `step` that is not a node of the workflow, a `path` out of its form, an unknown `op`, a `value` missing for `equals`, `notEquals` or `matches` or present for `exists`, a `matches` pattern out of its syntax, or an edge out of the node whose `on` is not `true` or `false`
+ */
+export type NodeCondition = {
+    /**
+     * The id of the node whose last visit the condition reads (`WorkflowNode.id`); it may be on a branch the run did not take (no value then)
+     */
+    step: string;
+    /**
+     * What it reads of that visit: `outcome`, `output`, or a value of the output read as JSON, `output` followed by 1 to 10 segments, each `.<key>` (a member of an object: 1 to 64 characters among letters, digits, `_` and `-`) or `[<index>]` (an element of an array, from 0, at most 4 digits), as in `output.a.b[0].c`; 200 characters in all. A key with another character is not addressable. A `wait` visit's output is its answer's values, a JSON object
+     */
+    path: string;
+    op: NodeConditionOp;
+    /**
+     * What `equals` and `notEquals` compare with, or the pattern of `matches`. Its syntax: literal characters; `.`, any character but a newline; bracket classes `[…]`, where a first `^` negates, `-` between two characters is a range and `]` closes (`\]` inside); `*`, `+`, `?`; groups `( )`; alternation `|` (an empty alternative or group matches the empty text); anchors `^` and `$`, of the whole text, not of a line; `\d`, `\w`, `\s`, and a backslash before any of `\ . ^ $ | ? * + ( ) [ ] { } - /` for the character itself. No backreference, no lookaround, no counted repetition (`{`). The server matches it in linear time, without backtracking. Absent for `exists`
+     */
+    value?: string;
+};
+
+/**
+ * `equals` and `notEquals` compare the value with `value`; `exists` is true when the value is there; `matches` is true when the pattern `value` matches a part of it (anchors to match it whole)
+ */
+export type NodeConditionOp = 'equals' | 'notEquals' | 'exists' | 'matches';
 
 /**
  * Position of a node in the editor
@@ -2146,7 +2327,7 @@ export type NotificationStatus = 'queued' | 'sent' | 'logged-only' | 'not-sent';
 export type OrgCreate = {
     name: string;
     /**
-     * Derived from the name when absent
+     * Derived from the name when absent; otherwise 2 to 39 lower case letters, digits and single dashes, and not a reserved one (400 if not). Short names are one space for everybody, as on GitHub; one already taken answers 409 `conflict`, whether a live organization holds it or a deleted one during the 30 days it is kept (freed when the organization is erased)
      */
     slug?: string;
 };
@@ -2225,10 +2406,25 @@ export type OrgMemberUpdate = {
 };
 
 /**
- * A new name
+ * An organization's settings to change; a field left out stays as it is
  */
 export type OrgRename = {
-    name: string;
+    /**
+     * The new name; a blank one is refused with 400
+     */
+    name?: string;
+    /**
+     * The new IANA time zone, such as `Europe/Paris`; an unknown one is refused with 400
+     */
+    timeZone?: string;
+    /**
+     * The short name, accepted only exactly as it is (it never changes); any other value is refused with 400
+     */
+    slug?: string;
+    /**
+     * The new wait for the first hook, in seconds; outside 5 to 300 is refused with 400. Planned: the server does not read it yet
+     */
+    hooksDeadlineSeconds?: number;
 };
 
 /**
@@ -2251,9 +2447,13 @@ export type OrgView = {
     role: string;
     createdAt: string;
     /**
-     * The organization's IANA time zone, `UTC` by default
+     * The organization's IANA time zone, `UTC` until an owner or admin sets one
      */
-    timeZone?: string;
+    timeZone: string;
+    /**
+     * How long the CLI waits for the first of Ostrom's hooks in an agent's session before it reports `hooks.missing`, 15 until an owner or an admin sets it. Planned: the server does not send it yet
+     */
+    hooksDeadlineSeconds?: number;
 };
 
 /**
@@ -2458,6 +2658,18 @@ export type QuietHours = {
  */
 export type Receipt = {
     id: string;
+    /**
+     * The organization the receipt was signed for, inside the signed body, in the lowercase canonical form of a UUID: a receipt that names one organization never verifies as another's, online or offline (the offline verifier is given the organization it checks for: the CLI's configured organization or `--org`). Absent (never null) from a receipt signed before it was planned: such a receipt stays verifiable by its signature but is never bound to an organization (`Verification.orgBound`). Planned: the server does not sign it yet
+     */
+    orgId?: string;
+    /**
+     * The launch the receipt belongs to, as the server names it, inside the signed body. Omitted (never null) when the receipt has none. Planned
+     */
+    launchId?: string;
+    /**
+     * The session segment the receipt belongs to, as the server names it, inside the signed body. Omitted (never null) when the receipt has none. For a session's own receipt it is the segment `subject.id` names, the same id. Planned
+     */
+    sessionId?: string;
     subject: ReceiptSubject;
     initiator: string;
     agent?: string;
@@ -3018,6 +3230,10 @@ export type Spending = {
     byAgent: Array<SpendingLine>;
     byRepo: Array<SpendingLine>;
     byPerson: Array<SpendingLine>;
+    /**
+     * By workflow: the model calls of the launches that play one (`workflowId` of `createLaunch`), `key` the workflow's `id`, `label` its name; the calls of no workflow are in no line. Planned: the server does not send it yet
+     */
+    byWorkflow?: Array<SpendingLine>;
     daily: Array<SpendingDay>;
     /**
      * The budgets the reader sees spent past their limit today or this month, whatever `period`: all of the organization's for whoever sees its whole spending, the reader's own otherwise; empty when none
@@ -3030,13 +3246,17 @@ export type Spending = {
  */
 export type ExceededBudget = {
     /**
-     * `organization` or `member`
+     * `organization`, `member`, or `workflow` (planned)
      */
     scope: string;
     /**
-     * For `member`: the member's `id`
+     * For `member`: the member's `id`; for `workflow` (planned): the workflow's `id`
      */
     subject?: string;
+    /**
+     * For `member`: the member's login, as `SpendingLine.label` of `byPerson` names them; a member with no spending in the period read has no line there. Planned: the server does not send it yet
+     */
+    label?: string;
     period: 'day' | 'month';
     /**
      * The limit in US dollars
@@ -3087,7 +3307,7 @@ export type StartSessionRequest = {
 };
 
 /**
- * 403 step_up_required: a yes, and a sensitive write from the console or the app (a personal token, a service key, a sign-in link, an invitation, a role, a member removed, a transfer, a secret, an MCP server, its assignments, policies and settings, the model keys), need a sign-in less than 5 minutes old (a sign-in of unknown age is refused too); sign in again, then send it again. A no never needs it, and an API token is never asked: it has no sign-in to renew
+ * 403 step_up_required: a yes, and a sensitive write from the console or the app (a personal token, a service key, a sign-in link, an invitation, a role, a member removed, a transfer, a secret, an MCP server, its assignments, policies and settings, the model keys), need a sign-in less than 5 minutes old (a sign-in of unknown age is refused too); sign in again, then send it again. A no never needs it, and an API token is never asked: it has no sign-in to renew. Planned: a yes from the phone app to a high-risk action also needs an unlock bound to its approval (`unlockMobileApp.requestId`, `error.requestBound`)
  */
 export type StepUpRequired = {
     /**
@@ -3096,6 +3316,10 @@ export type StepUpRequired = {
     error: {
         type: 'step_up_required';
         message: string;
+        /**
+         * True when the refused yes came from the phone app, unlocked in the last 5 minutes, to a high-risk action, without an unlock bound to this very approval (`unlockMobileApp.requestId`) less than 60 seconds old and not used yet: its unlock is older, was used, or names another approval. The app unlocks again for this approval, then sends the yes again. Absent when the app was not unlocked in the last 5 minutes (that refusal comes first) and for every other refusal. Planned: the server does not send it yet
+         */
+        requestBound?: boolean;
     };
 };
 
@@ -3381,6 +3605,10 @@ export type Verification = {
     digest?: string;
     kid?: string;
     reason?: string;
+    /**
+     * Whether the signed body names the organization that verifies it. `ok` says only that the signature holds: a client that relies on the receipt being this organization's checks `orgBound` is true, and reads an absent `orgBound` (a server that predates it) as not bound. False for a receipt signed before `Receipt.orgId`: valid, shown as not bound to an organization, never accepted as this organization's. A receipt that names another organization is not ok, with a `reason` that names no organization. Planned
+     */
+    orgBound?: boolean;
 };
 
 /**
@@ -3497,7 +3725,7 @@ export type Workflow = {
 };
 
 /**
- * An edge. For a run, [on] is the outcome that follows it (`next`, `delivered`, a wait action id); [to] null ends
+ * An edge. For a run, [on] is the outcome that follows it (`next`, `delivered`, a wait action id, `true` or `false` out of a check node with a condition, which has no default); [to] null ends
  */
 export type WorkflowEdge = {
     from: string;
@@ -3537,11 +3765,15 @@ export type WorkflowNode = {
     run?: NodeRun;
     suggested?: NodeSuggestions;
     wait?: WaitSpec;
+    /**
+     * The workflow a `workflow` node runs: a child run of another accepted workflow of the organization, with `arguments` as its inputs. A run never calls a workflow already running above it, and runs nest at most 5 deep: the visit fails then, and the run ends `failed`, with the reason in `failure` (no HTTP error: the call is checked when the run reaches it, since the called workflow may change after it is saved)
+     */
     workflowId?: string;
     arguments?: {
         [key: string]: string;
     };
     maxVisits?: number;
+    condition?: NodeCondition;
 };
 
 export type WorkflowNodeKind = 'trigger' | 'step' | 'check' | 'gate' | 'notify' | 'agent' | 'wait' | 'workflow';
@@ -3579,7 +3811,7 @@ export type WorkflowStatus = 'proposed' | 'accepted' | 'edited';
  */
 export type McpServerWritable = {
     /**
-     * 1 to 64 characters; `servers`, `settings`, `calls` and `usage` are reserved (they are paths of this API)
+     * 1 to 64 characters; `servers`, `settings`, `calls` and `usage` are reserved (they are paths of this API), and so is a name agents would see as one of Ostrom's own MCP servers, which every agent already has (`ostrom`, `ostrom-workflow` and `workflow`, since the launcher labels a server `ostrom-<name>` and keeps a name that starts with `ostrom`), whatever their case and surrounding spaces; a reserved name is refused with a 400
      */
     name: string;
     /**
@@ -3825,11 +4057,7 @@ export type CapabilitiesErrors = {
     /**
      * A refusal
      */
-    400: ApiError;
-    /**
-     * A refusal
-     */
-    404: ApiError;
+    401: ApiError;
 };
 
 export type CapabilitiesError = CapabilitiesErrors[keyof CapabilitiesErrors];
@@ -3838,10 +4066,7 @@ export type CapabilitiesResponses = {
     /**
      * OK
      */
-    200: {
-        version: string;
-        capabilities: Array<string>;
-    };
+    200: Capabilities;
 };
 
 export type CapabilitiesResponse = CapabilitiesResponses[keyof CapabilitiesResponses];
@@ -3893,7 +4118,7 @@ export type MobileTokenErrors = {
      */
     404: ApiError;
     /**
-     * A refusal
+     * Too many attempts lately (`rate_limited`): nothing was done. A sign-in step, an organization's creations, a webhook trigger or a batch of usage events is limited per address, person, organization or automation over a window; wait, then try again
      */
     429: ApiError;
 };
@@ -3920,6 +4145,10 @@ export type MobileTokenResponse = MobileTokenResponses[keyof MobileTokenResponse
 export type UnlockMobileAppData = {
     body: {
         unlockKey: string;
+        /**
+         * The approval this unlock is for: the `id` of the `Approval`, as in the path of `answerApproval`. A yes from the app to a high-risk action is taken only with an unlock bound to its own approval, less than 60 seconds old, and only once; otherwise 403 `step_up_required` with `error.requestBound` true. High risk is every action whose `risk` is not `low`, an approval without an `action` included (no yes is low today: the server measures no risk). The first yes sent after the unlock uses it, whatever its outcome (a 409, another 403 or a 5xx included): a yes sent again unlocks again. A token holds one binding: a new unlock replaces the last one, so an app unlocks just before each yes. Every unlock, bound or not, also opens the 5-minute window, which a low-risk yes and every no are given with. The server does not check the id: one that names no approval the caller may answer serves no yes. The binding limits one unlock to one yes; it does not prove to the server a biometric per unlock (the `unlockKey` stays the app's). Planned: the server does not read it yet
+         */
+        requestId?: string;
     };
     path?: never;
     query?: never;
@@ -3936,7 +4165,7 @@ export type UnlockMobileAppErrors = {
      */
     403: ApiError;
     /**
-     * A refusal
+     * Too many attempts lately (`rate_limited`): nothing was done. A sign-in step, an organization's creations, a webhook trigger or a batch of usage events is limited per address, person, organization or automation over a window; wait, then try again
      */
     429: ApiError;
 };
@@ -4098,6 +4327,10 @@ export type LinkSignInProviderErrors = {
      * A refusal
      */
     404: ApiError;
+    /**
+     * Too many attempts lately (`rate_limited`): nothing was done. A sign-in step, an organization's creations, a webhook trigger or a batch of usage events is limited per address, person, organization or automation over a window; wait, then try again
+     */
+    429: ApiError;
 };
 
 export type LinkSignInProviderError = LinkSignInProviderErrors[keyof LinkSignInProviderErrors];
@@ -4140,6 +4373,10 @@ export type GetDeviceLoginErrors = {
      * A refusal
      */
     404: ApiError;
+    /**
+     * Too many attempts lately (`rate_limited`): nothing was done. A sign-in step, an organization's creations, a webhook trigger or a batch of usage events is limited per address, person, organization or automation over a window; wait, then try again
+     */
+    429: ApiError;
 };
 
 export type GetDeviceLoginError = GetDeviceLoginErrors[keyof GetDeviceLoginErrors];
@@ -4170,7 +4407,7 @@ export type StartDeviceLoginErrors = {
      */
     404: ApiError;
     /**
-     * A refusal
+     * Too many attempts lately (`rate_limited`): nothing was done. A sign-in step, an organization's creations, a webhook trigger or a batch of usage events is limited per address, person, organization or automation over a window; wait, then try again
      */
     429: ApiError;
 };
@@ -4255,6 +4492,10 @@ export type AnswerDeviceLoginErrors = {
      * org_required (approving `ostrom login --admin` without `Ostrom-Org`, for a person in several organizations)
      */
     409: ApiError;
+    /**
+     * Too many attempts lately (`rate_limited`): nothing was done. A sign-in step, an organization's creations, a webhook trigger or a batch of usage events is limited per address, person, organization or automation over a window; wait, then try again
+     */
+    429: ApiError;
 };
 
 export type AnswerDeviceLoginError = AnswerDeviceLoginErrors[keyof AnswerDeviceLoginErrors];
@@ -4353,6 +4594,10 @@ export type LauncherLoginErrors = {
      * A refusal
      */
     404: ApiError;
+    /**
+     * Too many attempts lately (`rate_limited`): nothing was done. A sign-in step, an organization's creations, a webhook trigger or a batch of usage events is limited per address, person, organization or automation over a window; wait, then try again
+     */
+    429: ApiError;
 };
 
 export type LauncherLoginError = LauncherLoginErrors[keyof LauncherLoginErrors];
@@ -4375,6 +4620,10 @@ export type CreateLaunchData = {
         repo?: string;
         agent: string;
         model?: string;
+        /**
+         * The workflow this launch plays (`Workflow.id` of the organization; 404 otherwise): every model call of its sessions counts under it, for the budgets of scope `workflow` and `Spending.byWorkflow`. Absent, the calls count under no workflow. Planned: the server does not read it yet
+         */
+        workflowId?: string;
     };
     headers?: {
         /**
@@ -4424,6 +4673,10 @@ export type CreateLaunchResponses = {
         launchId: string;
         agentToken: string;
         expiresAt: string;
+        /**
+         * What the CLI does when none of Ostrom's hooks runs in the session. Planned: the server does not send it yet
+         */
+        hooksCheck?: HooksCheck;
     };
 };
 
@@ -4459,6 +4712,41 @@ export type EndLaunchResponses = {
 };
 
 export type EndLaunchResponse = EndLaunchResponses[keyof EndLaunchResponses];
+
+export type ReportHooksMissingData = {
+    body: HooksMissingRequest;
+    path: {
+        launchId: string;
+    };
+    query?: never;
+    url: '/api/v1/launches/{launchId}/hooks-missing';
+};
+
+export type ReportHooksMissingErrors = {
+    /**
+     * A refusal
+     */
+    400: ApiError;
+    /**
+     * A refusal
+     */
+    401: ApiError;
+    /**
+     * A refusal
+     */
+    404: ApiError;
+};
+
+export type ReportHooksMissingError = ReportHooksMissingErrors[keyof ReportHooksMissingErrors];
+
+export type ReportHooksMissingResponses = {
+    /**
+     * Recorded
+     */
+    204: void;
+};
+
+export type ReportHooksMissingResponse = ReportHooksMissingResponses[keyof ReportHooksMissingResponses];
 
 export type CheckAgentPolicyData = {
     body?: never;
@@ -4700,6 +4988,10 @@ export type RequestSignInEmailErrors = {
      * A refusal
      */
     409: ApiError;
+    /**
+     * Too many attempts lately (`rate_limited`): nothing was done. A sign-in step, an organization's creations, a webhook trigger or a batch of usage events is limited per address, person, organization or automation over a window; wait, then try again
+     */
+    429: ApiError;
 };
 
 export type RequestSignInEmailError = RequestSignInEmailErrors[keyof RequestSignInEmailErrors];
@@ -4784,6 +5076,10 @@ export type ExchangeSignInLinkErrors = {
      * A refusal
      */
     409: ApiError;
+    /**
+     * Too many attempts lately (`rate_limited`): nothing was done. A sign-in step, an organization's creations, a webhook trigger or a batch of usage events is limited per address, person, organization or automation over a window; wait, then try again
+     */
+    429: ApiError;
 };
 
 export type ExchangeSignInLinkError = ExchangeSignInLinkErrors[keyof ExchangeSignInLinkErrors];
@@ -4907,6 +5203,10 @@ export type CreateSignInLinkErrors = {
      * A refusal
      */
     409: ApiError;
+    /**
+     * Too many attempts lately (`rate_limited`): nothing was done. A sign-in step, an organization's creations, a webhook trigger or a batch of usage events is limited per address, person, organization or automation over a window; wait, then try again
+     */
+    429: ApiError;
 };
 
 export type CreateSignInLinkError = CreateSignInLinkErrors[keyof CreateSignInLinkErrors];
@@ -5657,6 +5957,10 @@ export type ListActivityErrors = {
      * A refusal
      */
     409: ApiError;
+    /**
+     * Too many reads lately (`rate_limited`): nothing was read. A costly read is bounded per caller (a person, a device, an agent or a service): calls per minute, reads and waits together, and calls at once, the waits of `getGate` counted apart from the reads
+     */
+    429: ApiError;
 };
 
 export type ListActivityError = ListActivityErrors[keyof ListActivityErrors];
@@ -5709,6 +6013,10 @@ export type GetSpendingErrors = {
      * A refusal
      */
     409: ApiError;
+    /**
+     * Too many reads lately (`rate_limited`): nothing was read. A costly read is bounded per caller (a person, a device, an agent or a service): calls per minute, reads and waits together, and calls at once, the waits of `getGate` counted apart from the reads
+     */
+    429: ApiError;
 };
 
 export type GetSpendingError = GetSpendingErrors[keyof GetSpendingErrors];
@@ -5898,6 +6206,10 @@ export type StartGithubAppInstallErrors = {
      * A refusal
      */
     409: ApiError;
+    /**
+     * A refusal
+     */
+    503: ApiError;
 };
 
 export type StartGithubAppInstallError = StartGithubAppInstallErrors[keyof StartGithubAppInstallErrors];
@@ -6096,7 +6408,7 @@ export type CreateOrgErrors = {
      */
     409: ApiError;
     /**
-     * A refusal
+     * Too many attempts lately (`rate_limited`): nothing was done. A sign-in step, an organization's creations, a webhook trigger or a batch of usage events is limited per address, person, organization or automation over a window; wait, then try again
      */
     429: ApiError;
 };
@@ -6343,6 +6655,10 @@ export type ListOrgMembersData = {
          * The `next` of the previous page: the members who joined after this one
          */
         after?: string;
+        /**
+         * Only the members whose login or name starts with it, whatever the case; it combines with `limit` and `after`. Its `%` and `_` match only themselves. 1 to 100 characters, else 400
+         */
+        q?: string;
     };
     url: '/api/v1/orgs/{org}/members';
 };
@@ -6415,7 +6731,7 @@ export type InviteOrgMembersErrors = {
      */
     409: ApiError;
     /**
-     * A refusal
+     * Not done: `rate_limited`, the organization sent too many invitations this hour; or, made with a person's API token, `confirmation_limit`, the person already has 10 governance confirmations waiting (the key is `error.type`)
      */
     429: ApiError;
 };
@@ -6427,6 +6743,13 @@ export type InviteOrgMembersResponses = {
      * OK
      */
     200: OrgInvited;
+    /**
+     * Not applied: made with a person's API token (a personal token, the CLI's included), the governance write
+     * opened a confirmation, which an owner or an admin confirms on the console within 15 minutes
+     * (`getGovernanceConfirmation`). A browser session's write and an `inference:admin` service key's are applied at
+     * once, as before.
+     */
+    202: GovernanceConfirmationPending;
 };
 
 export type InviteOrgMembersResponse = InviteOrgMembersResponses[keyof InviteOrgMembersResponses];
@@ -6461,11 +6784,22 @@ export type RemoveOrgMemberErrors = {
      * A refusal
      */
     409: ApiError;
+    /**
+     * confirmation_limit: the person already has 10 governance confirmations waiting (expired, refused and answered ones do not count)
+     */
+    429: ApiError;
 };
 
 export type RemoveOrgMemberError = RemoveOrgMemberErrors[keyof RemoveOrgMemberErrors];
 
 export type RemoveOrgMemberResponses = {
+    /**
+     * Not applied: made with a person's API token (a personal token, the CLI's included), the governance write
+     * opened a confirmation, which an owner or an admin confirms on the console within 15 minutes
+     * (`getGovernanceConfirmation`). A browser session's write and an `inference:admin` service key's are applied at
+     * once, as before.
+     */
+    202: GovernanceConfirmationPending;
     /**
      * Removed
      */
@@ -6547,6 +6881,10 @@ export type UpdateOrgMemberErrors = {
      * A refusal
      */
     409: ApiError;
+    /**
+     * confirmation_limit: the person already has 10 governance confirmations waiting (expired, refused and answered ones do not count)
+     */
+    429: ApiError;
 };
 
 export type UpdateOrgMemberError = UpdateOrgMemberErrors[keyof UpdateOrgMemberErrors];
@@ -6556,6 +6894,13 @@ export type UpdateOrgMemberResponses = {
      * OK
      */
     200: OrgMember;
+    /**
+     * Not applied: made with a person's API token (a personal token, the CLI's included), the governance write
+     * opened a confirmation, which an owner or an admin confirms on the console within 15 minutes
+     * (`getGovernanceConfirmation`). A browser session's write and an `inference:admin` service key's are applied at
+     * once, as before.
+     */
+    202: GovernanceConfirmationPending;
 };
 
 export type UpdateOrgMemberResponse = UpdateOrgMemberResponses[keyof UpdateOrgMemberResponses];
@@ -6632,7 +6977,7 @@ export type CreateInvitationLinkErrors = {
      */
     409: ApiError;
     /**
-     * A refusal
+     * Not done: `rate_limited`, the organization sent too many invitations this hour; or, made with a person's API token, `confirmation_limit`, the person already has 10 governance confirmations waiting (the key is `error.type`)
      */
     429: ApiError;
 };
@@ -6644,6 +6989,13 @@ export type CreateInvitationLinkResponses = {
      * OK
      */
     201: InvitationLink;
+    /**
+     * Not applied: made with a person's API token (a personal token, the CLI's included), the governance write
+     * opened a confirmation, which an owner or an admin confirms on the console within 15 minutes
+     * (`getGovernanceConfirmation`). A browser session's write and an `inference:admin` service key's are applied at
+     * once, as before.
+     */
+    202: GovernanceConfirmationPending;
 };
 
 export type CreateInvitationLinkResponse = CreateInvitationLinkResponses[keyof CreateInvitationLinkResponses];
@@ -7285,6 +7637,10 @@ export type ListSessionsData = {
         dev?: string;
         open?: boolean;
         before?: string;
+        /**
+         * The page size, 1 to 100 (50 by default); a value outside is brought into it
+         */
+        limit?: number;
     };
     url: '/api/v1/sessions';
 };
@@ -7310,6 +7666,10 @@ export type ListSessionsErrors = {
      * A refusal
      */
     409: ApiError;
+    /**
+     * Too many reads lately (`rate_limited`): nothing was read. A costly read is bounded per caller (a person, a device, an agent or a service): calls per minute, reads and waits together, and calls at once, the waits of `getGate` counted apart from the reads
+     */
+    429: ApiError;
 };
 
 export type ListSessionsError = ListSessionsErrors[keyof ListSessionsErrors];
@@ -7409,6 +7769,10 @@ export type GetSessionErrors = {
      * A refusal
      */
     409: ApiError;
+    /**
+     * Too many reads lately (`rate_limited`): nothing was read. A costly read is bounded per caller (a person, a device, an agent or a service): calls per minute, reads and waits together, and calls at once, the waits of `getGate` counted apart from the reads
+     */
+    429: ApiError;
 };
 
 export type GetSessionError = GetSessionErrors[keyof GetSessionErrors];
@@ -7682,6 +8046,51 @@ export type ReportSeenResponses = {
 
 export type ReportSeenResponse = ReportSeenResponses[keyof ReportSeenResponses];
 
+export type ReportLocalGateDenialData = {
+    body: GateLocalDenial;
+    headers?: {
+        /**
+         * The id of the organization the request acts in. Required when the signed-in person is a member of several organizations; without it, a person with exactly one active membership acts in that organization. Missing while several memberships are active, 409 `org_required` (`error.type`, the usual `ApiError` body); an organization the person is not a member of, 404, as for anything of another organization. A token bound to one organization (device, agent, runner, service key) acts in its own organization
+         */
+        'Ostrom-Org'?: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/v1/gates/local-denials';
+};
+
+export type ReportLocalGateDenialErrors = {
+    /**
+     * A refusal
+     */
+    400: ApiError;
+    /**
+     * A refusal
+     */
+    401: ApiError;
+    /**
+     * A refusal
+     */
+    403: ApiError;
+    /**
+     * A refusal
+     */
+    404: ApiError;
+    /**
+     * A refusal
+     */
+    409: ApiError;
+};
+
+export type ReportLocalGateDenialError = ReportLocalGateDenialErrors[keyof ReportLocalGateDenialErrors];
+
+export type ReportLocalGateDenialResponses = {
+    /**
+     * Recorded
+     */
+    202: unknown;
+};
+
 export type ListGatesData = {
     body?: never;
     headers?: {
@@ -7830,7 +8239,7 @@ export type GetGateErrors = {
      */
     409: ApiError;
     /**
-     * A refusal
+     * Too many reads lately (`rate_limited`): nothing was read. A costly read is bounded per caller (a person, a device, an agent or a service): calls per minute, reads and waits together, and calls at once, the waits of `getGate` counted apart from the reads
      */
     429: ApiError;
 };
@@ -8247,7 +8656,7 @@ export type SetGatePolicyResponses = {
         selfApproval: string;
     };
     /**
-     * Not applied: made with a person's API token (the CLI's, `ostrom login --admin` or not), the governance write
+     * Not applied: made with a person's API token (a personal token, the CLI's included), the governance write
      * opened a confirmation, which an owner or an admin confirms on the console within 15 minutes
      * (`getGovernanceConfirmation`). A browser session's write and an `inference:admin` service key's are applied at
      * once, as before.
@@ -8302,6 +8711,10 @@ export type ListApprovalsErrors = {
      * A refusal
      */
     409: ApiError;
+    /**
+     * Too many reads lately (`rate_limited`): nothing was read. A costly read is bounded per caller (a person, a device, an agent or a service): calls per minute, reads and waits together, and calls at once, the waits of `getGate` counted apart from the reads
+     */
+    429: ApiError;
 };
 
 export type ListApprovalsError = ListApprovalsErrors[keyof ListApprovalsErrors];
@@ -8488,7 +8901,7 @@ export type AnswerApprovalErrors = {
      */
     401: ApiError;
     /**
-     * self_approval_refused, step_up_required, or not an approver (the key is `error.type`)
+     * self_approval_refused, github_link_required, step_up_required, or not an approver (the key is `error.type`)
      */
     403: SelfApprovalRefused | StepUpRequired | Forbidden;
     /**
@@ -8686,6 +9099,10 @@ export type ListReceiptsData = {
         subjectKind?: string;
         subjectId?: string;
         before?: string;
+        /**
+         * The page size, 1 to 200 (50 by default); a value outside is brought into it
+         */
+        limit?: number;
     };
     url: '/api/v1/receipts';
 };
@@ -8711,6 +9128,10 @@ export type ListReceiptsErrors = {
      * A refusal
      */
     409: ApiError;
+    /**
+     * Too many reads lately (`rate_limited`): nothing was read. A costly read is bounded per caller (a person, a device, an agent or a service): calls per minute, reads and waits together, and calls at once, the waits of `getGate` counted apart from the reads
+     */
+    429: ApiError;
 };
 
 export type ListReceiptsError = ListReceiptsErrors[keyof ListReceiptsErrors];
@@ -8794,6 +9215,10 @@ export type GetReceiptErrors = {
      * A refusal
      */
     409: ApiError;
+    /**
+     * Too many reads lately (`rate_limited`): nothing was read. A costly read is bounded per caller (a person, a device, an agent or a service): calls per minute, reads and waits together, and calls at once, the waits of `getGate` counted apart from the reads
+     */
+    429: ApiError;
 };
 
 export type GetReceiptError = GetReceiptErrors[keyof GetReceiptErrors];
@@ -8843,6 +9268,10 @@ export type VerifyReceiptErrors = {
      * A refusal
      */
     409: ApiError;
+    /**
+     * Too many reads lately (`rate_limited`): nothing was read. A costly read is bounded per caller (a person, a device, an agent or a service): calls per minute, reads and waits together, and calls at once, the waits of `getGate` counted apart from the reads
+     */
+    429: ApiError;
 };
 
 export type VerifyReceiptError = VerifyReceiptErrors[keyof VerifyReceiptErrors];
@@ -9624,7 +10053,7 @@ export type CreateRuleResponses = {
      */
     201: Rule;
     /**
-     * Not applied: made with a person's API token (the CLI's, `ostrom login --admin` or not), the governance write
+     * Not applied: made with a person's API token (a personal token, the CLI's included), the governance write
      * opened a confirmation, which an owner or an admin confirms on the console within 15 minutes
      * (`getGovernanceConfirmation`). A browser session's write and an `inference:admin` service key's are applied at
      * once, as before.
@@ -9680,7 +10109,7 @@ export type DeleteRuleError = DeleteRuleErrors[keyof DeleteRuleErrors];
 
 export type DeleteRuleResponses = {
     /**
-     * Not applied: made with a person's API token (the CLI's, `ostrom login --admin` or not), the governance write
+     * Not applied: made with a person's API token (a personal token, the CLI's included), the governance write
      * opened a confirmation, which an owner or an admin confirms on the console within 15 minutes
      * (`getGovernanceConfirmation`). A browser session's write and an `inference:admin` service key's are applied at
      * once, as before.
@@ -9806,7 +10235,7 @@ export type UpdateRuleResponses = {
      */
     200: Rule;
     /**
-     * Not applied: made with a person's API token (the CLI's, `ostrom login --admin` or not), the governance write
+     * Not applied: made with a person's API token (a personal token, the CLI's included), the governance write
      * opened a confirmation, which an owner or an admin confirms on the console within 15 minutes
      * (`getGovernanceConfirmation`). A browser session's write and an `inference:admin` service key's are applied at
      * once, as before.
@@ -9869,7 +10298,7 @@ export type BulkUpdateRulesResponses = {
         updated: number;
     };
     /**
-     * Not applied: made with a person's API token (the CLI's, `ostrom login --admin` or not), the governance write
+     * Not applied: made with a person's API token (a personal token, the CLI's included), the governance write
      * opened a confirmation, which an owner or an admin confirms on the console within 15 minutes
      * (`getGovernanceConfirmation`). A browser session's write and an `inference:admin` service key's are applied at
      * once, as before.
@@ -9980,7 +10409,7 @@ export type CreateWorkflowResponses = {
      */
     201: Workflow;
     /**
-     * Not applied: made with a person's API token (the CLI's, `ostrom login --admin` or not), the governance write
+     * Not applied: made with a person's API token (a personal token, the CLI's included), the governance write
      * opened a confirmation, which an owner or an admin confirms on the console within 15 minutes
      * (`getGovernanceConfirmation`). A browser session's write and an `inference:admin` service key's are applied at
      * once, as before.
@@ -10036,7 +10465,7 @@ export type DeleteWorkflowError = DeleteWorkflowErrors[keyof DeleteWorkflowError
 
 export type DeleteWorkflowResponses = {
     /**
-     * Not applied: made with a person's API token (the CLI's, `ostrom login --admin` or not), the governance write
+     * Not applied: made with a person's API token (a personal token, the CLI's included), the governance write
      * opened a confirmation, which an owner or an admin confirms on the console within 15 minutes
      * (`getGovernanceConfirmation`). A browser session's write and an `inference:admin` service key's are applied at
      * once, as before.
@@ -10152,7 +10581,7 @@ export type SaveWorkflowResponses = {
      */
     200: Workflow;
     /**
-     * Not applied: made with a person's API token (the CLI's, `ostrom login --admin` or not), the governance write
+     * Not applied: made with a person's API token (a personal token, the CLI's included), the governance write
      * opened a confirmation, which an owner or an admin confirms on the console within 15 minutes
      * (`getGovernanceConfirmation`). A browser session's write and an `inference:admin` service key's are applied at
      * once, as before.
@@ -10956,7 +11385,7 @@ export type TriggerAutomationErrors = {
      */
     409: ApiError;
     /**
-     * A refusal
+     * Too many attempts lately (`rate_limited`): nothing was done. A sign-in step, an organization's creations, a webhook trigger or a batch of usage events is limited per address, person, organization or automation over a window; wait, then try again
      */
     429: ApiError;
 };
@@ -10993,6 +11422,14 @@ export type ListWaitsData = {
         mine?: boolean;
         sessionId?: string;
         runId?: string;
+        /**
+         * The `next` of the previous page: the id of its last wait
+         */
+        before?: string;
+        /**
+         * The page size, 1 to 100 (50 by default); 400 outside
+         */
+        limit?: number;
     };
     url: '/api/v1/waits';
 };
@@ -12344,44 +12781,44 @@ export type InferenceMessagesData = {
 
 export type InferenceMessagesErrors = {
     /**
-     * A refusal
+     * An error of the Messages endpoint: in Anthropic's shape from the gateway, `ApiError` from the server around it
      */
-    400: ApiError;
+    400: AnthropicError | ApiError;
     /**
-     * A refusal
+     * An error of the Messages endpoint: in Anthropic's shape from the gateway, `ApiError` from the server around it
      */
-    401: ApiError;
+    401: AnthropicError | ApiError;
     /**
-     * A refusal
+     * An error of the Messages endpoint: in Anthropic's shape from the gateway, `ApiError` from the server around it
      */
-    403: ApiError;
+    403: AnthropicError | ApiError;
     /**
-     * A refusal
+     * An error of the Messages endpoint: in Anthropic's shape from the gateway, `ApiError` from the server around it
      */
-    404: ApiError;
+    404: AnthropicError | ApiError;
     /**
-     * A refusal
+     * An error of the Messages endpoint: in Anthropic's shape from the gateway, `ApiError` from the server around it
      */
-    409: ApiError;
+    409: AnthropicError | ApiError;
     /**
      * Too many requests, in the provider's own error shape, which satisfies `ApiError` (`error.type`, `error.message`). Refused by the budgets before any provider is called: `error.type` `rate_limit_error` on the Messages endpoint, `insufficient_quota` on the OpenAI-compatible ones, which also carry `error.code` `budget_exhausted` or `budget_insufficient`; `error.message` starts with one of three fixed phrases a client can match on (`LedgerSpendGuard.EXHAUSTED`, `.EXHAUSTED_TODAY` and `.INSUFFICIENT` in ostrom-server). `Monthly budget reached: ...`: a monthly limit of the organization or of the member is spent; `Retry-After` gives the seconds until the month ends (UTC), when the limit resets. `Daily budget reached: ...`: a daily limit is spent; `Retry-After` gives the seconds until the day ends (00:00 UTC). Only a limit with `hardStop` refuses a call. `Budget left too low for this call: ...`: the limit is not spent, but what is left after the calls in flight cannot cover what this call may cost (its output price times the largest of its `max_tokens`, `max_output_tokens` and `max_completion_tokens`, 32 000 when it names none, at most 1 000 000; plus its estimated input; nothing for a model without a price); the message says what is left and what the call may cost, with no `Retry-After`: lower the call's output bound, or retry once the calls in flight finish. Every shared account busy or at its limit: `rate_limit_error`, or `rate_limit_exceeded` with `error.code` `no_capacity`, with `Retry-After` when the gateway knows when one frees up. A provider's own 429, once no other account can take the call, is relayed as the provider sent it, with its `Retry-After` and rate-limit headers
      */
-    429: ApiError;
+    429: AnthropicError | OpenAiError;
     /**
-     * A refusal
+     * An error of the Messages endpoint: in Anthropic's shape from the gateway, `ApiError` from the server around it
      */
-    502: ApiError;
+    502: AnthropicError | ApiError;
     /**
-     * A refusal
+     * An error of the Messages endpoint: in Anthropic's shape from the gateway, `ApiError` from the server around it
      */
-    503: ApiError;
+    503: AnthropicError | ApiError;
 };
 
 export type InferenceMessagesError = InferenceMessagesErrors[keyof InferenceMessagesErrors];
 
 export type InferenceMessagesResponses = {
     /**
-     * OK
+     * OK, the provider's answer as it sent it: JSON when the request does not stream; with `"stream": true`, server-sent events whose every `data:` is an `AnthropicStreamEvent`. Planned: the strict contract test of ostrom-server does not read the events yet
      */
     200: unknown;
 };
@@ -12401,44 +12838,44 @@ export type InferenceResponsesData = {
 
 export type InferenceResponsesErrors = {
     /**
-     * A refusal
+     * An error of an OpenAI-compatible endpoint: in OpenAI's shape from the gateway, `ApiError` from the server around it
      */
-    400: ApiError;
+    400: OpenAiError | ApiError;
     /**
-     * A refusal
+     * An error of an OpenAI-compatible endpoint: in OpenAI's shape from the gateway, `ApiError` from the server around it
      */
-    401: ApiError;
+    401: OpenAiError | ApiError;
     /**
-     * A refusal
+     * An error of an OpenAI-compatible endpoint: in OpenAI's shape from the gateway, `ApiError` from the server around it
      */
-    403: ApiError;
+    403: OpenAiError | ApiError;
     /**
-     * A refusal
+     * An error of an OpenAI-compatible endpoint: in OpenAI's shape from the gateway, `ApiError` from the server around it
      */
-    404: ApiError;
+    404: OpenAiError | ApiError;
     /**
-     * A refusal
+     * An error of an OpenAI-compatible endpoint: in OpenAI's shape from the gateway, `ApiError` from the server around it
      */
-    409: ApiError;
+    409: OpenAiError | ApiError;
     /**
      * Too many requests, in the provider's own error shape, which satisfies `ApiError` (`error.type`, `error.message`). Refused by the budgets before any provider is called: `error.type` `rate_limit_error` on the Messages endpoint, `insufficient_quota` on the OpenAI-compatible ones, which also carry `error.code` `budget_exhausted` or `budget_insufficient`; `error.message` starts with one of three fixed phrases a client can match on (`LedgerSpendGuard.EXHAUSTED`, `.EXHAUSTED_TODAY` and `.INSUFFICIENT` in ostrom-server). `Monthly budget reached: ...`: a monthly limit of the organization or of the member is spent; `Retry-After` gives the seconds until the month ends (UTC), when the limit resets. `Daily budget reached: ...`: a daily limit is spent; `Retry-After` gives the seconds until the day ends (00:00 UTC). Only a limit with `hardStop` refuses a call. `Budget left too low for this call: ...`: the limit is not spent, but what is left after the calls in flight cannot cover what this call may cost (its output price times the largest of its `max_tokens`, `max_output_tokens` and `max_completion_tokens`, 32 000 when it names none, at most 1 000 000; plus its estimated input; nothing for a model without a price); the message says what is left and what the call may cost, with no `Retry-After`: lower the call's output bound, or retry once the calls in flight finish. Every shared account busy or at its limit: `rate_limit_error`, or `rate_limit_exceeded` with `error.code` `no_capacity`, with `Retry-After` when the gateway knows when one frees up. A provider's own 429, once no other account can take the call, is relayed as the provider sent it, with its `Retry-After` and rate-limit headers
      */
-    429: ApiError;
+    429: AnthropicError | OpenAiError;
     /**
-     * A refusal
+     * An error of an OpenAI-compatible endpoint: in OpenAI's shape from the gateway, `ApiError` from the server around it
      */
-    502: ApiError;
+    502: OpenAiError | ApiError;
     /**
-     * A refusal
+     * An error of an OpenAI-compatible endpoint: in OpenAI's shape from the gateway, `ApiError` from the server around it
      */
-    503: ApiError;
+    503: OpenAiError | ApiError;
 };
 
 export type InferenceResponsesError = InferenceResponsesErrors[keyof InferenceResponsesErrors];
 
 export type InferenceResponsesResponses = {
     /**
-     * OK
+     * OK, the provider's answer as it sent it: JSON when the request does not stream; with `"stream": true`, server-sent events whose every `data:` is an `OpenAiResponsesStreamEvent`. Planned: the strict contract test of ostrom-server does not read the events yet
      */
     200: unknown;
 };
@@ -12458,44 +12895,44 @@ export type InferenceChatCompletionsData = {
 
 export type InferenceChatCompletionsErrors = {
     /**
-     * A refusal
+     * An error of an OpenAI-compatible endpoint: in OpenAI's shape from the gateway, `ApiError` from the server around it
      */
-    400: ApiError;
+    400: OpenAiError | ApiError;
     /**
-     * A refusal
+     * An error of an OpenAI-compatible endpoint: in OpenAI's shape from the gateway, `ApiError` from the server around it
      */
-    401: ApiError;
+    401: OpenAiError | ApiError;
     /**
-     * A refusal
+     * An error of an OpenAI-compatible endpoint: in OpenAI's shape from the gateway, `ApiError` from the server around it
      */
-    403: ApiError;
+    403: OpenAiError | ApiError;
     /**
-     * A refusal
+     * An error of an OpenAI-compatible endpoint: in OpenAI's shape from the gateway, `ApiError` from the server around it
      */
-    404: ApiError;
+    404: OpenAiError | ApiError;
     /**
-     * A refusal
+     * An error of an OpenAI-compatible endpoint: in OpenAI's shape from the gateway, `ApiError` from the server around it
      */
-    409: ApiError;
+    409: OpenAiError | ApiError;
     /**
      * Too many requests, in the provider's own error shape, which satisfies `ApiError` (`error.type`, `error.message`). Refused by the budgets before any provider is called: `error.type` `rate_limit_error` on the Messages endpoint, `insufficient_quota` on the OpenAI-compatible ones, which also carry `error.code` `budget_exhausted` or `budget_insufficient`; `error.message` starts with one of three fixed phrases a client can match on (`LedgerSpendGuard.EXHAUSTED`, `.EXHAUSTED_TODAY` and `.INSUFFICIENT` in ostrom-server). `Monthly budget reached: ...`: a monthly limit of the organization or of the member is spent; `Retry-After` gives the seconds until the month ends (UTC), when the limit resets. `Daily budget reached: ...`: a daily limit is spent; `Retry-After` gives the seconds until the day ends (00:00 UTC). Only a limit with `hardStop` refuses a call. `Budget left too low for this call: ...`: the limit is not spent, but what is left after the calls in flight cannot cover what this call may cost (its output price times the largest of its `max_tokens`, `max_output_tokens` and `max_completion_tokens`, 32 000 when it names none, at most 1 000 000; plus its estimated input; nothing for a model without a price); the message says what is left and what the call may cost, with no `Retry-After`: lower the call's output bound, or retry once the calls in flight finish. Every shared account busy or at its limit: `rate_limit_error`, or `rate_limit_exceeded` with `error.code` `no_capacity`, with `Retry-After` when the gateway knows when one frees up. A provider's own 429, once no other account can take the call, is relayed as the provider sent it, with its `Retry-After` and rate-limit headers
      */
-    429: ApiError;
+    429: AnthropicError | OpenAiError;
     /**
-     * A refusal
+     * An error of an OpenAI-compatible endpoint: in OpenAI's shape from the gateway, `ApiError` from the server around it
      */
-    502: ApiError;
+    502: OpenAiError | ApiError;
     /**
-     * A refusal
+     * An error of an OpenAI-compatible endpoint: in OpenAI's shape from the gateway, `ApiError` from the server around it
      */
-    503: ApiError;
+    503: OpenAiError | ApiError;
 };
 
 export type InferenceChatCompletionsError = InferenceChatCompletionsErrors[keyof InferenceChatCompletionsErrors];
 
 export type InferenceChatCompletionsResponses = {
     /**
-     * OK
+     * OK, the provider's answer as it sent it: JSON when the request does not stream; with `"stream": true`, server-sent events whose every `data:` is an `OpenAiChatCompletionChunk`, the last one `[DONE]`. Planned: the strict contract test of ostrom-server does not read the events yet
      */
     200: unknown;
 };
@@ -12515,25 +12952,25 @@ export type InferenceModelsData = {
 
 export type InferenceModelsErrors = {
     /**
-     * A refusal
+     * An error of an OpenAI-compatible endpoint: in OpenAI's shape from the gateway, `ApiError` from the server around it
      */
-    400: ApiError;
+    400: OpenAiError | ApiError;
     /**
-     * A refusal
+     * An error of an OpenAI-compatible endpoint: in OpenAI's shape from the gateway, `ApiError` from the server around it
      */
-    401: ApiError;
+    401: OpenAiError | ApiError;
     /**
-     * A refusal
+     * An error of an OpenAI-compatible endpoint: in OpenAI's shape from the gateway, `ApiError` from the server around it
      */
-    403: ApiError;
+    403: OpenAiError | ApiError;
     /**
-     * A refusal
+     * An error of an OpenAI-compatible endpoint: in OpenAI's shape from the gateway, `ApiError` from the server around it
      */
-    404: ApiError;
+    404: OpenAiError | ApiError;
     /**
-     * A refusal
+     * An error of an OpenAI-compatible endpoint: in OpenAI's shape from the gateway, `ApiError` from the server around it
      */
-    409: ApiError;
+    409: OpenAiError | ApiError;
 };
 
 export type InferenceModelsError = InferenceModelsErrors[keyof InferenceModelsErrors];
@@ -12543,6 +12980,7 @@ export type InferenceModelsResponses = {
      * OK
      */
     200: {
+        object?: 'list';
         data: Array<{
             [key: string]: unknown;
         }>;
@@ -12740,7 +13178,7 @@ export type SetModelPolicyResponses = {
      */
     200: ModelPolicy;
     /**
-     * Not applied: made with a person's API token (the CLI's, `ostrom login --admin` or not), the governance write
+     * Not applied: made with a person's API token (a personal token, the CLI's included), the governance write
      * opened a confirmation, which an owner or an admin confirms on the console within 15 minutes
      * (`getGovernanceConfirmation`). A browser session's write and an `inference:admin` service key's are applied at
      * once, as before.
@@ -12992,6 +13430,10 @@ export type SetBudgetErrors = {
      * A refusal
      */
     409: ApiError;
+    /**
+     * confirmation_limit: the person already has 10 governance confirmations waiting (expired, refused and answered ones do not count)
+     */
+    429: ApiError;
 };
 
 export type SetBudgetError = SetBudgetErrors[keyof SetBudgetErrors];
@@ -13001,6 +13443,13 @@ export type SetBudgetResponses = {
      * OK
      */
     200: Budget;
+    /**
+     * Not applied: made with a person's API token (a personal token, the CLI's included), the governance write
+     * opened a confirmation, which an owner or an admin confirms on the console within 15 minutes
+     * (`getGovernanceConfirmation`). A browser session's write and an `inference:admin` service key's are applied at
+     * once, as before.
+     */
+    202: GovernanceConfirmationPending;
 };
 
 export type SetBudgetResponse = SetBudgetResponses[keyof SetBudgetResponses];
@@ -13249,6 +13698,10 @@ export type RecordUsageEventsErrors = {
      * A refusal
      */
     413: ApiError;
+    /**
+     * Too many attempts lately (`rate_limited`): nothing was done. A sign-in step, an organization's creations, a webhook trigger or a batch of usage events is limited per address, person, organization or automation over a window; wait, then try again
+     */
+    429: ApiError;
 };
 
 export type RecordUsageEventsError = RecordUsageEventsErrors[keyof RecordUsageEventsErrors];
@@ -13792,6 +14245,10 @@ export type RunnerHeartbeatData = {
          * The sessions whose workspace volumes the machine holds.
          */
         workspaces?: Array<string>;
+        /**
+         * The sessions the machine runs at once at most; the server never hands it more, and a session with no room anywhere stays queued. 0 drains the machine. Absent, as from an older runner: no limit.
+         */
+        capacity?: number;
     };
     headers?: {
         /**
@@ -13802,7 +14259,12 @@ export type RunnerHeartbeatData = {
     path: {
         id: string;
     };
-    query?: never;
+    query?: {
+        /**
+         * Seconds the heartbeat may wait for an execution to hand over, for a runner that has room; it answers as soon as one is taken or assigned to it, and at the end of the wait otherwise. Absent or 0 answers at once, and so does a heartbeat when its server instance already holds too many waiting ones. A value outside 0 to 25 is read as the nearest bound. A runner then heartbeats again at once
+         */
+        wait?: number;
+    };
     url: '/api/v1/runners/{id}/heartbeat';
 };
 
@@ -14258,7 +14720,7 @@ export type AttachCloudTerminalData = {
 
 export type AttachCloudTerminalErrors = {
     /**
-     * A refusal
+     * A GET that does not ask for the WebSocket upgrade, whoever asks and whatever the session, before any credential is read (invalid_request). Planned: ostrom-server answers it with ostrom-server#317; its main answers such a GET a 400 without a body
      */
     400: ApiError;
     /**
@@ -14270,9 +14732,9 @@ export type AttachCloudTerminalErrors = {
      */
     403: ApiError;
     /**
-     * A refusal
+     * An HTTP 404 answered to a request that does not open the socket (observed by ostrom-server's isolation matrix) has no body; a socket that opens refuses with a close, 4404 for an unknown or foreign session
      */
-    404: ApiError;
+    404: unknown;
     /**
      * A refusal
      */
@@ -14292,6 +14754,10 @@ export type AttachRunnerTerminalData = {
 };
 
 export type AttachRunnerTerminalErrors = {
+    /**
+     * A GET that does not ask for the WebSocket upgrade, before any credential is read (invalid_request); a socket that opens refuses with a close (4401, 4409). Planned: ostrom-server answers it with ostrom-server#317; its main answers such a GET a 404
+     */
+    400: ApiError;
     /**
      * A refusal
      */
@@ -14426,6 +14892,10 @@ export type OpenRunnerLaunchResponses = {
         launchId: string;
         agentToken: string;
         expiresAt: string;
+        /**
+         * What the CLI does when none of Ostrom's hooks runs in the session. Planned: the server does not send it yet
+         */
+        hooksCheck?: HooksCheck;
     };
 };
 
@@ -16544,6 +17014,10 @@ export type ListAuditErrors = {
      * A refusal
      */
     409: ApiError;
+    /**
+     * Too many reads lately (`rate_limited`): nothing was read. A costly read is bounded per caller (a person, a device, an agent or a service): calls per minute, reads and waits together, and calls at once, the waits of `getGate` counted apart from the reads
+     */
+    429: ApiError;
 };
 
 export type ListAuditError = ListAuditErrors[keyof ListAuditErrors];
@@ -17254,6 +17728,10 @@ export type ListBillingInvoicesData = {
 };
 
 export type ListBillingInvoicesErrors = {
+    /**
+     * A refusal
+     */
+    400: ApiError;
     /**
      * A refusal
      */
