@@ -250,4 +250,87 @@ describe("session store", () => {
         expect(store.getState().state).toEqual({status: "signed-out"})
         expect(storage.items.has(SESSION_KEY)).toBe(false)
     })
+
+    describe("capabilities", () => {
+        const capabilities = {apiVersion: 1, serverVersion: "1.4.0", features: ["receipts.v1"]}
+
+        async function signedIn(): Promise<{store: ReturnType<typeof createSessionStore>; storage: MemoryStorage}> {
+            const storage = new MemoryStorage()
+            const store = createSessionStore(storage)
+            await store.getState().signIn(session)
+            return {store, storage}
+        }
+
+        it("keeps what the server speaks with the session, across launches", async () => {
+            const {store, storage} = await signedIn()
+            await store.getState().noteCapabilities(session.token, capabilities)
+            expect(store.getState().state).toEqual({status: "signed-in", session: {...session, capabilities}})
+            const next = createSessionStore(storage)
+            await next.getState().hydrate()
+            expect(next.getState().state).toEqual({status: "signed-in", session: {...session, capabilities}})
+        })
+
+        it("writes nothing when they have not changed, and lifts the incompatibility", async () => {
+            const {store, storage} = await signedIn()
+            await store.getState().noteCapabilities(session.token, capabilities)
+            store.getState().noteIncompatible(session.token, 2)
+            expect(store.getState().incompatible).toEqual({apiVersion: 2})
+            const set = jest.spyOn(storage, "set")
+            await store.getState().noteCapabilities(session.token, capabilities)
+            expect(set).not.toHaveBeenCalled()
+            expect(store.getState().incompatible).toBeUndefined()
+        })
+
+        it("marks a server too old to say its version", async () => {
+            const {store} = await signedIn()
+            store.getState().noteIncompatible(session.token, undefined)
+            expect(store.getState().incompatible).toEqual({apiVersion: undefined})
+        })
+
+        it("ignores what was read for another session, or none", async () => {
+            const {store} = await signedIn()
+            await store.getState().noteCapabilities("ost_other", capabilities)
+            store.getState().noteIncompatible("ost_other", 2)
+            expect(store.getState().state).toEqual({status: "signed-in", session})
+            expect(store.getState().incompatible).toBeUndefined()
+            await store.getState().signOut()
+            await store.getState().noteCapabilities(session.token, capabilities)
+            store.getState().noteIncompatible(session.token, 2)
+            expect(store.getState().state).toEqual({status: "signed-out"})
+            expect(store.getState().incompatible).toBeUndefined()
+        })
+
+        it("never signs in again a session signed out while its capabilities were kept", async () => {
+            const {store, storage} = await signedIn()
+            const noting = store.getState().noteCapabilities(session.token, capabilities)
+            const signingOut = store.getState().signOut()
+            await Promise.all([noting, signingOut])
+            expect(store.getState().state).toEqual({status: "signed-out"})
+            expect(storage.items.has(SESSION_KEY)).toBe(false)
+        })
+
+        it("drops the incompatibility on sign-out and on the next sign-in", async () => {
+            const {store} = await signedIn()
+            store.getState().noteIncompatible(session.token, 2)
+            await store.getState().signOut()
+            expect(store.getState().incompatible).toBeUndefined()
+            await store.getState().signIn(session)
+            store.getState().noteIncompatible(session.token, 3)
+            await store.getState().signIn(session)
+            expect(store.getState().incompatible).toBeUndefined()
+        })
+
+        it("signs out when the keychain write of the capabilities lands after a sign-out", async () => {
+            const {store, storage} = await signedIn()
+            const set = storage.set.bind(storage)
+            jest.spyOn(storage, "set").mockImplementation(async (key, value) => {
+                void store.getState().signOut()
+                await set(key, value)
+            })
+            await store.getState().noteCapabilities(session.token, capabilities)
+            expect(store.getState().state).toEqual({status: "signed-out"})
+            await store.getState().signOut()
+            expect(storage.items.has(SESSION_KEY)).toBe(false)
+        })
+    })
 })

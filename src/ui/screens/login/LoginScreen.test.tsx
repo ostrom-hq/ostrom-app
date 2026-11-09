@@ -2,7 +2,9 @@
 import {fireEvent, render, screen, waitFor} from "@testing-library/react-native"
 import {ServicesProvider} from "@/services/AppServices"
 import type {SignInOutcome} from "@/services/signIn/GithubSignIn"
-import {fakeServices, testSession} from "@/test/fakeServices"
+import {ApiError} from "@/api/http/ApiError"
+import type {Capabilities} from "@/api/contract/capabilities"
+import {fakeRepositories, fakeServices, testSession} from "@/test/fakeServices"
 import {LoginScreen} from "./LoginScreen"
 
 function setup(outcome: SignInOutcome): {signIn: jest.Mock<Promise<SignInOutcome>, [string]>; services: ReturnType<typeof fakeServices>} {
@@ -102,5 +104,70 @@ describe("LoginScreen", () => {
         expect(
             await screen.findByText("The server did not accept the sign-in. Check the address and try again."),
         ).toBeOnTheScreen()
+    })
+
+    describe("the server's API version", () => {
+        const capabilities: Capabilities = {apiVersion: 1, serverVersion: "1.4.0", features: ["receipts.v1"]}
+
+        function servedBy(
+            read: () => Promise<Capabilities>,
+            logout: () => Promise<void> = () => Promise.resolve(),
+        ): {services: ReturnType<typeof fakeServices>; logout: jest.Mock<Promise<void>, []>} {
+            const logoutCall = jest.fn(logout)
+            const services = fakeServices({
+                signIn: {signIn: () => Promise.resolve({kind: "signed-in", session: testSession, unlockKey: "key-1"})},
+                repositories: fakeRepositories({
+                    capabilities: {read},
+                    account: {me: jest.fn(), organizations: jest.fn(), exchangeCode: jest.fn(), unlock: jest.fn(), logout: logoutCall},
+                }),
+            })
+            return {services, logout: logoutCall}
+        }
+
+        it("keeps what a compatible server serves with the session", async () => {
+            const {services} = servedBy(() => Promise.resolve(capabilities))
+            await renderLogin(services)
+            await fireEvent.press(screen.getByRole("button", {name: "Continue with GitHub"}))
+            await waitFor(() => {
+                expect(services.sessionStore.getState().state).toEqual({status: "signed-in", session: {...testSession, capabilities}})
+            })
+        })
+
+        it("signs in all the same when the server cannot be asked", async () => {
+            const {services} = servedBy(() => Promise.reject(new ApiError({kind: "network"})))
+            await renderLogin(services)
+            await fireEvent.press(screen.getByRole("button", {name: "Continue with GitHub"}))
+            await waitFor(() => {
+                expect(services.sessionStore.getState().state).toEqual({status: "signed-in", session: testSession})
+            })
+        })
+
+        it("revokes the new session of a server that speaks another version, and says so", async () => {
+            const keep = jest.fn()
+            const {services, logout} = servedBy(() => Promise.resolve({...capabilities, apiVersion: 2}))
+            await renderLogin({...services, unlock: {keep, unlock: jest.fn(), forget: jest.fn()}})
+            await fireEvent.press(screen.getByRole("button", {name: "Continue with GitHub"}))
+            expect(
+                await screen.findByText(
+                    "This server speaks API v2; this app speaks v1. Update the app or ask your administrator to update the server.",
+                ),
+            ).toBeOnTheScreen()
+            expect(logout).toHaveBeenCalledTimes(1)
+            expect(keep).not.toHaveBeenCalled()
+            expect(services.sessionStore.getState().state).toEqual({status: "loading"})
+            expect(screen.getByRole("button", {name: "Continue with GitHub"})).toBeEnabled()
+        })
+
+        it("treats a server without the route as too old, even when the revocation fails", async () => {
+            const {services, logout} = servedBy(
+                () => Promise.reject(new ApiError({kind: "unexpected-status", status: 404})),
+                () => Promise.reject(new ApiError({kind: "network"})),
+            )
+            await renderLogin(services)
+            await fireEvent.press(screen.getByRole("button", {name: "Continue with GitHub"}))
+            expect(await screen.findByText(/This server is too old for this app/)).toBeOnTheScreen()
+            expect(logout).toHaveBeenCalledTimes(1)
+            expect(services.sessionStore.getState().state).toEqual({status: "loading"})
+        })
     })
 })

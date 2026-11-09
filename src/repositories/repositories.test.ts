@@ -4,6 +4,7 @@ import {HttpClientImpl} from "@/api/http/HttpClientImpl"
 import {ApiError} from "@/api/http/ApiError"
 import {MOCK_BASE_URL, notificationSettings, pendingApproval, receipts, selfApproval, stepUpApproval} from "@/api/mocks/fixtures"
 import {createMockApi} from "@/api/mocks/handlers"
+import {CapabilitiesRepositoryImpl} from "./CapabilitiesRepositoryImpl"
 import {AccountRepositoryImpl} from "./AccountRepositoryImpl"
 import {ActivityRepositoryImpl} from "./ActivityRepositoryImpl"
 import {ApprovalsRepositoryImpl} from "./ApprovalsRepositoryImpl"
@@ -34,6 +35,14 @@ async function refusal(call: Promise<unknown>): Promise<string> {
     }
     throw new Error("the call was not refused")
 }
+
+describe("CapabilitiesRepositoryImpl", () => {
+    it("reads the API version, the release and the features of the server", async () => {
+        const capabilities = await new CapabilitiesRepositoryImpl(http).read()
+        expect(capabilities).toMatchObject({apiVersion: 1, serverVersion: "0.0.0-mock"})
+        expect(capabilities.features).toContain("notifications.push.v1")
+    })
+})
 
 describe("ApprovalsRepositoryImpl", () => {
     const approvals = new ApprovalsRepositoryImpl(http)

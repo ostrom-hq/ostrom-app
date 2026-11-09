@@ -186,3 +186,10 @@ export const notificationSettings: z.input<typeof NotificationSettingsSchema> = 
     spending: false,
     quietHours: {start: "22:00", end: "07:00", timeZone: "Europe/Paris"},
 }
+
+/** What the mock server speaks and serves: this app's API version, and every feature the app has a function for. */
+export const capabilities = {
+    apiVersion: 1,
+    serverVersion: "0.0.0-mock",
+    features: ["notifications.push.v1", "notifications.v1", "receipts.v1", "budgets.v1", "gates.v1"],
+}

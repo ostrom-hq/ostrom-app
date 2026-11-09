@@ -26,7 +26,7 @@ describe("useSettingsViewModel", () => {
                 <QueryClientProvider client={testQueryClient()}>{children}</QueryClientProvider>
             </ServicesProvider>
         )
-        const {result} = await renderHook(() => useSettingsViewModel("en", "Europe/Paris"), {wrapper})
+        const {result} = await renderHook(() => useSettingsViewModel("en", "Europe/Paris", undefined), {wrapper})
         expect(result.current.state.kind).toBe("loading")
         await act(async () => {
             result.current.toggle("spending", true)

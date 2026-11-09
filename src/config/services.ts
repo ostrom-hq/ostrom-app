@@ -11,6 +11,7 @@ import {HttpClientImpl} from "@/api/http/HttpClientImpl"
 import {AccountRepositoryImpl} from "@/repositories/AccountRepositoryImpl"
 import {ActivityRepositoryImpl} from "@/repositories/ActivityRepositoryImpl"
 import {ApprovalsRepositoryImpl} from "@/repositories/ApprovalsRepositoryImpl"
+import {CapabilitiesRepositoryImpl} from "@/repositories/CapabilitiesRepositoryImpl"
 import {NotificationsRepositoryImpl} from "@/repositories/NotificationsRepositoryImpl"
 import {PinnedReceiptsRepository} from "@/repositories/PinnedReceiptsRepository"
 import {ProfileRepositoryImpl} from "@/repositories/ProfileRepositoryImpl"
@@ -50,6 +51,7 @@ export function repositoriesOver(http: HttpClient): Repositories {
         account: new AccountRepositoryImpl(http),
         activity: new ActivityRepositoryImpl(http),
         approvals: new ApprovalsRepositoryImpl(http),
+        capabilities: new CapabilitiesRepositoryImpl(http),
         notifications: new NotificationsRepositoryImpl(http),
         profile: new ProfileRepositoryImpl(http),
         receipts: new ReceiptsRepositoryImpl(http),

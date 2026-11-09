@@ -14,7 +14,19 @@ export const en = {
             "state-mismatch": "This sign-in did not come from this app. Try again.",
             denied: "GitHub or the server refused the sign-in.",
             "exchange-failed": "The server did not accept the sign-in. Check the address and try again.",
+            "unsupported-server":
+                "This server speaks API v{{version}}; this app speaks v{{supported}}. Update the app or ask your administrator to update the server.",
+            "server-too-old":
+                "This server is too old for this app: it does not say which API version it speaks (this app speaks v{{supported}}). Ask your administrator to update the server.",
         },
+    },
+    incompatible: {
+        title: "This server is not supported",
+        unsupported:
+            "This server speaks API v{{version}}; this app speaks v{{supported}}. Update the app or ask your administrator to update the server.",
+        tooOld:
+            "This server is too old for this app: it does not say which API version it speaks (this app speaks v{{supported}}). Ask your administrator to update the server.",
+        signOut: "Sign out",
     },
     common: {
         retry: "Try again",
@@ -96,6 +108,9 @@ export const en = {
         account: "Account",
         login: "GitHub",
         server: "Server",
+        serverVersion: "Server version",
+        apiVersion: "API version",
+        appVersion: "App version",
         organization: "Organization",
         organizationIntro: "Ostrom acts in the organization chosen here: its requests, its history, its spending.",
         chooseOrganization: "You are a member of several organizations: choose the one Ostrom acts in.",

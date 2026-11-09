@@ -15,7 +15,19 @@ export const fr: TranslationShape = {
             "state-mismatch": "Cette connexion ne vient pas de cette app. Réessaie.",
             denied: "GitHub ou le serveur a refusé la connexion.",
             "exchange-failed": "Le serveur n'a pas accepté la connexion. Vérifie l'adresse et réessaie.",
+            "unsupported-server":
+                "Ce serveur parle l'API v{{version}} ; cette app parle la v{{supported}}. Mets l'app à jour ou demande à ton administrateur de mettre le serveur à jour.",
+            "server-too-old":
+                "Ce serveur est trop ancien pour cette app : il n'indique pas quelle version de l'API il parle (cette app parle la v{{supported}}). Demande à ton administrateur de mettre le serveur à jour.",
         },
+    },
+    incompatible: {
+        title: "Ce serveur n'est pas pris en charge",
+        unsupported:
+            "Ce serveur parle l'API v{{version}} ; cette app parle la v{{supported}}. Mets l'app à jour ou demande à ton administrateur de mettre le serveur à jour.",
+        tooOld:
+            "Ce serveur est trop ancien pour cette app : il n'indique pas quelle version de l'API il parle (cette app parle la v{{supported}}). Demande à ton administrateur de mettre le serveur à jour.",
+        signOut: "Se déconnecter",
     },
     common: {
         retry: "Réessayer",
@@ -97,6 +109,9 @@ export const fr: TranslationShape = {
         account: "Compte",
         login: "GitHub",
         server: "Serveur",
+        serverVersion: "Version du serveur",
+        apiVersion: "Version de l'API",
+        appVersion: "Version de l'app",
         organization: "Organisation",
         organizationIntro: "Ostrom agit dans l'organisation choisie ici : ses demandes, son historique, ses dépenses.",
         chooseOrganization: "Tu es membre de plusieurs organisations : choisis celle où Ostrom agit.",

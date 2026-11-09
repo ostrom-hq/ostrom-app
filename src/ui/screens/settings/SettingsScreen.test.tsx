@@ -1,16 +1,29 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import {act, fireEvent, screen, waitFor} from "@testing-library/react-native"
 import {type Device, type DeviceRegistration, type NotificationSettings, NotificationSettingsSchema} from "@/api/contract/notifications"
+import type {Capabilities} from "@/api/contract/capabilities"
 import {ApiError} from "@/api/http/ApiError"
 import {notificationSettings} from "@/api/mocks/fixtures"
 import type {AppServices} from "@/services/AppServices"
 import type {PushPermission} from "@/services/push/PushService"
-import {fakeRepositories, fakeServices, signedInServices} from "@/test/fakeServices"
+import {fakeRepositories, fakeServices, signedInServices, testSession} from "@/test/fakeServices"
 import {renderWithServices} from "@/test/renderWithServices"
 import {phoneTimeZone, SettingsScreen} from "./SettingsScreen"
 import {defaultQuietHours} from "./useSettingsViewModel"
 
 const mockPush = jest.fn()
+const mockApp: {config: {version: string} | null} = {config: null}
+jest.mock("expo-constants", () => ({
+    __esModule: true,
+    default: {
+        get expoConfig(): {version: string} | null {
+            return mockApp.config
+        },
+    },
+}))
+afterEach(() => {
+    mockApp.config = null
+})
 jest.mock("expo-router", () => ({useRouter: () => ({push: mockPush})}))
 
 const initial = NotificationSettingsSchema.parse(notificationSettings)
@@ -29,12 +42,15 @@ async function open({
     save,
     unregister = () => Promise.resolve(),
     revoke = () => Promise.resolve(),
+    capabilities,
 }: {
     permission?: PushPermission
     refuseSave?: boolean
     save?: (settings: NotificationSettings) => Promise<NotificationSettings>
     unregister?: (id: string) => Promise<void>
     revoke?: () => Promise<void>
+    /** What the server serves, once read; unknown by default. */
+    capabilities?: Capabilities
 } = {}): Promise<Harness> {
     const saveSettings = jest.fn(
         save ??
@@ -59,8 +75,11 @@ async function open({
             notifications: {registerDevice, unregisterDevice, settings: () => Promise.resolve(initial), saveSettings},
         }),
     })
+    if (capabilities !== undefined) await services.sessionStore.getState().signIn({...testSession, capabilities})
     await renderWithServices(<SettingsScreen />, services)
-    await screen.findByRole("switch", {name: "A request waits for my yes"})
+    if (capabilities === undefined || capabilities.features.includes("notifications.v1")) {
+        await screen.findByRole("switch", {name: "A request waits for my yes"})
+    }
     return {services, saveSettings, registerDevice, unregisterDevice, logout}
 }
 
@@ -82,6 +101,38 @@ describe("SettingsScreen", () => {
         expect(screen.getByRole("switch", {name: "Spending passes a budget threshold"})).not.toBeChecked()
         expect(screen.getByText("No notification from 22:00 to 07:00 (Europe/Paris)")).toBeOnTheScreen()
         expect(await screen.findByText(/Notifications are off on this phone/)).toBeOnTheScreen()
+    })
+
+    it("shows the versions of the server and of the app next to the server", async () => {
+        mockApp.config = {version: "0.3.0"}
+        await open({capabilities: {apiVersion: 1, serverVersion: "1.4.0", features: ["notifications.v1"]}})
+        expect(screen.getByText("Server version")).toBeOnTheScreen()
+        expect(screen.getByText("1.4.0")).toBeOnTheScreen()
+        expect(screen.getByText("API version")).toBeOnTheScreen()
+        expect(screen.getByText("v1")).toBeOnTheScreen()
+        expect(screen.getByText("App version")).toBeOnTheScreen()
+        expect(screen.getByText("0.3.0")).toBeOnTheScreen()
+    })
+
+    it("shows no version it does not know", async () => {
+        await open()
+        expect(screen.queryByText("Server version")).toBeNull()
+        expect(screen.queryByText("API version")).toBeNull()
+        expect(screen.queryByText("App version")).toBeNull()
+    })
+
+    it("hides the notifications of a server that does not serve them, and registers nothing for push", async () => {
+        const {registerDevice} = await open({permission: granted, capabilities: {apiVersion: 1, serverVersion: "1.4.0", features: ["receipts.v1"]}})
+        expect(screen.queryByText("Notifications")).toBeNull()
+        expect(screen.queryByRole("switch", {name: "A request waits for my yes"})).toBeNull()
+        expect(registerDevice).not.toHaveBeenCalled()
+    })
+
+    it("does not register this phone for push on a server without push, but shows the preferences", async () => {
+        const {registerDevice} = await open({permission: granted, capabilities: {apiVersion: 1, serverVersion: "1.4.0", features: ["notifications.v1"]}})
+        expect(screen.getByRole("switch", {name: "A request waits for my yes"})).toBeOnTheScreen()
+        expect(screen.queryByText("This phone receives Ostrom notifications.")).toBeNull()
+        expect(registerDevice).not.toHaveBeenCalled()
     })
 
     it("registers this phone for push when the person allows it", async () => {

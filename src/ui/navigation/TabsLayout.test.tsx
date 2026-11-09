@@ -5,12 +5,15 @@ import {renderRouter} from "expo-router/testing-library"
 import type {ReactNode} from "react"
 import {Text} from "react-native"
 import {type AppServices, ServicesProvider} from "@/services/AppServices"
-import {signedInServices} from "@/test/fakeServices"
+import {signedInServices, testSession} from "@/test/fakeServices"
 import {testQueryClient} from "@/test/renderWithServices"
 import {TabsLayout} from "./TabsLayout"
 
-async function launch(extra: Partial<AppServices>): Promise<void> {
+async function launch(extra: Partial<AppServices>, features?: readonly string[]): Promise<void> {
     const services = {...(await signedInServices()), ...extra}
+    if (features !== undefined) {
+        await services.sessionStore.getState().signIn({...testSession, capabilities: {apiVersion: 1, serverVersion: "1.4.0", features: [...features]}})
+    }
     const client = testQueryClient()
     const wrapper = ({children}: {children: ReactNode}): React.JSX.Element => (
         <ServicesProvider services={services}>
@@ -46,5 +49,24 @@ describe("TabsLayout", () => {
         await launch({})
         await fireEvent.press(await screen.findByText("Activity"))
         expect(await screen.findByText("activity screen")).toBeOnTheScreen()
+    })
+
+    it("shows every tab while the features of the server are not known", async () => {
+        await launch({})
+        expect(await screen.findByText("History")).toBeOnTheScreen()
+        expect(screen.getByText("Spending")).toBeOnTheScreen()
+    })
+
+    it("hides the tabs of the functions the server does not serve", async () => {
+        await launch({}, ["gates.v1"])
+        expect(await screen.findByText("Activity")).toBeOnTheScreen()
+        expect(screen.queryByText("History")).toBeNull()
+        expect(screen.queryByText("Spending")).toBeNull()
+    })
+
+    it("keeps the tabs of the functions the server serves", async () => {
+        await launch({}, ["receipts.v1", "budgets.v1"])
+        expect(await screen.findByText("History")).toBeOnTheScreen()
+        expect(screen.getByText("Spending")).toBeOnTheScreen()
     })
 })

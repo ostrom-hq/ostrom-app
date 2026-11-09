@@ -6,7 +6,8 @@ import {useEffect, useRef, useState} from "react"
 import {useTranslation} from "react-i18next"
 import {isOrgScoped} from "@/query/orgScope"
 import {createQueryClient, followAppFocus} from "@/query/queryClient"
-import {type AppServices, ServicesProvider, useServices, useSessionState} from "@/services/AppServices"
+import {type AppServices, ServicesProvider, useIncompatibleServer, useServices, useSessionState} from "@/services/AppServices"
+import {useServerCheck} from "@/ui/capabilities/useServerCheck"
 import {PrivacyGuard} from "@/ui/components/PrivacyGuard"
 import {navigationThemeFor} from "@/ui/theme/navigationTheme"
 import {useTheme} from "@/ui/theme/useTheme"
@@ -17,6 +18,8 @@ function RootNavigator(): React.JSX.Element | null {
     const {sessionStore, unlock, push} = useServices()
     const queryClient = useQueryClient()
     const state = useSessionState()
+    const incompatible = useIncompatibleServer() !== undefined
+    useServerCheck()
     useEffect(() => {
         void sessionStore.getState().hydrate()
     }, [sessionStore])
@@ -53,10 +56,14 @@ function RootNavigator(): React.JSX.Element | null {
     const signedIn = state.status === "signed-in"
     return (
         <Stack screenOptions={{headerShown: false}}>
-            <Stack.Protected guard={signedIn}>
+            <Stack.Protected guard={signedIn && !incompatible}>
                 <Stack.Screen name="(tabs)" />
                 <Stack.Screen name="request/[id]" options={{headerShown: true, title: t("request.title"), headerBackTitle: t("inbox.title")}} />
                 <Stack.Screen name="account" options={{headerShown: true, title: t("account.title"), headerBackTitle: t("settings.title")}} />
+            </Stack.Protected>
+            {/* A server this app does not speak: nothing else is reachable but signing out. */}
+            <Stack.Protected guard={signedIn && incompatible}>
+                <Stack.Screen name="incompatible" />
             </Stack.Protected>
             <Stack.Protected guard={!signedIn}>
                 <Stack.Screen name="login" />

@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import {Tabs} from "expo-router"
 import {useTranslation} from "react-i18next"
-import {useServices} from "@/services/AppServices"
+import {FEATURES} from "@/domain/capabilities/compatibility"
+import {useFeature, useServices} from "@/services/AppServices"
 import {usePushBridge} from "@/ui/push/usePushBridge"
 import {useTheme} from "@/ui/theme/useTheme"
 
@@ -11,6 +12,9 @@ export function TabsLayout(): React.JSX.Element {
     const {colors} = useTheme()
     const {onTabPress} = useServices()
     usePushBridge()
+    // A tab whose function the server does not serve is hidden.
+    const receipts = useFeature(FEATURES.receipts)
+    const budgets = useFeature(FEATURES.budgets)
     return (
         <Tabs
             // The performance pass times a list from this press (the E2E build only: no other build listens).
@@ -28,9 +32,9 @@ export function TabsLayout(): React.JSX.Element {
             }}
         >
             <Tabs.Screen name="index" options={{title: t("tabs.inbox")}} />
-            <Tabs.Screen name="history" options={{title: t("tabs.history")}} />
+            <Tabs.Screen name="history" options={{title: t("tabs.history"), href: receipts ? "/history" : null}} />
             <Tabs.Screen name="activity" options={{title: t("tabs.activity")}} />
-            <Tabs.Screen name="spending" options={{title: t("tabs.spending")}} />
+            <Tabs.Screen name="spending" options={{title: t("tabs.spending"), href: budgets ? "/spending" : null}} />
             <Tabs.Screen name="settings" options={{title: t("tabs.settings")}} />
         </Tabs>
     )

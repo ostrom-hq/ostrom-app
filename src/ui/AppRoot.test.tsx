@@ -2,7 +2,9 @@
 import {act, fireEvent, screen} from "@testing-library/react-native"
 import {renderRouter} from "expo-router/testing-library"
 import type {ApprovalQueue} from "@/api/contract/approvals"
+import type {Capabilities} from "@/api/contract/capabilities"
 import {ApiError} from "@/api/http/ApiError"
+import type {AppServices} from "@/services/AppServices"
 import type {PushService} from "@/services/push/PushService"
 import type {PhoneUnlock} from "@/services/unlock/PhoneUnlock"
 import {SESSION_KEY} from "@/stores/session"
@@ -13,6 +15,7 @@ import {TabsLayout} from "@/ui/navigation/TabsLayout"
 import {ActivityScreen} from "@/ui/screens/activity/ActivityScreen"
 import {HistoryScreen} from "@/ui/screens/history/HistoryScreen"
 import {InboxScreen} from "@/ui/screens/inbox/InboxScreen"
+import {IncompatibleServerScreen} from "@/ui/screens/incompatible/IncompatibleServerScreen"
 import {LoginScreen} from "@/ui/screens/login/LoginScreen"
 import {RequestRoute} from "@/ui/screens/request/RequestRoute"
 import {SettingsScreen} from "@/ui/screens/settings/SettingsScreen"
@@ -45,6 +48,7 @@ async function launch(
             "(tabs)/spending": SpendingScreen,
             "(tabs)/settings": SettingsScreen,
             login: LoginScreen,
+            incompatible: IncompatibleServerScreen,
             "request/[id]": RequestRoute,
         },
         {initialUrl: "/"},
@@ -58,6 +62,53 @@ function keptSession(): MemoryStorage {
 }
 
 describe("AppRoot", () => {
+    describe("a server this app does not speak", () => {
+        async function launchOn(read: () => Promise<Capabilities>): Promise<AppServices> {
+            const services = fakeServices({
+                storage: keptSession(),
+                repositories: fakeRepositories({
+                    approvals: {queue: () => Promise.resolve(EMPTY), view: jest.fn(), answer: jest.fn()},
+                    capabilities: {read},
+                    account: {me: jest.fn(), organizations: jest.fn(), exchangeCode: jest.fn(), unlock: jest.fn(), logout: () => Promise.resolve()},
+                }),
+            })
+            await renderRouter(
+                {
+                    _layout: (): React.JSX.Element => <AppRoot services={services} queryClient={testQueryClient()} />,
+                    "(tabs)/_layout": TabsLayout,
+                    "(tabs)/index": InboxScreen,
+                    "(tabs)/history": HistoryScreen,
+                    "(tabs)/activity": ActivityScreen,
+                    "(tabs)/spending": SpendingScreen,
+                    "(tabs)/settings": SettingsScreen,
+                    login: LoginScreen,
+                    incompatible: IncompatibleServerScreen,
+                },
+                {initialUrl: "/"},
+            )
+            return services
+        }
+
+        it("blocks the app with a screen that only signs out", async () => {
+            const services = await launchOn(() => Promise.resolve({apiVersion: 2, serverVersion: "2.0.0", features: []}))
+            expect(await screen.findByText(/This server speaks API v2; this app speaks v1/)).toBeOnTheScreen()
+            expect(screen.queryByText("Inbox")).toBeNull()
+            await fireEvent.press(screen.getByRole("button", {name: "Sign out"}))
+            expect(await screen.findByRole("button", {name: "Continue with GitHub"})).toBeOnTheScreen()
+            expect(services.sessionStore.getState().incompatible).toBeUndefined()
+        })
+
+        it("leaves the app open on a server it speaks", async () => {
+            await launchOn(() => Promise.resolve({apiVersion: 1, serverVersion: "1.4.0", features: []}))
+            expect(await screen.findByText("Nothing waits for your yes right now.")).toBeOnTheScreen()
+        })
+
+        it("leaves the app open when the server cannot be reached", async () => {
+            await launchOn(() => Promise.reject(new ApiError({kind: "network"})))
+            expect(await screen.findByText("Nothing waits for your yes right now.")).toBeOnTheScreen()
+        })
+    })
+
     it("opens on the login screen when signed out", async () => {
         await launch(new MemoryStorage())
         expect(await screen.findByRole("button", {name: "Continue with GitHub"})).toBeOnTheScreen()
