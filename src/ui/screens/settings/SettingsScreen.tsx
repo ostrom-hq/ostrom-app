@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+import Constants from "expo-constants"
 import {useRouter} from "expo-router"
 import {useTranslation} from "react-i18next"
 import {ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View} from "react-native"
@@ -40,11 +41,16 @@ export function phoneTimeZone(): string {
     return Intl.DateTimeFormat().resolvedOptions().timeZone
 }
 
+/** The version of this app (`app.json`), when the build knows it. */
+export function appVersion(): string | undefined {
+    return Constants.expoConfig?.version
+}
+
 export function SettingsScreen(): React.JSX.Element {
     const {t, i18n} = useTranslation()
     const {colors} = useTheme()
     const router = useRouter()
-    const vm = useSettingsViewModel(i18n.language, phoneTimeZone())
+    const vm = useSettingsViewModel(i18n.language, phoneTimeZone(), appVersion())
     const {state} = vm
 
     let notifications: React.JSX.Element
@@ -99,6 +105,9 @@ export function SettingsScreen(): React.JSX.Element {
                 <Section title={t("settings.account")}>
                     {vm.login === undefined ? null : <Field label={t("settings.login")} value={vm.login} />}
                     {vm.serverUrl === undefined ? null : <Field label={t("settings.server")} value={vm.serverUrl} />}
+                    {vm.serverVersion === undefined ? null : <Field label={t("settings.serverVersion")} value={vm.serverVersion} />}
+                    {vm.apiVersion === undefined ? null : <Field label={t("settings.apiVersion")} value={`v${vm.apiVersion}`} />}
+                    {vm.appVersion === undefined ? null : <Field label={t("settings.appVersion")} value={vm.appVersion} />}
                     <Button
                         label={t("settings.myAccount")}
                         onPress={() => {
@@ -108,10 +117,12 @@ export function SettingsScreen(): React.JSX.Element {
                     />
                 </Section>
                 <OrganizationSection />
-                <Section title={t("settings.notifications")}>
-                    {push === undefined ? null : <Text style={[styles.body, {color: colors.textMuted}]}>{push}</Text>}
-                    {notifications}
-                </Section>
+                {vm.notificationsServed ? (
+                    <Section title={t("settings.notifications")}>
+                        {push === undefined ? null : <Text style={[styles.body, {color: colors.textMuted}]}>{push}</Text>}
+                        {notifications}
+                    </Section>
+                ) : null}
                 <Button label={t("settings.signOut")} variant="danger" onPress={vm.signOut} busy={vm.signingOut} />
             </ScrollView>
         </SafeAreaView>

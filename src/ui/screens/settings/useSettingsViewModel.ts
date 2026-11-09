@@ -2,7 +2,8 @@
 import {useCallback, useState} from "react"
 import type {NotificationSettings, QuietHours} from "@/api/contract/notifications"
 import {useDeviceRegistration, useNotificationSettings, useNotificationSettingsEditor} from "@/query/notifications"
-import {useRepositories, useServices, useSessionState} from "@/services/AppServices"
+import {FEATURES} from "@/domain/capabilities/compatibility"
+import {useCapabilities, useFeature, useRepositories, useServices, useSessionState} from "@/services/AppServices"
 import {isPresent} from "@/ui/format/presence"
 
 export type Toggle = "requests" | "decisions" | "spending"
@@ -20,6 +21,12 @@ export type SettingsState =
 export interface SettingsViewModel {
     readonly login: string | undefined
     readonly serverUrl: string | undefined
+    /** The server's release and the API version it speaks; undefined until they have been read. */
+    readonly serverVersion: string | undefined
+    readonly apiVersion: number | undefined
+    readonly appVersion: string | undefined
+    /** Whether the server serves notification preferences; the section is hidden otherwise. */
+    readonly notificationsServed: boolean
     /** Whether this phone is registered for push; undefined while it is being asked. */
     readonly pushOn: boolean | undefined
     readonly state: SettingsState
@@ -31,11 +38,13 @@ export interface SettingsViewModel {
     readonly signOut: () => void
 }
 
-export function useSettingsViewModel(locale: string, timeZone: string): SettingsViewModel {
+export function useSettingsViewModel(locale: string, timeZone: string, appVersion: string | undefined): SettingsViewModel {
     const session = useSessionState()
     const {sessionStore} = useServices()
     const {account, notifications} = useRepositories()
     const query = useNotificationSettings()
+    const capabilities = useCapabilities()
+    const notificationsServed = useFeature(FEATURES.notifications)
     const editor = useNotificationSettingsEditor()
     const [signingOut, setSigningOut] = useState(false)
     const device = useDeviceRegistration(locale).data
@@ -77,6 +86,10 @@ export function useSettingsViewModel(locale: string, timeZone: string): Settings
     return {
         login: signedIn?.user.login,
         serverUrl: signedIn?.serverUrl,
+        serverVersion: capabilities?.serverVersion,
+        apiVersion: capabilities?.apiVersion,
+        appVersion,
+        notificationsServed,
         pushOn: device === undefined ? undefined : device !== null,
         state,
         saveFailed: editor.failed,

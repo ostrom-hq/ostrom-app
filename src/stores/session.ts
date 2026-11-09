@@ -2,17 +2,21 @@
 import {z} from "zod"
 import {createStore, type StoreApi} from "zustand/vanilla"
 import {UserSchema} from "@/api/contract/account"
+import {type Capabilities, CapabilitiesSchema} from "@/api/contract/capabilities"
 import type {SecureStorage} from "@/services/storage/SecureStorage"
 
 /**
  * What the app keeps between launches: the server, the token, who it belongs to, and the organization the calls act
- * in (`Ostrom-Org`), when the server named one at sign-in. A session kept before it existed has none.
+ * in (`Ostrom-Org`), when the server named one at sign-in, and what the server speaks and serves. A session kept
+ * before they existed has none.
  */
 export const SessionSchema = z.object({
     serverUrl: z.url(),
     token: z.string().min(1),
     user: UserSchema,
     orgId: z.string().min(1).optional(),
+    /** What the server spoke and served when last read; a session kept before they were read has none. */
+    capabilities: CapabilitiesSchema.optional(),
 })
 export type Session = z.output<typeof SessionSchema>
 
@@ -21,8 +25,18 @@ export type SessionState =
     | {readonly status: "signed-out"}
     | {readonly status: "signed-in"; readonly session: Session}
 
+/** The server of the signed-in session speaks another API version than this app: `apiVersion` is undefined when too old to say. */
+export interface ServerIncompatibility {
+    readonly apiVersion: number | undefined
+}
+
 export interface SessionStore {
     readonly state: SessionState
+    /**
+     * Set when the last reading of the server's capabilities showed an API version this app does not speak. Kept in
+     * memory only: it is read again at each launch, and a phone that cannot reach the server is never blocked.
+     */
+    readonly incompatible: ServerIncompatibility | undefined
     /**
      * Reads the stored session at launch; a missing or unreadable one means signed out. Once the person has signed in or
      * out, it changes nothing, in memory or in the keychain.
@@ -31,6 +45,13 @@ export interface SessionStore {
     signIn(session: Session): Promise<void>
     /** Keeps the organization the calls act in from now on; nothing happens signed out. */
     chooseOrg(orgId: string): Promise<void>
+    /**
+     * Keeps what the server of the session whose token this is speaks and serves, and lifts any incompatibility.
+     * Nothing happens when the session is another one by then, or none.
+     */
+    noteCapabilities(token: string, capabilities: Capabilities): Promise<void>
+    /** The server of the session whose token this is speaks another API version: the app blocks. */
+    noteIncompatible(token: string, apiVersion: number | undefined): void
     signOut(): Promise<void>
 }
 
@@ -77,6 +98,7 @@ export function createSessionStore(
     const quietly = (write: () => Promise<void>): Promise<void> => Promise.resolve().then(write).catch(() => undefined)
     return createStore<SessionStore>()((set, get) => ({
         state: {status: "loading"},
+        incompatible: undefined,
         // Only the launch is decided here: once the person has signed in or out, a reading of the keychain changes nothing.
         hydrate: () =>
             inTurn(async () => {
@@ -98,7 +120,7 @@ export function createSessionStore(
             const asked = signOuts
             return inTurn(async () => {
                 await storage.set(SESSION_KEY, JSON.stringify(session))
-                if (signOuts === asked) set({state: {status: "signed-in", session}})
+                if (signOuts === asked) set({state: {status: "signed-in", session}, incompatible: undefined})
             })
         },
         chooseOrg: (orgId) => {
@@ -112,11 +134,29 @@ export function createSessionStore(
                 if (signOuts === asked) set({state: {status: "signed-in", session}})
             })
         },
+        noteCapabilities: (token, capabilities) => {
+            const asked = signOuts
+            return inTurn(async () => {
+                const {state} = get()
+                if (signOuts !== asked || state.status !== "signed-in" || state.session.token !== token) return
+                if (JSON.stringify(state.session.capabilities) === JSON.stringify(capabilities)) {
+                    set({incompatible: undefined})
+                    return
+                }
+                const session = {...state.session, capabilities}
+                await storage.set(SESSION_KEY, JSON.stringify(session))
+                if (signOuts === asked) set({state: {status: "signed-in", session}, incompatible: undefined})
+            })
+        },
+        noteIncompatible: (token, apiVersion) => {
+            const {state} = get()
+            if (state.status === "signed-in" && state.session.token === token) set({incompatible: {apiVersion}})
+        },
         signOut: () => {
             // Signed out at once, whatever the keychain says. If the token cannot be removed, it is blanked: the next
             // launch reads an unreadable session, which is signed out too.
             signOuts += 1
-            set({state: {status: "signed-out"}})
+            set({state: {status: "signed-out"}, incompatible: undefined})
             return inTurn(async () => {
                 try {
                     await storage.remove(SESSION_KEY)

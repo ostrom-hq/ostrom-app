@@ -63,6 +63,33 @@ export const zAgentEvent = z.enum([
 ]);
 
 /**
+ * An error in Anthropic's shape, as the Messages endpoint of the gateway answers it
+ */
+export const zAnthropicError = z.object({
+    type: z.enum(['error']),
+    error: z.object({
+        type: z.string(),
+        message: z.string()
+    })
+});
+
+/**
+ * One `data:` of a Messages stream, as Anthropic sends it and the gateway relays it
+ */
+export const zAnthropicStreamEvent = z.object({
+    type: z.enum([
+        'message_start',
+        'content_block_start',
+        'content_block_delta',
+        'content_block_stop',
+        'message_delta',
+        'message_stop',
+        'ping',
+        'error'
+    ])
+});
+
+/**
  * The kind of action (clients keep an unknown kind as UNKNOWN)
  */
 export const zApprovalActionKind = z.enum([
@@ -109,6 +136,7 @@ export const zApprovalCallerView = z.object({
     self: z.boolean(),
     canApprove: z.boolean(),
     reason: z.string().optional(),
+    reasonType: z.enum(['github_link_required', 'self_approval_refused']).optional(),
     selfApproval: z.boolean().optional()
 });
 
@@ -232,6 +260,22 @@ export const zArtifactVersion = z.object({
     entry: z.string(),
     createdAt: z.string(),
     createdBy: z.string()
+});
+
+/**
+ * What the CLI does when none of Ostrom's hooks runs in the agent's session
+ */
+export const zHooksCheck = z.object({
+    afterSeconds: z.int().gte(5).lte(300),
+    stopAgent: z.boolean()
+});
+
+/**
+ * What the CLI saw: none of Ostrom's hooks ran in the agent's session
+ */
+export const zHooksMissingRequest = z.object({
+    waitedSeconds: z.int().gte(0).lte(3600),
+    stopped: z.boolean()
 });
 
 /**
@@ -547,6 +591,15 @@ export const zBudgetOverride = z.object({
 });
 
 /**
+ * What a server speaks and serves (`capabilities`). `apiVersion` changes only when `/api/v1` breaks compatibility; additive changes keep it. Feature keys are `<domain>.v<n>` (`ServerFeatures` in ostrom-core): `artifacts.v1`, `audit.v1`, `automations.v1`, `billing.v1`, `budgets.v1`, `gates.v1`, `github.v1`, `governance.v1`, `import.teamcode.v1`, `inference.v1`, `mcp.v1`, `notifications.v1`, `notifications.push.v1`, `packages.v1`, `receipts.v1`, `reports.v1`, `rules.v1`, `runners.v1`, `runners.cloud.v1`, `secrets.v1`, `sessions.v1`, `sharing.v1`, `slack.v1`, `usage.v1`, `waits.v1`, `workflows.v1`, `license.v1`. A client ignores a key it does not know.
+ */
+export const zCapabilities = z.object({
+    apiVersion: z.int(),
+    serverVersion: z.string(),
+    features: z.array(z.string())
+});
+
+/**
  * Remaining capacity of the shared subscriptions
  */
 export const zCapacity = z.object({
@@ -726,7 +779,8 @@ export const zDeviceLoginStart = z.object({
     scopes: z.array(z.enum([
         'policy:write',
         'harness:write',
-        'gates:policy'
+        'gates:policy',
+        'budgets:write'
     ])).optional()
 });
 
@@ -835,7 +889,7 @@ export const zApproval = z.object({
 });
 
 /**
- * 403 other than step_up_required: `forbidden` (a token without the scope, a member without the role, a credential the route does not admit), or a finer key (`email_link_other_browser`, `installation_not_yours`, `probe_not_yours`, `cutover_owner_required`, `self_approval_refused`: the server names the other approvers in `message` only, without the `others` of `SelfApprovalRefused`)
+ * 403 other than step_up_required: `forbidden` (a token without the scope, a member without the role, a credential the route does not admit), or a finer key (`email_link_other_browser`, `installation_not_yours`, `probe_not_yours`, `cutover_owner_required`, `self_approval_refused`: the server names the other approvers in `message` only, without the `others` of `SelfApprovalRefused`; `github_link_required`: a yes under a never-self-approve policy, on a pull request whose author linked no Ostrom person, from an answerer who linked no GitHub account)
  */
 export const zForbidden = z.object({
     error: z.object({
@@ -845,10 +899,30 @@ export const zForbidden = z.object({
             'installation_not_yours',
             'probe_not_yours',
             'cutover_owner_required',
-            'self_approval_refused'
+            'self_approval_refused',
+            'github_link_required'
         ]),
         message: z.string()
     })
+});
+
+/**
+ * A gated action the hook refused on the workstation, without asking the server
+ */
+export const zGateLocalDenial = z.object({
+    sessionId: z.string(),
+    class: z.string(),
+    reason: z.enum([
+        'redirected',
+        'unreadable',
+        'unknown_landing',
+        'dynamic_command',
+        'git_setting',
+        'foreign_repository',
+        'policy_held'
+    ]),
+    command: z.string().max(4096),
+    repo: z.string().optional()
 });
 
 /**
@@ -933,7 +1007,12 @@ export const zGovernanceChangeKind = z.enum([
     'models.policy',
     'workflows.create',
     'workflows.save',
-    'workflows.delete'
+    'workflows.delete',
+    'members.role',
+    'members.remove',
+    'members.invite',
+    'members.link',
+    'budgets.set'
 ]);
 
 export const zGovernanceConfirmationAnswer = z.enum(['confirm', 'refuse']);
@@ -943,7 +1022,7 @@ export const zGovernanceConfirmationAnswerRequest = z.object({
 });
 
 /**
- * The 202 of a governance write made with a CLI token: nothing was written. An owner or an admin confirms it at `confirmUrl` before `expiresAt` (15 minutes); the CLI waits on `getGovernanceConfirmation`. The same change asked again by the same person while it waits answers the same confirmation
+ * The 202 of a governance write made with a person's API token: nothing was written. An owner or an admin confirms it at `confirmUrl` before `expiresAt` (15 minutes); the CLI waits on `getGovernanceConfirmation`. The same change asked again by the same person while it waits answers the same confirmation
  */
 export const zGovernanceConfirmationPending = z.object({
     confirmationId: z.string(),
@@ -961,6 +1040,14 @@ export const zGovernanceConfirmationPerson = z.object({
 });
 
 /**
+ * A person's personal token, without its secret
+ */
+export const zGovernanceConfirmationToken = z.object({
+    id: z.string(),
+    name: z.string().min(1).max(100)
+});
+
+/**
  * pending until answered; confirmed, refused, expired (15 minutes without an answer), or failed (confirmed, but the write was refused: see `error`). The confirmation is closed before the write is made: a server stopped between the two leaves it confirmed without the write, and the change is then asked again
  */
 export const zGovernanceConfirmationStatus = z.enum([
@@ -972,7 +1059,7 @@ export const zGovernanceConfirmationStatus = z.enum([
 ]);
 
 /**
- * A governance write made with a CLI token, held until an owner or an admin confirms it on the console. `before` and `after` are what the change replaces and what it writes, as the read routes show them (JSON null for nothing: a creation has no `before`, a deletion no `after`)
+ * A governance write made with a person's API token, held until an owner or an admin confirms it on the console. `before` and `after` are what the change replaces and what it writes, as the read routes show them (JSON null for nothing: a creation has no `before`, a deletion no `after`)
  */
 export const zGovernanceConfirmation = z.object({
     id: z.string(),
@@ -985,7 +1072,12 @@ export const zGovernanceConfirmation = z.object({
     before: z.unknown(),
     after: z.unknown(),
     requestedBy: zGovernanceConfirmationPerson,
-    credential: z.enum(['admin', 'device']),
+    credential: z.enum([
+        'admin',
+        'device',
+        'api_token'
+    ]),
+    token: zGovernanceConfirmationToken.optional(),
     createdAt: z.iso.datetime(),
     expiresAt: z.iso.datetime(),
     answeredBy: zGovernanceConfirmationPerson.optional(),
@@ -1328,6 +1420,33 @@ export const zAccount = z.object({
     providers: z.array(z.string())
 });
 
+/**
+ * One `data:` of a chat completions stream, as the OpenAI-compatible provider sends it and the gateway relays it; the stream ends with `data: [DONE]`
+ */
+export const zOpenAiChatCompletionChunk = z.object({
+    object: z.enum(['chat.completion.chunk']).optional(),
+    choices: z.array(z.record(z.string(), z.unknown()))
+});
+
+/**
+ * An error in OpenAI's shape, as the OpenAI-compatible endpoints of the gateway answer it
+ */
+export const zOpenAiError = z.object({
+    error: z.object({
+        message: z.string(),
+        type: z.string(),
+        code: z.string().nullish(),
+        param: z.string().nullish()
+    })
+});
+
+/**
+ * One `data:` of a Responses stream (`response.created`, `response.output_text.delta`, `response.completed`, `error`…), as OpenAI sends it and the gateway relays it
+ */
+export const zOpenAiResponsesStreamEvent = z.object({
+    type: z.string()
+});
+
 export const zTokenScope = z.object({
     scope: z.string(),
     description: z.string()
@@ -1399,7 +1518,28 @@ export const zMyBudget = z.object({
     remainingMicros: z.int().optional(),
     resetsAt: z.string(),
     exhausted: z.boolean(),
-    exhaustedScope: z.enum(['org', 'member']).optional()
+    exhaustedScope: z.enum(['org', 'member']).optional(),
+    period: z.enum(['day', 'month']).optional()
+});
+
+/**
+ * `equals` and `notEquals` compare the value with `value`; `exists` is true when the value is there; `matches` is true when the pattern `value` matches a part of it (anchors to match it whole)
+ */
+export const zNodeConditionOp = z.enum([
+    'equals',
+    'notEquals',
+    'exists',
+    'matches'
+]);
+
+/**
+ * What a `check` node decides in a server's run (planned: the server does not play check nodes yet). It reads one value of a step the run visited before, never an expression: no language, no evaluation of code. Only a `check` node has a condition; a `check` node without one is a session's check (its `run`), which a server's run does not play: the run fails. The visit ends with the outcome `true` or `false` (no output), and the run follows the edge whose `on` is that outcome; every edge out of a check node with a condition says `on: "true"` or `on: "false"` (none defaults to `next`), and an outcome without its edge fails the run. Values are compared as texts, exactly: a JSON string without its quotes, a number or a boolean as written in the output (`1.0` is not `1`; the string `"true"` and the boolean `true` both read `true`), an object or an array as its compact JSON text. No value: a step not visited, a visit without output, an output that is not JSON or not of the segment's kind (an object for `.<key>`, an array for `[<index>]`), a missing key or index, a JSON `null`. `exists` is false on no value; `equals`, `notEquals` and `matches` do not evaluate on no value, nor on a text over 10 000 characters: the run fails, with the reason, and never takes a branch by default. Checked when the workflow is saved: 400 `invalid_request` for a condition on a node that is not a `check`, a `step` that is not a node of the workflow, a `path` out of its form, an unknown `op`, a `value` missing for `equals`, `notEquals` or `matches` or present for `exists`, a `matches` pattern out of its syntax, or an edge out of the node whose `on` is not `true` or `false`
+ */
+export const zNodeCondition = z.object({
+    step: z.string().max(200),
+    path: z.string().max(200),
+    op: zNodeConditionOp,
+    value: z.string().max(200).optional()
 });
 
 /**
@@ -1486,10 +1626,13 @@ export const zOrgMemberUpdate = z.object({
 });
 
 /**
- * A new name
+ * An organization's settings to change; a field left out stays as it is
  */
 export const zOrgRename = z.object({
-    name: z.string()
+    name: z.string().optional(),
+    timeZone: z.string().optional(),
+    slug: z.string().optional(),
+    hooksDeadlineSeconds: z.int().gte(5).lte(300).optional()
 });
 
 /**
@@ -1508,7 +1651,8 @@ export const zOrgView = z.object({
     name: z.string(),
     role: z.string(),
     createdAt: z.iso.datetime(),
-    timeZone: z.string().optional()
+    timeZone: z.string(),
+    hooksDeadlineSeconds: z.int().gte(5).lte(300).optional()
 });
 
 /**
@@ -1803,6 +1947,9 @@ export const zReceiptSubject = z.object({
  */
 export const zReceipt = z.object({
     id: z.string(),
+    orgId: z.uuid().optional(),
+    launchId: z.string().optional(),
+    sessionId: z.string().optional(),
     subject: zReceiptSubject,
     initiator: z.string(),
     agent: z.string().optional(),
@@ -2212,6 +2359,7 @@ export const zSkill = z.object({
 export const zExceededBudget = z.object({
     scope: z.string(),
     subject: z.string().optional(),
+    label: z.string().optional(),
     period: z.enum(['day', 'month']),
     usd: z.number(),
     hardStop: z.boolean(),
@@ -2248,6 +2396,7 @@ export const zSpending = z.object({
     byAgent: z.array(zSpendingLine),
     byRepo: z.array(zSpendingLine),
     byPerson: z.array(zSpendingLine),
+    byWorkflow: z.array(zSpendingLine).optional(),
     daily: z.array(zSpendingDay),
     exceeded: z.array(zExceededBudget).optional()
 });
@@ -2269,12 +2418,13 @@ export const zStartSessionRequest = z.object({
 });
 
 /**
- * 403 step_up_required: a yes, and a sensitive write from the console or the app (a personal token, a service key, a sign-in link, an invitation, a role, a member removed, a transfer, a secret, an MCP server, its assignments, policies and settings, the model keys), need a sign-in less than 5 minutes old (a sign-in of unknown age is refused too); sign in again, then send it again. A no never needs it, and an API token is never asked: it has no sign-in to renew
+ * 403 step_up_required: a yes, and a sensitive write from the console or the app (a personal token, a service key, a sign-in link, an invitation, a role, a member removed, a transfer, a secret, an MCP server, its assignments, policies and settings, the model keys), need a sign-in less than 5 minutes old (a sign-in of unknown age is refused too); sign in again, then send it again. A no never needs it, and an API token is never asked: it has no sign-in to renew. Planned: a yes from the phone app to a high-risk action also needs an unlock bound to its approval (`unlockMobileApp.requestId`, `error.requestBound`)
  */
 export const zStepUpRequired = z.object({
     error: z.object({
         type: z.enum(['step_up_required']),
-        message: z.string()
+        message: z.string(),
+        requestBound: z.boolean().optional()
     })
 });
 
@@ -2551,7 +2701,8 @@ export const zVerification = z.object({
     ok: z.boolean(),
     digest: z.string().optional(),
     kid: z.string().optional(),
-    reason: z.string().optional()
+    reason: z.string().optional(),
+    orgBound: z.boolean().optional()
 });
 
 /**
@@ -2646,7 +2797,7 @@ export const zWebhook = z.object({
 });
 
 /**
- * An edge. For a run, [on] is the outcome that follows it (`next`, `delivered`, a wait action id); [to] null ends
+ * An edge. For a run, [on] is the outcome that follows it (`next`, `delivered`, a wait action id, `true` or `false` out of a check node with a condition, which has no default); [to] null ends
  */
 export const zWorkflowEdge = z.object({
     from: z.string(),
@@ -2996,7 +3147,8 @@ export const zWorkflowNode = z.object({
     wait: zWaitSpec.optional(),
     workflowId: z.string().optional(),
     arguments: z.record(z.string(), z.string()).optional(),
-    maxVisits: z.int().optional()
+    maxVisits: z.int().optional(),
+    condition: zNodeCondition.optional()
 });
 
 /**
@@ -3142,10 +3294,7 @@ export const zListInstanceKeysResponse = z.object({
 /**
  * OK
  */
-export const zCapabilitiesResponse = z.object({
-    version: z.string(),
-    capabilities: z.array(z.string())
-});
+export const zCapabilitiesResponse = zCapabilities;
 
 export const zStartGithubLoginQuery = z.object({
     redirect: z.string().optional(),
@@ -3172,7 +3321,8 @@ export const zMobileTokenResponse = z.object({
 });
 
 export const zUnlockMobileAppBody = z.object({
-    unlockKey: z.string()
+    unlockKey: z.string(),
+    requestId: z.string().optional()
 });
 
 /**
@@ -3302,7 +3452,8 @@ export const zLauncherLoginResponse = z.object({
 export const zCreateLaunchBody = z.object({
     repo: z.string().optional(),
     agent: z.string(),
-    model: z.string().optional()
+    model: z.string().optional(),
+    workflowId: z.string().optional()
 });
 
 export const zCreateLaunchHeaders = z.object({
@@ -3315,7 +3466,8 @@ export const zCreateLaunchHeaders = z.object({
 export const zCreateLaunchResponse = z.object({
     launchId: z.string(),
     agentToken: z.string(),
-    expiresAt: z.string()
+    expiresAt: z.string(),
+    hooksCheck: zHooksCheck.optional()
 });
 
 export const zEndLaunchPath = z.object({
@@ -3326,6 +3478,17 @@ export const zEndLaunchPath = z.object({
  * Done
  */
 export const zEndLaunchResponse = z.void();
+
+export const zReportHooksMissingBody = zHooksMissingRequest;
+
+export const zReportHooksMissingPath = z.object({
+    launchId: z.string()
+});
+
+/**
+ * Recorded
+ */
+export const zReportHooksMissingResponse = z.void();
 
 export const zCheckAgentPolicyHeaders = z.object({
     'Ostrom-Org': z.string().optional()
@@ -3367,7 +3530,7 @@ export const zGetMeResponse = z.union([
 
 export const zListMyAuditQuery = z.object({
     before: z.int().optional(),
-    limit: z.int().optional()
+    limit: z.int().gte(1).lte(200).optional()
 });
 
 /**
@@ -3747,7 +3910,8 @@ export const zListOrgMembersPath = z.object({
 
 export const zListOrgMembersQuery = z.object({
     limit: z.int().gte(1).lte(1000).optional().default(1000),
-    after: z.uuid().optional()
+    after: z.uuid().optional(),
+    q: z.string().min(1).max(100).optional()
 });
 
 /**
@@ -3761,20 +3925,20 @@ export const zInviteOrgMembersPath = z.object({
     org: z.string()
 });
 
-/**
- * OK
- */
-export const zInviteOrgMembersResponse = zOrgInvited;
+export const zInviteOrgMembersResponse = z.union([
+    zOrgInvited,
+    zGovernanceConfirmationPending
+]);
 
 export const zRemoveOrgMemberPath = z.object({
     org: z.string(),
     login: z.string()
 });
 
-/**
- * Removed
- */
-export const zRemoveOrgMemberResponse = z.void();
+export const zRemoveOrgMemberResponse = z.union([
+    zGovernanceConfirmationPending,
+    z.void()
+]);
 
 export const zGetOrgMemberPath = z.object({
     org: z.string(),
@@ -3793,10 +3957,10 @@ export const zUpdateOrgMemberPath = z.object({
     login: z.string()
 });
 
-/**
- * OK
- */
-export const zUpdateOrgMemberResponse = zOrgMember;
+export const zUpdateOrgMemberResponse = z.union([
+    zOrgMember,
+    zGovernanceConfirmationPending
+]);
 
 export const zListInvitationsPath = z.object({
     org: z.string()
@@ -3813,10 +3977,10 @@ export const zCreateInvitationLinkPath = z.object({
     org: z.string()
 });
 
-/**
- * OK
- */
-export const zCreateInvitationLinkResponse = zInvitationLink;
+export const zCreateInvitationLinkResponse = z.union([
+    zInvitationLink,
+    zGovernanceConfirmationPending
+]);
 
 export const zRevokeInvitationPath = z.object({
     org: z.string(),
@@ -3929,7 +4093,7 @@ export const zListTeamsPath = z.object({
 
 export const zListTeamsQuery = z.object({
     after: z.string().optional(),
-    limit: z.int().optional()
+    limit: z.int().gte(1).lte(100).optional()
 });
 
 /**
@@ -3946,7 +4110,7 @@ export const zListReposHeaders = z.object({
 
 export const zListReposQuery = z.object({
     after: z.string().optional(),
-    limit: z.int().optional()
+    limit: z.int().gte(1).lte(100).optional()
 });
 
 /**
@@ -3985,7 +4149,8 @@ export const zListSessionsQuery = z.object({
     repo: z.string().optional(),
     dev: z.string().optional(),
     open: z.boolean().optional(),
-    before: z.string().optional()
+    before: z.string().optional(),
+    limit: z.int().gte(1).lte(100).optional()
 });
 
 /**
@@ -4109,6 +4274,12 @@ export const zReportSeenPath = z.object({
  * Done
  */
 export const zReportSeenResponse = z.void();
+
+export const zReportLocalGateDenialBody = zGateLocalDenial;
+
+export const zReportLocalGateDenialHeaders = z.object({
+    'Ostrom-Org': z.string().optional()
+});
 
 export const zListGatesHeaders = z.object({
     'Ostrom-Org': z.string().optional()
@@ -4269,7 +4440,7 @@ export const zListApprovalsQuery = z.object({
     status: z.array(zApprovalStatus).optional(),
     mine: z.boolean().optional(),
     before: z.string().optional(),
-    limit: z.int().gte(1).lte(200).optional().default(50)
+    limit: z.int().gte(1).lte(100).optional().default(50)
 });
 
 /**
@@ -4387,7 +4558,8 @@ export const zListReceiptsHeaders = z.object({
 export const zListReceiptsQuery = z.object({
     subjectKind: z.string().optional(),
     subjectId: z.string().optional(),
-    before: z.string().optional()
+    before: z.string().optional(),
+    limit: z.int().gte(1).lte(200).optional()
 });
 
 /**
@@ -4627,7 +4799,7 @@ export const zListRulesQuery = z.object({
     status: z.string().optional(),
     group: z.string().optional(),
     after: z.string().optional(),
-    limit: z.int().optional()
+    limit: z.int().gte(1).lte(1000).optional()
 });
 
 /**
@@ -5037,7 +5209,9 @@ export const zListWaitsQuery = z.object({
     status: z.string().optional(),
     mine: z.boolean().optional(),
     sessionId: z.string().optional(),
-    runId: z.string().optional()
+    runId: z.string().optional(),
+    before: z.uuid().optional(),
+    limit: z.int().gte(1).lte(100).optional()
 });
 
 /**
@@ -5423,6 +5597,7 @@ export const zInferenceModelsHeaders = z.object({
  * OK
  */
 export const zInferenceModelsResponse = z.object({
+    object: z.enum(['list']).optional(),
     data: z.array(z.record(z.string(), z.unknown()))
 });
 
@@ -5523,10 +5698,10 @@ export const zSetBudgetHeaders = z.object({
     'Ostrom-Org': z.string().optional()
 });
 
-/**
- * OK
- */
-export const zSetBudgetResponse = zBudget;
+export const zSetBudgetResponse = z.union([
+    zBudget,
+    zGovernanceConfirmationPending
+]);
 
 export const zGetMyBudgetHeaders = z.object({
     'Ostrom-Org': z.string().optional()
@@ -5764,7 +5939,8 @@ export const zRunnerHeartbeatBody = z.object({
             'ended'
         ])
     })).optional(),
-    workspaces: z.array(z.uuid()).optional()
+    workspaces: z.array(z.uuid()).optional(),
+    capacity: z.int().gte(0).lte(256).optional()
 });
 
 export const zRunnerHeartbeatHeaders = z.object({
@@ -5773,6 +5949,10 @@ export const zRunnerHeartbeatHeaders = z.object({
 
 export const zRunnerHeartbeatPath = z.object({
     id: z.string()
+});
+
+export const zRunnerHeartbeatQuery = z.object({
+    wait: z.int().gte(0).lte(25).optional().default(0)
 });
 
 /**
@@ -5953,7 +6133,8 @@ export const zOpenRunnerLaunchHeaders = z.object({
 export const zOpenRunnerLaunchResponse = z.object({
     launchId: z.string(),
     agentToken: z.string(),
-    expiresAt: z.string()
+    expiresAt: z.string(),
+    hooksCheck: zHooksCheck.optional()
 });
 
 export const zReportRunnerCheckBody = z.object({

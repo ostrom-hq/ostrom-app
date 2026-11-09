@@ -11,6 +11,7 @@ import History from "@/app/(tabs)/history"
 import Index from "@/app/(tabs)/index"
 import Settings from "@/app/(tabs)/settings"
 import Spending from "@/app/(tabs)/spending"
+import Incompatible from "@/app/incompatible"
 import Login from "@/app/login"
 import {redirectSystemPath} from "@/app/+native-intent"
 
@@ -34,6 +35,7 @@ describe("RootLayout", () => {
                 "(tabs)/spending": Spending,
                 "(tabs)/settings": Settings,
                 login: Login,
+                incompatible: Incompatible,
                 "request/[id]": RequestById,
                 account: Account,
             },

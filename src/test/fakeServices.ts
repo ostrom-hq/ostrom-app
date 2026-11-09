@@ -54,6 +54,7 @@ export function fakeRepositories(overrides: Partial<Repositories> = {}): Reposit
             view: unexpected("approvals.view"),
             answer: unexpected("approvals.answer"),
         },
+        capabilities: {read: unexpected("capabilities.read")},
         notifications: {
             registerDevice: unexpected("notifications.registerDevice"),
             unregisterDevice: unexpected("notifications.unregisterDevice"),

@@ -11,7 +11,7 @@ import {useLoginViewModel} from "./useLoginViewModel"
 export function LoginScreen(): React.JSX.Element {
     const {t} = useTranslation()
     const {colors} = useTheme()
-    const {serverUrl, setServerUrl, busy, error, submit} = useLoginViewModel()
+    const {serverUrl, setServerUrl, busy, error, versions, submit} = useLoginViewModel()
     return (
         <SafeAreaView style={[styles.container, {backgroundColor: colors.bg}]}>
             <View style={styles.content}>
@@ -26,7 +26,7 @@ export function LoginScreen(): React.JSX.Element {
                     value={serverUrl}
                     onChangeText={setServerUrl}
                     keyboardType="url"
-                    error={error === undefined ? undefined : t(`login.errors.${error}`)}
+                    error={error === undefined ? undefined : t(`login.errors.${error}`, versions)}
                     testID="login-server"
                 />
                 <Button label={t("login.github")} onPress={submit} variant="signal" busy={busy} testID="login-github" />
