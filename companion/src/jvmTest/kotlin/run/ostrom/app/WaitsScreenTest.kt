@@ -120,7 +120,8 @@ class WaitsScreenTest {
     fun aServerWithoutWaitsHasNoWaitingTab() {
         val server = server(features = "")
         signedIn(server) {
-            waitFor("server-version")
+            // Activity is the first tab of a server without waits.
+            waitFor("activity")
             onNodeWithTag("tab-waiting").assertDoesNotExist()
         }
         assertTrue(server.asked.none { it.startsWith("GET /api/v1/waits") }, server.asked.toString())

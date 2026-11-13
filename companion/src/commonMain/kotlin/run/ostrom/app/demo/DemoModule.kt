@@ -6,10 +6,14 @@ import org.koin.dsl.module
 import run.ostrom.app.domain.repositories.AccountRepository
 import run.ostrom.app.domain.repositories.AuthRepository
 import run.ostrom.app.domain.repositories.FeaturesRepository
+import run.ostrom.app.domain.repositories.ActivityRepository
+import run.ostrom.app.domain.repositories.SpendingRepository
 import run.ostrom.app.domain.repositories.WaitRepository
 import run.ostrom.app.domain.services.CredentialStore
 import run.ostrom.app.infrastructure.repositories.CachedFeaturesRepository
 import run.ostrom.app.infrastructure.repositories.RemoteAuthRepository
+import run.ostrom.app.infrastructure.repositories.RemoteActivityRepository
+import run.ostrom.app.infrastructure.repositories.RemoteSpendingRepository
 import run.ostrom.app.infrastructure.repositories.RemoteWaitRepository
 import run.ostrom.app.infrastructure.settings.SettingsAccountRepository
 
@@ -27,4 +31,6 @@ val demoModule = module {
     single<AuthRepository> { DemoAwareAuthRepository(get<RemoteAuthRepository>(), get<DemoAuthRepository>()) }
     single<FeaturesRepository> { DemoAwareFeaturesRepository(get<CachedFeaturesRepository>(), DemoFeaturesRepository(get())) }
     single<WaitRepository> { DemoAwareWaitRepository(get<RemoteWaitRepository>(), DemoWaitRepository(get(), get())) }
+    single<SpendingRepository> { DemoAwareSpendingRepository(get<RemoteSpendingRepository>(), DemoSpendingRepository(get())) }
+    single<ActivityRepository> { DemoAwareActivityRepository(get<RemoteActivityRepository>(), DemoActivityRepository(get())) }
 }

@@ -10,7 +10,7 @@ import run.ostrom.app.demo.demoModule
 
 /** All app modules, given the platform module (credential store, HTTP engine, preferences, platform details). */
 fun appModules(platformModule: Module): List<Module> =
-    listOf(infrastructureModule, domainModule, presentationModule, waitsModule, demoModule, approvalsModule, platformModule)
+    listOf(infrastructureModule, domainModule, presentationModule, waitsModule, spendingModule, demoModule, approvalsModule, platformModule)
 
 /** Starts Koin once at launch; each entry point (Android application, iOS view controller, desktop main) calls it. */
 fun initKoin(platformModule: Module, appDeclaration: KoinAppDeclaration = {}): KoinApplication =
