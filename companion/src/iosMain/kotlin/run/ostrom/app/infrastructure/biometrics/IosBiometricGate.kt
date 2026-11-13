@@ -38,7 +38,8 @@ class IosBiometricGate : BiometricGate {
         }
         if (unavailable != null) return@withContext unavailable
         suspendCancellableCoroutine { continuation ->
-            context.evaluatePolicy(LAPolicyDeviceOwnerAuthentication, localizedReason = prompt) { success, error ->
+            // An empty reason is an Objective-C exception, which would end the app.
+            context.evaluatePolicy(LAPolicyDeviceOwnerAuthentication, localizedReason = prompt.ifBlank { "Ostrom" }) { success, error ->
                 val outcome = if (success) BiometricOutcome.CONFIRMED else outcomeOf(error)
                 if (continuation.isActive) continuation.resume(outcome)
             }

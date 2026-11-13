@@ -30,8 +30,11 @@ class PhoneUnlock(
     private val biometrics: BiometricGate,
     private val clock: Clock,
 ) {
-    /** When an account last unlocked, and a tag of the key it unlocked with (never the key itself). */
-    private class Fresh(val at: Long, val keyTag: Int)
+    /**
+     * When an account last unlocked, and the key it unlocked with: a new sign-in (another key) is never fresh. Kept in
+     * memory only, for the few minutes it counts, and never written anywhere.
+     */
+    private class Fresh(val at: Long, val key: String)
 
     private val fresh = MutableStateFlow<Map<String, Fresh>>(emptyMap())
 
@@ -53,7 +56,7 @@ class PhoneUnlock(
         val key = credentials.read(entry)
             ?: return if (always && biometrics.supported) biometrics.confirm(prompt).asUnlock() else UnlockOutcome.CONFIRMED
         val last = fresh.value[accountId]
-        if (!always && requestId == null && last != null && last.keyTag == key.hashCode() && clock.nowMillis() - last.at < FRESH_UNLOCK_MILLIS) {
+        if (!always && requestId == null && last != null && last.key == key && clock.nowMillis() - last.at < FRESH_UNLOCK_MILLIS) {
             return UnlockOutcome.CONFIRMED
         }
         // A key without any biometrics to give it back cannot happen on a phone; never sent without a check.
@@ -73,7 +76,7 @@ class PhoneUnlock(
         }
         // Signed out, or in again, while the unlock was on its way: it proves nothing for the session now kept.
         if (credentials.read(entry) != key) return UnlockOutcome.CANCELLED
-        fresh.update { it + (accountId to Fresh(clock.nowMillis(), key.hashCode())) }
+        fresh.update { it + (accountId to Fresh(clock.nowMillis(), key)) }
         return UnlockOutcome.CONFIRMED
     }
 

@@ -45,10 +45,12 @@ class AndroidBiometricGate : BiometricGate {
                 }
                 // onAuthenticationFailed: one attempt not recognized; the prompt stays and lets the person try again.
             }
-            val biometricPrompt = BiometricPrompt(activity, ContextCompat.getMainExecutor(activity), callback)
-            val info = BiometricPrompt.PromptInfo.Builder().setTitle(prompt).setAllowedAuthenticators(authenticators).build()
+            val main = ContextCompat.getMainExecutor(activity)
+            val biometricPrompt = BiometricPrompt(activity, main, callback)
+            val info = BiometricPrompt.PromptInfo.Builder().setTitle(prompt.ifBlank { "Ostrom" }).setAllowedAuthenticators(authenticators).build()
             biometricPrompt.authenticate(info)
-            continuation.invokeOnCancellation { biometricPrompt.cancelAuthentication() }
+            // Cancelled from any thread (the screen left): the prompt is closed on the main thread, where it lives.
+            continuation.invokeOnCancellation { main.execute { biometricPrompt.cancelAuthentication() } }
         }
     }
 
