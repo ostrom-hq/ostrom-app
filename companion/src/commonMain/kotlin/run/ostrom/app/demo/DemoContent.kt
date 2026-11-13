@@ -31,7 +31,7 @@ object DemoContent {
     const val REPOSITORY_URL = "https://github.com/ostrom-hq/ostrom-server"
 
     /** What the demo server announces: the features whose demo content exists. */
-    val features: Set<String> = setOf(Features.GATES, Features.WAITS)
+    val features: Set<String> = setOf(Features.GATES, Features.WAITS, Features.BUDGETS)
 
     /**
      * The approvals inbox: a high-risk push and a low-risk tool waiting for Ada's yes, and a merge she approved. The

@@ -250,4 +250,37 @@
     <string name="request_problem_offline">The server could not be reached. The request has been read again: check whether your answer went through.</string>
     <string name="request_problem_session_expired">Your session has expired. Sign in again.</string>
     <string name="request_problem_failed">The answer could not be sent. Try again.</string>
+
+    <!-- Spending (budgets.v1) and Activity tabs -->
+    <string name="tab_spending">Spending</string>
+    <string name="tab_activity">Activity</string>
+    <string name="spending_title">Spending</string>
+    <string name="spending_error">The spending could not be loaded.</string>
+    <string name="spending_load_failed">Could not refresh the spending.</string>
+    <string name="spending_period_week">This week</string>
+    <string name="spending_period_month">This month</string>
+    <string name="spending_of_budget">%1$d % of the %2$s budget</string>
+    <string name="spending_by_agent">By agent</string>
+    <string name="spending_by_repo">By repository</string>
+    <string name="spending_by_person">By person</string>
+    <string name="spending_sessions">Sessions: %1$d</string>
+    <string name="spending_none">Nothing spent.</string>
+    <string name="spending_exceeded_title">Over budget</string>
+    <string name="spending_exceeded_me_day">You are past your daily budget of %1$s</string>
+    <string name="spending_exceeded_me_month">You are past your monthly budget of %1$s</string>
+    <string name="spending_exceeded_member_day">%1$s is past their daily budget of %2$s</string>
+    <string name="spending_exceeded_member_month">%1$s is past their monthly budget of %2$s</string>
+    <string name="spending_exceeded_someone_day">A member is past their daily budget of %1$s</string>
+    <string name="spending_exceeded_someone_month">A member is past their monthly budget of %1$s</string>
+    <string name="spending_exceeded_organization_day">The organization is past its daily budget of %1$s</string>
+    <string name="spending_exceeded_organization_month">The organization is past its monthly budget of %1$s</string>
+    <string name="spending_exceeded_stops_day">The model calls are refused until the day ends.</string>
+    <string name="spending_exceeded_stops_month">The model calls are refused until the month ends.</string>
+    <string name="spending_exceeded_goes_on">The model calls go on: the overrun is only flagged.</string>
+    <string name="activity_title">Activity</string>
+    <string name="activity_empty_title">No activity yet</string>
+    <string name="activity_empty">Sessions, approvals and checks of your organization show up here.</string>
+    <string name="activity_error">The activity could not be loaded.</string>
+    <string name="activity_load_failed">Could not refresh the activity.</string>
+    <string name="activity_actor_agent">Agent %1$s</string>
 </resources>
