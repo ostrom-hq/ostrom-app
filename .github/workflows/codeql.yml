@@ -24,9 +24,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # The app's Kotlin needs a build that CodeQL's build-mode none cannot do; the workflows are analyzed.
         language:
           - actions
-          - javascript-typescript
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

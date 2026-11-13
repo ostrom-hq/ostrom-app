@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only -->
+<resources>
+    <string name="app_name">Ostrom</string>
+    <string name="action_back">Back</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_close">Close</string>
+    <string name="action_continue">Continue</string>
+    <string name="action_retry">Retry</string>
+
+    <string name="add_server_title">Your Ostrom server</string>
+    <string name="add_server_intro">Enter the address of the Ostrom server you sign in to. Agents propose, people decide.</string>
+    <string name="add_server_origin">Server address</string>
+    <string name="add_server_check">Check the server</string>
+    <string name="add_server_found">Ostrom server found</string>
+    <string name="add_server_new_warning">No account on this device uses this server yet. Check the address before you sign in.</string>
+
+    <string name="demo_try">Try the demo</string>
+    <string name="demo_try_hint">No server yet? Look around with sample data, kept on this device only.</string>
+    <string name="demo_banner_title">You are trying the demo</string>
+    <string name="demo_banner_detail">Nothing here is real. Deploy your own Ostrom server to use the app.</string>
+    <string name="demo_github">GitHub</string>
+
+    <string name="login_title">Sign in</string>
+    <string name="login_signing_in_to">Signing in to</string>
+    <string name="login_back_server">Server</string>
+    <string name="login_submit">Continue with GitHub</string>
+    <string name="login_browser_hint">You sign in with GitHub on your Ostrom server. Your yes is signed in your name.</string>
+    <string name="login_device_intro">Enter the code below on the page that opens, as with ostrom login.</string>
+    <string name="login_device_hint">Your code</string>
+    <string name="login_copy_code">Copy the code</string>
+    <string name="login_open_page">Open the page again</string>
+    <string name="login_waiting">Waiting for you to confirm in the browser…</string>
+    <string name="login_no_github">This server does not offer GitHub sign-in, which this app uses.</string>
+    <string name="login_invite_only">This server is invite-only: open your invitation in a browser to create your account, then sign in here.</string>
+
+    <string name="home_signed_out">Your session on %1$s ended. Sign in again to see it.</string>
+    <string name="home_sign_in_again">Sign in</string>
+
+    <string name="tab_settings">Settings</string>
+
+    <string name="settings_title">Settings</string>
+    <string name="settings_accounts">Accounts</string>
+    <string name="settings_add_account">Add an account</string>
+    <string name="settings_account_active">Active</string>
+    <string name="settings_account_signed_out">Signed out</string>
+    <string name="settings_organization">Organization</string>
+    <string name="settings_no_organization">None chosen</string>
+    <string name="settings_change_organization">Change</string>
+    <string name="settings_appearance">Appearance</string>
+    <string name="settings_about">About</string>
+    <string name="settings_app_version">App version</string>
+    <string name="settings_server_version">Server version</string>
+    <string name="settings_api_version">API version</string>
+    <string name="settings_api_version_value">Server v%1$s · app v%2$d</string>
+    <string name="settings_unknown">Unknown</string>
+    <string name="settings_sign_out">Sign out</string>
+    <string name="settings_end_demo">End the demo</string>
+    <string name="settings_sign_in_again">Sign in again</string>
+    <string name="settings_memory_only">This computer has no keyring: your sessions are kept in memory only and end when the app quits.</string>
+    <string name="settings_signed_out_of">Signed out of %1$s on %2$s.</string>
+    <string name="settings_signed_out_unreachable">Signed out on this device. The server could not be reached; its session expires on its own.</string>
+    <string name="settings_signed_out_storage">Signed out on this device, but its secure storage refused access: the session may stay valid until it expires.</string>
+
+    <string name="theme_system">System</string>
+    <string name="theme_light">Light</string>
+    <string name="theme_dark">Dark</string>
+
+    <string name="incompatible_title">This server is not supported</string>
+    <string name="incompatible_unsupported">This server speaks API v%1$d; this app speaks v%2$d. Update the app or ask your administrator to update the server.</string>
+    <string name="incompatible_too_old">This server is too old for this app: it does not say which API version it speaks (this app speaks v%1$d). Ask your administrator to update the server.</string>
+    <string name="incompatible_sign_out">Sign out</string>
+
+    <string name="error_check_input">Check what you entered.</string>
+    <string name="error_credential_storage">This device's secure storage refused access. Unlock it and try again.</string>
+    <string name="error_generic">Something went wrong.</string>
+    <string name="error_invalid_origin">Enter the address of your Ostrom server, with https://.</string>
+    <string name="error_no_github">This server does not offer GitHub sign-in.</string>
+    <string name="error_not_found">This no longer exists.</string>
+    <string name="error_not_ostrom">No Ostrom server answers at this address.</string>
+    <string name="error_organization_required">You belong to several organizations, and Ostrom needs to know which one: choose it in Settings.</string>
+    <string name="error_rate_limited">Too many attempts. Try again in a moment.</string>
+    <string name="error_rate_limited_in">Too many attempts. Try again in %1$d s.</string>
+    <string name="error_server_http">The server answered with an error (HTTP %1$d).</string>
+    <string name="error_server_http_code">The server answered with an error (HTTP %1$d, %2$s).</string>
+    <string name="error_sign_in_denied">GitHub or the server refused the sign-in.</string>
+    <string name="error_sign_in_expired">The code expired before the sign-in was confirmed. Start again.</string>
+    <string name="error_sign_in_mismatch">This sign-in did not come from this app. Try again.</string>
+    <string name="error_sign_up_closed">This Ostrom instance is invite-only: open your invitation in a browser to create your account, then sign in here.</string>
+    <string name="error_unauthorized">Your session ended. Sign in again.</string>
+    <string name="error_unreachable">The server could not be reached. Check your connection and try again.</string>
+    <string name="error_unsupported">This server does not offer this feature.</string>
+    <string name="error_unsupported_api">This server speaks another version of the API than this app. Update the app or ask your administrator to update the server.</string>
+    <string name="error_untrusted_page">The server sent a sign-in page this app does not trust. Nothing was opened.</string>
+</resources>

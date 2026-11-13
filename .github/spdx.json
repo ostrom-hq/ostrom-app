@@ -9,8 +9,6 @@
   "allowed": [
     "LicenseRef-Ostrom-Enterprise"
   ],
-  "exclude": [
-    "src/api/gen/*"
-  ],
+  "exclude": [],
   "scope": "added"
 }

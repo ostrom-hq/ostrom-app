@@ -1,44 +1,36 @@
-# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
-
-# dependencies
-node_modules/
-
-# Expo
-.expo/
-dist/
-web-build/
-expo-env.d.ts
-
-# Native
+# Gradle and Kotlin
+.gradle/
+build/
 .kotlin/
-*.orig.*
+local.properties
+# ostrom-core checked out by CI next to the sources (gradle/ostrom-core.ref)
+.core/
+
+# IDEs
+.idea/
+*.iml
+.fleet/
+
+# Xcode
+xcuserdata/
+DerivedData/
+*.xcuserstate
+
+# Signing material never enters the repository (docs/distribution.md)
 *.jks
+*.keystore
 *.p8
 *.p12
 *.key
+*.pem
 *.mobileprovision
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/
+fastlane/test_output/
 
-# Metro
-.metro-health-check*
-
-# debug
-npm-debug.*
-yarn-debug.*
-yarn-error.*
+# Android push configuration of a published build
+companion-android/google-services.json
 
 # macOS
 .DS_Store
-*.pem
-
-# local env files
-.env*.local
-
-# typescript
-*.tsbuildinfo
-
-example
-
-# generated native folders
-/ios
-/android
-coverage/

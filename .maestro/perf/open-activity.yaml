@@ -1,9 +1,0 @@
-# The performance pass (scripts/perf-measure.sh): the Activity tab, with its long list shown, ready to be scrolled.
-appId: run.ostrom.app
----
-- launchApp:
-    stopApp: false
-- tapOn: "Activity"
-- extendedWaitUntil:
-    visible: "claude-code asks to merge PR #100"
-    timeout: 30000

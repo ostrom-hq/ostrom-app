@@ -20,38 +20,44 @@
   <a href="SECURITY.md">Security</a>
 </p>
 
-> [!IMPORTANT]
-> **This app is being rewritten in Kotlin Multiplatform and Compose (2026-11-13).** The requirement: the team needs one
-> identical app to reach its agents on iOS, iPad, Android **and the desktop on macOS, Linux and Windows**, only the layout
-> adapting to the screen, as with TeamCode's companion that it uses every day. The technology was left open; Claude (the AI
-> agent doing the port) chose Kotlin Multiplatform, for these reasons. React Native with Expo has no desktop target that shares the phone's code (react-native-macos and
-> react-native-windows sit outside Expo and have no Linux; Electron around react-native-web is a web page in a shell, not
-> the same app). TeamCode's companion already does all of this in Kotlin Multiplatform, and the rest of Ostrom (core,
-> server, CLI) is Kotlin Multiplatform too. Full reasoning and the options set aside:
-> [decision 0001](docs/decisions/0001-kotlin-multiplatform-companion.md).
-
 <p align="center">
   <a href="https://github.com/ostrom-hq/ostrom-app/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/ostrom-hq/ostrom-app/actions/workflows/ci.yml/badge.svg?branch=main"></a>
-  <a href="CONTRIBUTING.md#tests-the-bar"><img alt="Coverage: 100% enforced" src="https://img.shields.io/badge/coverage-100%25%20enforced-8E1B3A"></a>
+  <a href="CONTRIBUTING.md#tests-the-bar"><img alt="Coverage: enforced" src="https://img.shields.io/badge/coverage-enforced-8E1B3A"></a>
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-AGPL--3.0%20%2B%20ee-8E1B3A"></a>
   <a href="CHANGELOG.md"><img alt="Version: pre-1.0" src="https://img.shields.io/badge/version-pre--1.0-44393C"></a>
 </p>
 
 ## What this is
 
-The phone is where a person says yes. A push notification says a request is waiting; the app shows its evidence
-(commits, repository, checks, who asked), and the person answers. A yes from the phone requires a recent unlock of the
-app (Face ID or the device biometrics): the server checks that unlock, never the biometrics themselves. Today it
-accepts an unlock from the last five minutes; binding the unlock to the request it answers, for a single use, is in
-progress. The app also verifies signed receipts offline, on the phone, and will show the history, the agents'
-activity and the spending map. React Native with Expo and expo-router, TypeScript at its strictest.
+The app is where a person follows Ostrom and says yes: on iOS, iPad, Android, and the desktop on macOS, Linux and
+Windows, one identical app whose layout adapts to the screen. A push says a request is waiting; the app shows its
+evidence (commits, repository, checks, who asked), and the person answers. A yes from a phone requires a fresh unlock of
+the app (Face ID or the device biometrics), bound to the request it answers: the server checks that unlock, never the
+biometrics themselves. The app also verifies signed receipts on the device, and shows the waits, the history, the
+agents' activity and the spending.
+
+## Why Kotlin Multiplatform
+
+The app was rewritten in Kotlin Multiplatform and Compose Multiplatform (2026-11-13), from a React Native (Expo) app.
+The requirement: the team needs one identical app to reach its agents on iOS, iPad, Android **and the desktop on macOS,
+Linux and Windows**, only the layout adapting to the screen, as with TeamCode's companion that it uses every day. The
+technology was left open; Claude (the AI agent doing the port) chose Kotlin Multiplatform, for these reasons. React
+Native with Expo has no desktop target that shares the phone's code; TeamCode's companion already does all of this in
+Kotlin Multiplatform, and the rest of Ostrom (core, server, CLI) is Kotlin Multiplatform too, so the app shares the
+contract's models and the typed client of ostrom-core with the CLI. Full reasoning and the options set aside:
+[decision 0001](docs/decisions/0001-kotlin-multiplatform-companion.md).
 
 ## Quick start
 
+Prerequisites: JDK 21, the Android SDK (platform 37) for the Android app, Xcode for the iOS app. ostrom-core is built
+from a clone next to this one when there is one (`../ostrom-core`), else taken from GitHub Packages.
+
 ```sh
+git clone https://github.com/ostrom-hq/ostrom-core.git
 git clone https://github.com/ostrom-hq/ostrom-app.git && cd ostrom-app
-npm ci
-npm start          # Expo dev server: press i for iOS, a for Android
+./gradlew :companion-desktop:run                    # the desktop app
+./gradlew :companion-android:installDebug           # the Android app, on a device or an emulator
+open companion-ios/Ostrom.xcodeproj                 # the iOS app (Xcode builds the shared framework)
 ```
 
 ## How it fits
@@ -65,10 +71,10 @@ flowchart LR
   server --- db[("PostgreSQL")]
   server -- "reads the diff, runs checks" --> gh["GitHub"]
   server -- "a yes is needed" --> person(["Approver"])
-  person --> web["Web console"] & app["Mobile app"]
+  person --> web["Web console"] & app["App: phone, tablet, desktop"]
   web & app -- "API" --> server
   server -- "signed receipt" --> receipt[/"Receipt"/]
-  core{{"ostrom-core<br/>contract, workflow model, receipts"}} -.- cli & server & web & app
+  core{{"ostrom-core<br/>contract, typed client, receipts"}} -.- cli & server & web & app
   helm["Helm chart"] -. "deploys" .-> server
   classDef here fill:#8E1B3A,stroke:#8E1B3A,color:#FFFFFF
   class app here
@@ -76,79 +82,44 @@ flowchart LR
 
 ## Status
 
-Ostrom is before its first public release, and the app is not in the stores yet.
+Ostrom is before its first public release, and the app is not in the stores yet (no store account yet: builds are
+unsigned, see [docs/distribution.md](docs/distribution.md)). What the app does, screen by screen, and what remains:
+[docs/companion.md](docs/companion.md).
 
 | Part | Status |
 | --- | --- |
-| Offline verification of signed receipts (Ed25519, canonical JSON) | Available |
-| Typed HTTP client, repositories, mocks of the API | Available |
-| Approval inbox, push notifications, yes after a recent unlock (bound to its request: in progress) | In progress |
-| History, agent activity, spending map | Planned |
+| Sign-in (GitHub in the system browser on a phone, the device flow of `ostrom login` on a computer), several accounts and servers, secure storage, organization, capabilities check, light and dark, English and French, demo | Available |
+| Approvals inbox and request (yes after a biometric unlock bound to the request), waits, history and receipt verification, activity, spending, push | Being ported from the React Native app |
+| Artifacts and the other TeamCode features Ostrom serves, desktop menu bar and CLI account, store distribution | Planned |
 
 ## Development
 
 ```sh
-npm run check      # typecheck + lint + tests, what CI runs
-npm run test:ci    # tests with the 100 % coverage gate
+./gradlew :companion:jvmTest :companion:koverVerify   # domain and Compose UI tests on the desktop JVM, coverage gate
+./gradlew :companion:testAndroidHostTest              # the same tests on Android's host JVM
+./gradlew :companion-android:assembleDebug            # the Android app
 ```
 
-## End-to-end tests
-
-Maestro flows in [`.maestro/`](.maestro), run by the `E2E` workflow on an Android emulator against the release build
-(about 30 minutes: on `main`, by hand, and on a pull request labelled `full-ci`). No Ostrom server runs on the runner:
-the E2E build (`EXPO_PUBLIC_OSTROM_MOCK=1`) answers from the in-memory server of `src/api/mocks/mockServer.ts`, the
-same one the unit tests use, through the real HTTP client, repositories and screens. Only the GitHub sign-in, the
-fingerprint and push are replaced, since the emulator has none of them. `metro.config.js` swaps the services only for
-that build, and the `ci` job proves it: `scripts/check-store-bundle.sh` first exports the E2E bundles and requires the
-mock's strings in both (Android, iOS), so that the search is known to see them, then exports the production bundles as
-a store build makes them and fails on any trace of the mock on either platform. `scripts/run-maestro.sh` runs the flows
-one at a time once the emulator answers (with an `adb reconnect` when it does not), after a warm-up flow that does not
-count (`.maestro/common/warm-up.yaml`). A flow runs a second time only when its first failure is an outage of the
-emulator (device offline, `DeviceServerDiedException`), never on a failed assertion.
-
-| Flow | What it proves | Status |
-| --- | --- | --- |
-| `login.yaml` | Signed out on a new phone: the login screen, and an address that is not `https://` is refused before anything is sent | Green ([run 41048146402](https://github.com/ostrom-hq/ostrom-app/actions/runs/41048146402)) |
-| `sign-in-return.yaml` | The real sign-in (S2-24): the system browser, the E2E auth host for GitHub (`scripts/e2e-auth-host.py`), and the `ostrom://auth/callback` return. The good state connects; a replayed state (the last good sign-in's) and a foreign one are refused; the return opens no screen, while the app runs or when it launches it. Android only: the CI has no iOS simulator, where `ASWebAuthenticationSession` hands the return to the session alone | Pending |
-| `step-up.yaml` | A yes the server answers with 403 `step_up_required` (production deploy): the explanation, no raw error, then a button that opens the console on this request (when the console cannot open, its address to select and copy: unit tests) | Green ([run 41048146402](https://github.com/ostrom-hq/ostrom-app/actions/runs/41048146402)) |
-| `self-approval.yaml` | A request the person asked for (`canApprove: false`, `self_approval_refused`): Approve is not offered, and the no still goes through with its reason | Green ([run 41048146402](https://github.com/ostrom-hq/ostrom-app/actions/runs/41048146402)) |
-| Organization required | A member of several organizations without `Ostrom-Org` (409 `org_required`): the inbox and the request say it clearly and lead to Settings, where the person chooses among `GET /me/organizations`. The header is sent on every call and the mock server checks it like the real one (unit tests) | Missing |
-| Approve a request | A yes on someone else's request is sent with the shown digest and the request shows as approved | Missing |
-| Changed request | The request changes while it is shown (409 `shown_digest_mismatch`): the app asks to read it again | Missing |
-| Organization isolation | Another organization's data never shows (CONVENTIONS.md section 16) | Missing: needs a second organization on a real server |
-| Receipts, history, activity, spending | Each screen opens and reads its data | Missing |
-
-Against the real server, the workflow `App journey` of ostrom-server (`.github/workflows/app-journey.yml`, run on demand
-with this repository's ref; it lives there because that repository's token reads the server image) starts the
-`sha-<7>` image of ostrom-server main with PostgreSQL and the demo stack's fake GitHub, then prepares it through the
-server's own routes (`scripts/real-server-session.sh`): the phone's person signs in with GitHub, owns the organization
-and is named approver of pushes to main; another member, signed in by e-mail, asks two pushes; the phone's session is
-made by the app's sign-in (PKCE S256 to `ostrom://auth/callback`, `POST /auth/mobile/token`). The app is built with
-`EXPO_PUBLIC_OSTROM_REAL_E2E=1`: the real services, given that session and its unlock key (`src/config/realServices.ts`).
-It runs the flows of `.maestro/real/` on an Android emulator of the same runner, then the job checks through the API that
-the gates are approved and rejected and that each receipt verifies.
-
-| Flow (real server) | What it proves | What it does not |
-|---|---|---|
-| `real/journey.yaml` | On the real server: the inbox reads the yes queue, a yes (biometrics, `POST /auth/mobile/unlock`, the answer) and a no with its reason go through, Settings shows the login and the only organization, the History shows the signed receipts verified on the phone, Activity shows the phone's yes and no and the two requests, Spending reads the organization's spending ($0.00, nothing yet) | The app's own browser hop of the sign-in (the job makes the session by the same routes); a real fingerprint (the build confirms it: no finger is enrolled on the emulator) |
+CI runs these on every pull request, and compiles the iOS code; on `main` it also builds the iOS app for the simulator
+and the desktop app on Linux, macOS and Windows, unsigned.
 
 ## Layout
 
 | Path | What lives there |
 |---|---|
-| `src/app/` | expo-router routes, thin: each file renders a screen |
-| `src/ui/screens/<feature>/` | a screen and its view-model hook (`use<Screen>ViewModel`) |
-| `src/ui/components/` | shared UI pieces |
-| `src/ui/theme/` | the Signal tokens (garnet `#8E1B3A`), light and dark |
-| `src/config/` | i18n, query client, environment |
-| `src/i18n/` | locales: English is the source, every other locale is type-checked against it |
+| `companion/` | The shared app (Kotlin Multiplatform, Compose Multiplatform): `domain/` (models, use cases, repository interfaces), `infrastructure/` (the typed client of ostrom-core, secure storage, settings), `presentation/` (screens, view models, theme), `demo/`, `di/` (Koin) |
+| `companion-android/` | The Android app: activity, manifest, resources |
+| `companion-ios/` | The Xcode project of the iOS app, which embeds the shared framework `Companion` |
+| `companion-desktop/` | The desktop app (macOS, Windows, Linux) and its packaging |
+| `docs/` | How the app works ([companion.md](docs/companion.md)), distribution, decisions |
 
 ## Rules
 
-- TypeScript at its strictest (`exactOptionalPropertyTypes`, `noUncheckedIndexedAccess`…) and ESLint
-  `strict-type-checked`; no `any`, no `eslint-disable` (inline config is off), no type assertion on data:
-  anything that crosses a boundary (HTTP, storage, notification payload) is read by a zod schema.
-- No hard-coded text: `t("…")` with keys checked by the compiler.
+- Clean Architecture: the domain knows neither the HTTP client nor Compose; screens talk to view models, view models
+  to use cases and repositories, which the platform modules implement.
+- API models and calls come from ostrom-core (`run.ostrom:ostrom-api`, `run.ostrom:ostrom-client`): never a
+  hand-written copy of the contract. A server feature shows only when the server announces it in `/capabilities`.
+- No hard-coded text: `Res.string` keys, English and French, checked by `LocalizationTest`.
 - Garnet means "a person is awaited or has just decided", and nothing else; amber is budget, red is error.
 
 ## Repositories
@@ -159,7 +130,7 @@ the gates are approved and rejected and that each receipt verifies.
 | [ostrom-cli](https://github.com/ostrom-hq/ostrom-cli) | The `ostrom` command line: runs coding agents under the team's rules | Apache-2.0 |
 | [ostrom-server](https://github.com/ostrom-hq/ostrom-server) | The server: gates, receipts, policies, the API | AGPL-3.0 + ee |
 | [ostrom-web](https://github.com/ostrom-hq/ostrom-web) | The web console | AGPL-3.0 + ee |
-| **ostrom-app** (this one) | The iOS and Android app | AGPL-3.0 + ee |
+| **ostrom-app** (this one) | The app: iOS, iPad, Android, macOS, Linux, Windows | AGPL-3.0 + ee |
 | [ostrom-e2e](https://github.com/ostrom-hq/ostrom-e2e) | Full-stack end-to-end and load tests | Apache-2.0 |
 | [ostrom-site](https://github.com/ostrom-hq/ostrom-site) | ostrom.run: website, documentation, blog | Apache-2.0 |
 | [ostrom-helm](https://github.com/ostrom-hq/ostrom-helm) | Helm chart and Docker Compose for self-hosting | AGPL-3.0 |
@@ -172,4 +143,4 @@ go to [Discussions](https://github.com/ostrom-hq/ostrom-app/discussions); help o
 
 ## License
 
-GNU Affero General Public License v3.0 ([LICENSE](LICENSE)), except the `ee/` directory, under the Ostrom Enterprise License ([ee/LICENSE](ee/LICENSE)): you can read, modify and test that code, and running it in production needs an Ostrom Enterprise subscription. Details in [LICENSING.md](LICENSING.md).
+GNU Affero General Public License v3.0 ([LICENSE](LICENSE)), except the `ee/` directory, under the Ostrom Enterprise License ([ee/LICENSE](ee/LICENSE)), and code ported from TeamCode under Apache-2.0 ([NOTICE](NOTICE)): you can read, modify and test that code, and running it in production needs an Ostrom Enterprise subscription. Details in [LICENSING.md](LICENSING.md).

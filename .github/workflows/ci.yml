@@ -1,14 +1,17 @@
 name: CI
 
+# The companion app (Kotlin Multiplatform, Compose Multiplatform), built and tested like TeamCode's companion: the
+# shared module's tests on the JVM (domain and Compose UI tests on the desktop) and on Android's host JVM, the Android
+# app assembled, the iOS code compiled. On main, the iOS app and the desktop apps are built too, unsigned (signing and
+# store upload wait for a store account: docs/distribution.md).
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
-  # No tag trigger: this job publishes nothing, and a release-like trigger makes the npm cache a poisoning risk (zizmor).
   push:
     branches: [main]
   workflow_dispatch:
 
-# One run per workflow and ref; a new push cancels the previous run, except on main (JOURNAL 03:10).
+# One run per workflow and ref; a new push cancels the previous run, except on main.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
@@ -17,49 +20,135 @@ permissions:
   contents: read
 
 jobs:
-  # The single job of a pull request and the required check on main (ostrom-e2e/templates/README.md).
+  # The single required check of a pull request.
   ci:
     name: ci
     # A draft pull request runs no CI: mark it ready when you want it.
     if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ubuntu-latest
-    # Three production bundle exports (store check) come on top of the tests.
-    timeout-minutes: 35
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Read the pinned ostrom-core commit
         id: core
-        run: echo "sha=$(tr -d '[:space:]' < contract/CORE_SHA)" >> "$GITHUB_OUTPUT"
+        run: echo "sha=$(tr -d '[:space:]' < gradle/ostrom-core.ref)" >> "$GITHUB_OUTPUT"
+      # ostrom-core (api, client) is built from source at that commit (settings.gradle.kts, -Postrom.core.path).
       - name: Check out ostrom-core at that commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: ostrom-hq/ostrom-core
           ref: ${{ steps.core.outputs.sha }}
-          ssh-key: ${{ secrets.DEPLOY_KEY_CORE }}
           path: .core
-          sparse-checkout: api/openapi.yaml
-          sparse-checkout-cone-mode: false
           persist-credentials: false
-      - name: The contract copy is ostrom-core's, byte for byte
-        run: cmp contract/openapi.yaml .core/api/openapi.yaml
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
-          node-version: 24
-          cache: npm
-      - run: npm ci
-      - name: The generated types are those of the copy
-        run: npm run gen:check
-      - name: Typecheck
-        run: npm run typecheck
-      - name: Lint
-        run: npm run lint
-      - name: The emulator outage classifier (a run again only on an outage, never on an assertion or a crash)
-        run: scripts/emulator-outage.test.sh
-      - name: Test, 100 % coverage
-        run: npm run test:ci
-      - name: Expo config is valid
-        run: npx expo config --type public > /dev/null
-      - name: No store bundle carries the in-memory server
-        run: scripts/check-store-bundle.sh
-      - name: Release configuration (pinned actions, Android permissions and clear text, iOS ATS)
-        run: scripts/check-release-config.sh
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+        with:
+          cache-provider: basic
+      - name: Install the Android platforms the app and ostrom-core compile against
+        # `yes` ends on SIGPIPE once sdkmanager exits; that status must not fail the step under pipefail.
+        run: '{ yes || true; } | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-37.0" "platforms;android-36" > /dev/null'
+      - name: Test (JVM with Compose UI tests, Android host), coverage gate, assemble the Android and desktop apps
+        run: >-
+          ./gradlew -Postrom.core.path=.core
+          :companion:jvmTest :companion:koverVerify :companion:testAndroidHostTest
+          :companion-android:assembleDebug :companion-desktop:compileKotlin
+      - name: Keep the unsigned debug APK
+        if: github.event_name == 'push'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ostrom-android-debug
+          path: companion-android/build/outputs/apk/debug/*.apk
+          retention-days: 14
+      - name: Keep the test reports of a failure
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: test-reports
+          path: companion/build/reports
+          retention-days: 7
+
+  # The iOS code compiled on every pull request; the Xcode app built for the simulator, unsigned, on main.
+  ios:
+    name: ios
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Read the pinned ostrom-core commit
+        id: core
+        run: echo "sha=$(tr -d '[:space:]' < gradle/ostrom-core.ref)" >> "$GITHUB_OUTPUT"
+      - name: Check out ostrom-core at that commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ostrom-hq/ostrom-core
+          ref: ${{ steps.core.outputs.sha }}
+          path: .core
+          persist-credentials: false
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+        with:
+          cache-provider: basic
+      - name: Compile the iOS code
+        if: github.event_name == 'pull_request'
+        run: ./gradlew -Postrom.core.path=.core :companion:compileKotlinIosSimulatorArm64
+      - name: Build the iOS app for the simulator, unsigned
+        if: github.event_name != 'pull_request'
+        # Xcode's build phase runs Gradle without arguments: ostrom-core goes where settings.gradle.kts looks by default.
+        run: >-
+          ln -s "$PWD/.core" ../ostrom-core &&
+          xcodebuild -project companion-ios/Ostrom.xcodeproj -scheme Ostrom -configuration Debug
+          -sdk iphonesimulator -destination 'generic/platform=iOS Simulator'
+          CODE_SIGNING_ALLOWED=NO build
+
+  # The desktop app on each system, as a runnable jar (unsigned): installers come with a version 1.0.0 or later and a
+  # signing identity (docs/distribution.md).
+  desktop:
+    name: desktop (${{ matrix.os }})
+    if: github.event_name != 'pull_request'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Read the pinned ostrom-core commit
+        id: core
+        run: echo "sha=$(tr -d '[:space:]' < gradle/ostrom-core.ref)" >> "$GITHUB_OUTPUT"
+      - name: Check out ostrom-core at that commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ostrom-hq/ostrom-core
+          ref: ${{ steps.core.outputs.sha }}
+          path: .core
+          persist-credentials: false
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+        with:
+          cache-provider: basic
+      - run: ./gradlew -Postrom.core.path=.core :companion-desktop:packageUberJarForCurrentOS
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ostrom-desktop-${{ runner.os }}
+          path: companion-desktop/build/compose/jars/*.jar
+          retention-days: 14

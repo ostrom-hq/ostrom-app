@@ -1,9 +1,0 @@
-# The performance pass (scripts/perf-measure.sh): the Inbox tab, with its long list shown, ready to be scrolled.
-appId: run.ostrom.app
----
-- launchApp:
-    stopApp: false
-- tapOn: "Inbox"
-- extendedWaitUntil:
-    visible: "Merge PR #100 into main"
-    timeout: 30000
