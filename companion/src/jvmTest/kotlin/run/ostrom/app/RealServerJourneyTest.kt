@@ -95,9 +95,11 @@ class RealServerJourneyTest {
             onNodeWithTag("activity-empty").assertDoesNotExist()
             onNodeWithTag("activity-error-state").assertDoesNotExist()
 
-            // Who is signed in, and their only organization.
+            // Who is signed in, and their only organization, read from the server (`GET /me/organizations`): the
+            // session was given here, so the account names none until the person chooses.
             tap("tab-settings", scroll = false)
             waitForText(login)
+            tap("organization")
             waitForText("acme-e2e")
         }
     }
