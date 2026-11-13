@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- SPDX-License-Identifier: AGPL-3.0-only -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
 <!-- The languages the app is translated into (the values-<language> folders of :companion), offered by the per-app
      language picker of Android 13+. LocalizationTest keeps this list and the translations in step. -->
 <locale-config xmlns:android="http://schemas.android.com/apk/res/android">

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: Apache-2.0
 // The React Native app's decisionProblem.ts, in Kotlin.
 package run.ostrom.app.domain.models
 

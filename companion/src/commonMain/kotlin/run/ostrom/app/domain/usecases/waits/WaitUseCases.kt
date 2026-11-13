@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: Apache-2.0
 // Ported from TeamCode (Apache-2.0), companion/.../domain/usecases/waits/WaitUseCases.kt; see NOTICE.
 package run.ostrom.app.domain.usecases.waits
 

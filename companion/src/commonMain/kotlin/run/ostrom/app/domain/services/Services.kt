@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: Apache-2.0
 // The platform's services; Clock, IdGenerator, CredentialStore, PlatformInfo and SecureRandom are shaped like
 // TeamCode's companion ones (Apache-2.0); see NOTICE.
 package run.ostrom.app.domain.services

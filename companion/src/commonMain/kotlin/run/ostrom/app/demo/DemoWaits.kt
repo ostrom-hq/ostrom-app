@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: Apache-2.0
 // Ported from TeamCode (Apache-2.0), companion/.../demo/DemoContent.kt (waits), DemoMode.kt (answerWait),
 // DemoRepositories.kt (DemoWaitRepository) and DemoRouting.kt (DemoAwareWaitRepository); see NOTICE.
 package run.ostrom.app.demo

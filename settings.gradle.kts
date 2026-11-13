@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: Apache-2.0
 // The companion app: the shared Compose Multiplatform app (:companion) and its Android and desktop shells; the iOS
 // shell is the Xcode project companion-ios/. Laid out like TeamCode's companion (see NOTICE).
 rootProject.name = "ostrom-app"

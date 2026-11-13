@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: Apache-2.0
 // Ported from TeamCode (Apache-2.0), companion/src/androidMain/kotlin/me/nathanfallet/teamcode/companion/infrastructure/system/JavaSecureRandom.kt; see NOTICE.
 package run.ostrom.app.infrastructure.system
 
