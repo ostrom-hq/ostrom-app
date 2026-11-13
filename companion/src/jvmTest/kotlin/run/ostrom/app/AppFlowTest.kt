@@ -58,7 +58,7 @@ class AppFlowTest {
             onNodeWithText(origin).assertExists()
             onNodeWithTag("submit").performSemanticsAction(SemanticsActions.OnClick)
             // The code of `ostrom login`, and GitHub's page opened to enter it; then the server says yes. The server serves
-            // gates.v1, so the approvals inbox is the first tab; Settings is the other.
+            // gates.v1, so the approvals inbox is the first tab; the account is under Settings.
             waitUntil(timeoutMillis = 10_000) { onAllNodes(hasTestTag("tab-settings")).fetchSemanticsNodes().isNotEmpty() }
             onNodeWithTag("tab-settings").performSemanticsAction(SemanticsActions.OnClick)
             waitUntil(timeoutMillis = 10_000) { onAllNodes(hasTestTag("settings")).fetchSemanticsNodes().isNotEmpty() }
