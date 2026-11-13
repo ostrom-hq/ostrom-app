@@ -1,15 +1,20 @@
 # 0001. Rewrite the app in Kotlin Multiplatform and Compose, for iOS, Android and the desktop
 
 - Date: 2026-11-13
-- Decided by: Nathan Fallet
+- Requirement: Nathan Fallet (the team needs one identical app on mobile and the desktop)
+- Technology choice: made by Claude (Claude Code, the AI agent porting TeamCode's features to Ostrom), not by Nathan,
+  who left the technology open
 - Status: accepted
 
 ## Context
 
-The company runs on TeamCode today and is to migrate to Ostrom. Its members use TeamCode's companion app every day,
-the same app on a Mac, on an iPad and on a phone, with the same features written once. Nathan's condition for the
-migration: Ostrom has the same, on iOS, Android and the desktop, and the desktop means macOS, Linux and Windows,
-because the team uses all three.
+The company runs on TeamCode today and is to migrate to Ostrom. Several members of the team reach their agents through
+TeamCode's companion app every day, on a Mac or another desktop, on an iPad and on a phone. The requirement Nathan set
+for the migration, and the only one: the team gets the interface to its agents on mobile and on the desktop with an
+identical app everywhere (iOS, iPad, Android, and the desktop on macOS, Linux and Windows, because the team uses all
+three), the same features, only the layout adapting to the screen size (a phone layout, a wider iPad and desktop
+layout). He left the technology open: keep React Native and add a desktop target, rewrite in Kotlin Multiplatform, or
+anything else.
 
 ostrom-app, on 2026-11-13, is an Expo 58 / React Native 0.88 app (about 32,000 lines of TypeScript outside tests).
 It targets iOS (tablets included) and Android, plus the web through react-native-web. It covers approving gates
@@ -23,14 +28,14 @@ the CLI. It is Apache-2.0.
 
 ## Decision
 
-Replace the React Native app with a Kotlin Multiplatform + Compose Multiplatform app built the way TeamCode's
+Claude chose to replace the React Native app with a Kotlin Multiplatform + Compose Multiplatform app built the way TeamCode's
 companion is (shared `companion` module, `companion-android`, `companion-ios`, `companion-desktop`), on a typed Kotlin
 client in ostrom-core shared with the CLI. Port TeamCode's companion code where Ostrom has the same feature, with
 attribution. Keep every feature the React Native app has (gate approvals with biometric confirmation, receipts,
 spending, activity, push), so nothing is lost. The React Native sources leave the repository in the same change; git
 history keeps them.
 
-## Why not keep React Native
+## Why Claude did not keep React Native
 
 - **No supported desktop target with the same code.** Expo builds iOS, Android and the web. The desktop options are
   react-native-macos and react-native-windows (maintained by Microsoft, outside Expo's managed workflow, with no

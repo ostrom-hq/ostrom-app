@@ -1,6 +1,6 @@
 # Decisions
 
-One file per decision that changes the app's direction: what was decided, when, by whom, why, and the options set
+One file per decision that changes the app's direction: what was decided, when, who set the requirement and who made the choice, why, and the options set
 aside. A decision is never edited afterwards; a later one replaces it and links back.
 
 | # | Decision | Date |
