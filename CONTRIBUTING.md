@@ -23,12 +23,15 @@ goes through the same short path. This guide takes ten minutes to read and saves
 
 ## Set up your machine
 
-Prerequisites: Node.js (version in `package.json` `engines`) and npm. For the simulators, Xcode or Android Studio.
+Prerequisites: JDK 21; the Android SDK (platform 37) for the Android app; Xcode for the iOS app. Clone
+[ostrom-core](https://github.com/ostrom-hq/ostrom-core) next to this repository (`../ostrom-core`): the build uses it
+instead of the published artifacts (`-Postrom.core.local=false` forces those, with `gpr.user` and `gpr.key` in
+`~/.gradle/gradle.properties`).
 
 ```sh
-npm ci
-npm run test:ci      # unit tests, and the 100 % coverage gate
-npm run check        # typecheck, lint and tests, as in CI
+./gradlew :companion:jvmTest :companion:koverVerify   # domain and Compose UI tests, coverage gate
+./gradlew :companion:testAndroidHostTest              # the same tests on Android's host JVM
+./gradlew :companion-desktop:run                      # run the desktop app
 ```
 
 ## Tests: the bar
@@ -39,7 +42,8 @@ Every change ships with its tests, and CI enforces it:
 - **integration tests** against real dependencies (a real PostgreSQL, real HTTP), never a mock of our own server;
 - **end-to-end tests** of the journey the change touches, run in CI from the first commit
   ([`ostrom-e2e`](https://github.com/ostrom-hq/ostrom-e2e) holds the full-stack journeys);
-- **100 % line and branch coverage** of the code you add. The coverage job fails below. An exclusion needs a one-line
+- **coverage**: every line and branch you add is tested; Kover's gate on the domain fails the build below its bound.
+  Screens are tested as Compose UI tests on the desktop JVM (`companion/src/jvmTest`). An exclusion needs a one-line
   justification next to it, and the reviewer reads it.
 
 A bug fix starts with a test that fails without the fix.
@@ -78,7 +82,8 @@ Every source file starts with its SPDX identifier, checked in CI by the `communi
 // SPDX-License-Identifier: AGPL-3.0-only
 ```
 
-Add it to the files you create, or let the script do it: `python3 .github/scripts/check_spdx.py --fix <files>`.
+Add it to the files you create, or let the script do it: `python3 .github/scripts/check_spdx.py --fix <files>`. A file
+ported from TeamCode adds a second line naming its origin: `// Ported from TeamCode (Apache-2.0), <path>; see NOTICE.`
 
 ## AI-assisted contributions
 

@@ -1,12 +1,8 @@
 # zizmor configuration (https://docs.zizmor.sh/configuration/).
-# Temporary: ci.yml predates the open source checks and still uses actions by tag. CONVENTIONS.md section 11 requires
-# a commit SHA for every action; remove this exception in the pull request that pins them.
+# ci.yml restores Gradle's cache (setup-gradle) and runs on pull requests and on main, never on a tag or a release:
+# nothing it builds is published as a release, so a poisoned cache could not reach one. Remove this exception if a
+# release job ever joins that workflow.
 rules:
-  unpinned-uses:
-    ignore:
-      - ci.yml
-  # Temporary: ci.yml caches npm (setup-node) in a workflow that also runs on release tags. Drop the cache
-  # on tag runs, or split the release job, then remove this exception.
   cache-poisoning:
     ignore:
       - ci.yml

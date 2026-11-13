@@ -1,0 +1,70 @@
+# The app
+
+One Kotlin Multiplatform module, `companion/`, holds the whole app: its domain, its calls to the server, its Compose
+Multiplatform screens. Three thin shells run it: `companion-android/` (an activity), `companion-ios/` (an Xcode project
+that embeds the framework `Companion`) and `companion-desktop/` (a window). It is built like TeamCode's companion
+(`companion/`, `companion-android/`, `companion-ios/`, `companion-desktop/` of
+[TeamCode](https://github.com/nathanfallet/teamcode), Apache-2.0); files ported from it say so in their header.
+
+## Layers
+
+| Layer | Package | What it holds |
+| --- | --- | --- |
+| Domain | `run.ostrom.app.domain` | Models (`Account`, `ServerInfo`, `ServerCapabilities`, `AppException`), use cases (sign-in, sign-out, refresh, organizations), repository and service interfaces. No Ktor, no client, no Compose. |
+| Infrastructure | `run.ostrom.app.infrastructure` | The repositories over ostrom-core's typed client (`OstromClient`, one per account, `OstromClientProvider`), failures translated to `AppException` (`AccountCalls`), settings (accounts metadata, theme), credential stores. |
+| Presentation | `run.ostrom.app.presentation` | Screens, view models (`StateFlow` of a `UiState`), navigation, theme (Ostrom's garnet), components ported from TeamCode. |
+| Demo | `run.ostrom.app.demo` | The built-in demo: an account on no server, answered from memory; routers send the demo account's calls there and every other account's to its server. |
+| Platforms | `androidMain`, `iosMain`, `jvmMain` | Secure storage, settings, HTTP engine, the browser sign-in of the phones. |
+
+## Sign-in
+
+- **Phones** (Android, iOS) sign in with GitHub in the system browser: a Custom Tab on Android, an
+  `ASWebAuthenticationSession` on iOS. The app draws a PKCE verifier and a state, opens
+  `GET /api/v1/auth/github/start` with `redirect_uri=ostrom://auth/callback`, takes the return only if its state is the
+  latest attempt's, and exchanges the code (`POST /api/v1/auth/mobile/token`) for a 30-day app token and its unlock key.
+- **Computers** sign in with the device flow of `ostrom login` (`POST /api/v1/auth/device`, then
+  `POST /api/v1/auth/device/token` every interval, slower on `slow_down`): the server only sends a browser back to
+  the phones' `ostrom://auth/callback`. The page to enter the code on must be GitHub's or of the server's own origin
+  (or its console's, `app.` for `api.`).
+- Every new session's capabilities are read before it is kept: a server whose API version this app does not speak
+  is refused, and the new session revoked. The organization the calls act in (`Ostrom-Org`) is the only membership,
+  or the one `GET /auth/me` names; a member of several chooses it in Settings.
+- Tokens and unlock keys live in the platform's secure storage (Keychain, Android Keystore AES-GCM, the desktop
+  keyring; in memory where a desktop has none, which Settings says); account metadata in the settings.
+- Several accounts, on one server or several, side by side; a session the server ended stays listed as signed out
+  and asks to sign in again.
+
+## Capabilities
+
+`GET /api/v1/capabilities` decides what shows: a tab or a screen appears only when the server announces its feature
+key (`Features`, equal to ostrom-core's `ServerFeatures`, a test checks it). A server of another API version, or one
+too old to have the route, replaces the app with a blocking screen whose only action is to sign out. The server is
+asked again when the app comes back to the foreground, at most every ten minutes; an unreachable server changes
+nothing.
+
+## Tests
+
+- `companion/src/commonTest`: use cases with fakes, repositories against Ktor's `MockEngine`.
+- `companion/src/jvmTest`: Compose UI tests of the whole `App()` on the desktop JVM against a fake server (sign-in,
+  sign-out, a server too new, the demo), and the translations (`LocalizationTest`).
+- `testAndroidHostTest` runs the common tests on Android's host JVM. Kover's gate covers the domain.
+
+## Parity
+
+What the React Native app did, what TeamCode's companion does that an Ostrom server serves, and where each stands.
+"Feature" is the capability key that gates it.
+
+| Area | Feature | Status |
+| --- | --- | --- |
+| Sign-in (phone browser, desktop device flow), accounts, organizations, secure storage, capabilities check, incompatible server, settings with versions, theme, English and French, demo | none | Done |
+| Approvals inbox and request, yes after a biometric unlock bound to the request (`POST /auth/mobile/unlock` with `requestId`) | `gates.v1` | To port from the React Native app |
+| Waiting for you (waits asked of the person, answer with actions and values) | `waits.v1` | To port (React Native app's Waiting tab, TeamCode's `WaitsScreen`) |
+| History: receipts, verified on the device | `receipts.v1` | To port |
+| Spending | `budgets.v1` | To port |
+| Activity | none | To port |
+| Push registration and notification preferences | `notifications.v1`, `notifications.push.v1` | To port (the server sends Expo push today) |
+| Artifacts gallery and viewer | `artifacts.v1` | To port from TeamCode |
+| Sessions (list, transcript, follow live) | `sessions.v1` | To port from TeamCode, once ostrom-core's client has the session routes |
+| Todos, workflows, automations, MCP servers, GitHub link, sharing | `todos.v1`, `workflows.v1`, `automations.v1`, `mcp.v1`, `github.link.v1`, `sharing.v1` | Later, each with its client routes in ostrom-core |
+| Desktop: menu bar icon, the CLI's account, update banner | none | To port from TeamCode's `companion-desktop` |
+| Store and desktop distribution | none | Waiting for a store account ([distribution.md](distribution.md)) |

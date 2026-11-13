@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only -->
+<resources>
+    <string name="app_name">Ostrom</string>
+    <string name="action_back">Retour</string>
+    <string name="action_cancel">Annuler</string>
+    <string name="action_close">Fermer</string>
+    <string name="action_continue">Continuer</string>
+    <string name="action_retry">Réessayer</string>
+
+    <string name="add_server_title">Ton serveur Ostrom</string>
+    <string name="add_server_intro">Saisis l'adresse du serveur Ostrom sur lequel tu te connectes. Les agents proposent, les personnes décident.</string>
+    <string name="add_server_origin">Adresse du serveur</string>
+    <string name="add_server_check">Vérifier le serveur</string>
+    <string name="add_server_found">Serveur Ostrom trouvé</string>
+    <string name="add_server_new_warning">Aucun compte de cet appareil n'utilise encore ce serveur. Vérifie l'adresse avant de te connecter.</string>
+
+    <string name="demo_try">Essayer la démo</string>
+    <string name="demo_try_hint">Pas encore de serveur ? Fais le tour avec des données d'exemple, gardées sur cet appareil seulement.</string>
+    <string name="demo_banner_title">Tu essaies la démo</string>
+    <string name="demo_banner_detail">Rien n'est réel ici. Déploie ton propre serveur Ostrom pour utiliser l'app.</string>
+    <string name="demo_github">GitHub</string>
+
+    <string name="login_title">Connexion</string>
+    <string name="login_signing_in_to">Connexion à</string>
+    <string name="login_back_server">Serveur</string>
+    <string name="login_submit">Continuer avec GitHub</string>
+    <string name="login_browser_hint">Tu te connectes avec GitHub sur ton serveur Ostrom. Ton oui est signé à ton nom.</string>
+    <string name="login_device_intro">Saisis le code ci-dessous sur la page qui s'ouvre, comme avec ostrom login.</string>
+    <string name="login_device_hint">Ton code</string>
+    <string name="login_copy_code">Copier le code</string>
+    <string name="login_open_page">Rouvrir la page</string>
+    <string name="login_waiting">En attente de ta confirmation dans le navigateur…</string>
+    <string name="login_no_github">Ce serveur ne propose pas la connexion GitHub, que cette app utilise.</string>
+    <string name="login_invite_only">Ce serveur est sur invitation : ouvre ton invitation dans un navigateur pour créer ton compte, puis connecte-toi ici.</string>
+
+    <string name="home_signed_out">Ta session sur %1$s a pris fin. Reconnecte-toi pour la voir.</string>
+    <string name="home_sign_in_again">Se connecter</string>
+
+    <string name="tab_settings">Réglages</string>
+
+    <string name="settings_title">Réglages</string>
+    <string name="settings_accounts">Comptes</string>
+    <string name="settings_add_account">Ajouter un compte</string>
+    <string name="settings_account_active">Actif</string>
+    <string name="settings_account_signed_out">Déconnecté</string>
+    <string name="settings_organization">Organisation</string>
+    <string name="settings_no_organization">Aucune choisie</string>
+    <string name="settings_change_organization">Changer</string>
+    <string name="settings_appearance">Apparence</string>
+    <string name="settings_about">À propos</string>
+    <string name="settings_app_version">Version de l'app</string>
+    <string name="settings_server_version">Version du serveur</string>
+    <string name="settings_api_version">Version de l'API</string>
+    <string name="settings_api_version_value">Serveur v%1$s · app v%2$d</string>
+    <string name="settings_unknown">Inconnue</string>
+    <string name="settings_sign_out">Se déconnecter</string>
+    <string name="settings_end_demo">Quitter la démo</string>
+    <string name="settings_sign_in_again">Se reconnecter</string>
+    <string name="settings_memory_only">Cet ordinateur n'a pas de trousseau : tes sessions sont gardées en mémoire seulement et prennent fin quand l'app se ferme.</string>
+    <string name="settings_signed_out_of">Déconnecté de %1$s sur %2$s.</string>
+    <string name="settings_signed_out_unreachable">Déconnecté sur cet appareil. Le serveur n'a pas pu être joint ; sa session expirera d'elle-même.</string>
+    <string name="settings_signed_out_storage">Déconnecté sur cet appareil, mais son stockage sécurisé a refusé l'accès : la session peut rester valide jusqu'à son expiration.</string>
+
+    <string name="theme_system">Système</string>
+    <string name="theme_light">Clair</string>
+    <string name="theme_dark">Sombre</string>
+
+    <string name="incompatible_title">Ce serveur n'est pas pris en charge</string>
+    <string name="incompatible_unsupported">Ce serveur parle l'API v%1$d ; cette app parle la v%2$d. Mets l'app à jour ou demande à ton administrateur de mettre le serveur à jour.</string>
+    <string name="incompatible_too_old">Ce serveur est trop ancien pour cette app : il n'indique pas quelle version de l'API il parle (cette app parle la v%1$d). Demande à ton administrateur de mettre le serveur à jour.</string>
+    <string name="incompatible_sign_out">Se déconnecter</string>
+
+    <string name="error_check_input">Vérifie ce que tu as saisi.</string>
+    <string name="error_credential_storage">Le stockage sécurisé de cet appareil a refusé l'accès. Déverrouille-le et réessaie.</string>
+    <string name="error_generic">Quelque chose s'est mal passé.</string>
+    <string name="error_invalid_origin">Saisis l'adresse de ton serveur Ostrom, en https://.</string>
+    <string name="error_no_github">Ce serveur ne propose pas la connexion GitHub.</string>
+    <string name="error_not_found">Ceci n'existe plus.</string>
+    <string name="error_not_ostrom">Aucun serveur Ostrom ne répond à cette adresse.</string>
+    <string name="error_organization_required">Tu es membre de plusieurs organisations, et Ostrom doit savoir pour laquelle : choisis-la dans les Réglages.</string>
+    <string name="error_rate_limited">Trop de tentatives. Réessaie dans un instant.</string>
+    <string name="error_rate_limited_in">Trop de tentatives. Réessaie dans %1$d s.</string>
+    <string name="error_server_http">Le serveur a répondu par une erreur (HTTP %1$d).</string>
+    <string name="error_server_http_code">Le serveur a répondu par une erreur (HTTP %1$d, %2$s).</string>
+    <string name="error_sign_in_denied">GitHub ou le serveur a refusé la connexion.</string>
+    <string name="error_sign_in_expired">Le code a expiré avant que la connexion soit confirmée. Recommence.</string>
+    <string name="error_sign_in_mismatch">Cette connexion ne vient pas de cette app. Réessaie.</string>
+    <string name="error_sign_up_closed">Cette instance Ostrom est sur invitation : ouvre ton invitation dans un navigateur pour créer ton compte, puis connecte-toi ici.</string>
+    <string name="error_unauthorized">Ta session a pris fin. Reconnecte-toi.</string>
+    <string name="error_unreachable">Le serveur n'a pas pu être joint. Vérifie ta connexion et réessaie.</string>
+    <string name="error_unsupported">Ce serveur ne propose pas cette fonctionnalité.</string>
+    <string name="error_unsupported_api">Ce serveur parle une autre version de l'API que cette app. Mets l'app à jour ou demande à ton administrateur de mettre le serveur à jour.</string>
+    <string name="error_untrusted_page">Le serveur a envoyé une page de connexion à laquelle cette app ne se fie pas. Rien n'a été ouvert.</string>
+</resources>

@@ -1,6 +1,10 @@
 # ostrom-app contributor instructions
 
-This is the mobile app, React Native (Expo) + TypeScript (strictest settings). AGPL-3.0, `ee/` under the commercial license.
+This is the Ostrom app: one Kotlin Multiplatform module with a Compose Multiplatform UI (`companion/`) for iOS, iPad,
+Android and the desktop (macOS, Linux, Windows), with thin platform shells (`companion-android/`, `companion-ios/`,
+`companion-desktop/`). It is built like TeamCode's companion, from which part of its code is ported (Apache-2.0, see
+NOTICE). AGPL-3.0, `ee/` under the commercial license. Why Kotlin Multiplatform rather than the former React Native app:
+[decision 0001](docs/decisions/0001-kotlin-multiplatform-companion.md).
 
 **The conventions are in [ostrom-core `docs/CONVENTIONS.md`](https://github.com/ostrom-hq/ostrom-core/blob/main/docs/CONVENTIONS.md) (local clone: `../ostrom-core/docs/CONVENTIONS.md`).** They follow Nathan Fallet's practices (teamcode, asonar,
 pkg) and bind every contributor, human or agent. This file only summarizes the most important rules; when in
@@ -10,25 +14,36 @@ All repository content (code, comments, docs, commits, pull requests) is in Engl
 
 ## Specific to this repository
 
-API types and Zod schemas come from `@ostrom-hq/core` (generated from ostrom-core by Zodable): never hand-write an API entity type. Maestro end-to-end tests run on an Android emulator in CI. Every org-scoped screen has an end-to-end test that another organization's data never shows (CONVENTIONS.md section 16).
+- API models and calls come from ostrom-core: `run.ostrom:ostrom-api` (the contract's models) and
+  `run.ostrom:ostrom-client` (the typed client), never a hand-written copy. A missing route or model is added to
+  ostrom-core first. CI builds ostrom-core from source at the commit of `gradle/ostrom-core.ref`; move it when the app
+  needs a newer core.
+- A feature's screen shows only when the server announces its key in `GET /api/v1/capabilities` (`Features`, kept
+  equal to core's `ServerFeatures` by a test); a server of another API version is refused and blocks the app.
+- How the app works and what remains to port: [docs/companion.md](docs/companion.md). Distribution: no store account
+  yet, so no signing and no store upload ([docs/distribution.md](docs/distribution.md)).
+- A file ported from TeamCode keeps a second header line `// Ported from TeamCode (Apache-2.0), <path>; see NOTICE.`
 
-## The 15 rules that matter most
+## The rules that matter most
 
-1. Read CONVENTIONS.md before each pull request (section 13 for TypeScript); it wins over habits from other projects.
-2. `tsconfig` extends the strictest base (`strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `noImplicitOverride`, `noPropertyAccessFromIndexSignature`, `verbatimModuleSyntax`…). TypeScript 6.0.x until typescript-eslint supports 7.
-3. ESLint flat config with typescript-eslint `strictTypeChecked` + `stylisticTypeChecked` and `noInlineConfig: true`: no `eslint-disable`, no `@ts-ignore`/`@ts-expect-error`.
-4. No `any`, no `as` assertion (only `as const`), no non-null `!`, no floating promise, exhaustive `switch`.
-5. Everything from outside (HTTP, storage, URL, deep links, SSE/WebSocket events, environment) is `unknown` until a Zod schema parses it.
-6. API types and Zod schemas come from `@ostrom-hq/core`, generated from ostrom-core by Zodable: never hand-write an API entity type; a missing type is added to ostrom-core first.
-7. Layers: `repositories/` (`XxxRepository` + `XxxRepositoryImpl`, Zod parse of every response) → `query/` (React Query) → `hooks/` (custom hooks are the ViewModels) → `components/`, `screens/`. Zustand only for client state, never a copy of server state.
-8. A component never calls `fetch`, a repository or a store directly: it uses its hook.
-9. Files: `PascalCase.tsx` components, `camelCase.ts` hooks and utilities, never kebab-case components.
-10. All user-facing text through i18n keys, French and English.
-11. A feature ships on web and mobile unless written otherwise; shared code lives in shared packages.
-12. Tests: TDD, 100 % coverage thresholds (lines, branches, functions, statements) enforced by the test runner; Testing Library for components; end-to-end against the real server (Playwright web, Maestro app).
-13. Never log tokens, prompts or response bodies; no secret in the repository or in CI in clear.
-14. CI: typecheck, lint, tests with coverage and end-to-end on every pull request; actions pinned by SHA.
-15. Git: one branch per topic in its own worktree, never push to `main`, Conventional Commits in English, squash-merge after green CI and a review with nothing blocking; evidence in the pull request, never in a shared status file.
+1. Read CONVENTIONS.md before each pull request (the Kotlin sections); it wins over habits from other projects.
+2. Clean Architecture: `domain/` (models, use cases, repository and service interfaces) imports neither Ktor, the
+   typed client nor Compose; `infrastructure/` implements them; `presentation/` holds the screens and their view
+   models (`XxxViewModel`, a `StateFlow` of an immutable `XxxUiState`); `di/` wires them with Koin; the platform
+   modules (`androidMain`, `iosMain`, `jvmMain`) bind the platform services.
+3. Never swallow `CancellationException`: rethrow it first in every broad catch; no `runCatching` around suspend code.
+4. Failures reach the screen as `AppException`s worded by `userMessage()`: never a server-provided message.
+5. Secrets (tokens, unlock keys) only in the `CredentialStore` (Keychain, Android Keystore, the desktop keyring);
+   never in settings, logs or crash reports. Never log tokens, prompts or response bodies.
+6. All user-facing text through `Res.string`, in English and French (`LocalizationTest`); the apostrophe stays bare.
+7. Tests: TDD. Domain and repositories in `commonTest` (fakes, Ktor `MockEngine`), screens as Compose UI tests on the
+   desktop JVM (`jvmTest`, the whole `App()` on a fake server); Kover's gate on the domain must stay green.
+8. The demo (`demo/`) answers from memory and creates no HTTP client; a new screen adds its demo content.
+9. No simulator or emulator run is required locally: CI builds and tests every platform.
+10. Every source file starts with `// SPDX-License-Identifier: AGPL-3.0-only` (`LicenseRef-Ostrom-Enterprise` under `ee/`).
+11. CI: actions pinned by SHA; a draft pull request runs no CI.
+12. Git: one branch per topic in its own worktree, never push to `main`, Conventional Commits in English, signed off,
+    squash-merge after green CI and a review with nothing blocking; evidence in the pull request.
 
 ## Coordination
 
