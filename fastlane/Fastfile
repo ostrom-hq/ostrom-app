@@ -1,0 +1,104 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Ported from TeamCode (Apache-2.0), fastlane/Fastfile; see NOTICE. Only its iOS lane, renamed for Ostrom.
+#
+# The iOS app's TestFlight builds, run from a maintainer's Mac or from the manual TestFlight workflow
+# (.github/workflows/testflight.yml):
+#
+#   bundle exec fastlane ios beta version:0.2.0       # build, sign, then upload to TestFlight (internal testing)
+#
+# Only builds are uploaded: store listings, screenshots and descriptions are kept in App Store Connect, never in this
+# repository, and no lane submits for review or releases. There is no Android lane: Android builds stay debug-signed
+# until Ostrom has a Play account (docs/distribution.md).
+#
+# Secrets stay next to this file, ignored by git (the workflow writes them from GitHub secrets):
+#   fastlane/api_key.json   App Store Connect API key (key_id, issuer_id, key, in fastlane's format)
+#   fastlane/key.p8         the same key's .p8, for Xcode's cloud signing
+#
+# Versions follow the app (gradle.properties, ostromAppVersion): `version` is MAJOR.MINOR.PATCH. The build number
+# (CFBundleVersion) is (major * 1 000 000 + minor * 1 000 + patch) * 100 + a counter, the counter going up for each
+# upload of the same version (at most 99), read from what TestFlight already has: the same formula as Android's
+# versionCode (companion-android/build.gradle.kts).
+
+require "json"
+require "shellwords"
+
+default_platform(:ios)
+
+XCODEPROJ = "companion-ios/Ostrom.xcodeproj"
+SCHEME = "Ostrom"
+
+# Lanes run with fastlane/ as the working directory; plain Ruby resolves from there, actions from the repository root.
+def fastlane_file(name)
+  [File.join("fastlane", name), name].each do |candidate|
+    absolute = File.expand_path(candidate, Dir.pwd)
+    return absolute if File.exist?(absolute)
+  end
+  UI.user_error!("fastlane/#{name} is missing: it is written from a secret and never committed (docs/distribution.md).")
+end
+
+def release_version(options)
+  version = options[:version].to_s
+  UI.user_error!("Pass the app version: version:MAJOR.MINOR.PATCH") unless version.match?(/\A\d{1,3}\.\d{1,3}\.\d{1,3}\z/)
+  UI.user_error!("Version 0.0.0 has no build number: TestFlight needs one above 0.") if version == "0.0.0"
+  version
+end
+
+# The first build number of a version; uploads of the same version add one each.
+def base_build(version)
+  major, minor, patch = version.split(".").map(&:to_i)
+  UI.user_error!("Major versions above 20 overflow Android's versionCode, which shares this formula.") if major > 20
+  (major * 1_000_000 + minor * 1_000 + patch) * 100
+end
+
+# [uploaded] is every build number the store holds; only this version's range counts.
+def next_build(version, uploaded)
+  base = base_build(version)
+  mine = Array(uploaded).compact.map(&:to_i).select { |code| code >= base && code < base + 100 }
+  build = mine.empty? ? base : mine.max + 1
+  UI.user_error!("Version #{version} was uploaded 100 times: publish a new version.") if build >= base + 100
+  build
+end
+
+platform :ios do
+  desc "Builds the iOS app and uploads it to TestFlight (internal testing). Option: version:MAJOR.MINOR.PATCH."
+  lane :beta do |options|
+    version = release_version(options)
+    asc_key = fastlane_file("api_key.json")
+    latest = latest_testflight_build_number(api_key_path: asc_key, version: version, initial_build_number: 0)
+    build = next_build(version, [latest])
+    UI.message("Ostrom #{version}, build #{build}")
+
+    # Automatic signing with the App Store Connect key (cloud signing): no certificate needs to be in the keychain.
+    asc = JSON.parse(File.read(asc_key))
+    # gym passes xcargs to the export too, so the distribution profile gets the same key without export_xcargs
+    # (xcodebuild refuses an -authenticationKey* option given twice).
+    authentication = [
+      "-allowProvisioningUpdates",
+      "-authenticationKeyPath #{fastlane_file('key.p8').shellescape}",
+      "-authenticationKeyID #{asc['key_id'].to_s.shellescape}",
+      "-authenticationKeyIssuerID #{asc['issuer_id'].to_s.shellescape}",
+    ]
+    build_app(
+      scheme: SCHEME,
+      project: XCODEPROJ,
+      configuration: "Release",
+      export_method: "app-store",
+      output_directory: "companion-ios/build",
+      xcargs: [
+        "MARKETING_VERSION=#{version}",
+        "CURRENT_PROJECT_VERSION=#{build}",
+        # Xcode's build phase runs Gradle, which reads the version for the settings screen and the User-Agent.
+        "ORG_GRADLE_PROJECT_ostromAppVersion=#{version}",
+        *authentication,
+      ].join(" "),
+    )
+
+    # TestFlight only, for internal testers: no external beta review, no App Store submission.
+    upload_to_testflight(
+      api_key_path: asc_key,
+      skip_waiting_for_build_processing: true,
+      skip_submission: true,
+    )
+    clean_build_artifacts
+  end
+end

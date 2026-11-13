@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-// A contributor without access to the Ostrom Apple team sets their own OSTROM_DEVELOPMENT_TEAM and TEAM_ID (any
-// suffix): the bundle identifier then becomes unique to that team, so a local build never collides with the published
-// app. Release builds get both from fastlane (docs/distribution.md).
-OSTROM_DEVELOPMENT_TEAM=
+// The Apple team is TeamCode's for now (Nathan, 2026-11-13), until Ostrom has its own (docs/distribution.md).
+// A contributor without access to it sets their own OSTROM_DEVELOPMENT_TEAM and TEAM_ID (any suffix): the bundle
+// identifier then becomes unique to that team, so a local build never collides with the published app.
+OSTROM_DEVELOPMENT_TEAM=Z8T3MHFW48
 TEAM_ID=
 
 PRODUCT_NAME=Ostrom
