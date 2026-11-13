@@ -107,3 +107,9 @@ class FakeAuthRepository : AuthRepository {
         abandoned += token
     }
 }
+
+/** A server whose capabilities are [features]; every test sets the ones it needs. */
+class FakeFeatures(var features: Set<String> = emptySet()) : run.ostrom.app.domain.repositories.FeaturesRepository {
+    override suspend fun capabilities(accountId: String, refresh: Boolean) = ServerCapabilities("1.4.0", 1, features)
+    override fun cached(accountId: String) = ServerCapabilities("1.4.0", 1, features)
+}

@@ -3,6 +3,7 @@
 package run.ostrom.app.demo
 
 import run.ostrom.app.domain.models.Account
+import run.ostrom.app.domain.models.Features
 import run.ostrom.app.domain.models.SignInMethod
 
 /** The built-in demo's account and content, in English. Each feature adds its sample data here. */
@@ -15,7 +16,7 @@ object DemoContent {
     const val REPOSITORY_URL = "https://github.com/ostrom-hq/ostrom-server"
 
     /** What the demo server announces: the features whose demo content exists. */
-    val features: Set<String> = emptySet()
+    val features: Set<String> = setOf(Features.WAITS)
 
     fun account(): Account = Account(
         id = ACCOUNT_ID,

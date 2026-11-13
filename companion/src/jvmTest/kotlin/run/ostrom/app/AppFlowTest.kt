@@ -115,6 +115,8 @@ class AppFlowTest {
             settle()
             waitUntil(timeoutMillis = 10_000) { onAllNodes(hasTestTag("demo-banner")).fetchSemanticsNodes().isNotEmpty() }
             assertEquals(DemoContent.ACCOUNT_ID, koin.get<AccountRepository>().activeAccountId.value)
+            onNodeWithTag("tab-settings").performSemanticsAction(SemanticsActions.OnClick)
+            settle()
             onNodeWithTag("server-version").assertTextEquals("demo")
             onNodeWithTag("add-account").assertDoesNotExist()
             onNodeWithTag("sign-out").performScrollTo().performSemanticsAction(SemanticsActions.OnClick)

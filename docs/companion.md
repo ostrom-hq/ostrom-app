@@ -58,7 +58,7 @@ What the React Native app did, what TeamCode's companion does that an Ostrom ser
 | --- | --- | --- |
 | Sign-in (phone browser, desktop device flow), accounts, organizations, secure storage, capabilities check, incompatible server, settings with versions, theme, English and French, demo | none | Done |
 | Approvals inbox and request, yes after a biometric unlock bound to the request (`POST /auth/mobile/unlock` with `requestId`) | `gates.v1` | To port from the React Native app |
-| Waiting for you (waits asked of the person, answer with actions and values) | `waits.v1` | To port (React Native app's Waiting tab, TeamCode's `WaitsScreen`) |
+| Waiting for you (waits asked of the person, answer with actions and values) | `waits.v1` | Ported from TeamCode's `WaitsScreen` (open, answered and cancelled filters, in-progress timers and webhooks, tab badge). Loaded at each return to the app until the server serves its event feed; no link to the session (no sessions screen yet), no withdraw (no route) |
 | History: receipts, verified on the device | `receipts.v1` | To port |
 | Spending | `budgets.v1` | To port |
 | Activity | none | To port |
