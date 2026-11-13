@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SPDX-License-Identifier: AGPL-3.0-only
+# SPDX-License-Identifier: Apache-2.0
 # Prepares the real Ostrom server ostrom-server's app-journey workflow started, through its own routes, for the app's
 # journey: two requests of a push to main, pending, that the phone's person answers in the app (one yes, one no).
 # - The phone's person signs in with GitHub (the demo stack's fake GitHub, ostrom-helm compose/demo/fake-github.mjs):
