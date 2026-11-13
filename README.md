@@ -21,9 +21,10 @@
 </p>
 
 > [!IMPORTANT]
-> **This app is being rewritten in Kotlin Multiplatform and Compose (decided on 2026-11-13).** The team needs the same
-> app on iOS, iPad, Android **and the desktop on macOS, Linux and Windows**, written once, like TeamCode's companion that
-> it uses every day. React Native with Expo has no desktop target that shares the phone's code (react-native-macos and
+> **This app is being rewritten in Kotlin Multiplatform and Compose (2026-11-13).** The requirement: the team needs one
+> identical app to reach its agents on iOS, iPad, Android **and the desktop on macOS, Linux and Windows**, only the layout
+> adapting to the screen, as with TeamCode's companion that it uses every day. The technology was left open; Claude (the AI
+> agent doing the port) chose Kotlin Multiplatform, for these reasons. React Native with Expo has no desktop target that shares the phone's code (react-native-macos and
 > react-native-windows sit outside Expo and have no Linux; Electron around react-native-web is a web page in a shell, not
 > the same app). TeamCode's companion already does all of this in Kotlin Multiplatform, and the rest of Ostrom (core,
 > server, CLI) is Kotlin Multiplatform too. Full reasoning and the options set aside:
