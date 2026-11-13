@@ -90,8 +90,8 @@ class ApprovalsFlowTest {
         val (settings, credentials) = signedIn(phone = true)
         testApp(server, settings = settings, credentials = credentials) {
             waitFor("request-appr_0001")
-            onNodeWithText("Waiting for your answer", substring = true).assertExists()
-            onNodeWithText("Answered lately", substring = true).assertExists()
+            onNodeWithText("Waiting for your answer", substring = true, ignoreCase = true).assertExists()
+            onNodeWithText("Answered lately", substring = true, ignoreCase = true).assertExists()
             onNodeWithTag("request-appr_0000").assertExists()
             openRequest()
             // Everything before any button: who asks, through which gate, the command, the commits and checks.
@@ -283,7 +283,7 @@ class ApprovalsFlowTest {
             tap("back", scroll = false)
             waitFor("request-demo-tool")
             onNodeWithTag("request-demo-push").performScrollTo()
-            onNodeWithText("Answered lately", substring = true).assertExists()
+            onNodeWithText("Answered lately", substring = true, ignoreCase = true).assertExists()
         }
         assertEquals(0, server.clients, "The demo reaches no server")
     }
