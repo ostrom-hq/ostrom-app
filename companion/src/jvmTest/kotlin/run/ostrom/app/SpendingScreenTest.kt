@@ -104,7 +104,8 @@ class SpendingScreenTest {
         signedIn(server) {
             waitFor("activity-row-i1")
             onNodeWithText("Session ended").assertExists()
-            onNodeWithText("Agent Codex", substring = true).assertExists()
+            // The details line is a string resource, read once its strings are loaded.
+            waitForText("Agent Codex · ae/web · $4.12")
             onNodeWithTag("activity-more").performScrollTo().performSemanticsAction(SemanticsActions.OnClick)
             waitFor("activity-row-i2")
             onNodeWithTag("activity-more").assertDoesNotExist()

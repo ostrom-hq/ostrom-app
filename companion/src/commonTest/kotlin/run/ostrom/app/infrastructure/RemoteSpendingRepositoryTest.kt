@@ -77,9 +77,10 @@ class RemoteSpendingRepositoryTest {
     }
 
     @Test
-    fun aServerWithoutTheRouteIsANotFound() = runTest {
+    fun aServerWithoutTheRouteFailsWithoutItsMessage() = runTest {
         signedIn()
-        assertFailsWith<AppException.NotFound> { RemoteSpendingRepository(calls).report("a1", SpendPeriod.MONTH) }
+        val error = assertFailsWith<AppException.Server> { RemoteSpendingRepository(calls).report("a1", SpendPeriod.MONTH) }
+        assertEquals(404, error.statusCode)
     }
 
     @Test
