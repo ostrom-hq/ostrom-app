@@ -89,7 +89,8 @@ track only (see [Release](#release)). What the app does, screen by screen, and w
 | Part | Status |
 | --- | --- |
 | Sign-in (GitHub in the system browser on a phone, the device flow of `ostrom login` on a computer), several accounts and servers, secure storage, organization, capabilities check, light and dark, English and French, demo | Available |
-| Approvals inbox and request (yes after a biometric unlock bound to the request), waits, history and receipt verification, activity, spending, push | Being ported from the React Native app |
+| Approvals inbox and request (yes after a biometric unlock bound to the request) | Available |
+| Waits, history and receipt verification, activity, spending, push | Being ported from the React Native app |
 | Artifacts and the other TeamCode features Ostrom serves, desktop menu bar and CLI account, Play and desktop distribution | Planned |
 
 ## Development

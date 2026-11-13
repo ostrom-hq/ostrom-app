@@ -15,3 +15,10 @@ data class LoginRoute(val origin: String, val accountId: String? = null)
 /** The tabs of a signed-in app: the features the active account's server serves, and Settings. */
 @Serializable
 object MainRoute
+
+/**
+ * One request for a yes of [accountId]'s server: opened from the inbox, and by id from a push or a link. The request is
+ * read again from the server each time; an answer goes only from this screen.
+ */
+@Serializable
+data class RequestRoute(val accountId: String, val id: String)

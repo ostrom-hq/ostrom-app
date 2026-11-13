@@ -21,12 +21,14 @@ import io.ktor.client.engine.mock.respond
 import io.ktor.client.request.HttpRequestData
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.content.OutgoingContent
 import io.ktor.http.headersOf
 import org.koin.core.Koin
 import org.koin.core.context.startKoin
 import org.koin.core.context.stopKoin
 import org.koin.dsl.module
 import run.ostrom.app.di.appModules
+import run.ostrom.app.domain.services.BiometricGate
 import run.ostrom.app.domain.services.CredentialStore
 import run.ostrom.app.domain.services.PlatformInfo
 import run.ostrom.app.domain.services.SecureRandom
@@ -39,15 +41,20 @@ object TestPlatform : PlatformInfo {
 }
 
 /**
- * A fake server: [routes] answers `METHOD /path` with a JSON body (status 200), anything else with 404. A route may name
- * query parameters (`GET /api/v1/waits?status=open&resolver=time`): it answers only a request that has those values, and
- * wins over the route of the bare path. [failures] answers a route with a status and an error type instead. [bodies]
- * records what each `METHOD /path` was sent.
+/**
+ * A fake server: [routes] answers `METHOD /path` with a JSON body (status 200, or the one in [statuses]), anything else
+ * with 404. A route may name query parameters (`GET /api/v1/waits?status=open&resolver=time`): it answers only a request
+ * that has those values, and wins over the route of the bare path. [failures] answers a route with a status and an error
+ * type instead. [bodies] records the last body each `METHOD /path` was sent, [sent] all of them in order.
  */
-class FakeServer(val routes: MutableMap<String, String> = mutableMapOf()) : HttpClientEngineFactory<MockEngineConfig> {
+class FakeServer(
+    val routes: MutableMap<String, String> = mutableMapOf(),
+    val statuses: MutableMap<String, Int> = mutableMapOf(),
+) : HttpClientEngineFactory<MockEngineConfig> {
     val asked = mutableListOf<String>()
     val failures = mutableMapOf<String, Pair<Int, String>>()
     val bodies = mutableMapOf<String, String>()
+    val sent = mutableMapOf<String, MutableList<String>>()
     var clients = 0
 
     override fun create(block: MockEngineConfig.() -> Unit): HttpClientEngine {
@@ -60,29 +67,36 @@ class FakeServer(val routes: MutableMap<String, String> = mutableMapOf()) : Http
     private fun io.ktor.client.engine.mock.MockRequestHandleScope.answer(request: HttpRequestData) = synchronized(this@FakeServer) {
         val key = "${request.method.value} ${request.url.encodedPath}"
         asked += key
-        (request.body as? io.ktor.http.content.OutgoingContent.ByteArrayContent)?.let { bodies[key] = it.bytes().decodeToString() }
+        (request.body as? OutgoingContent.ByteArrayContent)?.let {
+            val text = it.bytes().decodeToString()
+            bodies[key] = text
+            sent.getOrPut(key) { mutableListOf() } += text
+        }
         failures[key]?.let { (status, type) ->
             return@synchronized respond("""{"error":{"type":"$type","message":"m"}}""", HttpStatusCode.fromValue(status), headersOf(HttpHeaders.ContentType, "application/json"))
         }
         val withQuery = routes.entries.firstOrNull { (route, _) ->
             route.startsWith("$key?") && route.substringAfter('?').split('&').all { pair -> request.url.parameters[pair.substringBefore('=')] == pair.substringAfter('=') }
         }?.value
-        (withQuery ?: routes[key])?.let { respond(it, HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "application/json")) }
+        (withQuery ?: routes[key])?.let { respond(it, HttpStatusCode.fromValue(statuses[key] ?: 200), headersOf(HttpHeaders.ContentType, "application/json")) }
             ?: respond("""{"error":{"type":"not_found","message":"m"}}""", HttpStatusCode.NotFound, headersOf(HttpHeaders.ContentType, "application/json"))
     }
 }
 
 /** The links the app asked to open, instead of a browser. */
-class RecordingUriHandler : UriHandler {
+class RecordingUriHandler(var fails: Boolean = false) : UriHandler {
     val opened = mutableListOf<String>()
     override fun openUri(uri: String) {
+        // A system without a browser, or one that refuses the link.
+        check(!fails) { "No browser" }
         opened += uri
     }
 }
 
 /**
  * The whole app (App(), its screens, navigation and modules) on a fresh device of the desktop platform (device-flow
- * sign-in) talking to [server], in a [width] × [height] window; [before] prepares the device.
+ * sign-in) talking to [server], in a [width] × [height] window; [before] prepares the device. [biometrics] stands in
+ * for a phone's gate (the desktop has none).
  */
 @OptIn(ExperimentalTestApi::class)
 fun testApp(
@@ -92,6 +106,7 @@ fun testApp(
     credentials: CredentialStore = MemoryCredentialStore(),
     settings: Settings = MapSettings(),
     links: RecordingUriHandler = RecordingUriHandler(),
+    biometrics: BiometricGate? = null,
     block: DesktopComposeUiTest.(Koin) -> Unit,
 ) {
     val koin = startKoin {
@@ -101,6 +116,7 @@ fun testApp(
             single<HttpClientEngineFactory<*>> { server }
             single<PlatformInfo> { TestPlatform }
             single<SecureRandom> { SecureRandom { ByteArray(it) { index -> index.toByte() } } }
+            if (biometrics != null) single<BiometricGate> { biometrics }
         }))
     }.koin
     try {

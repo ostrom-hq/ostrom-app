@@ -57,7 +57,10 @@ class AppFlowTest {
             onNodeWithTag("login-server").assertExists()
             onNodeWithText(origin).assertExists()
             onNodeWithTag("submit").performSemanticsAction(SemanticsActions.OnClick)
-            // The code of `ostrom login`, and GitHub's page opened to enter it; then the server says yes.
+            // The code of `ostrom login`, and GitHub's page opened to enter it; then the server says yes. The server serves
+            // gates.v1, so the approvals inbox is the first tab; Settings is the other.
+            waitUntil(timeoutMillis = 10_000) { onAllNodes(hasTestTag("tab-settings")).fetchSemanticsNodes().isNotEmpty() }
+            onNodeWithTag("tab-settings").performSemanticsAction(SemanticsActions.OnClick)
             waitUntil(timeoutMillis = 10_000) { onAllNodes(hasTestTag("settings")).fetchSemanticsNodes().isNotEmpty() }
             assertEquals(listOf("https://github.com/login/device"), links.opened)
             val account = koin.get<AccountRepository>().accounts.value.single()
@@ -115,6 +118,7 @@ class AppFlowTest {
             settle()
             waitUntil(timeoutMillis = 10_000) { onAllNodes(hasTestTag("demo-banner")).fetchSemanticsNodes().isNotEmpty() }
             assertEquals(DemoContent.ACCOUNT_ID, koin.get<AccountRepository>().activeAccountId.value)
+            waitUntil(timeoutMillis = 10_000) { onAllNodes(hasTestTag("tab-settings")).fetchSemanticsNodes().isNotEmpty() }
             onNodeWithTag("tab-settings").performSemanticsAction(SemanticsActions.OnClick)
             settle()
             onNodeWithTag("server-version").assertTextEquals("demo")
