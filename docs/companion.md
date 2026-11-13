@@ -68,6 +68,11 @@ command, the commit, the size of the change, the commits, checks and evidence be
 - `companion/src/commonTest`: use cases with fakes, repositories against Ktor's `MockEngine`.
 - `companion/src/jvmTest`: Compose UI tests of the whole `App()` on the desktop JVM against a fake server (sign-in,
   sign-out, a server too new, the demo), and the translations (`LocalizationTest`).
+- `RealServerJourneyTest` (jvmTest) drives the whole app against the real server: ostrom-server's `app-journey`
+  workflow starts a published server image, prepares it with `scripts/real-server-session.sh` (two pushes to main
+  waiting for the person, a budget passed, the phone's session and unlock key) and runs this test with that session in
+  `OSTROM_E2E_*`; it says yes and no, reads the spending, the activity and the account, and the workflow checks the
+  gates and their signed receipts. Without `OSTROM_E2E_SERVER` it is skipped.
 - `testAndroidHostTest` runs the common tests on Android's host JVM. Kover's gate covers the domain.
 
 ## Parity
