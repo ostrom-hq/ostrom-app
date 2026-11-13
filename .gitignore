@@ -28,7 +28,8 @@ DerivedData/
 *.pem
 *.mobileprovision
 # The App Store Connect key in fastlane's format (fastlane/api_key.json), written from a secret
-**/fastlane/*.json
+fastlane/api_key.json
+fastlane/play-key.json
 fastlane/README.md
 fastlane/report.xml
 fastlane/Preview.html

@@ -29,8 +29,8 @@ Before the first upload, once:
 
 1. In App Store Connect (team `Z8T3MHFW48`), create the app record for the bundle identifier `run.ostrom.app` (name
    "Ostrom"). Xcode registers the identifier and its capabilities on the first signed build.
-2. Add the repository's secrets to the `testflight` environment of `ostrom-hq/ostrom-app` (a required reviewer can be
-   set on it):
+2. Create the `testflight` environment of `ostrom-hq/ostrom-app`, limit its deployment branches to `main` (so a branch
+   cannot run a modified workflow or Fastfile with the key), optionally with a required reviewer, and add its secrets:
 
 | Secret | Value |
 | --- | --- |

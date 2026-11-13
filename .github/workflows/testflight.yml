@@ -22,11 +22,19 @@ permissions:
 jobs:
   testflight:
     name: testflight
+    # Only main's workflow, Fastfile and build scripts ever see the key; the environment is also limited to main
+    # (docs/distribution.md), which holds even if this line is edited on a branch.
+    if: github.ref == 'refs/heads/main'
     runs-on: macos-latest
     timeout-minutes: 60
     # The secrets live in this environment, so a maintainer can require an approval before each upload.
     environment: testflight
     steps:
+      - name: Check the version
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          [[ "$VERSION" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]] || { echo "::error::version must be MAJOR.MINOR.PATCH"; exit 1; }
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
