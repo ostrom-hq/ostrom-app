@@ -17,7 +17,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
@@ -37,10 +36,8 @@ import com.adamglin.phosphoricons.Regular
 import com.adamglin.phosphoricons.regular.ArrowSquareOut
 import com.adamglin.phosphoricons.regular.Warning
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.delay
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
-import org.koin.compose.koinInject
 import run.ostrom.app.domain.models.ActionKind
 import run.ostrom.app.domain.models.Approval
 import run.ostrom.app.domain.models.ApprovalAnswer
@@ -48,7 +45,6 @@ import run.ostrom.app.domain.models.ApprovalStatus
 import run.ostrom.app.domain.models.CheckState
 import run.ostrom.app.domain.models.DecisionProblem
 import run.ostrom.app.domain.models.NoApprove
-import run.ostrom.app.domain.services.Clock
 import run.ostrom.app.presentation.components.AppButton
 import run.ostrom.app.presentation.components.AppCard
 import run.ostrom.app.presentation.components.AppTextField
@@ -63,6 +59,7 @@ import run.ostrom.app.presentation.components.GroupRow
 import run.ostrom.app.presentation.components.NavBar
 import run.ostrom.app.presentation.components.SectionTitle
 import run.ostrom.app.presentation.components.Tone
+import run.ostrom.app.presentation.components.rememberNow
 import run.ostrom.app.presentation.theme.MetaStyle
 import run.ostrom.app.presentation.theme.MonospaceStyle
 import run.ostrom.app.presentation.theme.Ostrom
@@ -418,18 +415,6 @@ private fun DecisionProblem.words(): StringResource = when (this) {
     DecisionProblem.OFFLINE -> Res.string.request_problem_offline
     DecisionProblem.SESSION_EXPIRED -> Res.string.request_problem_session_expired
     DecisionProblem.FAILED -> Res.string.request_problem_failed
-}
-
-/** The clock's time, ticking every 30 seconds while shown. */
-@Composable
-private fun rememberNow(clock: Clock = koinInject()): Long {
-    val now by produceState(clock.nowMillis(), clock) {
-        while (true) {
-            delay(30_000)
-            value = clock.nowMillis()
-        }
-    }
-    return now
 }
 
 /** "5 min ago" for a past time, "in 5 min" for a coming one. */
