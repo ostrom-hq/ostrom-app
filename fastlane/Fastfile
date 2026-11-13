@@ -1,31 +1,31 @@
-# SPDX-License-Identifier: AGPL-3.0-only
-# Ported from TeamCode (Apache-2.0), fastlane/Fastfile; see NOTICE. Only its iOS lane, renamed for Ostrom.
+# The companion app's store builds, run from a maintainer's Mac (no CI yet).
 #
-# The iOS app's TestFlight builds, run from a maintainer's Mac or from the manual TestFlight workflow
-# (.github/workflows/testflight.yml):
+#   bundle exec fastlane ios beta version:0.2.0       # build, then upload to TestFlight
+#   bundle exec fastlane android beta version:0.2.0   # signed bundle, then Play's internal track
 #
-#   bundle exec fastlane ios beta version:0.2.0       # build, sign, then upload to TestFlight (internal testing)
+# Only builds are uploaded: store listings, screenshots and descriptions are kept in the stores, never in this
+# repository, and no lane submits for review or releases.
 #
-# Only builds are uploaded: store listings, screenshots and descriptions are kept in App Store Connect, never in this
-# repository, and no lane submits for review or releases. There is no Android lane: Android builds stay debug-signed
-# until Ostrom has a Play account (docs/distribution.md).
-#
-# Secrets stay next to this file, ignored by git (the workflow writes them from GitHub secrets):
+# Secrets stay on the Mac, next to this file, and are ignored by git:
 #   fastlane/api_key.json   App Store Connect API key (key_id, issuer_id, key, in fastlane's format)
 #   fastlane/key.p8         the same key's .p8, for Xcode's cloud signing
+#   fastlane/play-key.json  Google Play service account
+#   fastlane/keystore.jks   Android upload key, with SIGNING_STORE_PASSWORD, SIGNING_KEY_ALIAS, SIGNING_KEY_PASSWORD
 #
-# Versions follow the app (gradle.properties, ostromAppVersion): `version` is MAJOR.MINOR.PATCH. The build number
-# (CFBundleVersion) is (major * 1 000 000 + minor * 1 000 + patch) * 100 + a counter, the counter going up for each
-# upload of the same version (at most 99), read from what TestFlight already has: the same formula as Android's
-# versionCode (companion-android/build.gradle.kts).
+# Versions follow Ostrom: `version` is the Ostrom version (MAJOR.MINOR.PATCH). The build number (CFBundleVersion,
+# versionCode) is (major * 1 000 000 + minor * 1 000 + patch) * 100 + a counter, the counter going up for each upload
+# of the same version (at most 99), read from what the store already has.
 
 require "json"
 require "shellwords"
 
 default_platform(:ios)
 
+ASC_KEY = "fastlane/api_key.json"
+PLAY_KEY = "fastlane/play-key.json"
 XCODEPROJ = "companion-ios/Ostrom.xcodeproj"
 SCHEME = "Ostrom"
+AAB = "companion-android/build/outputs/bundle/release/companion-android-release.aab"
 
 # Lanes run with fastlane/ as the working directory; plain Ruby resolves from there, actions from the repository root.
 def fastlane_file(name)
@@ -33,20 +33,19 @@ def fastlane_file(name)
     absolute = File.expand_path(candidate, Dir.pwd)
     return absolute if File.exist?(absolute)
   end
-  UI.user_error!("fastlane/#{name} is missing: it is written from a secret and never committed (docs/distribution.md).")
+  UI.user_error!("fastlane/#{name} is missing: it stays on the maintainer's Mac and is never committed.")
 end
 
 def release_version(options)
   version = options[:version].to_s
   UI.user_error!("Pass the app version: version:MAJOR.MINOR.PATCH") unless version.match?(/\A\d{1,3}\.\d{1,3}\.\d{1,3}\z/)
-  UI.user_error!("Version 0.0.0 has no build number: TestFlight needs one above 0.") if version == "0.0.0"
   version
 end
 
 # The first build number of a version; uploads of the same version add one each.
 def base_build(version)
   major, minor, patch = version.split(".").map(&:to_i)
-  UI.user_error!("Major versions above 20 overflow Android's versionCode, which shares this formula.") if major > 20
+  UI.user_error!("Major versions above 20 overflow Android's versionCode.") if major > 20
   (major * 1_000_000 + minor * 1_000 + patch) * 100
 end
 
@@ -60,23 +59,22 @@ def next_build(version, uploaded)
 end
 
 platform :ios do
-  desc "Builds the iOS app and uploads it to TestFlight (internal testing). Option: version:MAJOR.MINOR.PATCH."
+  desc "Builds the iOS app and uploads it to TestFlight. Option: version:MAJOR.MINOR.PATCH (the app version)."
   lane :beta do |options|
     version = release_version(options)
-    asc_key = fastlane_file("api_key.json")
-    latest = latest_testflight_build_number(api_key_path: asc_key, version: version, initial_build_number: 0)
+    latest = latest_testflight_build_number(api_key_path: ASC_KEY, version: version, initial_build_number: 0)
     build = next_build(version, [latest])
     UI.message("Ostrom #{version}, build #{build}")
 
     # Automatic signing with the App Store Connect key (cloud signing): no certificate needs to be in the keychain.
-    asc = JSON.parse(File.read(asc_key))
+    asc = JSON.parse(File.read(fastlane_file("api_key.json")))
     # gym passes xcargs to the export too, so the distribution profile gets the same key without export_xcargs
     # (xcodebuild refuses an -authenticationKey* option given twice).
     authentication = [
       "-allowProvisioningUpdates",
       "-authenticationKeyPath #{fastlane_file('key.p8').shellescape}",
-      "-authenticationKeyID #{asc['key_id'].to_s.shellescape}",
-      "-authenticationKeyIssuerID #{asc['issuer_id'].to_s.shellescape}",
+      "-authenticationKeyID #{asc['key_id']}",
+      "-authenticationKeyIssuerID #{asc['issuer_id']}",
     ]
     build_app(
       scheme: SCHEME,
@@ -87,18 +85,56 @@ platform :ios do
       xcargs: [
         "MARKETING_VERSION=#{version}",
         "CURRENT_PROJECT_VERSION=#{build}",
-        # Xcode's build phase runs Gradle, which reads the version for the settings screen and the User-Agent.
         "ORG_GRADLE_PROJECT_ostromAppVersion=#{version}",
         *authentication,
       ].join(" "),
     )
 
-    # TestFlight only, for internal testers: no external beta review, no App Store submission.
     upload_to_testflight(
-      api_key_path: asc_key,
+      api_key_path: ASC_KEY,
       skip_waiting_for_build_processing: true,
       skip_submission: true,
     )
     clean_build_artifacts
+  end
+end
+
+platform :android do
+  desc "Builds the signed Android bundle and uploads it to Play's internal track. Option: version:MAJOR.MINOR.PATCH."
+  lane :beta do |options|
+    version = release_version(options)
+    # Without the upload key, bundleRelease would produce an unsigned bundle that Play refuses, minutes later.
+    unless File.exist?(fastlane_file("keystore.jks")) && ENV["SIGNING_STORE_PASSWORD"] && ENV["SIGNING_KEY_ALIAS"] && ENV["SIGNING_KEY_PASSWORD"]
+      UI.user_error!("fastlane/keystore.jks and SIGNING_STORE_PASSWORD, SIGNING_KEY_ALIAS, SIGNING_KEY_PASSWORD are needed to sign the bundle.")
+    end
+    # A wrong or expired key fails here, before any track is read: a read failure is never taken for an empty track.
+    validate_play_store_json_key(json_key: PLAY_KEY)
+    uploaded = %w[internal alpha beta production].flat_map do |track|
+      google_play_track_version_codes(json_key: PLAY_KEY, track: track)
+    rescue StandardError => error
+      # Only a track that holds no release yet is empty; anything else stops the lane.
+      raise unless error.message.match?(/trackEmpty|track not found|no releases/i)
+      []
+    end
+    build = next_build(version, uploaded)
+    UI.message("Ostrom #{version}, versionCode #{build}")
+
+    gradle(
+      task: ":companion-android:bundleRelease",
+      project_dir: ".",
+      flags: "--no-daemon",
+      properties: { "ostromAppVersion" => version, "ostromVersionCode" => build.to_s },
+    )
+
+    upload_to_play_store(
+      json_key: PLAY_KEY,
+      track: "internal",
+      aab: AAB,
+      skip_upload_apk: true,
+      skip_upload_metadata: true,
+      skip_upload_changelogs: true,
+      skip_upload_images: true,
+      skip_upload_screenshots: true,
+    )
   end
 end

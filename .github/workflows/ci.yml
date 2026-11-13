@@ -2,8 +2,8 @@ name: CI
 
 # The companion app (Kotlin Multiplatform, Compose Multiplatform), built and tested like TeamCode's companion: the
 # shared module's tests on the JVM (domain and Compose UI tests on the desktop) and on Android's host JVM, the Android
-# app assembled, the iOS code compiled. On main, the iOS app and the desktop apps are built too, unsigned (TestFlight
-# uploads are the manual testflight.yml; docs/distribution.md).
+# app assembled, the iOS code compiled. On main, the iOS app and the desktop apps are built too, unsigned (store
+# builds are uploaded from a maintainer's Mac with fastlane: docs/distribution.md).
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]

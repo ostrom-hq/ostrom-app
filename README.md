@@ -82,8 +82,8 @@ flowchart LR
 
 ## Status
 
-Ostrom is before its first public release, and the app is not in the stores. iOS builds go to TestFlight for internal
-testing only; Android and desktop builds are unsigned ([docs/distribution.md](docs/distribution.md)). What the app does, screen by screen, and what remains:
+Ostrom is before its first public release, and the app is not in the stores: builds go to TestFlight and Play's internal
+track only (see [Release](#release)). What the app does, screen by screen, and what remains:
 [docs/companion.md](docs/companion.md).
 
 | Part | Status |
@@ -102,6 +102,28 @@ testing only; Android and desktop builds are unsigned ([docs/distribution.md](do
 
 CI runs these on every pull request, and compiles the iOS code; on `main` it also builds the iOS app for the simulator
 and the desktop app on Linux, macOS and Windows, unsigned.
+
+## Release
+
+Store builds are made and uploaded from a maintainer's Mac with fastlane, exactly as TeamCode's companion: the same
+`Gemfile` and `fastlane/Fastfile`, with Ostrom's identifiers (`run.ostrom.app` on both stores). There is no publication
+job. Nothing in the repository holds a key, a certificate or a password: each lane reads them from files next to the
+Fastfile and from the environment, all ignored by git.
+
+```sh
+bundle install
+bundle exec fastlane ios beta version:0.2.0       # build, sign, then upload to TestFlight
+bundle exec fastlane android beta version:0.2.0   # signed bundle, then Play's internal track
+```
+
+| Lane | Does | Needs (local only) |
+| --- | --- | --- |
+| `bundle exec fastlane ios beta version:X.Y.Z` | Archives `companion-ios/Ostrom.xcodeproj` (shared scheme `Ostrom`, Release) with automatic signing through the App Store Connect key (Xcode cloud signing, no certificate in the keychain), then uploads to TestFlight without submitting | `fastlane/api_key.json`, `fastlane/key.p8` |
+| `bundle exec fastlane android beta version:X.Y.Z` | `:companion-android:bundleRelease --no-daemon`, signed with the upload key, then uploads to Play's internal track | `fastlane/play-key.json`, `fastlane/keystore.jks`, `SIGNING_STORE_PASSWORD`, `SIGNING_KEY_ALIAS`, `SIGNING_KEY_PASSWORD` |
+
+Only builds are uploaded, and no lane submits for review or releases. Xcode's build phase runs Gradle with ostrom-core
+checked out next to this repository (`../ostrom-core`). Details, versions and what stays to do:
+[docs/distribution.md](docs/distribution.md).
 
 ## Layout
 
