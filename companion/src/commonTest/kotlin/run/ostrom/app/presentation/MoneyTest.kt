@@ -14,5 +14,6 @@ class MoneyTest {
         assertEquals("-$3.20", formatUsd(-3.2, "en"))
         assertEquals("1 204,50 $", formatUsd(1204.5, "fr"))
         assertEquals("12,00 $", formatUsd(12.0, "fr-FR"))
+        assertEquals("—", formatUsd(Double.NaN, "en"), "a figure that is not one shows nothing rather than failing")
     }
 }

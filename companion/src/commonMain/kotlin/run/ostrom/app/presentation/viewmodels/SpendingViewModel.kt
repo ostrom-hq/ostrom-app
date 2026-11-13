@@ -24,7 +24,7 @@ import run.ostrom.app.domain.usecases.spending.LoadSpendingUseCase
 data class SpendingUiState(
     val account: Account? = null,
     val period: SpendPeriod = SpendPeriod.MONTH,
-    /** The report of [period]; while another period loads, the last one stays shown. */
+    /** The report of [period]; null while another period loads, so a figure is never shown under the wrong period. */
     val report: SpendingReport? = null,
     val loading: Boolean = false,
     /** The last load failed: what is shown stays, and Retry loads again. */
@@ -36,20 +36,29 @@ class SpendingViewModel(private val accounts: AccountRepository, private val loa
     private val state = MutableStateFlow(SpendingUiState())
     val uiState: StateFlow<SpendingUiState> = state.asStateFlow()
     private var loading: Job? = null
+    private var started = false
 
     init {
         viewModelScope.launch {
             combine(accounts.accounts, accounts.activeAccountId) { list, id -> list.firstOrNull { it.id == id } }
                 .distinctUntilChanged { old, new -> old?.id == new?.id && old?.signedIn == new?.signedIn }
-                .collect { account -> loading?.cancel(); state.value = SpendingUiState(account = account) }
+                .collect { account ->
+                    loading?.cancel()
+                    state.value = SpendingUiState(account = account, period = state.value.period)
+                    // Another account, or the same one signed in again, while the tab is shown: its spending loads.
+                    if (started) load()
+                }
         }
     }
 
-    fun start() = load()
+    fun start() {
+        started = true
+        load()
+    }
 
     fun setPeriod(period: SpendPeriod) {
         if (state.value.period == period) return
-        state.update { it.copy(period = period) }
+        state.update { it.copy(period = period, report = null) }
         load()
     }
 
@@ -68,7 +77,7 @@ class SpendingViewModel(private val accounts: AccountRepository, private val loa
                 throw error
             } catch (error: Exception) {
                 // An expired session is shown by the signed-in shell; here, what is shown stays and Retry loads again.
-                state.update { if (it.account?.id != account.id) it else it.copy(loading = false, error = true) }
+                state.update { if (it.account?.id != account.id || it.period != period) it else it.copy(loading = false, error = true) }
             }
         }
     }
@@ -92,18 +101,35 @@ class ActivityViewModel(private val accounts: AccountRepository, private val loa
     private val state = MutableStateFlow(ActivityUiState())
     val uiState: StateFlow<ActivityUiState> = state.asStateFlow()
     private var job: Job? = null
+    private var started = false
+
+    /** The last failure was an older page's: Retry asks that page again and keeps what is read. */
+    private var moreFailed = false
 
     init {
         viewModelScope.launch {
             combine(accounts.accounts, accounts.activeAccountId) { list, id -> list.firstOrNull { it.id == id } }
                 .distinctUntilChanged { old, new -> old?.id == new?.id && old?.signedIn == new?.signedIn }
-                .collect { account -> job?.cancel(); state.value = ActivityUiState(account = account) }
+                .collect { account ->
+                    job?.cancel()
+                    state.value = ActivityUiState(account = account)
+                    // Another account, or the same one signed in again, while the tab is shown: its feed loads.
+                    if (started) load()
+                }
         }
     }
 
     /** Loads the first page again; the older pages already read are replaced by it. */
     fun start() {
+        started = true
+        load()
+    }
+
+    fun retry() = if (moreFailed && state.value.next != null) loadMore() else load()
+
+    private fun load() {
         val account = state.value.account?.takeIf { it.signedIn } ?: return
+        moreFailed = false
         job?.cancel()
         state.update { it.copy(refreshing = true, loadingMore = false, error = false) }
         job = viewModelScope.launch {
@@ -118,14 +144,13 @@ class ActivityViewModel(private val accounts: AccountRepository, private val loa
         }
     }
 
-    fun retry() = start()
-
     /** The older page, from the cursor the last page gave; its lines already shown are not repeated. */
     fun loadMore() {
         val current = state.value
         val account = current.account?.takeIf { it.signedIn } ?: return
         val cursor = current.next ?: return
         if (current.loadingMore || current.refreshing) return
+        moreFailed = false
         state.update { it.copy(loadingMore = true, error = false) }
         job = viewModelScope.launch {
             try {
@@ -138,6 +163,7 @@ class ActivityViewModel(private val accounts: AccountRepository, private val loa
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Exception) {
+                if (state.value.account?.id == account.id) moreFailed = true
                 state.update { if (it.account?.id != account.id) it else it.copy(loadingMore = false, error = true) }
             }
         }

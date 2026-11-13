@@ -80,6 +80,23 @@ class SpendingScreenTest {
     }
 
     @Test
+    fun aPeriodThatFailsNeverShowsTheOtherPeriodsFigures() {
+        val server = server()
+        signedIn(server) {
+            waitFor("tab-spending")
+            onNodeWithTag("tab-spending").performSemanticsAction(SemanticsActions.OnClick)
+            waitForText("$412.80")
+            server.failures["GET /api/v1/spending"] = 503 to "unavailable"
+            onNodeWithTag("spending-period-week").performSemanticsAction(SemanticsActions.OnClick)
+            waitFor("spending-error-state")
+            onNodeWithTag("spending-total").assertDoesNotExist()
+            server.failures.clear()
+            onNodeWithTag("spending-retry").performSemanticsAction(SemanticsActions.OnClick)
+            waitForText("$103.20")
+        }
+    }
+
+    @Test
     fun aFailedSpendingIsRetriedAndAServerWithoutBudgetsHasNoTab() {
         val server = server().also { it.failures["GET /api/v1/spending"] = 503 to "unavailable" }
         signedIn(server) {

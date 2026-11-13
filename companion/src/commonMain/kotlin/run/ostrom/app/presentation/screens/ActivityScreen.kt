@@ -99,7 +99,7 @@ fun ActivityScreen(viewModel: ActivityViewModel = koinViewModel()) {
         ) {
             items(state.items, key = { "activity-${it.id}" }) { ActivityRow(it, today, language) }
             item(key = "end") {
-                BusyRow(state.loadingMore || (!state.loaded && !state.error))
+                BusyRow(state.loadingMore || (state.refreshing && !state.loaded))
                 if (state.loaded && state.items.isEmpty() && !state.error) EmptyState(
                     PhosphorIcons.Regular.Pulse, stringResource(Res.string.activity_empty_title), stringResource(Res.string.activity_empty), Modifier.testTag("activity-empty"),
                 )

@@ -9,6 +9,7 @@ import kotlin.math.roundToLong
  * English, `1 204,50 $` in French (narrow no-break spaces, as the French typography wants).
  */
 fun formatUsd(usd: Double, language: String): String {
+    if (!usd.isFinite()) return "—"
     val cents = (abs(usd) * 100).roundToLong()
     val whole = (cents / 100).toString()
     val fraction = (cents % 100).toString().padStart(2, '0')
