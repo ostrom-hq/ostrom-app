@@ -106,7 +106,7 @@ jobs:
         if: github.event_name != 'pull_request'
         # Xcode's build phase runs Gradle without arguments: ostrom-core goes where settings.gradle.kts looks by default.
         run: >-
-          ln -s "$PWD/.core" ../ostrom-core &&
+          ln -sfn "$PWD/.core" ../ostrom-core &&
           xcodebuild -project companion-ios/Ostrom.xcodeproj -scheme Ostrom -configuration Debug
           -sdk iphonesimulator -destination 'generic/platform=iOS Simulator'
           CODE_SIGNING_ALLOWED=NO build

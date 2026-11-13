@@ -4,6 +4,7 @@ package run.ostrom.app.domain
 import kotlinx.coroutines.test.runTest
 import run.ostrom.app.CountingRandom
 import run.ostrom.app.FakeAuthRepository
+import run.ostrom.app.FixedClock
 import run.ostrom.app.ORIGIN
 import run.ostrom.app.SERVER
 import run.ostrom.app.SequenceIds
@@ -37,6 +38,7 @@ class SignInUseCasesTest {
     private val accounts = accounts()
     private val credentials = MemoryCredentialStore()
     private val complete = CompleteSignInUseCase(auth, accounts, credentials, SequenceIds())
+    private val clock = FixedClock()
     private val state = base64Url(CountingRandom.nextBytes(16))
 
     private fun browser(answer: (url: String) -> String?) = BrowserSignInUseCase(auth, BrowserSignIn { url, scheme ->
@@ -96,7 +98,7 @@ class SignInUseCasesTest {
     fun aServerWithoutGitHubIsRefusedBeforeTheBrowserOpens() = runTest {
         val noGitHub = SERVER.copy(methods = setOf("email"))
         assertFailsWith<AppException.NoGitHubSignIn> { browser { error("opened") }(noGitHub) }
-        assertFailsWith<AppException.NoGitHubSignIn> { DeviceSignInUseCase(auth, complete) {}.start(noGitHub) }
+        assertFailsWith<AppException.NoGitHubSignIn> { DeviceSignInUseCase(auth, complete, clock) {}.start(noGitHub) }
     }
 
     @Test
@@ -153,7 +155,7 @@ class SignInUseCasesTest {
             { throw AppException.Server(503, null) },
             { DevicePoll.Done(NewSession("osm_cli", "ada", null, null)) },
         )
-        val device = DeviceSignInUseCase(auth, complete) { pauses += it }
+        val device = DeviceSignInUseCase(auth, complete, clock) { clock.now += it; pauses += it }
         val account = device.await(device.start(SERVER))
         assertEquals(SignInMethod.DEVICE, account.method)
         assertEquals(listOf(5_000L, 5_000L, 10_000L, 10_000L, 10_000L), pauses)
@@ -163,7 +165,7 @@ class SignInUseCasesTest {
     @Test
     fun theDeviceFlowEndsWhenTheCodeExpiresOrIsRefused() = runTest {
         auth.polls = MutableList(20) { { DevicePoll.Pending() } }
-        val device = DeviceSignInUseCase(auth, complete) {}
+        val device = DeviceSignInUseCase(auth, complete, clock) { clock.now += it }
         assertFailsWith<AppException.SignInExpired> { device.await(device.start(SERVER)) }
         auth.polls = mutableListOf({ throw AppException.Unreachable() }, { throw AppException.SignInDenied() })
         assertFailsWith<AppException.SignInDenied> { device.await(device.start(SERVER)) }
@@ -178,5 +180,8 @@ class SignInUseCasesTest {
         assertNull(queryOfReturn("ostrom://auth/callback2?code=x"))
         assertEquals("100%", percentDecode("100%"))
         assertEquals("é", percentDecode("%C3%A9"))
+        assertEquals("%-1", percentDecode("%-1"))
+        assertEquals("\uD83D\uDE00", percentDecode("\uD83D\uDE00"))
+        assertNull(queryOfReturn("ostrom://auth/callback?state=a&state=b"))
     }
 }

@@ -18,8 +18,13 @@ class AndroidBrowserSignIn(private val context: Context) : BrowserSignIn {
         val redirect = AuthRedirects.begin(callbackScheme)
         val tab = CustomTabsIntent.Builder().setShowTitle(true).build()
         tab.intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        tab.launchUrl(context, Uri.parse(url))
-        return redirect.await()
+        return try {
+            tab.launchUrl(context, Uri.parse(url))
+            redirect.await()
+        } finally {
+            // Cancelled (the screen left) or failed to open: no later redirect is taken for this attempt.
+            AuthRedirects.forget(redirect)
+        }
     }
 }
 
@@ -38,6 +43,13 @@ object AuthRedirects {
             scheme = callbackScheme
             left = false
         }
+    }
+
+    @Synchronized
+    internal fun forget(attempt: CompletableDeferred<String?>) {
+        if (pending !== attempt) return
+        pending = null
+        left = false
     }
 
     /** A link opened the app: the redirect of the waiting sign-in when it has its scheme. True when it was taken. */

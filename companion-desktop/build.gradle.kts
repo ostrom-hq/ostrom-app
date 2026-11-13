@@ -23,7 +23,9 @@ dependencies {
 // Installers take MAJOR.MINOR.PATCH only, and macOS refuses a major version of 0: packaging a 0.x fails instead of
 // publishing another number than the app's.
 val desktopPackageVersion = project.version.toString().substringBefore('-')
-tasks.matching { it.name.startsWith("package") || it.name.startsWith("create") && it.name.endsWith("Distributable") }.configureEach {
+// The runnable jar (packageUberJarForCurrentOS, what CI builds on main) has no such limit and is not guarded.
+val installerTasks = Regex("""(package|packageRelease)(Dmg|Msi|Exe|Deb|Rpm|Pkg|DistributionForCurrentOS)|create(Release)?Distributable""")
+tasks.matching { installerTasks.matches(it.name) }.configureEach {
     val packaged = desktopPackageVersion
     doFirst {
         check(!packaged.startsWith("0.")) { "Ostrom Desktop installers refuse a major version of 0: package version 1.0.0 or later (got $packaged)." }

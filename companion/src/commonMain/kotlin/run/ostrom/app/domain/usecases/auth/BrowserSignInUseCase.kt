@@ -64,11 +64,14 @@ internal fun queryOfReturn(url: String): Map<String, String>? {
     if (url.substring(0, end) != BrowserSignInUseCase.REDIRECT_URI) return null
     val query = url.substring(end).removePrefix("?").substringBefore('#')
     if (query.isEmpty()) return emptyMap()
-    return query.split('&').filter { it.isNotEmpty() }.associate { pair ->
+    val pairs = query.split('&').filter { it.isNotEmpty() }.map { pair ->
         val name = pair.substringBefore('=')
         val value = if ('=' in pair) pair.substringAfter('=') else ""
         percentDecode(name) to percentDecode(value)
     }
+    // A name given twice (a second `state` or `code`) makes the return ambiguous: it is no return of this app.
+    if (pairs.map { it.first }.toSet().size != pairs.size) return null
+    return pairs.toMap()
 }
 
 /** `application/x-www-form-urlencoded` decoding; a malformed escape is kept as it is. */
@@ -77,12 +80,17 @@ internal fun percentDecode(value: String): String {
     var index = 0
     while (index < value.length) {
         val char = value[index]
-        val hex = if (char == '%' && index + 2 < value.length) value.substring(index + 1, index + 3).toIntOrNull(16) else null
+        val digits = if (char == '%' && index + 2 < value.length) value.substring(index + 1, index + 3) else null
+        val hex = digits?.takeIf { it.all { digit -> digit in HEX_DIGITS } }?.toInt(16)
         when {
             char == '+' -> { bytes += ' '.code.toByte(); index++ }
             hex != null -> { bytes += hex.toByte(); index += 3 }
+            // A surrogate pair is encoded whole, never as two lone halves.
+            char.isHighSurrogate() && index + 1 < value.length -> { bytes += value.substring(index, index + 2).encodeToByteArray().toList(); index += 2 }
             else -> { bytes += char.toString().encodeToByteArray().toList(); index++ }
         }
     }
     return bytes.toByteArray().decodeToString()
 }
+
+private const val HEX_DIGITS = "0123456789abcdefABCDEF"

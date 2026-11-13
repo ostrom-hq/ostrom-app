@@ -6,6 +6,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import run.ostrom.app.domain.models.Account
 import run.ostrom.app.domain.models.AppException
+import run.ostrom.app.domain.services.Clock
 import run.ostrom.app.domain.models.DeviceLogin
 import run.ostrom.app.domain.models.ServerInfo
 import run.ostrom.app.domain.models.SignInMethod
@@ -21,6 +22,7 @@ import run.ostrom.app.domain.repositories.DevicePoll
 class DeviceSignInUseCase(
     private val auth: AuthRepository,
     private val complete: CompleteSignInUseCase,
+    private val clock: Clock,
     private val sleep: suspend (Long) -> Unit = { delay(it) },
 ) {
     suspend fun start(server: ServerInfo): DeviceLogin {
@@ -29,12 +31,12 @@ class DeviceSignInUseCase(
     }
 
     suspend fun await(login: DeviceLogin): Account {
-        var waited = 0L
+        // Measured on the clock: the calls themselves take time, up to their timeout when the server does not answer.
+        val deadline = clock.nowMillis() + login.expiresInMillis
         var pause = login.intervalMillis
         var lost: Exception? = null
-        while (waited < login.expiresInMillis) {
+        while (clock.nowMillis() + pause <= deadline) {
             sleep(pause)
-            waited += pause
             val poll = try {
                 auth.pollDeviceLogin(login.server.origin, login.deviceCode).also { lost = null }
             } catch (error: CancellationException) {

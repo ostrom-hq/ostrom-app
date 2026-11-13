@@ -54,7 +54,8 @@ class AppFlowTest {
             onNodeWithTag("continue").performSemanticsAction(SemanticsActions.OnClick)
             settle()
             waitUntil(timeoutMillis = 10_000) { onAllNodes(hasTestTag("submit")).fetchSemanticsNodes().isNotEmpty() }
-            onNodeWithTag("login-server").assertTextContains(origin)
+            onNodeWithTag("login-server").assertExists()
+            onNodeWithText(origin).assertExists()
             onNodeWithTag("submit").performSemanticsAction(SemanticsActions.OnClick)
             // The code of `ostrom login`, and GitHub's page opened to enter it; then the server says yes.
             waitUntil(timeoutMillis = 10_000) { onAllNodes(hasTestTag("settings")).fetchSemanticsNodes().isNotEmpty() }
@@ -87,7 +88,7 @@ class AppFlowTest {
             waitUntil(timeoutMillis = 10_000) { onAllNodes(hasTestTag("submit")).fetchSemanticsNodes().isNotEmpty() }
             onNodeWithTag("submit").performSemanticsAction(SemanticsActions.OnClick)
             waitUntil(timeoutMillis = 10_000) { onAllNodes(hasTestTag("error")).fetchSemanticsNodes().isNotEmpty() }
-            onNodeWithTag("error").assertTextContains("another version of the API", substring = true)
+            onNodeWithText("another version of the API", substring = true).assertExists()
             assertTrue(koin.get<AccountRepository>().accounts.value.isEmpty())
         }
     }

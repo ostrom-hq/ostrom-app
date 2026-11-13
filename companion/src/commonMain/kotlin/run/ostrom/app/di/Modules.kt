@@ -50,7 +50,7 @@ val domainModule = module {
     single { CompleteSignInUseCase(get(), get(), get<DemoCredentialStore>(), get()) }
     // Resolved only where a BrowserSignIn exists (the phones' platform modules).
     single { BrowserSignInUseCase(get(), get(), get(), get()) }
-    single { DeviceSignInUseCase(get(), get()) }
+    single { DeviceSignInUseCase(get(), get(), get()) }
     single { SignOutUseCase(get(), get(), get<DemoCredentialStore>()) }
     single { RefreshAccountUseCase(get(), get(), get<DemoCredentialStore>(), get()) }
     single { AccountGuard(get()) }

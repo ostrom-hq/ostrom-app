@@ -24,7 +24,9 @@ val semver = Regex("""(\d+)\.(\d+)\.(\d+).*""").matchEntire(project.version.toSt
 val ostromVersionCode = providers.gradleProperty("ostromVersionCode").map(String::toInt)
     .orElse(maxOf(1, (semver[0] * 1_000_000 + semver[1] * 1_000 + semver[2]) * 100)).get()
 // Play's ceiling: above it the code would wrap around instead of failing.
-check(semver[0] <= 20 && ostromVersionCode in 1..2_100_000_000) { "versionCode $ostromVersionCode is outside 1..2100000000 (major versions up to 20)." }
+// Each field has its own digits: a minor or patch above 999 would carry into the next field and collide.
+check(semver[0] <= 20 && semver[1] <= 999 && semver[2] <= 999) { "Version ${project.version} does not fit versionCode (major up to 20, minor and patch up to 999)." }
+check(ostromVersionCode in 1..2_100_000_000) { "versionCode $ostromVersionCode is outside 1..2100000000." }
 // The upload key stays on the maintainer's machine (fastlane/keystore.jks, git-ignored) with its passwords in SIGNING_*.
 val uploadKeystore = rootProject.file("fastlane/keystore.jks")
 

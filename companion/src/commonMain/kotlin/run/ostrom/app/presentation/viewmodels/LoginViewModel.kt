@@ -43,6 +43,7 @@ class LoginViewModel(
     private val state = MutableStateFlow(LoginUiState(origin = route.origin))
     val uiState: StateFlow<LoginUiState> = state.asStateFlow()
     private var attempt: Job? = null
+    private var reading: Job? = null
 
     /** Whether this platform signs in with the browser (a phone) rather than a code (a computer). */
     val usesBrowser: Boolean get() = browser != null
@@ -53,8 +54,9 @@ class LoginViewModel(
 
     /** Reads the server again (it could not be reached). */
     fun loadServer() {
+        reading?.cancel()
         state.update { it.copy(error = null) }
-        viewModelScope.launch {
+        reading = viewModelScope.launch {
             try {
                 val server = inspect(state.value.origin)
                 state.update { it.copy(server = server) }

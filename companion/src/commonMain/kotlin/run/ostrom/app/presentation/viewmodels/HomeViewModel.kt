@@ -5,6 +5,7 @@ package run.ostrom.app.presentation.viewmodels
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -51,25 +52,28 @@ class HomeViewModel(
 ) : ViewModel() {
     private val status = MutableStateFlow(HomeUiState())
     private var checkedAt = Long.MIN_VALUE
+    private var foreground: Job? = null
     val uiState: StateFlow<HomeUiState> = combine(accounts.accounts, accounts.activeAccountId, status) { list, active, status ->
         status.copy(account = list.firstOrNull { it.id == active })
     }.stateIn(viewModelScope, SharingStarted.Eagerly, HomeUiState())
 
     init {
         viewModelScope.launch {
-            accounts.activeAccountId.collectLatest { id -> if (id != null) refresh(id) else status.value = HomeUiState() }
+            accounts.activeAccountId.collectLatest { id ->
+                foreground?.cancel()
+                if (id != null) refresh(id) else status.value = HomeUiState()
+            }
         }
     }
 
     /** The app came back to the foreground: the server is asked again if it was not asked recently. */
     fun onForeground() {
         val id = accounts.activeAccountId.value ?: return
-        if (status.value.refreshing || clock.nowMillis() - checkedAt < RECHECK_AFTER_MILLIS) return
-        viewModelScope.launch { refresh(id) }
+        if (status.value.refreshing || foreground?.isActive == true || clock.nowMillis() - checkedAt < RECHECK_AFTER_MILLIS) return
+        foreground = viewModelScope.launch { refresh(id) }
     }
 
     private suspend fun refresh(id: String) {
-        checkedAt = clock.nowMillis()
         status.value = HomeUiState(capabilities = features.cached(id), refreshing = true)
         status.value = try {
             val account = refreshAccount(id)
@@ -78,6 +82,8 @@ class HomeViewModel(
             } else {
                 val capabilities = features.capabilities(id, refresh = true)
                 requireSupportedApi(capabilities.apiVersion)
+                // Only an answer counts as checked: offline, the next return to the foreground asks again.
+                checkedAt = clock.nowMillis()
                 HomeUiState(capabilities = capabilities)
             }
         } catch (error: CancellationException) {
@@ -85,6 +91,7 @@ class HomeViewModel(
             status.value = HomeUiState(capabilities = features.cached(id))
             throw error
         } catch (error: AppException.UnsupportedApi) {
+            checkedAt = clock.nowMillis()
             HomeUiState(incompatible = Incompatible(error.apiVersion))
         } catch (error: Exception) {
             HomeUiState(capabilities = features.cached(id), error = error.userMessage())
