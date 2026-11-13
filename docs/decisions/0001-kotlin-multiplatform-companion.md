@@ -48,13 +48,19 @@ history keeps them.
 - **One language with the rest of Ostrom.** ostrom-core, ostrom-server and ostrom-cli are Kotlin Multiplatform: the
   app reuses the contract's Kotlin models and the typed client instead of a generated TypeScript copy of the contract.
 
-## Options set aside
+## The options compared
 
-- Keep React Native for mobile and write a separate desktop app: two UIs to write and keep alike, the opposite of the
-  requirement.
-- React Native + react-native-macos + react-native-windows: no Linux, outside Expo, three native shells to maintain.
-- Electron around react-native-web: not the same app on the desktop, heavier, and a second release pipeline.
-- Flutter or another stack: a rewrite as well, without TeamCode's code to port and without the shared Kotlin client.
+| Option | For | Against |
+| --- | --- | --- |
+| **Kotlin Multiplatform + Compose Multiplatform** (chosen) | One UI and one logic for iOS, iPad, Android and the three desktops: the iPad and desktop apps come with the same code, only the layout adapts to the window size class. TeamCode's companion already exists in this stack and does what the team uses (porting instead of rebuilding). Same language as ostrom-core, ostrom-server and ostrom-cli: the contract's Kotlin models and one typed client shared with the CLI. Native binaries on every platform, no web view for the UI. | A rewrite: the React Native app's 32,000 lines are not reused as code (their behaviour is ported). Compose on iOS is younger than SwiftUI or React Native on iOS; a few iOS-specific pieces stay in Swift (the Xcode shell, keychain, push). Contributors need Kotlin rather than TypeScript. |
+| Keep React Native (Expo), add react-native-macos and react-native-windows | Keeps the existing code and the TypeScript skills; mature on iOS and Android. | No Linux at all. Both desktop ports are maintained outside Expo (no managed workflow, no Expo modules there): three native shells to keep in step, and each library used must support each port. Not the "same app everywhere" with equal confidence. |
+| Keep React Native for mobile, wrap react-native-web in Electron for the desktop | Linux, macOS and Windows; reuses part of the TypeScript. | The desktop app is a web page in a Chromium shell: different runtime, different behaviour from the phone, heavier, its own packaging, updates and security surface, and the React Native code has to work on react-native-web too. |
+| A separate desktop app (native or web) beside the React Native mobile app | Each app can use its platform's best tools. | Two UIs to write and keep alike: the opposite of the requirement. |
+| Flutter (or another cross-platform toolkit) | One UI for mobile and desktop as well. | A rewrite too, without TeamCode's code to port and without the shared Kotlin client; a fourth language in Ostrom. |
+
+Kotlin Multiplatform is the only option that gives the identical app on every required platform, from one code base,
+while reusing what already exists (TeamCode's companion, Ostrom's Kotlin contract and client). Its main cost, a
+rewrite, is lower than it looks because the app to reach is already written in that stack.
 
 ## Consequences
 
