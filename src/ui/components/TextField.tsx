@@ -8,11 +8,12 @@ interface TextFieldProps {
     readonly value: string
     readonly onChangeText: (value: string) => void
     readonly error?: string | undefined
-    readonly keyboardType?: "default" | "url"
+    readonly keyboardType?: "default" | "url" | "decimal-pad"
+    readonly placeholder?: string | undefined
     readonly testID?: string
 }
 
-export function TextField({label, value, onChangeText, error, keyboardType = "default", testID}: TextFieldProps): React.JSX.Element {
+export function TextField({label, value, onChangeText, error, keyboardType = "default", placeholder, testID}: TextFieldProps): React.JSX.Element {
     const {colors} = useTheme()
     return (
         <View style={styles.field}>
@@ -23,6 +24,8 @@ export function TextField({label, value, onChangeText, error, keyboardType = "de
                 autoCorrect={false}
                 keyboardType={keyboardType}
                 onChangeText={onChangeText}
+                placeholder={placeholder}
+                placeholderTextColor={colors.textSubtle}
                 style={[
                     styles.input,
                     {color: colors.text, backgroundColor: colors.surface, borderColor: error === undefined ? colors.border : colors.danger},

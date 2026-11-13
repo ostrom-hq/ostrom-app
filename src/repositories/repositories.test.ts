@@ -12,6 +12,7 @@ import {NotificationsRepositoryImpl} from "./NotificationsRepositoryImpl"
 import {ProfileRepositoryImpl} from "./ProfileRepositoryImpl"
 import {ReceiptsRepositoryImpl} from "./ReceiptsRepositoryImpl"
 import {SpendingRepositoryImpl} from "./SpendingRepositoryImpl"
+import {WaitsRepositoryImpl} from "./WaitsRepositoryImpl"
 
 const server = setupServer()
 const http = new HttpClientImpl({baseUrl: MOCK_BASE_URL, token: () => "ost_mock_token"})
@@ -258,5 +259,58 @@ describe("ProfileRepositoryImpl", () => {
         const account = await new ProfileRepositoryImpl(http).account()
         expect(account).toMatchObject({login: "rev-b", displayName: "Reviewer B", providers: ["github"]})
         expect(account.emails).toEqual([{email: "rev-b@acme.test", verified: true}])
+    })
+})
+
+describe("WaitsRepositoryImpl", () => {
+    const waits = new WaitsRepositoryImpl(http)
+
+    it("lists what is asked of me, newest first, by status", async () => {
+        const open = await waits.list("open")
+        expect(open.items.map((wait) => wait.question.title)).toEqual(["Which database for the cache?", "Ship the migration?"])
+        expect(open.next).toBeUndefined()
+        expect((await waits.list("answered")).items.map((wait) => wait.status)).toEqual(["resolved"])
+        expect((await waits.list("cancelled")).items.map((wait) => wait.status)).toEqual(["cancelled"])
+    })
+
+    it("asks for the caller's waits with the status, the page size and the cursor", async () => {
+        const seen: URL[] = []
+        server.use(
+            httpMock.get(`${MOCK_BASE_URL}/api/v1/waits`, ({request}) => {
+                seen.push(new URL(request.url))
+                return HttpResponse.json({items: []})
+            }),
+        )
+        await waits.list("answered", {cursor: "0b1f6c1e-0000-4000-8000-000000000003", limit: 20})
+        await waits.list("open")
+        expect(Object.fromEntries(seen[0]?.searchParams ?? [])).toEqual({mine: "true", status: "resolved", before: "0b1f6c1e-0000-4000-8000-000000000003", limit: "20"})
+        expect(Object.fromEntries(seen[1]?.searchParams ?? [])).toEqual({mine: "true", status: "open"})
+    })
+
+    it("reads a keyset page, then the older one", async () => {
+        const first = await waits.list("open", {limit: 1})
+        expect(first.items.map((wait) => wait.id)).toEqual(["0b1f6c1e-0000-4000-8000-000000000003"])
+        expect(first.next).toBe("0b1f6c1e-0000-4000-8000-000000000003")
+        const older = await waits.list("open", {limit: 1, cursor: first.next})
+        expect(older.items.map((wait) => wait.id)).toEqual(["0b1f6c1e-0000-4000-8000-000000000002"])
+        expect(older.next).toBeUndefined()
+        expect(await refusal(waits.list("open", {limit: 101}))).toBe("invalid_wait")
+    })
+
+    it("answers with the action and the values, and the first answer wins", async () => {
+        const answered = await waits.answer("0b1f6c1e-0000-4000-8000-000000000003", "choose", {store: "redis"})
+        expect(answered).toMatchObject({status: "resolved", answer: {action: "choose", values: {store: "redis"}, author: "rev-b"}})
+        expect(await refusal(waits.answer("0b1f6c1e-0000-4000-8000-000000000003", "choose", {store: "redis"}))).toBe("wait_closed")
+        expect(await refusal(waits.answer("0b1f6c1e-0000-4000-8000-000000000002", "maybe", {}))).toBe("invalid_answer")
+        expect(await refusal(waits.answer("nope", "choose", {}))).toBe("not_found")
+    })
+
+    it("reads a state of a newer server as unknown instead of failing the list", async () => {
+        server.use(
+            httpMock.get(`${MOCK_BASE_URL}/api/v1/waits`, () =>
+                HttpResponse.json({items: [{id: "w", kind: "human_request", status: "expired", assignee: "m", question: {title: "Q"}, createdAt: "2026-11-13T09:00:00Z"}]}),
+            ),
+        )
+        expect((await waits.list("open")).items.map((wait) => wait.status)).toEqual(["unknown"])
     })
 })

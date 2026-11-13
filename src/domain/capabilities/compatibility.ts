@@ -18,6 +18,8 @@ export const FEATURES = {
     receipts: "receipts.v1",
     /** The spending against budgets. */
     budgets: "budgets.v1",
+    /** The waits asked of the person ("Waiting for you"). */
+    waits: "waits.v1",
 } as const
 export type Feature = (typeof FEATURES)[keyof typeof FEATURES]
 

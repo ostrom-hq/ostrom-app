@@ -17,6 +17,7 @@ import {PinnedReceiptsRepository} from "@/repositories/PinnedReceiptsRepository"
 import {ProfileRepositoryImpl} from "@/repositories/ProfileRepositoryImpl"
 import {ReceiptsRepositoryImpl} from "@/repositories/ReceiptsRepositoryImpl"
 import {SpendingRepositoryImpl} from "@/repositories/SpendingRepositoryImpl"
+import {WaitsRepositoryImpl} from "@/repositories/WaitsRepositoryImpl"
 import type {AppServices, Repositories} from "@/services/AppServices"
 import {BiometricGateImpl} from "@/services/biometrics/BiometricGateImpl"
 import {PushServiceImpl} from "@/services/push/PushServiceImpl"
@@ -56,6 +57,7 @@ export function repositoriesOver(http: HttpClient): Repositories {
         profile: new ProfileRepositoryImpl(http),
         receipts: new ReceiptsRepositoryImpl(http),
         spending: new SpendingRepositoryImpl(http),
+        waits: new WaitsRepositoryImpl(http),
     }
 }
 
