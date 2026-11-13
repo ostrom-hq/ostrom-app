@@ -6,16 +6,23 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
+import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
+import org.koin.core.parameter.parametersOf
+import run.ostrom.app.domain.usecases.approvals.PhoneUnlock
 import run.ostrom.app.presentation.screens.AddServerScreen
 import run.ostrom.app.presentation.screens.LoginScreen
 import run.ostrom.app.presentation.screens.MainScreen
+import run.ostrom.app.presentation.screens.RequestScreen
+import run.ostrom.app.presentation.viewmodels.RequestViewModel
 import run.ostrom.app.presentation.viewmodels.RootViewModel
 
 /**
@@ -23,7 +30,10 @@ import run.ostrom.app.presentation.viewmodels.RootViewModel
  * screens pushed above them to add another account or sign one in again.
  */
 @Composable
-fun OstromNavHost(rootViewModel: RootViewModel = koinViewModel()) {
+fun OstromNavHost(rootViewModel: RootViewModel = koinViewModel(), unlock: PhoneUnlock = koinInject()) {
+    // The app went to the background: a fresh unlock was for the person who left it (never on a pause, which Face ID's
+    // sheet or the biometric prompt cause in the middle of an unlock).
+    LifecycleEventEffect(Lifecycle.Event.ON_STOP) { unlock.onBackground() }
     val hasAccounts by rootViewModel.hasAccounts.collectAsStateWithLifecycle()
     val navController = rememberNavController()
     // Captured once: the first sign-in navigates explicitly instead of rebuilding the graph.
@@ -56,7 +66,13 @@ fun OstromNavHost(rootViewModel: RootViewModel = koinViewModel()) {
             MainScreen(
                 onAddAccount = { navController.navigate(AddServerRoute) },
                 onSignInAgain = { account -> navController.navigate(LoginRoute(account.origin, account.id)) },
+                onOpenRequest = { accountId, id -> navController.navigate(RequestRoute(accountId, id)) },
             )
+        }
+        composable<RequestRoute> { entry ->
+            val route = entry.toRoute<RequestRoute>()
+            val viewModel: RequestViewModel = koinViewModel { parametersOf(route) }
+            RequestScreen(viewModel, onBack = { navController.popBackStack() })
         }
     }
 }

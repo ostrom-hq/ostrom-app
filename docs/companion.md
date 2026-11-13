@@ -42,6 +42,27 @@ too old to have the route, replaces the app with a blocking screen whose only ac
 asked again when the app comes back to the foreground, at most every ten minutes; an unreachable server changes
 nothing.
 
+## Approvals
+
+The first tab (`gates.v1`) lists what waits for the person's yes, then what was answered lately. A row only opens the
+request (`RequestRoute(accountId, id)`, which a push or a link can open too). The request shows who asks, the gate, the
+command, the commit, the size of the change, the commits, checks and evidence before any button.
+
+- The answer is bound to the digest of what was first read: a refresh that changes the digest, who asks, the command or
+  the gate holds every answer until the person taps "I read it again".
+- No yes when the change is not shown in full (`diffTruncated`) or the server does not take the person's yes
+  (`you.canApprove`), said in the person's language. A no needs its reason, which the agent reads.
+- Before an answer the device unlocks (`PhoneUnlock`): the biometrics (`BiometricGate`: BiometricPrompt with the device
+  credential on Android, `LAContext` `deviceOwnerAuthentication` on iOS) give back the unlock key kept at sign-in, and
+  `POST /auth/mobile/unlock` records it. A yes always unlocks, bound to its request. A no reuses an unlock younger than
+  four minutes, unless the action is not low risk. Going to the background ends it. The key itself stays in the
+  credential store (Keychain, Android Keystore); the prompt is what the app asks before reading it.
+- The desktop has no biometrics and no unlock key (device-flow sign-in): its answer goes with its token, and the
+  server decides. A yes the server wants confirmed (`403 step_up_required`) is sent to the console.
+- Every refusal is worded by its key, never the server's text. `step_up_required` with `requestBound` asks to unlock
+  again, without it to open the console (`<origin>/yes/<id>`, whose address is shown to copy when no browser opens). A
+  self-approval, an answer already given, `shown_digest_mismatch`, `org_required` and offline each have their sentence.
+
 ## Tests
 
 - `companion/src/commonTest`: use cases with fakes, repositories against Ktor's `MockEngine`.
@@ -57,7 +78,7 @@ What the React Native app did, what TeamCode's companion does that an Ostrom ser
 | Area | Feature | Status |
 | --- | --- | --- |
 | Sign-in (phone browser, desktop device flow), accounts, organizations, secure storage, capabilities check, incompatible server, settings with versions, theme, English and French, demo | none | Done |
-| Approvals inbox and request, yes after a biometric unlock bound to the request (`POST /auth/mobile/unlock` with `requestId`) | `gates.v1` | To port from the React Native app |
+| Approvals inbox and request, yes after a biometric unlock bound to the request (`POST /auth/mobile/unlock` with `requestId`) | `gates.v1` | Ported (see [Approvals](#approvals)) |
 | Waiting for you (waits asked of the person, answer with actions and values) | `waits.v1` | Ported from TeamCode's `WaitsScreen` (open, answered and cancelled filters, in-progress timers and webhooks, tab badge). Loaded at each return to the app until the server serves its event feed; no link to the session (no sessions screen yet), no withdraw (no route) |
 | History: receipts, verified on the device | `receipts.v1` | To port |
 | Spending | `budgets.v1` | To port |

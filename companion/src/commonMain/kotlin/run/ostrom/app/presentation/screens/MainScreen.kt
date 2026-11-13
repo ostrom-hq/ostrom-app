@@ -35,6 +35,7 @@ import com.adamglin.PhosphorIcons
 import com.adamglin.phosphoricons.Regular
 import com.adamglin.phosphoricons.regular.Bell
 import com.adamglin.phosphoricons.regular.GearSix
+import com.adamglin.phosphoricons.regular.Tray
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
@@ -55,6 +56,7 @@ import run.ostrom.app.presentation.viewmodels.words
 import run.ostrom.app.resources.Res
 import run.ostrom.app.resources.home_signed_out
 import run.ostrom.app.resources.home_sign_in_again
+import run.ostrom.app.resources.tab_inbox
 import run.ostrom.app.resources.tab_settings
 import run.ostrom.app.resources.tab_waits
 
@@ -63,6 +65,7 @@ import run.ostrom.app.resources.tab_waits
  * tabs every server has.
  */
 enum class MainTab(val feature: String?, val label: StringResource, val icon: ImageVector) {
+    INBOX(Features.GATES, Res.string.tab_inbox, PhosphorIcons.Regular.Tray),
     WAITING(Features.WAITS, Res.string.tab_waits, PhosphorIcons.Regular.Bell),
     SETTINGS(null, Res.string.tab_settings, PhosphorIcons.Regular.GearSix),
 }
@@ -78,6 +81,7 @@ internal fun HomeUiState.tabs(): List<MainTab> = MainTab.entries.filter { tab ->
 fun MainScreen(
     onAddAccount: () -> Unit,
     onSignInAgain: (Account) -> Unit,
+    onOpenRequest: (accountId: String, id: String) -> Unit = { _, _ -> },
     viewModel: HomeViewModel = koinViewModel(),
     waits: WaitsViewModel = koinViewModel(),
 ) {
@@ -126,6 +130,7 @@ fun MainScreen(
                 state.error?.let { Banner(it.words(), Tone.DANGER, Modifier.padding(horizontal = 12.dp, vertical = 6.dp).testTag("home-error")) }
                 Box(Modifier.weight(1f)) {
                     when (tab) {
+                        MainTab.INBOX -> InboxScreen(onOpen = onOpenRequest, onOpenSettings = { selected = MainTab.SETTINGS })
                         MainTab.WAITING -> WaitsScreen(waits)
                         MainTab.SETTINGS -> SettingsScreen(onAddAccount = onAddAccount, onSignInAgain = onSignInAgain)
                     }

@@ -132,6 +132,10 @@ class WaitsScreenTest {
         testApp(server) {
             onNodeWithTag("try-demo").performSemanticsAction(SemanticsActions.OnClick)
             settle()
+            // The demo serves the approvals too, whose inbox is the first tab.
+            waitFor("tab-waiting")
+            onNodeWithTag("tab-waiting").performSemanticsAction(SemanticsActions.OnClick)
+            settle()
             waitFor("wait-w3")
             onNodeWithTag("wait-option-store-App Store").performScrollTo().performSemanticsAction(SemanticsActions.OnClick)
             onNodeWithTag("wait-action-done").performScrollTo().performSemanticsAction(SemanticsActions.OnClick)
