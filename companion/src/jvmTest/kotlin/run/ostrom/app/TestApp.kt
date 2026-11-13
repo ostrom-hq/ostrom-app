@@ -99,7 +99,7 @@ class RecordingUriHandler(var fails: Boolean = false) : UriHandler {
  */
 @OptIn(ExperimentalTestApi::class)
 fun testApp(
-    server: FakeServer,
+    server: HttpClientEngineFactory<*>,
     width: Int = 1100,
     height: Int = 800,
     credentials: CredentialStore = MemoryCredentialStore(),
