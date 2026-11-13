@@ -13,6 +13,7 @@ import type {NotificationsRepository} from "@/repositories/NotificationsReposito
 import type {ProfileRepository} from "@/repositories/ProfileRepository"
 import type {ReceiptsRepository} from "@/repositories/ReceiptsRepository"
 import type {SpendingRepository} from "@/repositories/SpendingRepository"
+import type {WaitsRepository} from "@/repositories/WaitsRepository"
 import type {ServerIncompatibility, Session, SessionState, SessionStore} from "@/stores/session"
 import type {BiometricGate} from "./biometrics/BiometricGate"
 import type {PushService} from "./push/PushService"
@@ -29,6 +30,7 @@ export interface Repositories {
     readonly profile: ProfileRepository
     readonly receipts: ReceiptsRepository
     readonly spending: SpendingRepository
+    readonly waits: WaitsRepository
 }
 
 /** Everything a screen may need from outside React, injected once at the root (tests inject fakes). */
@@ -110,6 +112,7 @@ export const SIGNED_OUT_REPOSITORIES: Repositories = {
     profile: {account: refuse},
     receipts: {list: refuse, get: refuse, keys: refuse},
     spending: {report: refuse},
+    waits: {list: refuse, answer: refuse},
 }
 
 /** The repositories of the signed-in session; after sign-out, ones that refuse every call. */

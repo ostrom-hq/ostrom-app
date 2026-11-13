@@ -4,6 +4,7 @@ import type {AccountSchema, MeSchema} from "@/api/contract/account"
 import type {ApprovalSchema} from "@/api/contract/approvals"
 import type {NotificationSettingsSchema} from "@/api/contract/notifications"
 import type {SpendReportSchema} from "@/api/contract/spending"
+import type {WaitSchema} from "@/api/contract/waits"
 import receiptVectors from "@/domain/receipts/__fixtures__/receipts.json"
 
 /** Example data shaped like the server's answers. Names are neutral (`acme`, `dev-a`, `rev-b`), as in the vectors. */
@@ -191,5 +192,61 @@ export const notificationSettings: z.input<typeof NotificationSettingsSchema> = 
 export const capabilities = {
     apiVersion: 1,
     serverVersion: "0.0.0-mock",
-    features: ["notifications.push.v1", "notifications.v1", "receipts.v1", "budgets.v1", "gates.v1"],
+    features: ["notifications.push.v1", "notifications.v1", "receipts.v1", "budgets.v1", "gates.v1", "waits.v1"],
+}
+
+/** A wait with typed fields, asked of the caller by an agent: two actions, one of which needs the reason. */
+export const openWait: z.input<typeof WaitSchema> = {
+    id: "0b1f6c1e-0000-4000-8000-000000000003",
+    kind: "human_request",
+    status: "open",
+    sessionId: "ses_0001",
+    assignee: "6f1c2a4e-8b3d-4c5e-9f70-1a2b3c4d5e6f",
+    createdBy: "claude-code",
+    question: {
+        title: "Which database for the cache?",
+        body: "The cache needs a store before the release.",
+        fields: [
+            {id: "store", type: "choice", label: "Store", options: ["redis", "memcached"], allowOther: true},
+            {id: "ttl", type: "number", label: "TTL in seconds", default: 60},
+            {id: "reason", type: "text", label: "Reason"},
+        ],
+        actions: [
+            {id: "choose", label: "Choose", style: "primary", requires: ["store"]},
+            {id: "defer", label: "Not now", style: "secondary"},
+        ],
+        refs: [{kind: "url", url: "https://example.test/doc", title: "Design note"}],
+    },
+    createdAt: "2026-11-13T09:00:00Z",
+}
+
+/** A confirmation asked of the caller, older than `openWait`. */
+export const confirmWait: z.input<typeof WaitSchema> = {
+    id: "0b1f6c1e-0000-4000-8000-000000000002",
+    kind: "human_request",
+    status: "open",
+    assignee: "6f1c2a4e-8b3d-4c5e-9f70-1a2b3c4d5e6f",
+    question: {title: "Ship the migration?", actions: [{id: "yes", label: "Ship it", style: "primary"}, {id: "no", label: "Hold", style: "danger"}]},
+    createdAt: "2026-11-13T08:00:00Z",
+}
+
+export const answeredWait: z.input<typeof WaitSchema> = {
+    id: "0b1f6c1e-0000-4000-8000-000000000001",
+    kind: "human_request",
+    status: "resolved",
+    assignee: "6f1c2a4e-8b3d-4c5e-9f70-1a2b3c4d5e6f",
+    question: {title: "Use semantic versions?", fields: [{id: "ok", type: "confirm", label: "Agreed"}], actions: [{id: "send", label: "Send"}]},
+    answer: {action: "send", values: {ok: true}, author: "rev-b", answeredAt: "2026-11-12T10:00:00Z"},
+    createdAt: "2026-11-12T09:00:00Z",
+    resolvedAt: "2026-11-12T10:00:00Z",
+}
+
+export const cancelledWait: z.input<typeof WaitSchema> = {
+    id: "0b1f6c1e-0000-4000-8000-000000000000",
+    kind: "human_request",
+    status: "cancelled",
+    assignee: "6f1c2a4e-8b3d-4c5e-9f70-1a2b3c4d5e6f",
+    question: {title: "Pick a release date", fields: [{id: "date", type: "date", label: "Date"}], actions: [{id: "done", label: "Done"}]},
+    createdAt: "2026-11-11T09:00:00Z",
+    resolvedAt: "2026-11-11T12:00:00Z",
 }

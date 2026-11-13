@@ -102,3 +102,32 @@ describe("createMockServer and Ostrom-Org", () => {
         })
     })
 })
+
+describe("createMockServer and the waits", () => {
+    it("refuses an answer that is not a body, naming no action", () => {
+        const answer = createMockServer().handle({method: "POST", path: "/api/v1/waits/0b1f6c1e-0000-4000-8000-000000000003/answer", query: {}, body: {}})
+        expect(answer.status).toBe(400)
+    })
+
+    it("ends the list at a cursor that left it", () => {
+        const answer = createMockServer().handle({method: "GET", path: "/api/v1/waits", query: {before: "0b1f6c1e-0000-4000-8000-0000000000ff"}, body: undefined})
+        expect(answer).toEqual({status: 200, body: {items: []}})
+    })
+
+    it("takes an answer that names no values", () => {
+        const answer = createMockServer().handle({method: "POST", path: "/api/v1/waits/0b1f6c1e-0000-4000-8000-000000000002/answer", query: {}, body: {action: "yes"}})
+        expect(answer).toMatchObject({status: 200, body: {status: "resolved", answer: {action: "yes", values: {}}}})
+    })
+
+    it("lists the open waits when no status is asked, and none for a status nobody has", () => {
+        const listed = (query: Record<string, string>): number =>
+            z.object({items: z.array(z.unknown())}).parse(createMockServer().handle({method: "GET", path: "/api/v1/waits", query, body: undefined}).body).items.length
+        expect(listed({})).toBe(2)
+        expect(listed({status: "expired"})).toBe(0)
+    })
+
+    it("names the organization like the other routes of the organization", () => {
+        const answer = createMockServer({memberships: ["org_acme", "org_globex"]}).handle({method: "GET", path: "/api/v1/waits", query: {}, body: undefined})
+        expect(answer.status).toBe(409)
+    })
+})

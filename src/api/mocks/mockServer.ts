@@ -3,16 +3,20 @@ import type {z} from "zod"
 import type {ActivityPageSchema} from "@/api/contract/activity"
 import type {ApprovalSchema, ApprovalViewSchema} from "@/api/contract/approvals"
 import type {MyOrganizationsSchema} from "@/api/contract/organizations"
+import type {WaitSchema} from "@/api/contract/waits"
 import {
     zAnswerApprovalBody,
+    zAnswerWaitBody,
     zMobileTokenBody,
     zRegisterPushDeviceBody,
     zSetNotificationPreferencesBody,
 } from "@/api/gen/zod.gen"
+import {actionsOf} from "@/domain/waits/waitAnswer"
 import {pkceChallenge} from "@/services/signIn/pkce"
 import * as fixtures from "./fixtures"
 
 type ApprovalInput = z.input<typeof ApprovalSchema>
+type WaitInput = z.input<typeof WaitSchema>
 
 /** The unlock key the mock server gives with its token, and takes back. */
 export const MOCK_UNLOCK_KEY = "mock-unlock-key"
@@ -75,7 +79,7 @@ interface Route {
  * The routes of the app that act in the caller's organization (contract 0.1.142); the others take no header. `me` and
  * `me/organizations` never need it (core#31, server#64): they are how the app learns which organization to name.
  */
-const IN_ORG = /^\/api\/v1\/(push-devices|activity|spending|approvals|receipts(?!\/keys))(?=\/|$)/
+const IN_ORG = /^\/api\/v1\/(push-devices|activity|spending|approvals|waits|receipts(?!\/keys))(?=\/|$)/
 
 const pad = (index: number): string => String(index).padStart(4, "0")
 
@@ -126,6 +130,9 @@ export function createMockServer({memberships = [fixtures.acme.id], many = 0}: M
             ...manyApprovals(many),
         ].map((approval) => [approval.id, approval]),
     )
+    const waits = new Map<string, WaitInput>(
+        [fixtures.openWait, fixtures.confirmWait, fixtures.answeredWait, fixtures.cancelledWait].map((wait) => [wait.id, wait]),
+    )
     const receipts = [...fixtures.receipts, ...Array.from({length: many}, (_, index) => fixtures.receipts[index % fixtures.receipts.length])]
     const activity = many === 0 ? fixtures.activity : {items: [...fixtures.activity.items, ...manyActivity(many)]}
     let settings = fixtures.notificationSettings
@@ -173,6 +180,41 @@ export function createMockServer({memberships = [fixtures.acme.id], many = 0}: M
         }
         approvals.set(approval.id, answered)
         return ok(view(answered))
+    }
+
+    /** `GET /api/v1/waits?mine=true`: the caller's waits with this status, newest first, a keyset page at a time. */
+    const listWaits = ({query}: MockRequest): MockResponse => {
+        const limit = Number(query["limit"] ?? 50)
+        if (!Number.isInteger(limit) || limit < 1 || limit > 100) return refusal(400, "invalid_wait", "limit is 1 to 100.")
+        const all = [...waits.values()]
+            .filter((wait) => wait.status === (query["status"] ?? "open"))
+            .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+        // A cursor that left this list (its wait was answered since) is an end: nothing older is listed from it.
+        const at = query["before"] === undefined ? 0 : all.findIndex((wait) => wait.id === query["before"]) + 1
+        const after = query["before"] !== undefined && at === 0 ? all.length : at
+        const items = all.slice(after, after + limit)
+        const last = items.at(-1)
+        return ok(last !== undefined && after + limit < all.length ? {items, next: last.id} : {items})
+    }
+
+    /** `POST /api/v1/waits/:id/answer`: the first answer wins, the next gets 409 `wait_closed`. */
+    const answerWait = (id: string, raw: unknown): MockResponse => {
+        const wait = waits.get(id)
+        if (wait === undefined) return refusal(404, "not_found", "No such wait")
+        const body = zAnswerWaitBody.safeParse(raw)
+        if (!body.success) return refusal(400, "invalid_request", "action is required")
+        if (wait.status !== "open") return refusal(409, "wait_closed", "This wait is already closed.")
+        if (!actionsOf(wait.question, "Done").some((action) => action.id === body.data.action)) {
+            return refusal(400, "invalid_answer", "Unknown action.")
+        }
+        const answered: WaitInput = {
+            ...wait,
+            status: "resolved",
+            answer: {action: body.data.action, values: body.data.values ?? {}, author: caller, answeredAt: new Date().toISOString()},
+            resolvedAt: new Date().toISOString(),
+        }
+        waits.set(id, answered)
+        return ok(answered)
     }
 
     /** The server's `MembershipOrgResolver`, reduced to the header and the memberships. */
@@ -245,6 +287,8 @@ export function createMockServer({memberships = [fixtures.acme.id], many = 0}: M
             },
         ),
         route("POST", "/api/v1/approvals/:id/answer", ({body}, id) => answer(id, body)),
+        route("GET", "/api/v1/waits", listWaits),
+        route("POST", "/api/v1/waits/:id/answer", ({body}, id) => answerWait(id, body)),
         route("GET", "/api/v1/receipts/keys", () => ok({keys: [fixtures.receiptKey]})),
         route("GET", "/api/v1/receipts", () => ok({items: receipts})),
         route(

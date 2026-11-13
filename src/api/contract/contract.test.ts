@@ -4,6 +4,7 @@ import {ApprovalSchema, ApprovalViewSchema, needsBiometrics, phoneMayApprove} fr
 import {PushDataSchema} from "./notifications"
 import {MyOrganizationsSchema} from "./organizations"
 import {ReceiptEnvelopeSchema, ReceiptPageSchema} from "./receipts"
+import {WAIT_FILTER_STATUS, WaitsPageSchema} from "./waits"
 
 const approval = {id: "appr_1", title: "Merge PR #6", requestedFrom: "rev-b", channel: "app", status: "pending", shownDigest: "d"}
 
@@ -87,5 +88,18 @@ describe("contract", () => {
         expect(PushDataSchema.safeParse({kind: "approval", approvalId: "appr_1"}).success).toBe(true)
         expect(PushDataSchema.safeParse({kind: "approval", approvalId: "../settings"}).success).toBe(false)
         expect(PushDataSchema.safeParse({kind: "ask", askId: "appr_1"}).success).toBe(false)
+    })
+})
+
+describe("waits", () => {
+    it("reads a page, keeping a state of a newer server as unknown", () => {
+        const wait = {id: "w", kind: "human_request", assignee: "m", question: {title: "Q"}, createdAt: "2026-11-13T09:00:00Z"}
+        const page = WaitsPageSchema.parse({items: [{...wait, status: "open"}, {...wait, id: "x", status: "snoozed"}], next: "x"})
+        expect(page.items.map((item) => item.status)).toEqual(["open", "unknown"])
+        expect(page.next).toBe("x")
+    })
+
+    it("maps each filter to the status of the contract", () => {
+        expect(WAIT_FILTER_STATUS).toEqual({open: "open", answered: "resolved", cancelled: "cancelled"})
     })
 })
