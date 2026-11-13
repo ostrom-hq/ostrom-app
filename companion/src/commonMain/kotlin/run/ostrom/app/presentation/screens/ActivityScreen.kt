@@ -64,10 +64,11 @@ import run.ostrom.app.resources.activity_title
 
 /**
  * The organization's activity, newest first: what happened (the server's sentence), who, where, what it cost, when.
- * The first page loads at each return to the tab; older pages as the list nears its end.
+ * The first page loads at each return to the tab; older pages as the list nears its end. A line about an approval opens
+ * its request through [onOpen], given only when the server serves approvals.
  */
 @Composable
-fun ActivityScreen(viewModel: ActivityViewModel = koinViewModel()) {
+fun ActivityScreen(onOpen: ((accountId: String, approvalId: String) -> Unit)? = null, viewModel: ActivityViewModel = koinViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     LifecycleResumeEffect(viewModel) {
         viewModel.start()
@@ -97,7 +98,11 @@ fun ActivityScreen(viewModel: ActivityViewModel = koinViewModel()) {
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            items(state.items, key = { "activity-${it.id}" }) { ActivityRow(it, today, language) }
+            items(state.items, key = { "activity-${it.id}" }) { item ->
+                val accountId = state.account?.id
+                val approvalId = item.approvalId?.takeIf { it.isNotBlank() }
+                ActivityRow(item, today, language, onClick = if (onOpen != null && accountId != null && approvalId != null) ({ onOpen(accountId, approvalId) }) else null)
+            }
             item(key = "end") {
                 BusyRow(state.loadingMore || (state.refreshing && !state.loaded))
                 if (state.loaded && state.items.isEmpty() && !state.error) EmptyState(
@@ -118,7 +123,7 @@ fun ActivityScreen(viewModel: ActivityViewModel = koinViewModel()) {
 }
 
 @Composable
-private fun ActivityRow(item: ActivityItem, today: Long, language: String) {
+private fun ActivityRow(item: ActivityItem, today: Long, language: String, onClick: (() -> Unit)?) {
     val colors = Ostrom.colors
     val details = listOfNotNull(
         if (item.byAgent) stringResource(Res.string.activity_actor_agent, item.actorName) else item.actorName,
@@ -126,7 +131,7 @@ private fun ActivityRow(item: ActivityItem, today: Long, language: String) {
         item.costUsd?.let { formatUsd(it, language) },
         item.at?.let { formatEventTime(it, today) },
     )
-    AppCard(Modifier.testTag("activity-row-${item.id}")) {
+    AppCard(Modifier.testTag("activity-row-${item.id}"), onClick = onClick) {
         Text(item.summary, color = colors.text, fontSize = 14.sp)
         Text(details.joinToString(" · "), style = MetaStyle, color = colors.muted)
     }

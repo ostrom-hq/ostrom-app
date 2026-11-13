@@ -140,7 +140,7 @@ fun MainScreen(
                         MainTab.INBOX -> InboxScreen(onOpen = onOpenRequest, onOpenSettings = { selected = MainTab.SETTINGS })
                         MainTab.WAITING -> WaitsScreen(waits)
                         MainTab.SPENDING -> SpendingScreen()
-                        MainTab.ACTIVITY -> ActivityScreen()
+                        MainTab.ACTIVITY -> ActivityScreen(onOpen = if (state.serves(Features.GATES)) onOpenRequest else null)
                         MainTab.SETTINGS -> SettingsScreen(onAddAccount = onAddAccount, onSignInAgain = onSignInAgain)
                     }
                 }

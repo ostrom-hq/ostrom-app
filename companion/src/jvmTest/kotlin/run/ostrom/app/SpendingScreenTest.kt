@@ -5,6 +5,7 @@ package run.ostrom.app
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.DesktopComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.assertHasNoClickAction
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -131,6 +132,24 @@ class SpendingScreenTest {
     }
 
     @Test
+    fun aLineAboutAnApprovalOpensItsRequestOnlyOnAServerWithApprovals() {
+        val line = """{"items":[{"id":"i9","at":"2026-11-13T10:00:00Z","kind":"gate.requested","actor":{"kind":"agent","name":"Codex"},"summary":"Asked to push","approvalId":"apr1"}]}"""
+        val gates = server(features = "\"gates.v1\"").also { it.routes["GET /api/v1/activity"] = line }
+        signedIn(gates) {
+            waitFor("tab-activity")
+            onNodeWithTag("tab-activity").performSemanticsAction(SemanticsActions.OnClick)
+            waitFor("activity-row-i9")
+            onNodeWithTag("activity-row-i9").performSemanticsAction(SemanticsActions.OnClick)
+            waitUntil(timeoutMillis = 10_000) { "GET /api/v1/approvals/apr1/view" in gates.asked }
+        }
+        val bare = server(features = "").also { it.routes["GET /api/v1/activity"] = line }
+        signedIn(bare) {
+            waitFor("activity-row-i9")
+            onNodeWithTag("activity-row-i9").assertHasNoClickAction()
+        }
+    }
+
+    @Test
     fun aFailedActivityIsRetried() {
         val server = server(features = "").also { it.failures["GET /api/v1/activity"] = 503 to "unavailable" }
         signedIn(server) {
@@ -153,6 +172,9 @@ class SpendingScreenTest {
             onNodeWithTag("spending-exceeded").performScrollTo()
             onNodeWithTag("tab-activity").performSemanticsAction(SemanticsActions.OnClick)
             waitFor("activity-row-act-1")
+            // A line about an approval opens its request.
+            onNodeWithTag("activity-row-act-1").performSemanticsAction(SemanticsActions.OnClick)
+            waitFor("request-actions")
         }
         assertTrue(server.clients == 0, "the demo makes no request")
     }
