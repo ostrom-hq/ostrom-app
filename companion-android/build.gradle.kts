@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: Apache-2.0
 // Laid out like TeamCode's companion-android/build.gradle.kts (Apache-2.0); see NOTICE.
 plugins {
     alias(libs.plugins.android.application)

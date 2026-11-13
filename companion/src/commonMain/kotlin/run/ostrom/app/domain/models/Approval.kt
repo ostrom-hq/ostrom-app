@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: Apache-2.0
 // The rules of the React Native app's approvals contract (needsBiometrics, phoneMayApprove), in Kotlin.
 package run.ostrom.app.domain.models
 

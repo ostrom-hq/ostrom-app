@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: Apache-2.0
 // Ported from TeamCode (Apache-2.0), companion/.../infrastructure/client/TeamCodeClientProvider.kt; see NOTICE.
 package run.ostrom.app.infrastructure.client
 

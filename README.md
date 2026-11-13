@@ -23,7 +23,7 @@
 <p align="center">
   <a href="https://github.com/ostrom-hq/ostrom-app/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/ostrom-hq/ostrom-app/actions/workflows/ci.yml/badge.svg?branch=main"></a>
   <a href="CONTRIBUTING.md#tests-the-bar"><img alt="Coverage: enforced" src="https://img.shields.io/badge/coverage-enforced-8E1B3A"></a>
-  <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-AGPL--3.0%20%2B%20ee-8E1B3A"></a>
+  <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-Apache--2.0%20%2B%20ee-8E1B3A"></a>
   <a href="CHANGELOG.md"><img alt="Version: pre-1.0" src="https://img.shields.io/badge/version-pre--1.0-44393C"></a>
 </p>
 
@@ -151,12 +151,12 @@ checked out next to this repository (`../ostrom-core`). Details, versions and wh
 | --- | --- | --- |
 | [ostrom-core](https://github.com/ostrom-hq/ostrom-core) | Shared Kotlin Multiplatform library: API contract, workflow model, signed receipts | Apache-2.0 |
 | [ostrom-cli](https://github.com/ostrom-hq/ostrom-cli) | The `ostrom` command line: runs coding agents under the team's rules | Apache-2.0 |
-| [ostrom-server](https://github.com/ostrom-hq/ostrom-server) | The server: gates, receipts, policies, the API | AGPL-3.0 + ee |
-| [ostrom-web](https://github.com/ostrom-hq/ostrom-web) | The web console | AGPL-3.0 + ee |
-| **ostrom-app** (this one) | The app: iOS, iPad, Android, macOS, Linux, Windows | AGPL-3.0 + ee |
+| [ostrom-server](https://github.com/ostrom-hq/ostrom-server) | The server: gates, receipts, policies, the API | Apache-2.0 + ee |
+| [ostrom-web](https://github.com/ostrom-hq/ostrom-web) | The web console | Apache-2.0 + ee |
+| **ostrom-app** (this one) | The app: iOS, iPad, Android, macOS, Linux, Windows | Apache-2.0 + ee |
 | [ostrom-e2e](https://github.com/ostrom-hq/ostrom-e2e) | Full-stack end-to-end and load tests | Apache-2.0 |
 | [ostrom-site](https://github.com/ostrom-hq/ostrom-site) | ostrom.run: website, documentation, blog | Apache-2.0 |
-| [ostrom-helm](https://github.com/ostrom-hq/ostrom-helm) | Helm chart and Docker Compose for self-hosting | AGPL-3.0 |
+| [ostrom-helm](https://github.com/ostrom-hq/ostrom-helm) | Helm chart and Docker Compose for self-hosting | Apache-2.0 |
 
 ## Contributing
 
@@ -166,4 +166,4 @@ go to [Discussions](https://github.com/ostrom-hq/ostrom-app/discussions); help o
 
 ## License
 
-GNU Affero General Public License v3.0 ([LICENSE](LICENSE)), except the `ee/` directory, under the Ostrom Enterprise License ([ee/LICENSE](ee/LICENSE)), and code ported from TeamCode under Apache-2.0 ([NOTICE](NOTICE)): you can read, modify and test that code, and running it in production needs an Ostrom Enterprise subscription. Details in [LICENSING.md](LICENSING.md).
+Apache License 2.0 ([LICENSE](LICENSE)), except the `ee/` directory, under the Ostrom Enterprise License ([ee/LICENSE](ee/LICENSE)): you can read, modify and test that code, and running it in production needs an Ostrom Enterprise subscription. Details in [LICENSING.md](LICENSING.md).

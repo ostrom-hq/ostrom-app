@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: Apache-2.0
 // The answer of the React Native app's useRequestViewModel.ts, in Kotlin.
 package run.ostrom.app.domain.usecases.approvals
 

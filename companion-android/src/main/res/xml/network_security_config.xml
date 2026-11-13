@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- SPDX-License-Identifier: AGPL-3.0-only -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
 <!-- HTTPS everywhere; plain HTTP only on loopback, the one exception the typed client accepts. -->
 <network-security-config>
     <base-config cleartextTrafficPermitted="false" />

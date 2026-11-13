@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: Apache-2.0
 // The demo of TeamCode's companion (Apache-2.0), with Ostrom's content; see NOTICE.
 package run.ostrom.app.demo
 

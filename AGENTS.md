@@ -3,7 +3,7 @@
 This is the Ostrom app: one Kotlin Multiplatform module with a Compose Multiplatform UI (`companion/`) for iOS, iPad,
 Android and the desktop (macOS, Linux, Windows), with thin platform shells (`companion-android/`, `companion-ios/`,
 `companion-desktop/`). It is built like TeamCode's companion, from which part of its code is ported (Apache-2.0, see
-NOTICE). AGPL-3.0, `ee/` under the commercial license. Why Kotlin Multiplatform rather than the former React Native app:
+NOTICE). Apache-2.0, `ee/` under the Ostrom Enterprise License. Why Kotlin Multiplatform rather than the former React Native app:
 [decision 0001](docs/decisions/0001-kotlin-multiplatform-companion.md).
 
 **The conventions are in [ostrom-core `docs/CONVENTIONS.md`](https://github.com/ostrom-hq/ostrom-core/blob/main/docs/CONVENTIONS.md) (local clone: `../ostrom-core/docs/CONVENTIONS.md`).** They follow Nathan Fallet's practices (teamcode, asonar,
@@ -24,7 +24,7 @@ All repository content (code, comments, docs, commits, pull requests) is in Engl
   as is (`bundle exec fastlane ios beta` / `android beta`, run from Nathan's Mac, not CI): TestFlight and Play's
   internal track only, never a review submission or a public release (README, Release; [docs/distribution.md](docs/distribution.md)).
   Never commit or copy a key: `fastlane/key.p8`, `fastlane/*.json` and `*.jks` are git-ignored and stay on that Mac.
-- A file ported from TeamCode keeps a second header line `// Ported from TeamCode (Apache-2.0), <path>; see NOTICE.`
+- A file ported from TeamCode may keep a second header line `// Ported from TeamCode (Apache-2.0), <path>; see NOTICE.`
 
 ## The rules that matter most
 
@@ -42,7 +42,7 @@ All repository content (code, comments, docs, commits, pull requests) is in Engl
    desktop JVM (`jvmTest`, the whole `App()` on a fake server); Kover's gate on the domain must stay green.
 8. The demo (`demo/`) answers from memory and creates no HTTP client; a new screen adds its demo content.
 9. No simulator or emulator run is required locally: CI builds and tests every platform.
-10. Every source file starts with `// SPDX-License-Identifier: AGPL-3.0-only` (`LicenseRef-Ostrom-Enterprise` under `ee/`).
+10. Every source file starts with `// SPDX-License-Identifier: Apache-2.0` (`LicenseRef-Ostrom-Enterprise` under `ee/`).
 11. CI: actions pinned by SHA; a draft pull request runs no CI.
 12. Git: one branch per topic in its own worktree, never push to `main`, Conventional Commits in English, signed off,
     squash-merge after green CI and a review with nothing blocking; evidence in the pull request.

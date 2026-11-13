@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: Apache-2.0
 // Laid out like TeamCode's companion-desktop/build.gradle.kts (Apache-2.0); see NOTICE.
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 
