@@ -71,7 +71,8 @@ class InboxViewModel(
             val queue = load(id)
             state.update { if (it.accountId != id) it else it.copy(pending = queue.pending, recent = queue.recent, loaded = true, refreshing = false, error = null, orgRequired = false) }
         } catch (error: CancellationException) {
-            state.update { it.copy(refreshing = false) }
+            // Only this account's spinner: another account's read may already have started.
+            state.update { if (it.accountId != id) it else it.copy(refreshing = false) }
             throw error
         } catch (error: Exception) {
             state.update { if (it.accountId != id) it else it.copy(refreshing = false, error = error.userMessage(), orgRequired = error is AppException.OrganizationRequired) }

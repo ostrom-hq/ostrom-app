@@ -170,6 +170,10 @@ fun RequestScreen(viewModel: RequestViewModel, onBack: (() -> Unit)?) {
                 val error = state.error
                 when {
                     approval != null -> {
+                        // A reading that failed after one succeeded: what is shown may be out of date.
+                        if (error != null) Banner(error.words(), Tone.DANGER, Modifier.testTag("request-stale")) {
+                            AppButton(stringResource(Res.string.approvals_retry), onClick = viewModel::load, kind = ButtonKind.SECONDARY, small = true, fill = false)
+                        }
                         Head(approval)
                         Evidence(approval)
                         if (state.open) Actions(state, approval, viewModel)
@@ -431,11 +435,11 @@ private fun rememberNow(clock: Clock = koinInject()): Long {
 /** "5 min ago" for a past time, "in 5 min" for a coming one. */
 @Composable
 private fun timeOf(at: Long, now: Long): String {
-    val minutes = (at - now) / 60_000
-    val past = minutes <= 0
-    val count = kotlin.math.abs(minutes)
+    val past = at <= now
+    val count = kotlin.math.abs(at - now) / 60_000
     return when {
         past && count < 1 -> stringResource(Res.string.approvals_ago_now)
+        // Under a minute ahead reads "in 1 min", never "just now".
         count < 60 -> stringResource(if (past) Res.string.approvals_ago_minutes else Res.string.approvals_in_minutes, count.toInt().coerceAtLeast(1))
         count < 48 * 60 -> stringResource(if (past) Res.string.approvals_ago_hours else Res.string.approvals_in_hours, (count / 60).toInt())
         else -> stringResource(if (past) Res.string.approvals_ago_days else Res.string.approvals_in_days, (count / 1440).toInt())
