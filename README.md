@@ -20,6 +20,15 @@
   <a href="SECURITY.md">Security</a>
 </p>
 
+> [!IMPORTANT]
+> **This app is being rewritten in Kotlin Multiplatform and Compose (decided on 2026-11-13).** The team needs the same
+> app on iOS, iPad, Android **and the desktop on macOS, Linux and Windows**, written once, like TeamCode's companion that
+> it uses every day. React Native with Expo has no desktop target that shares the phone's code (react-native-macos and
+> react-native-windows sit outside Expo and have no Linux; Electron around react-native-web is a web page in a shell, not
+> the same app). TeamCode's companion already does all of this in Kotlin Multiplatform, and the rest of Ostrom (core,
+> server, CLI) is Kotlin Multiplatform too. Full reasoning and the options set aside:
+> [decision 0001](docs/decisions/0001-kotlin-multiplatform-companion.md).
+
 <p align="center">
   <a href="https://github.com/ostrom-hq/ostrom-app/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/ostrom-hq/ostrom-app/actions/workflows/ci.yml/badge.svg?branch=main"></a>
   <a href="CONTRIBUTING.md#tests-the-bar"><img alt="Coverage: 100% enforced" src="https://img.shields.io/badge/coverage-100%25%20enforced-8E1B3A"></a>
