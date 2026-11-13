@@ -49,6 +49,7 @@ internal fun Exception.translated(resource: Boolean = false): Exception = when (
     is OstromException -> when {
         status == 401 -> AppException.Unauthorized()
         status == 409 && type == ORG_REQUIRED -> AppException.OrganizationRequired()
+        status == 403 && type == STEP_UP_REQUIRED -> AppException.StepUpRequired(requestBound)
         // The server hides what a person may not read behind 404; a 403 is a refusal of the action and keeps its code.
         resource && status == 404 -> AppException.NotFound()
         status == 429 -> AppException.RateLimited(retryAfterSeconds)
@@ -67,6 +68,9 @@ internal fun Exception.translated(resource: Boolean = false): Exception = when (
 
 /** The person belongs to several organizations and the call named none. */
 internal const val ORG_REQUIRED = "org_required"
+
+/** A yes that needs a fresh sign-in, or an unlock bound to its request (`requestBound`). */
+internal const val STEP_UP_REQUIRED = "step_up_required"
 
 private const val REQUEST_TIMEOUT_MILLIS = 30_000L
 

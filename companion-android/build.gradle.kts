@@ -14,6 +14,8 @@ kotlin {
 dependencies {
     implementation(projects.companion)
     implementation(libs.androidx.activity.compose)
+    // FragmentActivity, which BiometricPrompt shows over.
+    implementation(libs.androidx.biometric)
     implementation(libs.compose.ui.tooling.preview)
     debugImplementation(libs.compose.ui.tooling)
 }

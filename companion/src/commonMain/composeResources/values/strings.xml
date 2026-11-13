@@ -92,4 +92,7 @@
     <string name="error_unsupported">This server does not offer this feature.</string>
     <string name="error_unsupported_api">This server speaks another version of the API than this app. Update the app or ask your administrator to update the server.</string>
     <string name="error_untrusted_page">The server sent a sign-in page this app does not trust. Nothing was opened.</string>
+
+    <!-- Approvals (gates.v1): the inbox, the request and its unlock. -->
+    <string name="error_step_up">Ostrom wants a fresh sign-in for this yes: confirm it in the console.</string>
 </resources>
