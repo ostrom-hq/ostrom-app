@@ -57,7 +57,7 @@ android {
         }
     }
     buildTypes {
-        // Without the upload key the release build is unsigned.
+        // Without the upload key the release build is unsigned, and the fastlane lane refuses to run.
         getByName("release") {
             isMinifyEnabled = false
             signingConfigs.findByName("release")?.let { signingConfig = it }
