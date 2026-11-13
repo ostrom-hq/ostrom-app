@@ -49,28 +49,28 @@ class AppFlowTest {
         testApp(server, credentials = credentials, links = links) { koin ->
             onNodeWithTag("origin").performTextInput("ostrom.example.org")
             onNodeWithTag("check").performSemanticsAction(SemanticsActions.OnClick)
-            waitUntil(10_000) { onAllNodes(hasTestTag("server")).fetchSemanticsNodes().isNotEmpty() }
+            waitUntil(timeoutMillis = 10_000) { onAllNodes(hasTestTag("server")).fetchSemanticsNodes().isNotEmpty() }
             onNodeWithText(origin).assertExists()
             onNodeWithTag("continue").performSemanticsAction(SemanticsActions.OnClick)
             settle()
-            waitUntil(10_000) { onAllNodes(hasTestTag("submit")).fetchSemanticsNodes().isNotEmpty() }
+            waitUntil(timeoutMillis = 10_000) { onAllNodes(hasTestTag("submit")).fetchSemanticsNodes().isNotEmpty() }
             onNodeWithTag("login-server").assertTextContains(origin)
             onNodeWithTag("submit").performSemanticsAction(SemanticsActions.OnClick)
             // The code of `ostrom login`, and GitHub's page opened to enter it; then the server says yes.
-            waitUntil(10_000) { onAllNodes(hasTestTag("settings")).fetchSemanticsNodes().isNotEmpty() }
+            waitUntil(timeoutMillis = 10_000) { onAllNodes(hasTestTag("settings")).fetchSemanticsNodes().isNotEmpty() }
             assertEquals(listOf("https://github.com/login/device"), links.opened)
             val account = koin.get<AccountRepository>().accounts.value.single()
             assertEquals("ada", account.login)
             assertEquals(SignInMethod.DEVICE, account.method)
             assertEquals("o1", account.organizationId)
             assertEquals("osm_desktop", runBlocking { credentials.read(account.id) })
-            waitUntil(10_000) { runCatching { onNodeWithTag("server-version").assertTextEquals("1.4.0") }.isSuccess }
+            waitUntil(timeoutMillis = 10_000) { runCatching { onNodeWithTag("server-version").assertTextEquals("1.4.0") }.isSuccess }
             onNodeWithTag("app-version").assertTextEquals("9.9.9")
             onNodeWithTag("api-version").assertTextEquals("Server v1 · app v1")
             onNodeWithText("Analytical Engines").assertExists()
             // Signing out revokes the session and goes back to the first screen.
             onNodeWithTag("sign-out").performScrollTo().performSemanticsAction(SemanticsActions.OnClick)
-            waitUntil(10_000) { onAllNodes(hasTestTag("origin")).fetchSemanticsNodes().isNotEmpty() }
+            waitUntil(timeoutMillis = 10_000) { onAllNodes(hasTestTag("origin")).fetchSemanticsNodes().isNotEmpty() }
             assertTrue("POST /api/v1/auth/logout" in server.asked)
             assertTrue(koin.get<AccountRepository>().accounts.value.isEmpty())
             assertNull(runBlocking { credentials.read(account.id) })
@@ -82,11 +82,11 @@ class AppFlowTest {
         testApp(server(apiVersion = 2)) { koin ->
             onNodeWithTag("origin").performTextInput(origin)
             onNodeWithTag("check").performSemanticsAction(SemanticsActions.OnClick)
-            waitUntil(10_000) { onAllNodes(hasTestTag("continue")).fetchSemanticsNodes().isNotEmpty() }
+            waitUntil(timeoutMillis = 10_000) { onAllNodes(hasTestTag("continue")).fetchSemanticsNodes().isNotEmpty() }
             onNodeWithTag("continue").performSemanticsAction(SemanticsActions.OnClick)
-            waitUntil(10_000) { onAllNodes(hasTestTag("submit")).fetchSemanticsNodes().isNotEmpty() }
+            waitUntil(timeoutMillis = 10_000) { onAllNodes(hasTestTag("submit")).fetchSemanticsNodes().isNotEmpty() }
             onNodeWithTag("submit").performSemanticsAction(SemanticsActions.OnClick)
-            waitUntil(10_000) { onAllNodes(hasTestTag("error")).fetchSemanticsNodes().isNotEmpty() }
+            waitUntil(timeoutMillis = 10_000) { onAllNodes(hasTestTag("error")).fetchSemanticsNodes().isNotEmpty() }
             onNodeWithTag("error").assertTextContains("another version of the API", substring = true)
             assertTrue(koin.get<AccountRepository>().accounts.value.isEmpty())
         }
@@ -98,10 +98,10 @@ class AppFlowTest {
         SettingsAccountRepository(settings).save(Account(id = "a1", origin = origin, login = "ada", method = SignInMethod.DEVICE))
         val credentials = MemoryCredentialStore().also { runBlocking { it.write("a1", "osm_old") } }
         testApp(server(apiVersion = 2), credentials = credentials, settings = settings) { koin ->
-            waitUntil(10_000) { onAllNodes(hasTestTag("incompatible-message")).fetchSemanticsNodes().isNotEmpty() }
+            waitUntil(timeoutMillis = 10_000) { onAllNodes(hasTestTag("incompatible-message")).fetchSemanticsNodes().isNotEmpty() }
             onNodeWithTag("incompatible-message").assertTextContains("API v2", substring = true)
             onNodeWithTag("incompatible-sign-out").performSemanticsAction(SemanticsActions.OnClick)
-            waitUntil(10_000) { onAllNodes(hasTestTag("origin")).fetchSemanticsNodes().isNotEmpty() }
+            waitUntil(timeoutMillis = 10_000) { onAllNodes(hasTestTag("origin")).fetchSemanticsNodes().isNotEmpty() }
             assertTrue(koin.get<AccountRepository>().accounts.value.isEmpty())
         }
     }
@@ -112,12 +112,12 @@ class AppFlowTest {
         testApp(server) { koin ->
             onNodeWithTag("try-demo").performSemanticsAction(SemanticsActions.OnClick)
             settle()
-            waitUntil(10_000) { onAllNodes(hasTestTag("demo-banner")).fetchSemanticsNodes().isNotEmpty() }
+            waitUntil(timeoutMillis = 10_000) { onAllNodes(hasTestTag("demo-banner")).fetchSemanticsNodes().isNotEmpty() }
             assertEquals(DemoContent.ACCOUNT_ID, koin.get<AccountRepository>().activeAccountId.value)
             onNodeWithTag("server-version").assertTextEquals("demo")
             onNodeWithTag("add-account").assertDoesNotExist()
             onNodeWithTag("sign-out").performScrollTo().performSemanticsAction(SemanticsActions.OnClick)
-            waitUntil(10_000) { onAllNodes(hasTestTag("origin")).fetchSemanticsNodes().isNotEmpty() }
+            waitUntil(timeoutMillis = 10_000) { onAllNodes(hasTestTag("origin")).fetchSemanticsNodes().isNotEmpty() }
             assertTrue(koin.get<AccountRepository>().accounts.value.isEmpty())
         }
         assertEquals(0, server.clients)
