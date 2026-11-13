@@ -4,6 +4,7 @@ import type {MyOrganization} from "@/api/contract/organizations"
 import type {AccountRepository} from "@/repositories/AccountRepository"
 import {ApiError} from "@/api/http/ApiError"
 import {pkceChallenge} from "./pkce"
+import type {SignInOutcome} from "./GithubSignIn"
 import {type AuthSessionResult, GithubSignInImpl, REDIRECT_URI} from "./GithubSignInImpl"
 
 const SERVER = "https://ostrom.test"
@@ -231,6 +232,18 @@ describe("GithubSignInImpl", () => {
             accountOf: () => account(),
         })
         await expect(stateless.signIn(SERVER)).resolves.toEqual({kind: "failed", reason: "denied"})
+    })
+
+    it("reports a closed sign-up only for the awaited state", async () => {
+        const closed = (state: (start: URL) => string | undefined): Promise<SignInOutcome> =>
+            new GithubSignInImpl({
+                openAuthSession: browser((start) => callback({error: "signup_closed", ...(state(start) === undefined ? {} : {state: state(start) ?? ""})})),
+                randomBytes: bytes,
+                accountOf: () => account(),
+            }).signIn(SERVER)
+        await expect(closed((start) => start.searchParams.get("state") ?? "")).resolves.toEqual({kind: "failed", reason: "signup-closed"})
+        await expect(closed(() => "another-state")).resolves.toEqual({kind: "failed", reason: "denied"})
+        await expect(closed(() => undefined)).resolves.toEqual({kind: "failed", reason: "denied"})
     })
 
     it("reports a code the server does not accept", async () => {

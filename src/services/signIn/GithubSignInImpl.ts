@@ -70,7 +70,11 @@ export class GithubSignInImpl implements GithubSignIn {
         const callback = CallbackSchema.safeParse(query)
         if (!callback.success) return {kind: "failed", reason: "denied"}
         // A refusal carries nothing to exchange: it is reported as such, with or without its state.
-        if (!("code" in callback.data)) return {kind: "failed", reason: "denied"}
+        if (!("code" in callback.data)) {
+            // An invite-only instance (server#370) names its refusal; only with the state of this sign-in.
+            const closed = callback.data.error === "signup_closed" && callback.data.state === state
+            return {kind: "failed", reason: closed ? "signup-closed" : "denied"}
+        }
         if (callback.data.state !== state) return {kind: "failed", reason: "state-mismatch"}
 
         try {

@@ -6,6 +6,8 @@ export type SignInFailure =
     | "state-mismatch"
     /** The server or GitHub said no (denied access, unknown organisation…). */
     | "denied"
+    /** The instance is invite-only and this person has no account: the invitation, opened in a browser, creates it. */
+    | "signup-closed"
     /** The server did not accept the code, or could not be reached. */
     | "exchange-failed"
 
