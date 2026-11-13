@@ -41,7 +41,6 @@ object TestPlatform : PlatformInfo {
 }
 
 /**
-/**
  * A fake server: [routes] answers `METHOD /path` with a JSON body (status 200, or the one in [statuses]), anything else
  * with 404. A route may name query parameters (`GET /api/v1/waits?status=open&resolver=time`): it answers only a request
  * that has those values, and wins over the route of the bare path. [failures] answers a route with a status and an error
