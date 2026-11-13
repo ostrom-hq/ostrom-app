@@ -106,9 +106,10 @@ class SpendingScreenTest {
             onNodeWithText("Session ended").assertExists()
             // The details line is a string resource, read once its strings are loaded.
             waitForText("Agent Codex · ae/web · $4.12")
-            onNodeWithTag("activity-more").performScrollTo().performSemanticsAction(SemanticsActions.OnClick)
+            // The end of a short page is on screen: the older page loads by itself, and i1 is not shown twice.
             waitFor("activity-row-i2")
             onNodeWithTag("activity-more").assertDoesNotExist()
+            onNodeWithText("Session ended").assertExists()
         }
     }
 
