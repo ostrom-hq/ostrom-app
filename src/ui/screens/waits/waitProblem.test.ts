@@ -37,6 +37,7 @@ describe("answerProblem", () => {
         [refused(409, "wait_closed"), "closed"],
         [refused(403, "forbidden"), "forbidden"],
         [refused(400, "invalid_answer"), "invalid"],
+        [refused(409, "answer_through_session"), "failed"],
         [refused(422), "failed"],
         [api({kind: "network"}), "offline"],
         [api({kind: "timeout"}), "offline"],

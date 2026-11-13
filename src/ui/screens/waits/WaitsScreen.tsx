@@ -77,7 +77,13 @@ export function WaitsScreen(): React.JSX.Element {
     let body: React.JSX.Element
     switch (state.kind) {
         case "loading":
-            body = <ActivityIndicator accessibilityLabel={t("waits.title")} style={styles.center} />
+            // The filters stay under the finger while another list loads.
+            body = (
+                <View style={styles.message}>
+                    {header}
+                    <ActivityIndicator accessibilityLabel={t("waits.title")} />
+                </View>
+            )
             break
         case "error":
             body = (
@@ -123,7 +129,6 @@ export function WaitsScreen(): React.JSX.Element {
 
 const styles = StyleSheet.create({
     container: {flex: 1},
-    center: {flex: 1},
     message: {padding: space[4], gap: space[3]},
     list: {padding: space[4], gap: space[3]},
     header: {gap: space[2]},

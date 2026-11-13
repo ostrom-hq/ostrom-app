@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import {useCallback, useState} from "react"
+import {useCallback, useRef, useState} from "react"
 import {useTranslation} from "react-i18next"
 import type {Wait, WaitAction, WaitField, WaitFilter} from "@/api/contract/waits"
 import {ApiError, isOrgRequired} from "@/api/http/ApiError"
@@ -117,13 +117,16 @@ export function useWaitsViewModel(): WaitsViewModel {
     const [drafts, setDrafts] = useState<Readonly<Record<string, WaitDraft>>>({})
     const [errors, setErrors] = useState<Readonly<Record<string, Readonly<Record<string, FieldError>>>>>({})
     const [sending, setSending] = useState<Sending>()
+    // Set at once, before the next render: a second press of the same instant sends nothing.
+    const inFlight = useRef(false)
+    const [pulling, setPulling] = useState(false)
     const [problem, setProblem] = useState<Problem>()
     const [closedNotice, setClosedNotice] = useState(false)
     const query = useWaits(filter)
     const badge = useWaitsBadge()
     const {mutateAsync} = useAnswerWait()
     const language = languageOf(i18n.language)
-    const {data, error, isError, isRefetching, isFetchingNextPage, hasNextPage, refetch, fetchNextPage} = query
+    const {data, error, isError, isFetchingNextPage, hasNextPage, refetch, fetchNextPage} = query
     const waits = data?.pages.flatMap((page) => page.items)
 
     const draftOf = useCallback((wait: Wait): WaitDraft => drafts[wait.id] ?? initialDraft(wait.question), [drafts])
@@ -182,7 +185,7 @@ export function useWaitsViewModel(): WaitsViewModel {
 
     const submit = (waitId: string, actionId: string): void => {
         const wait = waits?.find((candidate) => candidate.id === waitId)
-        if (wait?.status !== "open" || sending !== undefined) return
+        if (wait?.status !== "open" || inFlight.current) return
         const action = actionsOf(wait.question, t("waits.done")).find((candidate) => candidate.id === actionId)
         if (action === undefined) return
         const checked = checkAnswer(wait.question, action, draftOf(wait))
@@ -192,6 +195,7 @@ export function useWaitsViewModel(): WaitsViewModel {
             return
         }
         setErrors((current) => ({...current, [waitId]: {}}))
+        inFlight.current = true
         setSending({id: waitId, action: actionId})
         void (async () => {
             let outcome: UnlockOutcome
@@ -204,6 +208,7 @@ export function useWaitsViewModel(): WaitsViewModel {
                 // client, so a token the server no longer takes signs out here.
                 if (failure instanceof ApiError && failure.problem.kind === "unauthorized") void sessionStore.getState().signOut()
                 setProblem({id: waitId, problem: unlockErrorProblem(failure)})
+                inFlight.current = false
                 setSending(undefined)
                 return
             }
@@ -219,6 +224,7 @@ export function useWaitsViewModel(): WaitsViewModel {
             } else if (outcome !== "cancelled") {
                 setProblem({id: waitId, problem: unlockOutcomeProblem(outcome)})
             }
+            inFlight.current = false
             setSending(undefined)
         })()
     }
@@ -231,9 +237,13 @@ export function useWaitsViewModel(): WaitsViewModel {
         },
         state,
         badge,
-        refreshing: isRefetching && !isFetchingNextPage,
+        // Only a pull spins: the list read again after an answer, or for the badge, does not.
+        refreshing: pulling,
         refresh: () => {
-            void refetch()
+            setPulling(true)
+            void refetch().finally(() => {
+                setPulling(false)
+            })
         },
         loadMore: () => {
             void fetchNextPage()
@@ -245,10 +255,13 @@ export function useWaitsViewModel(): WaitsViewModel {
         edit: (waitId, fieldId, change) => {
             const wait = waits?.find((candidate) => candidate.id === waitId)
             if (wait === undefined) return
-            const draft = draftOf(wait)
             const field = (wait.question.fields ?? []).find((candidate) => candidate.id === fieldId)
             if (field === undefined) return
-            setDrafts({...drafts, [waitId]: {...draft, [fieldId]: {...fieldDraft(draft, field), ...change}}})
+            // From the latest drafts, not the render's: two edits before a render both count.
+            setDrafts((current) => {
+                const draft = current[waitId] ?? initialDraft(wait.question)
+                return {...current, [waitId]: {...draft, [fieldId]: {...fieldDraft(draft, field), ...change}}}
+            })
         },
         submit,
         openRef: (url) => {

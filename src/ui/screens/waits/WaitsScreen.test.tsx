@@ -429,7 +429,7 @@ describe("WaitsScreen", () => {
         await launch()
         expect(await screen.findByText("On te demande")).toBeOnTheScreen()
         expect(screen.getByText("Répondues")).toBeOnTheScreen()
-        expect(screen.getByLabelText("2 en attente")).toBeOnTheScreen()
+        expect(await screen.findByLabelText("2 en attente")).toBeOnTheScreen()
     })
 
     it("falls back on English for a language it does not speak", async () => {
@@ -459,5 +459,15 @@ describe("WaitsScreen", () => {
         await fireEvent.press(screen.getByTestId("waits-filter-cancelled"))
         expect(await screen.findByText("Ship the migration?")).toBeOnTheScreen()
         expect(screen.queryByText(/^Withdrawn/)).toBeNull()
+    })
+
+    it("keeps the filters in place while another list loads", async () => {
+        await launch({list: (filter) => (filter === "answered" ? new Promise<WaitsPage>(() => undefined) : Promise.resolve({items: [confirm]}))})
+        await screen.findByText("Ship the migration?")
+        await fireEvent.press(screen.getByTestId("waits-filter-answered"))
+        expect(await screen.findByLabelText("Asked of you")).toBeOnTheScreen()
+        expect(screen.getByTestId("waits-filter-open")).toBeOnTheScreen()
+        await fireEvent.press(screen.getByTestId("waits-filter-open"))
+        expect(await screen.findByText("Ship the migration?")).toBeOnTheScreen()
     })
 })

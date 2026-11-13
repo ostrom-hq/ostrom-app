@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import {QueryClientProvider} from "@tanstack/react-query"
+import {type QueryClient, QueryClientProvider} from "@tanstack/react-query"
 import {act, type RenderHookResult, renderHook, waitFor} from "@testing-library/react-native"
 import type {ReactNode} from "react"
 import {type Wait, WaitSchema, type WaitsPage} from "@/api/contract/waits"
@@ -17,7 +17,7 @@ async function mount(
     list: WaitsRepository["list"],
     answer: WaitsRepository["answer"] = jest.fn(),
     features?: readonly string[],
-): Promise<RenderHookResult<WaitsViewModel, unknown>> {
+): Promise<RenderHookResult<WaitsViewModel, unknown> & {client: QueryClient}> {
     const services = await signedInServices({repositories: fakeRepositories({waits: {list, answer}})})
     if (features !== undefined) {
         await services.sessionStore.getState().signIn({...testSession, capabilities: {apiVersion: 1, serverVersion: "1.4.0", features: [...features]}})
@@ -28,7 +28,8 @@ async function mount(
             <QueryClientProvider client={client}>{children}</QueryClientProvider>
         </ServicesProvider>
     )
-    return renderHook(() => useWaitsViewModel(), {wrapper})
+    const rendered = await renderHook(() => useWaitsViewModel(), {wrapper})
+    return {...rendered, client}
 }
 
 describe("useWaitsViewModel", () => {
@@ -75,6 +76,31 @@ describe("useWaitsViewModel", () => {
         await waitFor(() => {
             expect(result.current.state).toMatchObject({kind: "ready", loadingMore: false, hasMore: false})
         })
+    })
+
+    it("keeps two edits made before the next render", async () => {
+        const {result} = await mount(() => Promise.resolve({items: [open]}))
+        await waitFor(() => {
+            expect(result.current.state.kind).toBe("ready")
+        })
+        await act(async () => {
+            result.current.edit(open.id, "ttl", {text: "90"})
+            result.current.edit(open.id, "reason", {text: "fast"})
+            await Promise.resolve()
+        })
+        const row = result.current.state.kind === "ready" ? result.current.state.rows[0] : undefined
+        expect(row?.fields.map((model) => model.draft.text)).toEqual(["", "90", "fast"])
+    })
+
+    it("does not spin when the list is read again without a pull", async () => {
+        const {result, client} = await mount(() => Promise.resolve({items: [open]}))
+        await waitFor(() => {
+            expect(result.current.state.kind).toBe("ready")
+        })
+        await act(async () => {
+            await client.invalidateQueries()
+        })
+        expect(result.current.refreshing).toBe(false)
     })
 
     it("counts the open waits for the badge, and says when more pages remain", async () => {

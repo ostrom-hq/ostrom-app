@@ -109,6 +109,11 @@ describe("createMockServer and the waits", () => {
         expect(answer.status).toBe(400)
     })
 
+    it("ends the list at a cursor that left it", () => {
+        const answer = createMockServer().handle({method: "GET", path: "/api/v1/waits", query: {before: "0b1f6c1e-0000-4000-8000-0000000000ff"}, body: undefined})
+        expect(answer).toEqual({status: 200, body: {items: []}})
+    })
+
     it("takes an answer that names no values", () => {
         const answer = createMockServer().handle({method: "POST", path: "/api/v1/waits/0b1f6c1e-0000-4000-8000-000000000002/answer", query: {}, body: {action: "yes"}})
         expect(answer).toMatchObject({status: 200, body: {status: "resolved", answer: {action: "yes", values: {}}}})

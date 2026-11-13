@@ -11,6 +11,7 @@ import {
     initialField,
     isCalendarDate,
     MAX_OTHER,
+    type WaitDraft,
 } from "./waitAnswer"
 
 const act = (id: string, requires?: string[]): WaitAction => ({id, label: id, ...(requires === undefined ? {} : {requires})})
@@ -146,6 +147,16 @@ describe("checkAnswer", () => {
     it("never asks a value of an info field, even if an action names it", () => {
         const question = spec([{...field("info"), required: true}], [act("go", ["f", "ghost"])])
         expect(values(question, act("go", ["f", "ghost"]))).toEqual({})
+    })
+
+    it("reads a decimal comma as a point, and takes no hexadecimal", () => {
+        const number = spec([field("number")])
+        const typed = (text: string): WaitDraft => ({f: {text, picked: [], other: "", checked: false}})
+        expect(values(number, act("go"), typed("1,5"))).toEqual({f: 1.5})
+        expect(values(number, act("go"), typed("-2"))).toEqual({f: -2})
+        expect(values(number, act("go"), typed(".5"))).toEqual({f: 0.5})
+        expect(values(number, act("go"), typed("1e3"))).toEqual({f: 1000})
+        for (const text of ["0x1F", "1,2,3", "1e999", "--1", "1 2"]) expect(errors(number, act("go"), typed(text))).toEqual({f: {kind: "number"}})
     })
 
     it("refuses what is not a number or a calendar date", () => {

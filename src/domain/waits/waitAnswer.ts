@@ -42,6 +42,8 @@ export interface FieldDraft {
 /** The draft of a whole wait, by field id. */
 export type WaitDraft = Readonly<Record<string, FieldDraft>>
 
+const DECIMAL = /^[+-]?(\d+([.,]\d*)?|[.,]\d+)([eE][+-]?\d+)?$/
+
 const EMPTY_DRAFT: FieldDraft = {text: "", picked: [], other: "", checked: false}
 
 /** The draft of one field before anything is typed: its `default` when it fits the kind. */
@@ -119,7 +121,8 @@ function readField(field: WaitField, draft: FieldDraft): Read {
         case "number": {
             const text = draft.text.trim()
             if (text === "") return undefined
-            const value = Number(text)
+            // A decimal comma (a French keyboard) reads as a point; hexadecimal and the like are no number here.
+            const value = DECIMAL.test(text) ? Number(text.replace(",", ".")) : Number.NaN
             return Number.isFinite(value) ? {value} : {error: {kind: "number"}}
         }
         case "date": {

@@ -58,7 +58,7 @@ export function answerProblem(error: unknown): WaitProblem | "closed" {
     switch (problem.kind) {
         case "refused":
             if (problem.type === "org_required") return "org-required"
-            if (problem.status === 409) return "closed"
+            if (problem.status === 409 && problem.type === "wait_closed") return "closed"
             if (problem.status === 403) return "forbidden"
             if (problem.status === 400) return "invalid"
             return "failed"

@@ -189,7 +189,9 @@ export function createMockServer({memberships = [fixtures.acme.id], many = 0}: M
         const all = [...waits.values()]
             .filter((wait) => wait.status === (query["status"] ?? "open"))
             .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-        const after = query["before"] === undefined ? 0 : all.findIndex((wait) => wait.id === query["before"]) + 1
+        // A cursor that left this list (its wait was answered since) is an end: nothing older is listed from it.
+        const at = query["before"] === undefined ? 0 : all.findIndex((wait) => wait.id === query["before"]) + 1
+        const after = query["before"] !== undefined && at === 0 ? all.length : at
         const items = all.slice(after, after + limit)
         const last = items.at(-1)
         return ok(last !== undefined && after + limit < all.length ? {items, next: last.id} : {items})
