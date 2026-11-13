@@ -24,6 +24,7 @@ import run.ostrom.app.resources.error_sign_in_denied
 import run.ostrom.app.resources.error_sign_in_expired
 import run.ostrom.app.resources.error_sign_in_mismatch
 import run.ostrom.app.resources.error_sign_up_closed
+import run.ostrom.app.resources.error_step_up
 import run.ostrom.app.resources.error_unauthorized
 import run.ostrom.app.resources.error_unreachable
 import run.ostrom.app.resources.error_unsupported
@@ -67,6 +68,7 @@ private fun AppException.sentence(): Pair<StringResource, List<Any>> = when (thi
     is AppException.OrganizationRequired -> Res.string.error_organization_required to emptyList()
     is AppException.NotFound -> Res.string.error_not_found to emptyList()
     is AppException.Unsupported -> Res.string.error_unsupported to emptyList()
+    is AppException.StepUpRequired -> Res.string.error_step_up to emptyList()
     is AppException.CredentialStorage -> Res.string.error_credential_storage to emptyList()
     is AppException.Server -> visibleCode(code)?.let { Res.string.error_server_http_code to listOf<Any>(statusCode, it) }
         ?: (Res.string.error_server_http to listOf<Any>(statusCode))

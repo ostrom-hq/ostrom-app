@@ -29,6 +29,11 @@ sealed class AppException(message: String) : Exception(message) {
     class NotFound : AppException("This no longer exists, or you can no longer see it.")
     /** The server does not offer what the screen needs ([feature] is the missing capability). */
     class Unsupported(val feature: String) : AppException("This server does not offer this yet.")
+    /**
+     * A yes the server takes only after a fresh proof (`403 step_up_required`): with [requestBound], an unlock bound to
+     * this very request (unlock again, then answer again); otherwise a fresh sign-in, given in the console.
+     */
+    class StepUpRequired(val requestBound: Boolean) : AppException("Confirm this yes again.")
     class CredentialStorage : AppException("This device's secure storage refused to read or keep the sign-in. Unlock the device and try again.")
     /** The server refused with [code] (its stable error key, shown only when it is one) and [statusCode]. */
     class Server(val statusCode: Int, val code: String?) :

@@ -4,16 +4,19 @@ package run.ostrom.app.android
 
 import android.content.Intent
 import android.os.Bundle
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.fragment.app.FragmentActivity
 import run.ostrom.app.App
 import run.ostrom.app.infrastructure.auth.AuthRedirects
+import run.ostrom.app.infrastructure.biometrics.ForegroundActivity
 
-class MainActivity : ComponentActivity() {
+/** A FragmentActivity: BiometricPrompt shows over it before an answer. */
+class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        ForegroundActivity.attach(this)
         if (savedInstanceState == null) handle(intent)
         setContent { App() }
     }
@@ -21,6 +24,11 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         handle(intent)
+    }
+
+    override fun onDestroy() {
+        ForegroundActivity.detach(this)
+        super.onDestroy()
     }
 
     override fun onPause() {

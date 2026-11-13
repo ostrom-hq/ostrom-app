@@ -18,7 +18,8 @@ import run.ostrom.app.infrastructure.system.JavaSecureRandom
 /**
  * Desktop: the OS keyring (Keychain, Credential Manager, Secret Service), Java preferences and the JDK HTTP client.
  * No BrowserSignIn: a computer signs in with the device flow of `ostrom login` (the server only sends a browser back
- * to the phones' `ostrom://auth/callback`).
+ * to the phones' `ostrom://auth/callback`). No BiometricGate either: a computer holds no unlock key, so its answers go
+ * with its token and the server decides (a yes it wants confirmed is sent to the console with `step_up_required`).
  */
 fun platformModule() = module {
     single<Settings> { PreferencesSettings(Preferences.userRoot().node("run/ostrom/app")) }

@@ -82,6 +82,7 @@ kotlin {
         androidMain.dependencies {
             implementation(libs.androidx.activity.compose)
             implementation(libs.androidx.browser)
+            implementation(libs.androidx.biometric)
             implementation(libs.ktor.client.okhttp)
             implementation(libs.coroutines.android)
         }

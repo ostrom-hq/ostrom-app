@@ -92,4 +92,7 @@
     <string name="error_unsupported">Ce serveur ne propose pas cette fonctionnalité.</string>
     <string name="error_unsupported_api">Ce serveur parle une autre version de l'API que cette app. Mets l'app à jour ou demande à ton administrateur de mettre le serveur à jour.</string>
     <string name="error_untrusted_page">Le serveur a envoyé une page de connexion à laquelle cette app ne se fie pas. Rien n'a été ouvert.</string>
+
+    <!-- Approvals (gates.v1): the inbox, the request and its unlock. -->
+    <string name="error_step_up">Ostrom veut une connexion récente pour ce oui : confirme-le dans la console.</string>
 </resources>
