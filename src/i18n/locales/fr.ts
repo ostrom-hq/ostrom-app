@@ -14,6 +14,8 @@ export const fr: TranslationShape = {
             unexpected: "La connexion n'a pas pu aboutir sur ce téléphone. Réessaie.",
             "state-mismatch": "Cette connexion ne vient pas de cette app. Réessaie.",
             denied: "GitHub ou le serveur a refusé la connexion.",
+            "signup-closed":
+                "Cette instance Ostrom est sur invitation : ouvre ton invitation dans un navigateur pour créer ton compte, puis connecte-toi ici.",
             "exchange-failed": "Le serveur n'a pas accepté la connexion. Vérifie l'adresse et réessaie.",
             "unsupported-server":
                 "Ce serveur parle l'API v{{version}} ; cette app parle la v{{supported}}. Mets l'app à jour ou demande à ton administrateur de mettre le serveur à jour.",

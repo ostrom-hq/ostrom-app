@@ -13,6 +13,8 @@ export const en = {
             unexpected: "The sign-in could not finish on this phone. Try again.",
             "state-mismatch": "This sign-in did not come from this app. Try again.",
             denied: "GitHub or the server refused the sign-in.",
+            "signup-closed":
+                "This Ostrom instance is invite-only: open your invitation in a browser to create your account, then sign in here.",
             "exchange-failed": "The server did not accept the sign-in. Check the address and try again.",
             "unsupported-server":
                 "This server speaks API v{{version}}; this app speaks v{{supported}}. Update the app or ask your administrator to update the server.",

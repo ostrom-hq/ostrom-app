@@ -106,6 +106,17 @@ describe("LoginScreen", () => {
         ).toBeOnTheScreen()
     })
 
+    it("tells a person without an account that the instance is invite-only", async () => {
+        const {services} = setup({kind: "failed", reason: "signup-closed"})
+        await renderLogin(services)
+        await fireEvent.press(screen.getByRole("button", {name: "Continue with GitHub"}))
+        expect(
+            await screen.findByText(
+                "This Ostrom instance is invite-only: open your invitation in a browser to create your account, then sign in here.",
+            ),
+        ).toBeOnTheScreen()
+    })
+
     describe("the server's API version", () => {
         const capabilities: Capabilities = {apiVersion: 1, serverVersion: "1.4.0", features: ["receipts.v1"]}
 
