@@ -17,6 +17,7 @@ import run.ostrom.app.domain.models.WaitInputProblem
 import run.ostrom.app.domain.models.WaitInputProblem.Reason
 import run.ostrom.app.domain.models.WaitPage
 import run.ostrom.app.domain.models.WaitStatus
+import run.ostrom.app.domain.models.initialInput
 import run.ostrom.app.domain.models.Features
 import run.ostrom.app.domain.repositories.FeaturesRepository
 import run.ostrom.app.domain.repositories.has
@@ -60,7 +61,8 @@ sealed interface WaitAnswerOutcome {
 
 class AnswerWaitUseCase(private val waits: WaitRepository, private val guard: AccountGuard) {
     suspend operator fun invoke(accountId: String, wait: Wait, actionId: String, inputs: Map<String, FieldInput>): WaitAnswerOutcome {
-        val action = wait.actions.firstOrNull { it.id == actionId } ?: return WaitAnswerOutcome.Closed
+        // An action the wait does not have (a card older than a reload): refused here, the wait stays where it is.
+        val action = wait.actions.firstOrNull { it.id == actionId } ?: return WaitAnswerOutcome.Refused
         val values = try {
             WaitAnswerBuilder.build(wait, action, inputs)
         } catch (problem: WaitInputProblem) {
@@ -121,13 +123,14 @@ object WaitAnswerBuilder {
                 if (needed) throw problem(Reason.UNSUPPORTED)
                 continue
             }
-            val input = inputs[field.id]
+            val input = inputs[field.id] ?: field.initialInput()
             val value: JsonElement? = when (field.type) {
                 FieldType.SECRET -> (input as? FieldInput.Secret)?.value?.takeIf { it.isNotBlank() }?.let { text ->
                     if (text.encodeToByteArray().size > MAX_SECRET_BYTES || '\u0000' in text) throw problem(Reason.TOO_LONG)
                     JsonPrimitive(text)
                 }
-                FieldType.CONFIRM -> (input as? FieldInput.Flag)?.let { JsonPrimitive(it.value) }
+                // A required box must be checked (a consent); an optional one sends its yes or its no.
+                FieldType.CONFIRM -> (input as? FieldInput.Flag)?.takeIf { it.value || !needed }?.let { JsonPrimitive(it.value) }
                 FieldType.CHOICE -> (input as? FieldInput.Chosen)?.values?.filter { it.isNotBlank() }?.takeIf { it.isNotEmpty() }?.let { chosen ->
                     if (field.multiple) JsonArray(chosen.map(::JsonPrimitive)) else JsonPrimitive(chosen.first())
                 }

@@ -32,6 +32,7 @@ import run.ostrom.app.domain.models.WaitField
 import run.ostrom.app.domain.models.WaitInputProblem
 import run.ostrom.app.domain.models.WaitKind
 import run.ostrom.app.domain.models.WaitResolver
+import run.ostrom.app.domain.models.initialInput
 import run.ostrom.app.domain.models.WaitSource
 import run.ostrom.app.presentation.components.Banner
 import run.ostrom.app.presentation.components.ButtonKind
@@ -82,7 +83,7 @@ import org.jetbrains.compose.resources.stringResource
  * One wait as a card, the same everywhere a wait is shown: the kind, the session it belongs to, the title and body, and
  * then, for an open request from an agent, its fields and actions to answer in place; for a session's own permission
  * request or question, a button to open the session (they are answered there). A wait that ended shows what was given
- * instead: answered with the action and values, or cancelled. [today] is the UTC day of [now] for the times shown.
+ * instead: answered with the action and values, or cancelled. [today] is the device's day of [now] for the times shown.
  */
 @Composable
 internal fun WaitCard(
@@ -129,9 +130,9 @@ internal fun WaitCard(
                 WaitNotice.FAILED -> Res.string.waits_notice_failed
             }), Tone.DANGER) }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                wait.actions.forEachIndexed { index, action ->
+                wait.actions.forEach { action ->
                     AppButton(
-                        waitActionLabel(wait, action), onClick = { onAnswer(wait, action.id) }, small = true, enabled = !draft.sending, busy = draft.sending && index == 0,
+                        waitActionLabel(wait, action), onClick = { onAnswer(wait, action.id) }, small = true, enabled = !draft.sending, busy = draft.sending && draft.sendingAction == action.id,
                         kind = when (action.style) { "primary" -> ButtonKind.PRIMARY; "danger" -> ButtonKind.DANGER; else -> ButtonKind.SECONDARY },
                         modifier = Modifier.testTag("wait-action-${action.id}"),
                     )
@@ -176,6 +177,8 @@ private fun WaitInputProblem.words(): String = when (reason) {
 private fun WaitFieldInput(wait: Wait, field: WaitField, input: FieldInput?, onInput: (String, String, FieldInput) -> Unit) {
     val colors = Ostrom.colors
     val change = { value: FieldInput -> onInput(wait.id, field.id, value) }
+    // What the person typed, else what the field holds before they touch it (the same value the answer sends).
+    @Suppress("NAME_SHADOWING") val input = input ?: field.initialInput()
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         when (field.type) {
             FieldType.INFO -> field.help?.let { Text(it, color = colors.muted, fontSize = 13.sp) }

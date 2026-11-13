@@ -137,7 +137,7 @@ class WaitUseCasesTest {
         assertEquals(listOf("answer w1 request_changes feedback=\"Split step 2\""), waits.calls)
         waits.calls.clear()
         assertIs<WaitAnswerOutcome.Problem>(answer("a1", wait, "request_changes", emptyMap()))
-        assertIs<WaitAnswerOutcome.Closed>(answer("a1", wait, "gone", emptyMap()), "an action the wait no longer has")
+        assertIs<WaitAnswerOutcome.Refused>(answer("a1", wait, "gone", emptyMap()), "an action the wait no longer has")
         assertEquals(emptyList(), waits.calls)
     }
 
@@ -162,6 +162,26 @@ class WaitUseCasesTest {
         assertEquals(emptyList(), waits.calls)
         features.features = setOf("waits.v1"); waits.page = WaitPage(listOf(wait()), null)
         assertEquals(listOf("w1"), load("a1").waits.map { it.id })
+    }
+
+    @Test fun aFieldLeftAloneSendsItsDefaultAndARequiredBoxMustBeChecked() {
+        val fields = listOf(
+            WaitField("n", FieldType.NUMBER, "How many", default = JsonPrimitive(3)),
+            WaitField("store", FieldType.CHOICE, "Store", default = JsonPrimitive("ios"), options = listOf(WaitOption("ios", "iOS"))),
+            WaitField("tags", FieldType.CHOICE, "Tags", multiple = true, default = JsonArray(listOf(JsonPrimitive("a")))),
+            WaitField("notify", FieldType.CONFIRM, "Notify", default = JsonPrimitive(true)),
+            WaitField("optional", FieldType.CONFIRM, "Optional"),
+            WaitField("nothing", FieldType.TEXT, "Nothing", default = kotlinx.serialization.json.JsonNull),
+        )
+        val wait = wait(fields = fields)
+        assertEquals(
+            mapOf("n" to JsonPrimitive(3L), "store" to JsonPrimitive("ios"), "tags" to JsonArray(listOf(JsonPrimitive("a"))), "notify" to JsonPrimitive(true), "optional" to JsonPrimitive(false)),
+            WaitAnswerBuilder.build(wait, wait.actions.single(), emptyMap()),
+        )
+        val consent = wait(fields = listOf(WaitField("ok", FieldType.CONFIRM, "I agree", required = true)))
+        assertEquals(WaitInputProblem.Reason.MISSING, problem(consent, "done", emptyMap()).reason)
+        assertEquals(WaitInputProblem.Reason.MISSING, problem(consent, "done", mapOf("ok" to FieldInput.Flag(false))).reason)
+        assertEquals(mapOf("ok" to JsonPrimitive(true)), WaitAnswerBuilder.build(consent, consent.actions.single(), mapOf("ok" to FieldInput.Flag(true))))
     }
 
     @Test fun theWaitsLoadOnceUntilTheServerServesItsFeed() = runTest {

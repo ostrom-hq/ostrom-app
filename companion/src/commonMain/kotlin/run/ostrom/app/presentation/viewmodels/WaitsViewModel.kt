@@ -31,6 +31,8 @@ import run.ostrom.app.domain.usecases.waits.WaitsSignal
 data class WaitDraft(
     val inputs: Map<String, FieldInput> = emptyMap(),
     val sending: Boolean = false,
+    /** The action being sent, whose button shows the spinner. */
+    val sendingAction: String? = null,
     /** The field to fix, found before sending. */
     val problem: WaitInputProblem? = null,
     val notice: WaitNotice? = null,
@@ -112,28 +114,29 @@ class WaitsViewModel(
 
     fun input(waitId: String, fieldId: String, value: FieldInput) = state.update { current ->
         val draft = current.drafts[waitId] ?: WaitDraft()
-        current.copy(drafts = current.drafts + (waitId to draft.copy(inputs = draft.inputs + (fieldId to value), problem = null, notice = null)))
+        current.copy(drafts = current.drafts + (waitId to draft.copy(inputs = draft.inputs + (fieldId to value), problem = null, notice = null)), closedElsewhere = false)
     }
 
     fun answer(wait: Wait, actionId: String) {
         val account = state.value.account ?: return
         val draft = state.value.drafts[wait.id] ?: WaitDraft()
         if (draft.sending) return
-        setDraft(wait.id) { it.copy(sending = true, problem = null, notice = null) }
+        state.update { it.copy(closedElsewhere = false) }
+        setDraft(wait.id) { it.copy(sending = true, sendingAction = actionId, problem = null, notice = null) }
         viewModelScope.launch {
             val outcome = try {
                 answerWait(account.id, wait, actionId, draft.inputs)
             } catch (error: CancellationException) {
-                setDraft(wait.id) { it.copy(sending = false) }
+                setDraft(wait.id) { it.copy(sending = false, sendingAction = null) }
                 throw error
             }
             when (outcome) {
                 is WaitAnswerOutcome.Answered -> remove(wait.id, closedElsewhere = false)
                 WaitAnswerOutcome.Closed -> remove(wait.id, closedElsewhere = true)
-                is WaitAnswerOutcome.Problem -> setDraft(wait.id) { it.copy(sending = false, problem = outcome.problem) }
-                WaitAnswerOutcome.Refused -> setDraft(wait.id) { it.copy(sending = false, notice = WaitNotice.REFUSED) }
-                WaitAnswerOutcome.Retry -> setDraft(wait.id) { it.copy(sending = false, notice = WaitNotice.RETRY) }
-                is WaitAnswerOutcome.Failed -> setDraft(wait.id) { it.copy(sending = false, notice = WaitNotice.FAILED) }
+                is WaitAnswerOutcome.Problem -> setDraft(wait.id) { it.copy(sending = false, sendingAction = null, problem = outcome.problem) }
+                WaitAnswerOutcome.Refused -> setDraft(wait.id) { it.copy(sending = false, sendingAction = null, notice = WaitNotice.REFUSED) }
+                WaitAnswerOutcome.Retry -> setDraft(wait.id) { it.copy(sending = false, sendingAction = null, notice = WaitNotice.RETRY) }
+                is WaitAnswerOutcome.Failed -> setDraft(wait.id) { it.copy(sending = false, sendingAction = null, notice = WaitNotice.FAILED) }
             }
         }
     }
@@ -143,7 +146,7 @@ class WaitsViewModel(
         val account = state.value.account ?: return
         if (state.value.filter == filter) return
         paging?.cancel(); paging = null
-        state.update { it.copy(filter = filter, history = emptyList(), historyNext = null, historyLoaded = false, loadingMore = false, error = false) }
+        state.update { it.copy(filter = filter, history = emptyList(), historyNext = null, historyLoaded = false, loadingMore = false, error = false, closedElsewhere = false) }
         if (filter != WaitFilter.OPEN) viewModelScope.launch { loadHistory(account.id, filter) }
     }
 
@@ -186,8 +189,10 @@ class WaitsViewModel(
 
     fun dismissClosed() = state.update { it.copy(closedElsewhere = false) }
 
+    /** Changes a wait's draft; a wait no longer listed (another account, a reload that dropped it) gets none back. */
     private fun setDraft(waitId: String, change: (WaitDraft) -> WaitDraft) = state.update { current ->
-        current.copy(drafts = current.drafts + (waitId to change(current.drafts[waitId] ?: WaitDraft())))
+        if (current.waits.none { it.id == waitId }) current
+        else current.copy(drafts = current.drafts + (waitId to change(current.drafts[waitId] ?: WaitDraft())))
     }
 
     private fun remove(waitId: String, closedElsewhere: Boolean) = state.update { current ->
@@ -229,7 +234,7 @@ class WaitsViewModel(
         } catch (error: CancellationException) {
             throw error
         } catch (error: AppException.Unsupported) {
-            state.update { it.copy(available = false, waits = emptyList(), nextBefore = null, loaded = true, history = emptyList(), historyNext = null) }
+            state.update { it.copy(available = false, waits = emptyList(), nextBefore = null, loaded = true, history = emptyList(), historyNext = null, inProgress = emptyList()) }
         } catch (error: AppException.Unauthorized) {
             throw error
         } catch (error: Exception) {

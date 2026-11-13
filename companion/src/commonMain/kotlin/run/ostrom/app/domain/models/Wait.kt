@@ -52,6 +52,24 @@ data class WaitField(
     val oneTime: Boolean = false,
 )
 
+/**
+ * What the field holds before the person touches it: its [WaitField.default] read for its type, and an unchecked box for
+ * a yes-or-no field. The screen shows it and the answer sends it, so both always agree.
+ */
+fun WaitField.initialInput(): FieldInput? {
+    val value = default as? JsonPrimitive
+    return when (type) {
+        FieldType.CONFIRM -> FieldInput.Flag(value?.content == "true")
+        FieldType.CHOICE -> when (val given = default) {
+            is JsonArray -> FieldInput.Chosen(given.mapNotNull { (it as? JsonPrimitive)?.content }.toSet())
+            is JsonPrimitive -> FieldInput.Chosen(setOf(given.content))
+            else -> null
+        }
+        FieldType.SECRET, FieldType.FILE, FieldType.INFO -> null
+        else -> value?.takeIf { it.isString || it.content != "null" }?.let { FieldInput.Text(it.content) }
+    }
+}
+
 data class WaitAction(val id: String, val label: String, val requires: List<String> = emptyList(), val style: String? = null)
 
 /** Something to look at: an artifact or a session by [id], or a [url]. */
