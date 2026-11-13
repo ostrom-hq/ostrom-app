@@ -36,6 +36,7 @@ class DemoMode(private val clock: Clock) {
 /** One run of the demo: what the person sees and changes, until the demo ends. */
 internal class DemoStore(val startedAt: Long) {
     val account = MutableStateFlow(DemoContent.account())
+    val waits = MutableStateFlow(demoWaits(startedAt))
 }
 
 /** "Try the demo" on the first screen: offered only on a device without any account, so a demo never mixes with a real one. */

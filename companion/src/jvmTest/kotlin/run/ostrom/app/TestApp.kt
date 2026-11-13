@@ -38,9 +38,16 @@ object TestPlatform : PlatformInfo {
     override val appVersion = "9.9.9"
 }
 
-/** A fake server: [routes] answers `METHOD /path` with a JSON body (status 200), anything else with 404. */
+/**
+ * A fake server: [routes] answers `METHOD /path` with a JSON body (status 200), anything else with 404. A route may name
+ * query parameters (`GET /api/v1/waits?status=open&resolver=time`): it answers only a request that has those values, and
+ * wins over the route of the bare path. [failures] answers a route with a status and an error type instead. [bodies]
+ * records what each `METHOD /path` was sent.
+ */
 class FakeServer(val routes: MutableMap<String, String> = mutableMapOf()) : HttpClientEngineFactory<MockEngineConfig> {
     val asked = mutableListOf<String>()
+    val failures = mutableMapOf<String, Pair<Int, String>>()
+    val bodies = mutableMapOf<String, String>()
     var clients = 0
 
     override fun create(block: MockEngineConfig.() -> Unit): HttpClientEngine {
@@ -53,7 +60,14 @@ class FakeServer(val routes: MutableMap<String, String> = mutableMapOf()) : Http
     private fun io.ktor.client.engine.mock.MockRequestHandleScope.answer(request: HttpRequestData) = synchronized(this@FakeServer) {
         val key = "${request.method.value} ${request.url.encodedPath}"
         asked += key
-        routes[key]?.let { respond(it, HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "application/json")) }
+        (request.body as? io.ktor.http.content.OutgoingContent.ByteArrayContent)?.let { bodies[key] = it.bytes().decodeToString() }
+        failures[key]?.let { (status, type) ->
+            return@synchronized respond("""{"error":{"type":"$type","message":"m"}}""", HttpStatusCode.fromValue(status), headersOf(HttpHeaders.ContentType, "application/json"))
+        }
+        val withQuery = routes.entries.firstOrNull { (route, _) ->
+            route.startsWith("$key?") && route.substringAfter('?').split('&').all { pair -> request.url.parameters[pair.substringBefore('=')] == pair.substringAfter('=') }
+        }?.value
+        (withQuery ?: routes[key])?.let { respond(it, HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "application/json")) }
             ?: respond("""{"error":{"type":"not_found","message":"m"}}""", HttpStatusCode.NotFound, headersOf(HttpHeaders.ContentType, "application/json"))
     }
 }

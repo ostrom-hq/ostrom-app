@@ -1,0 +1,260 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Ported from TeamCode (Apache-2.0), companion/.../presentation/screens/WaitCards.kt; see NOTICE.
+package run.ostrom.app.presentation.screens
+
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import run.ostrom.app.domain.models.AnswerValue
+import run.ostrom.app.domain.models.FieldInput
+import run.ostrom.app.domain.models.FieldType
+import run.ostrom.app.domain.models.Wait
+import run.ostrom.app.domain.models.WaitField
+import run.ostrom.app.domain.models.WaitInputProblem
+import run.ostrom.app.domain.models.WaitKind
+import run.ostrom.app.domain.models.WaitResolver
+import run.ostrom.app.domain.models.initialInput
+import run.ostrom.app.domain.models.WaitSource
+import run.ostrom.app.presentation.components.Banner
+import run.ostrom.app.presentation.components.ButtonKind
+import run.ostrom.app.presentation.components.Chip
+import run.ostrom.app.presentation.components.AppButton
+import run.ostrom.app.presentation.components.AppCard
+import run.ostrom.app.presentation.components.AppTextField
+import run.ostrom.app.presentation.components.Tone
+import run.ostrom.app.presentation.components.relativeTime
+import run.ostrom.app.presentation.theme.MetaStyle
+import run.ostrom.app.presentation.theme.Ostrom
+import run.ostrom.app.presentation.viewmodels.WaitDraft
+import run.ostrom.app.presentation.viewmodels.WaitNotice
+import run.ostrom.app.resources.Res
+import run.ostrom.app.resources.waits_kind_permission
+import run.ostrom.app.resources.waits_kind_question
+import run.ostrom.app.resources.waits_asks_you
+import run.ostrom.app.resources.waits_answer_action
+import run.ostrom.app.resources.waits_answered_at
+import run.ostrom.app.resources.waits_cancelled_at
+import run.ostrom.app.resources.waits_field_in_session
+import run.ostrom.app.resources.waits_secret_hint
+import run.ostrom.app.resources.waits_secret_not_provided
+import run.ostrom.app.resources.waits_secret_once
+import run.ostrom.app.resources.waits_secret_provided
+import run.ostrom.app.resources.waits_from_session
+import run.ostrom.app.resources.waits_notice_failed
+import run.ostrom.app.resources.waits_notice_refused
+import run.ostrom.app.resources.waits_notice_retry
+import run.ostrom.app.resources.waits_problem_date
+import run.ostrom.app.resources.waits_problem_missing
+import run.ostrom.app.resources.waits_problem_number
+import run.ostrom.app.resources.waits_problem_too_long
+import run.ostrom.app.resources.waits_problem_unsupported
+import run.ostrom.app.resources.waits_status_answered
+import run.ostrom.app.resources.waits_status_cancelled
+import run.ostrom.app.resources.waits_yes
+import run.ostrom.app.resources.waits_no
+import run.ostrom.app.resources.waits_turn_failed
+import run.ostrom.app.resources.waits_kind_event
+import run.ostrom.app.resources.waits_kind_time
+import run.ostrom.app.resources.waits_resumes_at
+import run.ostrom.app.resources.waits_event_until
+import run.ostrom.app.resources.waits_event_until_ask
+import org.jetbrains.compose.resources.stringResource
+
+/**
+ * One wait as a card, the same everywhere a wait is shown: the kind, the session it belongs to, the title and body, and
+ * then, for an open request from an agent, its fields and actions to answer in place; for a session's own permission
+ * request or question, a button to open the session (they are answered there). A wait that ended shows what was given
+ * instead: answered with the action and values, or cancelled. [today] is the device's day of [now] for the times shown.
+ */
+@Composable
+internal fun WaitCard(
+    wait: Wait,
+    draft: WaitDraft,
+    now: Long,
+    onInput: (waitId: String, fieldId: String, FieldInput) -> Unit,
+    onAnswer: (Wait, actionId: String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val colors = Ostrom.colors
+    val today = localEpochDay(now)
+    AppCard(modifier.testTag("wait-${wait.id}"), borderColor = if (wait.open) colors.accentDim else colors.line) {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Chip(
+                stringResource(when (wait.kind) {
+                    WaitKind.PERMISSION -> Res.string.waits_kind_permission
+                    WaitKind.QUESTION -> Res.string.waits_kind_question
+                    WaitKind.TURN_FAILED -> Res.string.waits_turn_failed
+                    WaitKind.HUMAN_REQUEST -> Res.string.waits_asks_you
+                    WaitKind.TIMED -> if (wait.resolver == WaitResolver.EVENT) Res.string.waits_kind_event else Res.string.waits_kind_time
+                }),
+                tone = when {
+                    !wait.open -> Tone.MUTED
+                    wait.kind == WaitKind.TURN_FAILED -> Tone.DANGER
+                    else -> Tone.ACCENT
+                },
+                dot = wait.open, modifier = Modifier.testTag("wait-kind-${wait.id}"),
+            )
+            if (!wait.open) Chip(stringResource(if (wait.cancelled) Res.string.waits_status_cancelled else Res.string.waits_status_answered), tone = if (wait.cancelled) Tone.MUTED else Tone.NEUTRAL,
+                modifier = Modifier.testTag("wait-status-${wait.id}"))
+            Spacer(Modifier.weight(1f))
+            Text(relativeTime(wait.createdAt, now), style = MetaStyle, color = colors.muted, maxLines = 1, modifier = Modifier.testTag("wait-age-${wait.id}"))
+        }
+        wait.sessionName?.let { Text(stringResource(Res.string.waits_from_session, it), style = MetaStyle, color = colors.muted, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.testTag("wait-session-${wait.id}")) }
+        Text(waitTitle(wait), color = colors.text, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+        wait.body?.takeIf { it.isNotBlank() }?.let { Text(it, color = colors.muted, fontSize = 13.sp, maxLines = 6, overflow = TextOverflow.Ellipsis) }
+        if (wait.open && wait.source == WaitSource.WAIT) {
+            wait.fields.forEach { WaitFieldInput(wait, it, draft.inputs[it.id], onInput) }
+            draft.problem?.let { Banner(it.words(), Tone.WARN, Modifier.testTag("wait-problem")) }
+            draft.notice?.let { Banner(stringResource(when (it) {
+                WaitNotice.REFUSED -> Res.string.waits_notice_refused
+                WaitNotice.RETRY -> Res.string.waits_notice_retry
+                WaitNotice.FAILED -> Res.string.waits_notice_failed
+            }), Tone.DANGER) }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                wait.actions.forEach { action ->
+                    AppButton(
+                        waitActionLabel(wait, action), onClick = { onAnswer(wait, action.id) }, small = true, enabled = !draft.sending, busy = draft.sending && draft.sendingAction == action.id,
+                        kind = when (action.style) { "primary" -> ButtonKind.PRIMARY; "danger" -> ButtonKind.DANGER; else -> ButtonKind.SECONDARY },
+                        modifier = Modifier.testTag("wait-action-${action.id}"),
+                    )
+                }
+            }
+        }
+        if (!wait.open) WaitOutcome(wait, today)
+    }
+}
+
+/** What became of a wait that ended: when, and for an answered one the action chosen and the values given. */
+@Composable
+private fun WaitOutcome(wait: Wait, today: Long) {
+    val colors = Ostrom.colors
+    val at = wait.answer?.answeredAt ?: wait.resolvedAt
+    Column(Modifier.fillMaxWidth().testTag("wait-outcome-${wait.id}"), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        at?.let {
+            Text(stringResource(if (wait.cancelled) Res.string.waits_cancelled_at else Res.string.waits_answered_at, formatEventTime(it, today)), style = MetaStyle, color = colors.muted)
+        }
+        wait.answer?.let { given -> wait.actions.firstOrNull { it.id == given.action }?.let { waitActionLabel(wait, it) } ?: wait.answerActionLabel }?.let { Text(stringResource(Res.string.waits_answer_action, it), color = colors.text, fontSize = 13.sp, fontWeight = FontWeight.Medium) }
+        wait.answerLines().forEach { line ->
+            val value = when (val v = line.value) {
+                is AnswerValue.Flag -> stringResource(if (v.value) Res.string.waits_yes else Res.string.waits_no)
+                is AnswerValue.Words -> v.text
+                is AnswerValue.Secret -> stringResource(if (v.provided) Res.string.waits_secret_provided else Res.string.waits_secret_not_provided)
+            }
+            Text("${line.label}: $value", color = colors.muted, fontSize = 13.sp, maxLines = 6, overflow = TextOverflow.Ellipsis)
+        }
+    }
+}
+
+@Composable
+private fun WaitInputProblem.words(): String = when (reason) {
+    WaitInputProblem.Reason.MISSING -> stringResource(Res.string.waits_problem_missing, label)
+    WaitInputProblem.Reason.NOT_A_NUMBER -> stringResource(Res.string.waits_problem_number, label)
+    WaitInputProblem.Reason.NOT_A_DATE -> stringResource(Res.string.waits_problem_date, label)
+    WaitInputProblem.Reason.TOO_LONG -> stringResource(Res.string.waits_problem_too_long, label)
+    WaitInputProblem.Reason.UNSUPPORTED -> stringResource(Res.string.waits_problem_unsupported, label)
+}
+
+@Composable
+private fun WaitFieldInput(wait: Wait, field: WaitField, input: FieldInput?, onInput: (String, String, FieldInput) -> Unit) {
+    val colors = Ostrom.colors
+    val change = { value: FieldInput -> onInput(wait.id, field.id, value) }
+    // What the person typed, else what the field holds before they touch it (the same value the answer sends).
+    @Suppress("NAME_SHADOWING") val input = input ?: field.initialInput()
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        when (field.type) {
+            FieldType.INFO -> field.help?.let { Text(it, color = colors.muted, fontSize = 13.sp) }
+            // A secret is typed masked, kept in memory only, and sent with the answer: no autofill hint, no suggestions, no save prompt.
+            FieldType.SECRET -> AppTextField(
+                (input as? FieldInput.Secret)?.value.orEmpty(), { change(FieldInput.Secret(it)) },
+                label = field.label, hint = listOfNotNull(field.help, stringResource(Res.string.waits_secret_hint), if (field.oneTime) stringResource(Res.string.waits_secret_once) else null).joinToString(" "),
+                password = true, mono = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, autoCorrectEnabled = false, capitalization = KeyboardCapitalization.None),
+                tag = "wait-field-${field.id}",
+            )
+            // A file is not typed here: the session takes it.
+            FieldType.FILE -> {
+                Text(field.label, color = colors.text, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                Text(stringResource(Res.string.waits_field_in_session), style = MetaStyle, color = colors.muted)
+            }
+            FieldType.CONFIRM -> Row(
+                Modifier.fillMaxWidth().clickable(role = Role.Checkbox) { change(FieldInput.Flag(!((input as? FieldInput.Flag)?.value ?: false))) }.testTag("wait-field-${field.id}"),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Checkbox((input as? FieldInput.Flag)?.value ?: false, onCheckedChange = null)
+                Text(field.label, color = colors.text, fontSize = 14.sp, modifier = Modifier.padding(start = 8.dp))
+            }
+            FieldType.CHOICE -> {
+                val chosen = (input as? FieldInput.Chosen)?.values.orEmpty()
+                Text(field.label, color = colors.text, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                field.options.forEach { option ->
+                    val selected = option.value in chosen
+                    Row(
+                        Modifier.fillMaxWidth().clickable(role = if (field.multiple) Role.Checkbox else Role.RadioButton) {
+                            change(FieldInput.Chosen(if (field.multiple) (if (selected) chosen - option.value else chosen + option.value) else setOf(option.value)))
+                        }.testTag("wait-option-${field.id}-${option.value}"),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        if (field.multiple) Checkbox(selected, onCheckedChange = null) else RadioButton(selected, onClick = null)
+                        Text(option.label, color = colors.text, fontSize = 14.sp, modifier = Modifier.padding(start = 8.dp))
+                    }
+                }
+            }
+            else -> AppTextField(
+                (input as? FieldInput.Text)?.value.orEmpty(), { change(FieldInput.Text(it)) },
+                label = field.label, hint = field.help, singleLine = field.type != FieldType.TEXT && field.type != FieldType.UNKNOWN, minLines = if (field.type == FieldType.TEXT || field.type == FieldType.UNKNOWN) 2 else 1,
+                placeholder = if (field.type == FieldType.DATE) "2026-12-31" else null, tag = "wait-field-${field.id}",
+            )
+        }
+    }
+}
+
+/**
+ * A wait that waits for nobody: a timer ("Resumes 14:30") or a webhook ("Waits for a webhook, times out 09:00"). It has no
+ * fields and nothing to answer (Ostrom has no route to withdraw a wait from the app).
+ */
+@Composable
+internal fun InProgressCard(
+    wait: Wait,
+    now: Long,
+    modifier: Modifier = Modifier,
+) {
+    val colors = Ostrom.colors
+    val today = localEpochDay(now)
+    val event = wait.resolver == WaitResolver.EVENT
+    val at = wait.dueOrTimeout?.let { formatEventTime(it, today) }.orEmpty()
+    AppCard(modifier.testTag("in-progress-${wait.id}"), borderColor = colors.line) {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Chip(stringResource(if (event) Res.string.waits_kind_event else Res.string.waits_kind_time), tone = Tone.NEUTRAL, modifier = Modifier.testTag("in-progress-kind-${wait.id}"))
+            Spacer(Modifier.weight(1f))
+            Text(relativeTime(wait.createdAt, now), style = MetaStyle, color = colors.muted, maxLines = 1)
+        }
+        wait.sessionName?.let { Text(stringResource(Res.string.waits_from_session, it), style = MetaStyle, color = colors.muted, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+        Text(wait.title, color = colors.text, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+        Text(
+            stringResource(when {
+                !event -> Res.string.waits_resumes_at
+                wait.onTimeout == "turn_failed" -> Res.string.waits_event_until_ask
+                else -> Res.string.waits_event_until
+            }, at),
+            color = colors.muted, fontSize = 13.sp, modifier = Modifier.testTag("in-progress-when-${wait.id}"),
+        )
+    }
+}
