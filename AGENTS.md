@@ -20,8 +20,10 @@ All repository content (code, comments, docs, commits, pull requests) is in Engl
   needs a newer core.
 - A feature's screen shows only when the server announces its key in `GET /api/v1/capabilities` (`Features`, kept
   equal to core's `ServerFeatures` by a test); a server of another API version is refused and blocks the app.
-- How the app works and what remains to port: [docs/companion.md](docs/companion.md). Distribution: no store account
-  yet, so no signing and no store upload ([docs/distribution.md](docs/distribution.md)).
+- How the app works and what remains to port: [docs/companion.md](docs/companion.md). Distribution: iOS is signed with
+  TeamCode's Apple team (for now) and uploaded to TestFlight for internal testing by hand (`fastlane ios beta`, the
+  TestFlight workflow); no App Store or Play release, Android stays debug-signed ([docs/distribution.md](docs/distribution.md)).
+  Never commit a key: `fastlane/key.p8`, `fastlane/api_key.json` and keystores are git-ignored and come from secrets.
 - A file ported from TeamCode keeps a second header line `// Ported from TeamCode (Apache-2.0), <path>; see NOTICE.`
 
 ## The rules that matter most

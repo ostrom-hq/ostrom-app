@@ -67,4 +67,5 @@ What the React Native app did, what TeamCode's companion does that an Ostrom ser
 | Sessions (list, transcript, follow live) | `sessions.v1` | To port from TeamCode, once ostrom-core's client has the session routes |
 | Todos, workflows, automations, MCP servers, GitHub link, sharing | `todos.v1`, `workflows.v1`, `automations.v1`, `mcp.v1`, `github.link.v1`, `sharing.v1` | Later, each with its client routes in ostrom-core |
 | Desktop: menu bar icon, the CLI's account, update banner | none | To port from TeamCode's `companion-desktop` |
-| Store and desktop distribution | none | Waiting for a store account ([distribution.md](distribution.md)) |
+| iOS TestFlight (internal testing) | none | Ported (`fastlane ios beta`, TestFlight workflow; [distribution.md](distribution.md)) |
+| Play and desktop distribution, App Store release | none | Waiting for Ostrom's own accounts ([distribution.md](distribution.md)) |

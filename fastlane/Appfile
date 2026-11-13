@@ -1,0 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Ported from TeamCode (Apache-2.0), fastlane/Appfile; see NOTICE.
+# The iOS app's identifiers. The Apple team is TeamCode's for now (Nathan, 2026-11-13), until Ostrom has its own.
+app_identifier("run.ostrom.app")
+team_id("Z8T3MHFW48")

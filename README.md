@@ -82,15 +82,15 @@ flowchart LR
 
 ## Status
 
-Ostrom is before its first public release, and the app is not in the stores yet (no store account yet: builds are
-unsigned, see [docs/distribution.md](docs/distribution.md)). What the app does, screen by screen, and what remains:
+Ostrom is before its first public release, and the app is not in the stores. iOS builds go to TestFlight for internal
+testing only; Android and desktop builds are unsigned ([docs/distribution.md](docs/distribution.md)). What the app does, screen by screen, and what remains:
 [docs/companion.md](docs/companion.md).
 
 | Part | Status |
 | --- | --- |
 | Sign-in (GitHub in the system browser on a phone, the device flow of `ostrom login` on a computer), several accounts and servers, secure storage, organization, capabilities check, light and dark, English and French, demo | Available |
 | Approvals inbox and request (yes after a biometric unlock bound to the request), waits, history and receipt verification, activity, spending, push | Being ported from the React Native app |
-| Artifacts and the other TeamCode features Ostrom serves, desktop menu bar and CLI account, store distribution | Planned |
+| Artifacts and the other TeamCode features Ostrom serves, desktop menu bar and CLI account, Play and desktop distribution | Planned |
 
 ## Development
 

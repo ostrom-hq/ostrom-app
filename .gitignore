@@ -12,6 +12,9 @@ local.properties
 .fleet/
 
 # Xcode
+companion-ios/build/
+*.ipa
+*.dSYM.zip
 xcuserdata/
 DerivedData/
 *.xcuserstate
@@ -24,6 +27,9 @@ DerivedData/
 *.key
 *.pem
 *.mobileprovision
+# The App Store Connect key in fastlane's format (fastlane/api_key.json), written from a secret
+**/fastlane/*.json
+fastlane/README.md
 fastlane/report.xml
 fastlane/Preview.html
 fastlane/screenshots/

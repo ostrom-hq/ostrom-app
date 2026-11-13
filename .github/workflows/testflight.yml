@@ -1,0 +1,76 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+name: TestFlight
+
+# Builds the iOS app, signs it with the Apple team (TeamCode's for now, Nathan 2026-11-13) and uploads it to TestFlight
+# for internal testing, by fastlane's `ios beta` lane (fastlane/Fastfile). Run by hand only; nothing here submits to
+# App Store review or releases the app. Android has no upload: its builds stay debug-signed (docs/distribution.md).
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: App version to upload (MAJOR.MINOR.PATCH), usually ostromAppVersion of gradle.properties
+        required: true
+        type: string
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  testflight:
+    name: testflight
+    runs-on: macos-latest
+    timeout-minutes: 60
+    # The secrets live in this environment, so a maintainer can require an approval before each upload.
+    environment: testflight
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Read the pinned ostrom-core commit
+        id: core
+        run: echo "sha=$(tr -d '[:space:]' < gradle/ostrom-core.ref)" >> "$GITHUB_OUTPUT"
+      - name: Check out ostrom-core at that commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ostrom-hq/ostrom-core
+          ref: ${{ steps.core.outputs.sha }}
+          path: .core
+          persist-credentials: false
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: '21'
+      # No cache on an upload path: a build that reaches testers is made from clean dependencies.
+      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+        with:
+          cache-disabled: true
+      - uses: ruby/setup-ruby@b3aaceaef7e0ee231b499e7b5f49c03fc1d32199 # v1.338.0
+        with:
+          ruby-version: '3.4'
+          bundler-cache: false
+      - name: Install fastlane
+        run: bundle install --jobs 4
+      - name: Write the App Store Connect key
+        env:
+          ASC_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          ASC_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
+        # Written next to the Fastfile, ignored by git, and gone with the runner.
+        run: |
+          umask 077
+          printf '%s\n' "$ASC_KEY" > fastlane/key.p8
+          python3 -c 'import json, os; json.dump({"key_id": os.environ["ASC_KEY_ID"], "issuer_id": os.environ["ASC_ISSUER_ID"], "key": os.environ["ASC_KEY"], "in_house": False}, open("fastlane/api_key.json", "w"))'
+      - name: Build, sign and upload to TestFlight
+        env:
+          VERSION: ${{ inputs.version }}
+        # Xcode's build phase runs Gradle without arguments: ostrom-core goes where settings.gradle.kts looks by default.
+        run: |
+          ln -sfn "$PWD/.core" ../ostrom-core
+          bundle exec fastlane ios beta "version:$VERSION"
+      - name: Remove the key
+        if: always()
+        run: rm -f fastlane/key.p8 fastlane/api_key.json
