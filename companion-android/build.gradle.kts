@@ -44,7 +44,11 @@ android {
         versionName = project.version.toString()
     }
     packaging {
-        resources { excludes += "/META-INF/{AL2.0,LGPL2.1,INDEX.LIST,io.netty.versions.properties}" }
+        resources {
+            excludes += "/META-INF/{AL2.0,LGPL2.1,INDEX.LIST,io.netty.versions.properties}"
+            // Bouncy Castle's OSGi manifest of its Java 9 classes: no use on Android, and a duplicate beside others.
+            excludes += "/META-INF/versions/9/OSGI-INF/MANIFEST.MF"
+        }
     }
     signingConfigs {
         // The key and its passwords together: a keystore alone leaves the release build unsigned.

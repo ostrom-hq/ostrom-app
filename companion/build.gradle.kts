@@ -60,6 +60,8 @@ kotlin {
             dependencies {
                 implementation("run.ostrom:ostrom-client:$ostromCoreVersion")
                 implementation("run.ostrom:ostrom-api:$ostromCoreVersion")
+                // Canonical JSON and Ed25519: each receipt of the history is verified on the device.
+                implementation("run.ostrom:ostrom-receipts:$ostromCoreVersion")
                 implementation(libs.compose.runtime)
                 implementation(libs.compose.foundation)
                 implementation(libs.compose.material3)
@@ -85,6 +87,8 @@ kotlin {
             implementation(libs.androidx.biometric)
             implementation(libs.ktor.client.okhttp)
             implementation(libs.coroutines.android)
+            // Ed25519 below API 33, where the platform's providers have none: installed at start (installBouncyCastle).
+            implementation(libs.bouncycastle)
         }
         iosMain.dependencies { implementation(libs.ktor.client.darwin) }
         jvmMain.dependencies {

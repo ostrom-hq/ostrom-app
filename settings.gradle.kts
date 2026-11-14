@@ -33,7 +33,7 @@ dependencyResolutionManagement {
             }
         }
         mavenCentral()
-        // ostrom-core (run.ostrom:ostrom-api, ostrom-client) is published on GitHub Packages: gpr.user / gpr.key in
+        // ostrom-core (run.ostrom:ostrom-api, ostrom-client, ostrom-receipts) is published on GitHub Packages: gpr.user / gpr.key in
         // ~/.gradle/gradle.properties. A checkout next to this one is used instead when there is one (below).
         maven("https://maven.pkg.github.com/ostrom-hq/ostrom-core") {
             name = "ostromCore"
@@ -54,7 +54,7 @@ val coreLocal = providers.gradleProperty("ostrom.core.local").orNull?.toBooleanS
 if (coreLocal) {
     includeBuild(corePath) {
         dependencySubstitution {
-            for (module in listOf("api", "client")) {
+            for (module in listOf("api", "client", "receipts")) {
                 substitute(module("run.ostrom:ostrom-$module")).using(project(":$module"))
             }
         }

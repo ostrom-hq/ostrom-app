@@ -38,6 +38,7 @@ import com.adamglin.phosphoricons.regular.FileText
 import com.adamglin.phosphoricons.regular.GearSix
 import com.adamglin.phosphoricons.regular.Tray
 import com.adamglin.phosphoricons.regular.Pulse
+import com.adamglin.phosphoricons.regular.Receipt
 import com.adamglin.phosphoricons.regular.Wallet
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
@@ -62,6 +63,7 @@ import run.ostrom.app.resources.home_sign_in_again
 import run.ostrom.app.resources.tab_inbox
 import run.ostrom.app.resources.tab_activity
 import run.ostrom.app.resources.tab_artifacts
+import run.ostrom.app.resources.tab_history
 import run.ostrom.app.resources.tab_settings
 import run.ostrom.app.resources.tab_spending
 import run.ostrom.app.resources.tab_waits
@@ -73,6 +75,7 @@ import run.ostrom.app.resources.tab_waits
 enum class MainTab(val feature: String?, val label: StringResource, val icon: ImageVector) {
     INBOX(Features.GATES, Res.string.tab_inbox, PhosphorIcons.Regular.Tray),
     WAITING(Features.WAITS, Res.string.tab_waits, PhosphorIcons.Regular.Bell),
+    HISTORY(Features.RECEIPTS, Res.string.tab_history, PhosphorIcons.Regular.Receipt),
     SPENDING(Features.BUDGETS, Res.string.tab_spending, PhosphorIcons.Regular.Wallet),
     // Every server has its activity feed.
     ACTIVITY(null, Res.string.tab_activity, PhosphorIcons.Regular.Pulse),
@@ -144,6 +147,7 @@ fun MainScreen(
                     when (tab) {
                         MainTab.INBOX -> InboxScreen(onOpen = onOpenRequest, onOpenSettings = { selected = MainTab.SETTINGS })
                         MainTab.WAITING -> WaitsScreen(waits)
+                        MainTab.HISTORY -> HistoryScreen()
                         MainTab.SPENDING -> SpendingScreen()
                         MainTab.ACTIVITY -> ActivityScreen(onOpen = if (state.serves(Features.GATES)) onOpenRequest else null)
                         MainTab.ARTIFACTS -> ArtifactsScreen(onOpen = onOpenArtifact)

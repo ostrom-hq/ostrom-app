@@ -26,6 +26,8 @@ jkeychain = "1.1.0"
 firebase-bom = "35.1.0"
 junit = "5.11.4"
 kover = "0.9.11"
+# ostrom-core's: what cryptography-provider-jdk 0.6.0 is built against (receipts verified on Android).
+bouncycastle = "1.83"
 
 [plugins]
 android-kmp-library = { id = "com.android.kotlin.multiplatform.library", version.ref = "agp" }
@@ -74,4 +76,5 @@ jkeychain = { module = "pt.davidafsilva.apple:jkeychain", version.ref = "jkeycha
 firebase-bom = { module = "com.google.firebase:firebase-bom", version.ref = "firebase-bom" }
 firebase-messaging = { module = "com.google.firebase:firebase-messaging" }
 junit = { module = "org.junit.jupiter:junit-jupiter-engine", version.ref = "junit" }
+bouncycastle = { module = "org.bouncycastle:bcprov-jdk18on", version.ref = "bouncycastle" }
 junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher", version = "1.11.4" }
