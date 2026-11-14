@@ -17,13 +17,20 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import run.ostrom.app.domain.models.Account
 import run.ostrom.app.domain.models.AppException
+import run.ostrom.app.domain.models.NodeKind
 import run.ostrom.app.domain.models.Workflow
+import run.ostrom.app.domain.models.WorkflowEditRights
+import run.ostrom.app.domain.models.WorkflowWrite
 import run.ostrom.app.domain.models.WorkflowRun
 import run.ostrom.app.domain.repositories.AccountRepository
+import run.ostrom.app.domain.repositories.find
 import run.ostrom.app.domain.usecases.workflows.CanManageRunsUseCase
+import run.ostrom.app.domain.usecases.workflows.DeleteWorkflowUseCase
 import run.ostrom.app.domain.usecases.workflows.GetWorkflowUseCase
+import run.ostrom.app.domain.usecases.workflows.LoadWorkflowEditRightsUseCase
 import run.ostrom.app.domain.usecases.workflows.LoadWorkflowsUseCase
 import run.ostrom.app.domain.usecases.workflows.StartWorkflowRunUseCase
+import run.ostrom.app.domain.usecases.workflows.confirmationLink
 import run.ostrom.app.presentation.navigation.WorkflowRoute
 import run.ostrom.app.presentation.navigation.WorkflowStartRoute
 
@@ -33,12 +40,24 @@ data class WorkflowsUiState(
     val workflows: List<Workflow>? = null,
     val loading: Boolean = false,
     val error: Failure? = null,
+    /** Who may decide workflows; null until read or when unreadable (New then shows, and a refusal is worded). */
+    val rights: WorkflowEditRights? = null,
+    /** An owner or an admin (or a role that cannot be read): the editors' rule shows to them, read only. */
+    val administers: Boolean = false,
 ) {
     val empty: Boolean get() = workflows?.isEmpty() == true && !loading
+
+    /** New shows unless the settings say the person may not decide workflows. */
+    val canCreate: Boolean get() = account?.signedIn == true && rights?.mayDecide != false
 }
 
 /** The saved workflows of the active account, read only. They have no feed event: read at each return ([start]) and on [reload]. */
-class WorkflowsViewModel(private val accounts: AccountRepository, private val loadWorkflows: LoadWorkflowsUseCase) : ViewModel() {
+class WorkflowsViewModel(
+    private val accounts: AccountRepository,
+    private val loadWorkflows: LoadWorkflowsUseCase,
+    private val loadRights: LoadWorkflowEditRightsUseCase,
+    private val canManageRuns: CanManageRunsUseCase,
+) : ViewModel() {
     private val state = MutableStateFlow(WorkflowsUiState())
     val uiState: StateFlow<WorkflowsUiState> = state.asStateFlow()
     private var load: Job? = null
@@ -64,8 +83,13 @@ class WorkflowsViewModel(private val accounts: AccountRepository, private val lo
         state.update { it.copy(loading = true, error = null) }
         load = viewModelScope.launch {
             try {
+                val rights = async { loadRights.optional(account.id) }
+                val administers = async { canManageRuns(account.id) }
                 val workflows = loadWorkflows(account.id)
                 state.update { if (it.account?.id != account.id) it else it.copy(workflows = workflows, loading = false) }
+                val read = rights.await()
+                val admin = administers.await()
+                state.update { if (it.account?.id != account.id) it else it.copy(rights = read, administers = admin) }
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Exception) {
@@ -75,6 +99,15 @@ class WorkflowsViewModel(private val accounts: AccountRepository, private val lo
     }
 }
 
+/** The editing rights, null when they cannot be read: the actions then show and the server's refusal is worded. */
+private suspend fun LoadWorkflowEditRightsUseCase.optional(accountId: String): WorkflowEditRights? = try {
+    invoke(accountId)
+} catch (error: CancellationException) {
+    throw error
+} catch (_: Exception) {
+    null
+}
+
 data class WorkflowUiState(
     val workflow: Workflow? = null,
     val loading: Boolean = true,
@@ -82,7 +115,20 @@ data class WorkflowUiState(
     val error: Failure? = null,
     /** The person may start and cancel runs (an owner or an admin); false until known, so Start never flashes. */
     val managesRuns: Boolean = false,
+    /** The person may decide workflows; true until the settings say otherwise, or when unreadable. */
+    val mayDecide: Boolean = false,
+    val deleting: Boolean = false,
+    val deleteError: Failure? = null,
+    /** The deletion waits for an owner's or an admin's confirmation on the console. */
+    val deleteHeld: HeldChange? = null,
+    /** Deleted: the screen goes back. */
+    val deleted: Boolean = false,
 ) {
+    /** Edit shows for who may decide, on a workflow whose every node kind this app knows. */
+    val canEdit: Boolean get() = mayDecide && workflow?.nodes?.none { it.kind == NodeKind.UNKNOWN } == true
+
+    val canDelete: Boolean get() = mayDecide && workflow != null && !deleting && deleteHeld == null && !deleted
+
     /** Start shows on an accepted workflow, for who may start it. */
     val canStart: Boolean get() = managesRuns && workflow?.runnable == true
 }
@@ -92,6 +138,9 @@ class WorkflowViewModel(
     private val route: WorkflowRoute,
     private val getWorkflow: GetWorkflowUseCase,
     private val canManageRuns: CanManageRunsUseCase,
+    private val loadRights: LoadWorkflowEditRightsUseCase,
+    private val deleteWorkflow: DeleteWorkflowUseCase,
+    private val accounts: AccountRepository,
 ) : ViewModel() {
     private val state = MutableStateFlow(WorkflowUiState())
     val uiState: StateFlow<WorkflowUiState> = state.asStateFlow()
@@ -99,7 +148,31 @@ class WorkflowViewModel(
     // The role is read alongside the first read of the workflow, once per page: it changes rarely, and never fails.
     private val rights: Deferred<Boolean> = viewModelScope.async { canManageRuns(route.accountId) }
 
-    init { load() }
+    init {
+        load()
+        viewModelScope.launch { state.update { it.copy(mayDecide = loadRights.optional(route.accountId)?.mayDecide != false) } }
+    }
+
+    /** Deletes the workflow (asked first by the screen); a held deletion says so and offers its console page. */
+    fun delete() {
+        if (!state.value.canDelete) return
+        state.update { it.copy(deleting = true, deleteError = null) }
+        viewModelScope.launch {
+            try {
+                when (val write = deleteWorkflow(route.accountId, route.workflowId)) {
+                    is WorkflowWrite.Applied -> state.update { it.copy(deleting = false, deleted = true) }
+                    is WorkflowWrite.Held -> {
+                        val origin = accounts.find(route.accountId)?.origin.orEmpty()
+                        state.update { it.copy(deleting = false, deleteHeld = HeldChange(confirmationLink(origin, write.confirmUrl), write.expiresAt)) }
+                    }
+                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                state.update { it.copy(deleting = false, deleteError = error.userMessage()) }
+            }
+        }
+    }
 
     fun load() {
         state.update { it.copy(loading = true, error = null) }

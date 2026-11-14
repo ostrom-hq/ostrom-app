@@ -40,8 +40,10 @@ import com.adamglin.PhosphorIcons
 import com.adamglin.phosphoricons.Regular
 import com.adamglin.phosphoricons.regular.ArrowsClockwise
 import com.adamglin.phosphoricons.regular.FlowArrow
+import com.adamglin.phosphoricons.regular.Plus
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
+import run.ostrom.app.demo.isDemo
 import run.ostrom.app.domain.models.Workflow
 import run.ostrom.app.presentation.components.AppButton
 import run.ostrom.app.presentation.components.AppCard
@@ -67,6 +69,7 @@ import run.ostrom.app.resources.Res
 import run.ostrom.app.resources.action_load_more
 import run.ostrom.app.resources.action_retry
 import run.ostrom.app.resources.workflow_summary
+import run.ostrom.app.resources.wfe_new
 import run.ostrom.app.resources.workflows_edit_note
 import run.ostrom.app.resources.workflows_empty
 import run.ostrom.app.resources.workflows_empty_body
@@ -89,6 +92,7 @@ private enum class WorkflowsPart { RUNS, DEFINITIONS }
 fun WorkflowsScreen(
     onOpenRun: (accountId: String, runId: String) -> Unit,
     onOpenWorkflow: (accountId: String, workflowId: String) -> Unit,
+    onNewWorkflow: (accountId: String) -> Unit = {},
     runs: WorkflowRunsViewModel = koinViewModel(),
     definitions: WorkflowsViewModel = koinViewModel(),
 ) {
@@ -129,6 +133,11 @@ fun WorkflowsScreen(
                 }
             } else {
                 Text(stringResource(Res.string.workflows_edit_note), style = MetaStyle, color = colors.muted, modifier = Modifier.testTag("workflows-edit-note"))
+                val account = definitionsState.account
+                if (definitionsState.canCreate && account != null) {
+                    AppButton(stringResource(Res.string.wfe_new), onClick = { onNewWorkflow(account.id) }, kind = ButtonKind.SECONDARY, small = true, fill = false,
+                        icon = PhosphorIcons.Regular.Plus, modifier = Modifier.testTag("workflows-new"))
+                }
                 definitionsState.error?.let { error ->
                     Banner(error.words(), Tone.DANGER, Modifier.testTag("workflow-definitions-error"), action = {
                         AppButton(stringResource(Res.string.action_retry), onClick = definitions::reload, kind = ButtonKind.SECONDARY, small = true, fill = false)
@@ -146,6 +155,11 @@ fun WorkflowsScreen(
             if (part == WorkflowsPart.RUNS) {
                 runItems(runsState, now, runs::loadMore) { run -> runsState.accountId?.let { onOpenRun(it, run) } }
             } else {
+                val rights = definitionsState.rights
+                val account = definitionsState.account
+                if (rights != null && definitionsState.administers && account != null) {
+                    item(key = "editors") { WorkflowEditorsCard(rights, if (account.isDemo) null else "${account.origin}/workflows") }
+                }
                 items(definitionsState.workflows.orEmpty(), key = { it.id }) { workflow ->
                     WorkflowCard(workflow) { definitionsState.account?.let { onOpenWorkflow(it.id, workflow.id) } }
                 }

@@ -6,6 +6,7 @@ import androidx.compose.runtime.Composable
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 import run.ostrom.app.domain.models.AppException
+import run.ostrom.app.domain.models.WorkflowEditRefusal
 import run.ostrom.app.domain.models.WorkflowRefusal
 import run.ostrom.app.domain.models.visibleCode
 import run.ostrom.app.resources.Res
@@ -38,6 +39,15 @@ import run.ostrom.app.resources.error_workflow_not_runnable
 import run.ostrom.app.resources.error_workflow_run_busy
 import run.ostrom.app.resources.error_workflow_run_ended
 import run.ostrom.app.resources.error_workflow_run_limit
+import run.ostrom.app.resources.wfe_error_confirmation_limit
+import run.ostrom.app.resources.wfe_error_editors_only
+import run.ostrom.app.resources.wfe_error_id_taken
+import run.ostrom.app.resources.wfe_error_in_use
+import run.ostrom.app.resources.wfe_error_invalid
+import run.ostrom.app.resources.wfe_error_limit
+import run.ostrom.app.resources.wfe_error_name_taken
+import run.ostrom.app.resources.wfe_error_problems
+import run.ostrom.app.resources.wfe_error_stale
 
 /**
  * A failure shown to the person. [text] is the English sentence (logs, tests); [resource] and [args] word the same
@@ -87,6 +97,17 @@ private fun AppException.sentence(): Pair<StringResource, List<Any>> = when (thi
         WorkflowRefusal.RUN_BUSY -> Res.string.error_workflow_run_busy
     } to emptyList()
     is AppException.WorkflowInputMissing -> Res.string.error_workflow_input_missing to listOf<Any>(label)
+    is AppException.WorkflowEditRefused -> when (reason) {
+        WorkflowEditRefusal.EDITORS_ONLY -> Res.string.wfe_error_editors_only
+        WorkflowEditRefusal.STALE -> Res.string.wfe_error_stale
+        WorkflowEditRefusal.NAME_TAKEN -> Res.string.wfe_error_name_taken
+        WorkflowEditRefusal.ID_TAKEN -> Res.string.wfe_error_id_taken
+        WorkflowEditRefusal.LIMIT -> Res.string.wfe_error_limit
+        WorkflowEditRefusal.CONFIRMATION_LIMIT -> Res.string.wfe_error_confirmation_limit
+        WorkflowEditRefusal.INVALID -> Res.string.wfe_error_invalid
+        WorkflowEditRefusal.IN_USE -> Res.string.wfe_error_in_use
+    } to emptyList()
+    is AppException.WorkflowInvalid -> Res.string.wfe_error_problems to listOf<Any>(problems.size)
     is AppException.Server -> visibleCode(code)?.let { Res.string.error_server_http_code to listOf<Any>(statusCode, it) }
         ?: (Res.string.error_server_http to listOf<Any>(statusCode))
 }

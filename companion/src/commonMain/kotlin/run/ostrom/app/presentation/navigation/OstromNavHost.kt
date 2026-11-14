@@ -36,6 +36,7 @@ import run.ostrom.app.presentation.screens.NotificationPreferencesScreen
 import run.ostrom.app.presentation.screens.PersonalMcpServersScreen
 import run.ostrom.app.presentation.screens.RequestScreen
 import run.ostrom.app.presentation.screens.SessionScreen
+import run.ostrom.app.presentation.screens.WorkflowEditScreen
 import run.ostrom.app.presentation.screens.WorkflowRunScreen
 import run.ostrom.app.presentation.screens.WorkflowScreen
 import run.ostrom.app.presentation.screens.WorkflowStartScreen
@@ -47,6 +48,7 @@ import run.ostrom.app.presentation.viewmodels.NotificationSettingsViewModel
 import run.ostrom.app.presentation.viewmodels.RequestViewModel
 import run.ostrom.app.presentation.viewmodels.RootViewModel
 import run.ostrom.app.presentation.viewmodels.SessionViewModel
+import run.ostrom.app.presentation.viewmodels.WorkflowEditViewModel
 import run.ostrom.app.presentation.viewmodels.WorkflowRunViewModel
 import run.ostrom.app.presentation.viewmodels.WorkflowRunsViewModel
 import run.ostrom.app.presentation.viewmodels.WorkflowStartViewModel
@@ -150,6 +152,7 @@ fun OstromNavHost(rootViewModel: RootViewModel = koinViewModel(), unlock: PhoneU
                 onOpenArtifact = { accountId, artifactId -> navController.navigate(ArtifactRoute(accountId, artifactId)) },
                 onOpenSession = { accountId, sessionId -> navController.navigate(SessionRoute(accountId, sessionId)) },
                 onOpenWorkflow = { accountId, workflowId -> navController.navigate(WorkflowRoute(accountId, workflowId)) },
+                onNewWorkflow = { accountId -> navController.navigate(WorkflowEditRoute(accountId)) },
                 onOpenRun = { accountId, runId -> navController.navigate(WorkflowRunRoute(accountId, runId)) },
                 requestedTab = requestedTab,
                 onTabRequestShown = { requestedTab = null },
@@ -172,7 +175,19 @@ fun OstromNavHost(rootViewModel: RootViewModel = koinViewModel(), unlock: PhoneU
             WorkflowScreen(
                 viewModel, runs, onBack = { navController.popBackStack() }, onOpenRun = { runId -> navController.navigate(WorkflowRunRoute(route.accountId, runId)) },
                 onStart = { navController.navigate(WorkflowStartRoute(route.accountId, route.workflowId)) },
+                onEdit = { navController.navigate(WorkflowEditRoute(route.accountId, route.workflowId)) },
+                onDeleted = { navController.popBackStack() },
             )
+        }
+        composable<WorkflowEditRoute> { entry ->
+            val route = entry.toRoute<WorkflowEditRoute>()
+            val viewModel: WorkflowEditViewModel = koinViewModel { parametersOf(route) }
+            WorkflowEditScreen(viewModel, onBack = { navController.popBackStack() }, onSaved = { workflowId ->
+                // The saved workflow replaces the editor, and the page it was opened from when it was an edit: back returns to the list.
+                navController.navigate(WorkflowRoute(route.accountId, workflowId)) {
+                    if (route.workflowId != null) popUpTo<WorkflowRoute> { inclusive = true } else popUpTo<WorkflowEditRoute> { inclusive = true }
+                }
+            })
         }
         composable<WorkflowStartRoute> { entry ->
             val route = entry.toRoute<WorkflowStartRoute>()

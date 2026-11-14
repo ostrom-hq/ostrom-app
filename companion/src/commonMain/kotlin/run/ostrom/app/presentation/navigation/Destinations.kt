@@ -54,3 +54,7 @@ data class WorkflowStartRoute(val accountId: String, val workflowId: String)
 /** One run of a workflow with its visits, opened from a runs list, a session or a parent run. */
 @Serializable
 data class WorkflowRunRoute(val accountId: String, val runId: String)
+
+/** The workflow editor: a saved workflow ([workflowId]) or a new one (null), opened from a workflow's Edit or the list's New. */
+@Serializable
+data class WorkflowEditRoute(val accountId: String, val workflowId: String? = null)

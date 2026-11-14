@@ -87,7 +87,7 @@ private fun ApiWorkflowNode.detailLine(): String? =
 internal fun ApiWorkflow.domain() = Workflow(
     id = id, name = name, domain = domain, description = description, version = version, repos = repos.orEmpty(), status = status.value,
     start = start, inputs = inputs.map { WorkflowInput(it.id, it.label, it.required, it.default, it.maxLength) },
-    nodes = nodes.map { WorkflowNode(it.id, it.kind.domain(), it.label, it.detailLine()) }, updatedAt = millisOf(updatedAt ?: foundAt),
+    nodes = nodes.map { WorkflowNode(it.id, it.kind.domain(), it.label, it.detailLine(), it.workflowId?.takeIf { _ -> it.kind == WorkflowNodeKind.WORKFLOW }) }, updatedAt = millisOf(updatedAt ?: foundAt),
 )
 
 internal fun ApiWorkflowRun.domain() = WorkflowRun(

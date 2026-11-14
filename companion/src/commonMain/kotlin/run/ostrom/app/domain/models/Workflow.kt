@@ -85,8 +85,11 @@ data class WorkflowInput(val id: String, val label: String, val required: Boolea
 /** The longest input value a server takes when the definition names no maximum. */
 const val DEFAULT_INPUT_LENGTH = 4096
 
-/** One node of a definition, read only: its [label] and what it does ([detail]: the command, the message, the instructions...). */
-data class WorkflowNode(val id: String, val kind: NodeKind, val label: String, val detail: String?)
+/**
+ * One node of a definition, read only: its [label] and what it does ([detail]: the command, the message, the
+ * instructions...). [calls] is the workflow a `workflow` node runs, for the editor's call checks.
+ */
+data class WorkflowNode(val id: String, val kind: NodeKind, val label: String, val detail: String?, val calls: String? = null)
 
 /** A saved workflow, read only here (the console edits them). [status] is `proposed`, `accepted`, `edited` or `rejected`. */
 data class Workflow(

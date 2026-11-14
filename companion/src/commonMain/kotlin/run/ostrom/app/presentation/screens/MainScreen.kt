@@ -110,6 +110,7 @@ fun MainScreen(
     onOpenArtifact: (accountId: String, artifactId: String) -> Unit = { _, _ -> },
     onOpenSession: (accountId: String, sessionId: String) -> Unit = { _, _ -> },
     onOpenWorkflow: (accountId: String, workflowId: String) -> Unit = { _, _ -> },
+    onNewWorkflow: (accountId: String) -> Unit = {},
     onOpenRun: (accountId: String, runId: String) -> Unit = { _, _ -> },
     requestedTab: MainTab? = null,
     onTabRequestShown: () -> Unit = {},
@@ -179,7 +180,7 @@ fun MainScreen(
                         MainTab.SPENDING -> SpendingScreen()
                         MainTab.ACTIVITY -> ActivityScreen(onOpen = if (state.serves(Features.GATES)) onOpenRequest else null)
                         MainTab.ARTIFACTS -> ArtifactsScreen(onOpen = onOpenArtifact)
-                        MainTab.WORKFLOWS -> WorkflowsScreen(onOpenRun = onOpenRun, onOpenWorkflow = onOpenWorkflow)
+                        MainTab.WORKFLOWS -> WorkflowsScreen(onOpenRun = onOpenRun, onOpenWorkflow = onOpenWorkflow, onNewWorkflow = onNewWorkflow)
                         MainTab.SETTINGS -> SettingsScreen(onAddAccount = onAddAccount, onSignInAgain = onSignInAgain, onOpenNotifications = onOpenNotifications,
                             onOpenEnvironment = onOpenEnvironment, onOpenMcpServers = onOpenMcpServers)
                     }

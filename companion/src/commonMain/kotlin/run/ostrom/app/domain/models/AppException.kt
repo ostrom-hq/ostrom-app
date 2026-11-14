@@ -48,6 +48,21 @@ sealed class AppException(message: String) : Exception(message) {
     )
     /** A required input of a workflow ([label]) has no value. */
     class WorkflowInputMissing(val label: String) : AppException("Fill in $label.")
+    /** The server refused to create, save or delete a workflow, for [reason]. */
+    class WorkflowEditRefused(val reason: WorkflowEditRefusal) : AppException(
+        when (reason) {
+            WorkflowEditRefusal.EDITORS_ONLY -> "You may not decide this workflow: ask an owner or an admin, or an editor for a workflow without a gate."
+            WorkflowEditRefusal.STALE -> "Someone saved this workflow since you opened it. Reload it to see their version."
+            WorkflowEditRefusal.NAME_TAKEN -> "Another workflow of the organization has this name."
+            WorkflowEditRefusal.ID_TAKEN -> "A workflow with this id exists. Try again."
+            WorkflowEditRefusal.LIMIT -> "The organization keeps as many workflows as it may. Delete one first."
+            WorkflowEditRefusal.CONFIRMATION_LIMIT -> "Too many changes wait for a confirmation on the console. Confirm or let some lapse, then try again."
+            WorkflowEditRefusal.INVALID -> "The server refused this workflow. Check it, or edit it in the console."
+            WorkflowEditRefusal.IN_USE -> "This workflow is in use (a package, an automation or another workflow): remove that use first."
+        },
+    )
+    /** The draft breaks [problems] the server would refuse: nothing was sent. */
+    class WorkflowInvalid(val problems: List<WorkflowProblem>) : AppException("The workflow breaks ${problems.size} rule(s); fix them to save.")
     /** The server refused with [code] (its stable error key, shown only when it is one) and [statusCode]. */
     class Server(val statusCode: Int, val code: String?) :
         AppException("The server returned HTTP $statusCode" + (visibleCode(code)?.let { " ($it)" } ?: "") + ".")

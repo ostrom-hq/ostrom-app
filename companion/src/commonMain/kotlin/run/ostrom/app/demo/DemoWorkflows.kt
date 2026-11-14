@@ -51,6 +51,9 @@ private val triage = Workflow(
     null,
 )
 
+/** The demo's built-in workflows, before the person's edits ([demoWorkflows]). */
+internal fun builtInWorkflows(): List<Workflow> = listOf(release, triage)
+
 /** The demo's runs, relative to [startedAt]: one waiting at its gate, one that succeeded, one cancelled at its gate. */
 internal fun demoRuns(startedAt: Long): List<WorkflowRun> {
     val login = DemoContent.account().login
@@ -109,12 +112,10 @@ class DemoWorkflowRepository(private val demo: DemoMode, private val clock: Cloc
         }
     }
 
-    override suspend fun workflows(accountId: String): List<Workflow> { demo.store(); return listOf(release, triage) }
+    override suspend fun workflows(accountId: String): List<Workflow> = demoWorkflows(demo.store())
 
-    override suspend fun workflow(accountId: String, workflowId: String): Workflow {
-        demo.store()
-        return listOf(release, triage).firstOrNull { it.id == workflowId } ?: throw AppException.NotFound()
-    }
+    override suspend fun workflow(accountId: String, workflowId: String): Workflow =
+        demoWorkflows(demo.store()).firstOrNull { it.id == workflowId } ?: throw AppException.NotFound()
 
     override suspend fun runs(accountId: String, workflowId: String?, status: String?, before: String?): WorkflowRunPage {
         val runs = all(demo.store()).filter { (workflowId == null || it.workflowId == workflowId) && (status == null || it.status.wire == status) }

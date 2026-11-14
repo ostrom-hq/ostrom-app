@@ -57,6 +57,10 @@ internal class DemoStore(val startedAt: Long) {
     val startedRuns = MutableStateFlow<List<WorkflowRun>>(emptyList())
     val cancelledRuns = MutableStateFlow<Map<String, Long>>(emptyMap())
 
+    /** The workflows the person created or saved in the demo, whole, by id, and the ids of those they deleted. */
+    val editedWorkflows = MutableStateFlow<Map<String, EditedWorkflow>>(emptyMap())
+    val deletedWorkflows = MutableStateFlow<Set<String>>(emptySet())
+
     /** The demo server's receipt key, new for each demo and never written anywhere; its receipts are signed with it. */
     val receiptSigner: ReceiptSigner by lazy { ReceiptSignerImpl(ReceiptSigningKey.generate()) }
     val receipts: List<JsonObject> by lazy { demoReceipts(startedAt, receiptSigner) }
