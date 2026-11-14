@@ -64,6 +64,8 @@ class MemberSetupUseCasesTest {
         assertEquals(McpProcess.Failed("start_failed"), McpProcess.parse("failed", "start_failed"))
         assertEquals(McpProcess.Failed(null), McpProcess.parse("failed", "Not a <key>"))
         assertEquals(McpProcess.Untracked, McpProcess.parse("unknown", null))
+        assertEquals(McpProcess.Other("stopping"), McpProcess.parse("stopping", null))
+        assertEquals(McpProcess.Untracked, McpProcess.parse("Not a key", null))
         assertEquals(McpProcess.Untracked, McpProcess.parse(null, null))
     }
 }

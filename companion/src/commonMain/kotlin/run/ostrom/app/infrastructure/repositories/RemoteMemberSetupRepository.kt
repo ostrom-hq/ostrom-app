@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 package run.ostrom.app.infrastructure.repositories
 
+import io.ktor.http.URLParserException
+import io.ktor.http.Url
 import run.ostrom.app.domain.models.McpProcess
 import run.ostrom.app.domain.models.McpTransport
 import run.ostrom.app.domain.models.MemberEnvironment
@@ -32,12 +34,21 @@ class RemoteMemberSetupRepository(private val calls: AccountCalls) : MemberSetup
             agentName = agentName,
             transport = kind,
             // A stdio server's url reads `stdio:<launcher>:<package>`: its launcher and package say it better.
-            url = url.takeIf { kind == McpTransport.HTTP },
+            url = url.takeIf { kind == McpTransport.HTTP }?.let(::shown),
             launcher = stdio?.launcher,
             packageName = stdio?.packageName,
             secretNames = (secretNames.orEmpty() + stdio?.secretEnv?.values.orEmpty()).distinct().sorted(),
             enabled = enabled,
             process = if (kind == McpTransport.STDIO) McpProcess.parse(state, failure) else McpProcess.Untracked,
         )
+    }
+
+    /** An address as shown: scheme, host, port and path only, so a credential in its user part or query never shows. */
+    private fun shown(address: String): String = try {
+        val url = Url(address)
+        val port = if (url.port == url.protocol.defaultPort) "" else ":${url.port}"
+        "${url.protocol.name}://${url.host}$port${url.encodedPath}"
+    } catch (_: URLParserException) {
+        address.substringBefore('?').substringBefore('#').substringAfterLast('@')
     }
 }

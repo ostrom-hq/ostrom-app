@@ -41,6 +41,9 @@ sealed interface McpProcess {
     data object Backoff : McpProcess
     data class Failed(val code: String?) : McpProcess
 
+    /** A state this app does not know yet, shown as the server names it when that is a stable key. */
+    data class Other(val state: String) : McpProcess
+
     companion object {
         fun parse(state: String?, failure: String?): McpProcess = when (state) {
             "idle" -> Idle
@@ -48,7 +51,8 @@ sealed interface McpProcess {
             "ready" -> Ready
             "backoff" -> Backoff
             "failed" -> Failed(visibleCode(failure))
-            else -> Untracked
+            null, "unknown" -> Untracked
+            else -> visibleCode(state)?.let(::Other) ?: Untracked
         }
     }
 }

@@ -77,11 +77,11 @@ class RemoteMemberSetupRepositoryTest {
         bodies["/api/v1/me/mcp/servers"] = """{"items":[
             |{"name":"notes","url":"stdio:npm:notes@1.0.0","transport":"stdio","enabled":true,"scope":"org","agentName":"ostrom-notes",
             | "state":"failed","failure":"start_failed","secretNames":["A"],"stdio":{"launcher":"npm","packageName":"notes@1.0.0","secretEnv":{"TOKEN":"B"}}},
-            |{"name":"linear","url":"https://mcp.linear.app/mcp","transport":"http","enabled":false,"scope":"org","state":"ready"}]}""".trimMargin()
+            |{"name":"linear","url":"https://user:pw@mcp.linear.app:8443/mcp?token=abc#x","transport":"http","enabled":false,"scope":"org","state":"ready"}]}""".trimMargin()
         val servers = RemoteMemberSetupRepository(calls).mcpServers("a1")
         assertEquals(
             listOf(
-                PersonalMcpServer("linear", null, McpTransport.HTTP, "https://mcp.linear.app/mcp", null, null, emptyList(), false, McpProcess.Untracked),
+                PersonalMcpServer("linear", null, McpTransport.HTTP, "https://mcp.linear.app:8443/mcp", null, null, emptyList(), false, McpProcess.Untracked),
                 PersonalMcpServer("notes", "ostrom-notes", McpTransport.STDIO, null, "npm", "notes@1.0.0", listOf("A", "B"), true, McpProcess.Failed("start_failed")),
             ),
             servers,

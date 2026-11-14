@@ -213,6 +213,7 @@ private fun McpProcessLine(server: PersonalMcpServer) {
         McpProcess.Starting -> Chip(stringResource(Res.string.member_mcp_state_starting), tone = Tone.WARN, dot = true, modifier = tag)
         McpProcess.Idle -> Chip(stringResource(Res.string.member_mcp_state_idle), tone = Tone.MUTED, dot = true, modifier = tag)
         McpProcess.Backoff -> Chip(stringResource(Res.string.member_mcp_state_backoff), tone = Tone.WARN, dot = true, modifier = tag)
+        is McpProcess.Other -> Chip(process.state, tone = Tone.MUTED, modifier = tag)
         is McpProcess.Failed -> Text(
             process.code?.let { stringResource(Res.string.member_mcp_state_failed_code, it) } ?: stringResource(Res.string.member_mcp_state_failed),
             color = Ostrom.colors.danger, fontSize = 13.sp, lineHeight = 18.sp, modifier = tag,
