@@ -4,7 +4,8 @@ import UserNotifications
 
 /// Shows a push's real text: the relay sends a generic alert ("Ostrom" / "New activity in Ostrom") with
 /// `mutable-content` and the payload encrypted for this device in `p`; this extension decrypts it with the key the app
-/// shares through the Keychain. A payload it cannot read (another key, a key not made yet) keeps the generic alert.
+/// shares through the Keychain. A payload it cannot read (another key, a key not made yet), or one for an account not
+/// signed in on this phone, keeps the generic alert.
 final class NotificationService: UNNotificationServiceExtension {
     private var handler: ((UNNotificationContent) -> Void)?
     private var generic: UNNotificationContent?
@@ -19,7 +20,9 @@ final class NotificationService: UNNotificationServiceExtension {
               let json = try? PushCrypto.decrypt(payload, with: key),
               let push = try? JSONDecoder().decode(PushCrypto.Payload.self, from: json),
               !push.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-              PushCrypto.isId(push.orgId), PushCrypto.isId(push.memberId)
+              PushCrypto.isId(push.orgId), PushCrypto.isId(push.memberId),
+              // A push for an account signed out on this phone keeps the generic alert, without its text or link.
+              PushCrypto.isSignedIn(orgId: push.orgId, memberId: push.memberId)
         else { return contentHandler(request.content) }
         content.title = String(push.title.prefix(200))
         content.body = String(push.body.prefix(1_000))

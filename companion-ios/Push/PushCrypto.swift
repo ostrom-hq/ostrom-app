@@ -16,7 +16,7 @@ enum PushCrypto {
     /// this key and nothing else of the app's Keychain, where the accounts' tokens and unlock keys stay.
     private static var accessGroup: String? { Bundle.main.object(forInfoDictionaryKey: "OstromPushKeychainGroup") as? String }
 
-    private static func query(_ extra: [CFString: Any]) -> CFDictionary {
+    private static func query(_ extra: [CFString: Any], account: String = account) -> CFDictionary {
         var query: [CFString: Any] = [kSecClass: kSecClassGenericPassword, kSecAttrService: service, kSecAttrAccount: account]
         if let group = accessGroup, !group.isEmpty { query[kSecAttrAccessGroup] = group }
         return query.merging(extra) { _, new in new } as CFDictionary
@@ -41,6 +41,29 @@ enum PushCrypto {
         SecItemDelete(query([:])) // An entry that holds no key is replaced: the next sync registers the new public key.
         let added = SecItemAdd(query([kSecValueData: key.rawRepresentation, kSecAttrAccessible: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly]), nil)
         return added == errSecSuccess ? key : nil
+    }
+
+    /// The Keychain entry of the accounts signed in on this phone: `orgId memberId`, one per line, written by the app at
+    /// each change (ShareSignedInAccountsUseCase), never a token.
+    private static let signedInAccount = "signed-in-accounts"
+
+    /// Replaces the list of the accounts signed in on this phone (the app).
+    static func saveSignedIn(_ accounts: String) {
+        let data = Data(accounts.utf8)
+        let updated = SecItemUpdate(query([:], account: signedInAccount), [kSecValueData: data] as CFDictionary)
+        if updated == errSecItemNotFound {
+            SecItemAdd(query([kSecValueData: data, kSecAttrAccessible: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly], account: signedInAccount), nil)
+        }
+    }
+
+    /// Whether a push's organization and member are those of an account signed in on this phone (the extension), as
+    /// the Android app checks before showing one. No list (an app that never wrote it, a Keychain not readable yet)
+    /// answers no: the generic alert is shown, never a signed-out account's text.
+    static func isSignedIn(orgId: String, memberId: String) -> Bool {
+        var item: CFTypeRef?
+        let status = SecItemCopyMatching(query([kSecReturnData: true, kSecMatchLimit: kSecMatchLimitOne], account: signedInAccount), &item)
+        guard status == errSecSuccess, let data = item as? Data, let text = String(data: data, encoding: .utf8) else { return false }
+        return text.split(separator: "\n").contains { $0 == "\(orgId) \(memberId)" }
     }
 
     enum Failure: Error { case malformed }

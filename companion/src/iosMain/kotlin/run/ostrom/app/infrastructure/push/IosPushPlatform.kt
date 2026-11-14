@@ -22,6 +22,12 @@ interface IosPushKeys {
 
     /** Asks the person to allow notifications (iOS asks once; later calls do nothing). */
     fun requestAuthorization()
+
+    /**
+     * Writes the accounts signed in on this phone (`orgId memberId`, one per line) where the notification service
+     * extension reads them, in the Keychain group it shares: it shows a push's text only for one of them.
+     */
+    fun saveSignedIn(accounts: String)
 }
 
 class IosPushPlatform(private val keys: IosPushKeys) : PushPlatform {
@@ -43,6 +49,8 @@ class IosPushPlatform(private val keys: IosPushKeys) : PushPlatform {
         }
         return keys.publicKey().ifEmpty { error("The push key could not be read from the Keychain.") }
     }
+
+    override suspend fun signedIn(accounts: Set<String>) = keys.saveSignedIn(accounts.sorted().joinToString("\n"))
 
     override suspend fun open(payload: String): PushMessage =
         throw UnsupportedOperationException("On iOS the notification service extension decrypts.")

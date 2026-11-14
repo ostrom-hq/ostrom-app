@@ -32,6 +32,7 @@ class RemotePushRepositoryTest {
     private val requests = mutableListOf<HttpRequestData>()
     private val accounts = accounts()
     private val credentials = MemoryCredentialStore()
+    private var failDeletes = false
 
     private val engine = object : HttpClientEngineFactory<MockEngineConfig> {
         override fun create(block: MockEngineConfig.() -> Unit): HttpClientEngine = MockEngine(MockEngineConfig().apply {
@@ -39,10 +40,11 @@ class RemotePushRepositoryTest {
             addHandler { request ->
                 requests += request
                 if (request.method == HttpMethod.Delete) {
-                    respond("", HttpStatusCode.NoContent)
+                    respond("", if (failDeletes) HttpStatusCode.ServiceUnavailable else HttpStatusCode.NoContent)
                 } else {
+                    val id = "d" + requests.count { it.method == HttpMethod.Post }
                     respond(
-                        """{"id":"d1","provider":"fcm","platform":"android","locale":"fr-FR","createdAt":"2026-11-14T00:00:00Z"}""",
+                        """{"id":"$id","provider":"fcm","platform":"android","locale":"fr-FR","createdAt":"2026-11-14T00:00:00Z"}""",
                         HttpStatusCode.Created,
                         headersOf(HttpHeaders.ContentType, "application/json"),
                     )
@@ -85,5 +87,40 @@ class RemotePushRepositoryTest {
         repository.clear("a1")
         assertEquals(2, requests.size)
         assertTrue(requests.none { it.url.encodedPath.endsWith("/null") })
+    }
+
+    @Test
+    fun aChangeOfOrganizationDeletesTheRegistrationOfTheOldOne() = runTest {
+        accounts.save(account().copy(organizationId = "o1"))
+        credentials.write("a1", "osm_token")
+        repository.register("a1", "fcm-token-0123456789", "spki", "android", null)
+        // Registered again in the same organization (a start, a token rotation): nothing to delete.
+        repository.register("a1", "fcm-token-0123456789", "spki", "android", null)
+        accounts.update(account().copy(organizationId = "o2"))
+        repository.register("a1", "fcm-token-0123456789", "spki", "android", null)
+
+        assertEquals(
+            listOf("POST o1", "POST o1", "POST o2", "DELETE o1 /api/v1/push-devices/d2"),
+            requests.map { r ->
+                "${r.method.value} ${r.headers["Ostrom-Org"]}" + if (r.method == HttpMethod.Delete) " ${r.url.encodedPath}" else ""
+            },
+        )
+
+        // The sign-out deletes the current registration, in its own organization.
+        repository.clear("a1")
+        assertEquals("DELETE o2 /api/v1/push-devices/d3", requests.last().let { "${it.method.value} ${it.headers["Ostrom-Org"]} ${it.url.encodedPath}" })
+    }
+
+    @Test
+    fun aFailedDeletionOfTheOldOrganizationsRegistrationKeepsTheNewOne() = runTest {
+        accounts.save(account().copy(organizationId = "o1"))
+        credentials.write("a1", "osm_token")
+        repository.register("a1", "fcm-token-0123456789", "spki", "android", null)
+        accounts.update(account().copy(organizationId = "o2"))
+        failDeletes = true
+        repository.register("a1", "fcm-token-0123456789", "spki", "android", null)
+        failDeletes = false
+        repository.clear("a1")
+        assertEquals("DELETE o2 /api/v1/push-devices/d2", requests.last().let { "${it.method.value} ${it.headers["Ostrom-Org"]} ${it.url.encodedPath}" })
     }
 }
