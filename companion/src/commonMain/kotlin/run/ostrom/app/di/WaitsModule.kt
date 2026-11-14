@@ -8,6 +8,8 @@ import run.ostrom.app.domain.usecases.waits.AnswerWaitUseCase
 import run.ostrom.app.domain.usecases.waits.FollowWaitsUseCase
 import run.ostrom.app.domain.usecases.waits.LoadInProgressWaitsUseCase
 import run.ostrom.app.domain.usecases.waits.LoadWaitsUseCase
+import run.ostrom.app.domain.repositories.EventRepository
+import run.ostrom.app.infrastructure.repositories.RemoteEventRepository
 import run.ostrom.app.infrastructure.repositories.RemoteWaitRepository
 import run.ostrom.app.presentation.viewmodels.WaitsViewModel
 
@@ -17,7 +19,8 @@ val waitsModule = module {
     single { RemoteWaitRepository(get()) }
     single { LoadWaitsUseCase(get(), get(), get()) }
     single { AnswerWaitUseCase(get(), get()) }
-    single { FollowWaitsUseCase(get(), get()) }
+    single<EventRepository> { RemoteEventRepository(get()) }
+    single { FollowWaitsUseCase(get(), get(), get()) }
     single { LoadInProgressWaitsUseCase(get(), get(), get()) }
     viewModel { WaitsViewModel(get(), get(), get(), get(), get()) }
 }
