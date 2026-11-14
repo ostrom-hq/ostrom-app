@@ -66,11 +66,16 @@ class KeyringCredentialStore(private val backend: KeyringBackend?, private val s
     companion object {
         const val SERVICE = "run.ostrom.app"
 
-        fun open(): KeyringCredentialStore = KeyringCredentialStore(
-            // No keyring (BackendNotSupportedException), or one that cannot load (a missing native library or D-Bus):
-            // the documented in-memory mode, never a crash.
-            try { JavaKeyringBackend(Keyring.create()) } catch (_: Exception) { null } catch (_: LinkageError) { null },
-        )
+        fun open(): KeyringCredentialStore = KeyringCredentialStore(openBackend())
+
+        /**
+         * The operating system's keyring, or null without one (BackendNotSupportedException), or when it cannot load (a
+         * missing native library or D-Bus): the documented in-memory mode, never a crash. The desktop also reads the
+         * `ostrom` CLI's own entry through it.
+         */
+        fun openBackend(): KeyringBackend? =
+            // not coroutine-reachable: opened once while the modules are built, before any coroutine starts.
+            try { JavaKeyringBackend(Keyring.create()) } catch (_: Exception) { null } catch (_: LinkageError) { null }
     }
 }
 

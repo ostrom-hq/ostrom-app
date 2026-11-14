@@ -53,6 +53,7 @@ import run.ostrom.app.presentation.components.Banner
 import run.ostrom.app.presentation.components.DemoBanner
 import run.ostrom.app.presentation.components.LocalWideLayout
 import run.ostrom.app.presentation.components.Tone
+import run.ostrom.app.presentation.components.UpdateBanner
 import run.ostrom.app.presentation.components.underDemoBanner
 import run.ostrom.app.presentation.theme.Ostrom
 import run.ostrom.app.presentation.viewmodels.HomeUiState
@@ -61,6 +62,7 @@ import run.ostrom.app.presentation.viewmodels.WaitsUiState
 import run.ostrom.app.presentation.viewmodels.WaitsViewModel
 import run.ostrom.app.presentation.viewmodels.words
 import run.ostrom.app.resources.Res
+import run.ostrom.app.resources.home_cli_signed_out
 import run.ostrom.app.resources.home_signed_out
 import run.ostrom.app.resources.home_sign_in_again
 import run.ostrom.app.resources.tab_inbox
@@ -129,7 +131,8 @@ fun MainScreen(
     }
     val tabs = state.tabs()
     var selected by rememberSaveable { mutableStateOf<MainTab?>(null) }
-    // A tapped notification (a wait's opens the waits) or a pushed screen (a session's receipt opens the History tab) asked for a tab.
+    // A tapped notification (a wait's opens the waits), a pushed screen (a session's receipt opens the History tab) or the
+    // desktop's menu bar asked for a tab. Kept even before the server's features are read: it shows once they are.
     LaunchedEffect(requestedTab) {
         requestedTab?.let { selected = it; onTabRequestShown() }
     }
@@ -153,9 +156,15 @@ fun MainScreen(
                 VerticalDivider(color = colors.line)
             }
             Column(Modifier.weight(1f)) {
+                UpdateBanner()
                 state.account?.takeIf { !it.signedIn }?.let { account ->
-                    Banner(stringResource(Res.string.home_signed_out, account.origin), Tone.WARN, Modifier.padding(12.dp).testTag("signed-out")) {
-                        AppButton(stringResource(Res.string.home_sign_in_again), onClick = { onSignInAgain(account) }, small = true, fill = false)
+                    if (account.usedByCli) {
+                        // The CLI's session: only `ostrom login` signs it in again, the app never writes the CLI's token.
+                        Banner(stringResource(Res.string.home_cli_signed_out, account.origin), Tone.WARN, Modifier.padding(12.dp).testTag("signed-out"))
+                    } else {
+                        Banner(stringResource(Res.string.home_signed_out, account.origin), Tone.WARN, Modifier.padding(12.dp).testTag("signed-out")) {
+                            AppButton(stringResource(Res.string.home_sign_in_again), onClick = { onSignInAgain(account) }, small = true, fill = false)
+                        }
                     }
                 }
                 state.error?.let { Banner(it.words(), Tone.DANGER, Modifier.padding(horizontal = 12.dp, vertical = 6.dp).testTag("home-error")) }

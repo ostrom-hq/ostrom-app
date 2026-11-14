@@ -26,6 +26,7 @@ import io.ktor.http.headersOf
 import org.koin.core.Koin
 import org.koin.core.context.startKoin
 import org.koin.core.context.stopKoin
+import org.koin.core.module.Module
 import org.koin.dsl.module
 import run.ostrom.app.di.appModules
 import run.ostrom.app.domain.services.BiometricGate
@@ -94,7 +95,7 @@ class RecordingUriHandler(var fails: Boolean = false) : UriHandler {
 
 /**
  * The whole app (App(), its screens, navigation and modules) on a fresh device of the desktop platform (device-flow
- * sign-in) talking to [server], in a [width] × [height] window; [before] prepares the device. [biometrics] stands in
+ * sign-in) talking to [server], in a [width] × [height] window; [before] prepares the device; [extra] adds a platform's own bindings. [biometrics] stands in
  * for a phone's gate (the desktop has none).
  */
 @OptIn(ExperimentalTestApi::class)
@@ -106,10 +107,12 @@ fun testApp(
     settings: Settings = MapSettings(),
     links: RecordingUriHandler = RecordingUriHandler(),
     biometrics: BiometricGate? = null,
+    extra: Module? = null,
     block: DesktopComposeUiTest.(Koin) -> Unit,
 ) {
     val koin = startKoin {
         modules(appModules(module {
+            extra?.let { includes(it) }
             single<Settings> { settings }
             single<CredentialStore> { credentials }
             single<HttpClientEngineFactory<*>> { server }

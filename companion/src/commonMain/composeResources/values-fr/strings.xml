@@ -495,4 +495,26 @@
     <string name="workflow_visit_started">Démarré %1$s</string>
     <string name="workflow_visit_finished">Terminé %1$s</string>
     <string name="workflow_visit_waiting">Attend une réponse.</string>
+    <string name="home_cli_signed_out">La session du CLI sur %1$s a pris fin. Lance ostrom login dans un terminal pour la rouvrir.</string>
+    <string name="settings_account_cli">CLI</string>
+    <string name="settings_cli_account">Ce compte est celui du CLI ostrom de cet ordinateur : il suit ostrom login et ostrom logout. Le déconnecter ici lance ostrom logout.</string>
+    <string name="update_available_title">ostrom %1$s est disponible</string>
+    <string name="update_available_detail">Le CLI de cet ordinateur est en %1$s. ostrom update vérifie et installe la version signée.</string>
+    <string name="update_action">Mettre à jour</string>
+    <string name="update_not_now">Plus tard</string>
+    <string name="update_updating_title">Mise à jour d'ostrom vers %1$s…</string>
+    <string name="update_updated_title">ostrom %1$s est installé</string>
+    <string name="update_updated_detail">Le CLI de cet ordinateur a été mis à jour.</string>
+    <string name="update_failed_title">ostrom %1$s n'a pas pu être installé</string>
+    <string name="update_failed_not_installed">Aucun CLI ostrom ne répond sur cet ordinateur. Lance ostrom version dans un terminal.</string>
+    <string name="update_failed_still_running">ostrom update tourne encore et va finir de lui-même. Réessaie une fois qu'il a terminé.</string>
+    <string name="update_failed_failed">ostrom update s'est arrêté sur une erreur.</string>
+    <string name="update_failed_unexpected">ostrom update a répondu quelque chose que l'app ne reconnaît pas.</string>
+    <string name="update_try_again">Réessayer</string>
+    <string name="tray_open">Ouvrir Ostrom</string>
+    <string name="tray_quit">Quitter Ostrom</string>
+    <string name="menu_file">Fichier</string>
+    <string name="menu_add_account">Ajouter un compte…</string>
+    <string name="menu_close_window">Fermer la fenêtre</string>
+    <string name="menu_view">Présentation</string>
 </resources>

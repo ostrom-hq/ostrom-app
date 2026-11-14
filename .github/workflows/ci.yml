@@ -52,11 +52,11 @@ jobs:
       - name: Install the Android platforms the app and ostrom-core compile against
         # `yes` ends on SIGPIPE once sdkmanager exits; that status must not fail the step under pipefail.
         run: '{ yes || true; } | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-37.0" "platforms;android-36" > /dev/null'
-      - name: Test (JVM with Compose UI tests, Android host), coverage gate, assemble the Android and desktop apps
+      - name: Test (JVM with Compose UI tests, Android host, desktop), coverage gate, assemble the Android and desktop apps
         run: >-
           ./gradlew -Postrom.core.path=.core
           :companion:jvmTest :companion:koverVerify :companion:testAndroidHostTest
-          :companion-android:assembleDebug :companion-desktop:compileKotlin
+          :companion-android:assembleDebug :companion-desktop:compileKotlin :companion-desktop:test
       - name: Keep the unsigned debug APK
         if: github.event_name == 'push'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

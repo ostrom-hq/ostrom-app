@@ -8,6 +8,7 @@ import kotlinx.coroutines.SupervisorJob
 import org.koin.dsl.module
 import run.ostrom.app.demo.DemoCredentialStore
 import run.ostrom.app.domain.repositories.PreferencesRepository
+import run.ostrom.app.domain.services.CliSession
 import run.ostrom.app.domain.services.Clock
 import run.ostrom.app.domain.services.IdGenerator
 import run.ostrom.app.domain.usecases.auth.AccountGuard
@@ -55,7 +56,7 @@ val domainModule = module {
     // This phone stops taking the account's push first, while its session can still speak.
     single {
         val clearPush = get<ClearPushUseCase>()
-        SignOutUseCase(get(), get(), get<DemoCredentialStore>()) { clearPush(it) }
+        SignOutUseCase(get(), get(), get<DemoCredentialStore>(), getOrNull<CliSession>()) { clearPush(it) }
     }
     single { RefreshAccountUseCase(get(), get(), get<DemoCredentialStore>(), get()) }
     single { AccountGuard(get()) }

@@ -60,6 +60,7 @@ import run.ostrom.app.resources.action_close
 import run.ostrom.app.resources.notifications_title
 import run.ostrom.app.resources.settings_about
 import run.ostrom.app.resources.settings_account_active
+import run.ostrom.app.resources.settings_account_cli
 import run.ostrom.app.resources.settings_account_signed_out
 import run.ostrom.app.resources.settings_accounts
 import run.ostrom.app.resources.settings_add_account
@@ -68,6 +69,7 @@ import run.ostrom.app.resources.settings_api_version_value
 import run.ostrom.app.resources.settings_app_version
 import run.ostrom.app.resources.settings_appearance
 import run.ostrom.app.resources.settings_change_organization
+import run.ostrom.app.resources.settings_cli_account
 import run.ostrom.app.resources.settings_end_demo
 import run.ostrom.app.resources.settings_memory_only
 import run.ostrom.app.resources.settings_no_organization
@@ -110,12 +112,14 @@ fun SettingsScreen(
             Group {
                 state.accounts.forEachIndexed { index, account ->
                     if (index > 0) GroupDivider()
-                    GroupRow(Modifier.testTag("account-${account.id}"), onClick = { if (account.signedIn) viewModel.switchTo(account) else onSignInAgain(account) }) {
+                    // The CLI's account signs in again with `ostrom login` only: a tap shows it, with what to run.
+                    GroupRow(Modifier.testTag("account-${account.id}"), onClick = { if (account.signedIn || account.usedByCli) viewModel.switchTo(account) else onSignInAgain(account) }) {
                         Avatar(account.displayName, dimmed = !account.signedIn)
                         Column(Modifier.weight(1f)) {
                             Text(account.displayName, color = colors.text, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             Text(account.origin, style = MonospaceStyle, color = colors.muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
+                        if (account.usedByCli) Chip(stringResource(Res.string.settings_account_cli), tone = Tone.ACCENT, modifier = Modifier.testTag("cli-badge"))
                         when {
                             !account.signedIn -> Chip(stringResource(Res.string.settings_account_signed_out), tone = Tone.WARN)
                             account.id == state.activeAccountId -> Chip(stringResource(Res.string.settings_account_active), tone = Tone.ACCENT, dot = true)
@@ -177,7 +181,8 @@ fun SettingsScreen(
             }
 
             if (active != null) {
-                if (!active.signedIn) AppButton(stringResource(Res.string.settings_sign_in_again), onClick = { onSignInAgain(active) }, modifier = Modifier.testTag("sign-in-again"))
+                if (active.usedByCli) Text(stringResource(Res.string.settings_cli_account), color = colors.muted, fontSize = 13.sp, modifier = Modifier.testTag("cli-account-hint"))
+                if (!active.signedIn && !active.usedByCli) AppButton(stringResource(Res.string.settings_sign_in_again), onClick = { onSignInAgain(active) }, modifier = Modifier.testTag("sign-in-again"))
                 AppButton(
                     stringResource(if (active.isDemo) Res.string.settings_end_demo else Res.string.settings_sign_out),
                     onClick = { viewModel.signOut(active) }, kind = ButtonKind.DANGER, busy = state.working, modifier = Modifier.testTag("sign-out"),
