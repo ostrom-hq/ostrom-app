@@ -88,7 +88,8 @@ What the React Native app did, what TeamCode's companion does that an Ostrom ser
 | History: receipts, verified on the device | `receipts.v1` | To port |
 | Spending | `budgets.v1` | Ported (week and month, budget bar, budgets passed, by agent, repository and person) |
 | Activity | none | Ported (newest first, paged; a line about an approval opens its request on a server with `gates.v1`) |
-| Push registration and notification preferences | `notifications.v1`, `notifications.push.v1` | To port (the server sends Expo push today) |
+| Notification preferences (requests, decisions, spending, quiet hours) | `notifications.v1` | Ported: Settings, Notifications, shaped like TeamCode's `NotificationPreferencesScreen` |
+| Push registration | `notifications.push.v1` | Waiting for the server: it accepts only `provider: "expo"`, which a native app has no token for (TeamCode's FCM push needs `fcm`/`apns` on the server) |
 | Artifacts gallery and viewer | `artifacts.v1` | To port from TeamCode |
 | Sessions (list, transcript, follow live) | `sessions.v1` | To port from TeamCode, once ostrom-core's client has the session routes |
 | Todos, workflows, automations, MCP servers, GitHub link, sharing | `todos.v1`, `workflows.v1`, `automations.v1`, `mcp.v1`, `github.link.v1`, `sharing.v1` | Later, each with its client routes in ostrom-core |

@@ -27,12 +27,14 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.adamglin.PhosphorIcons
 import com.adamglin.phosphoricons.Regular
+import com.adamglin.phosphoricons.regular.CaretRight
 import com.adamglin.phosphoricons.regular.Check
 import com.adamglin.phosphoricons.regular.Plus
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import run.ostrom.app.demo.isDemo
 import run.ostrom.app.domain.models.Account
+import run.ostrom.app.domain.models.Features
 import run.ostrom.app.domain.models.ThemePreference
 import run.ostrom.app.presentation.components.AppButton
 import run.ostrom.app.presentation.components.AppSheet
@@ -55,6 +57,7 @@ import run.ostrom.app.presentation.viewmodels.SettingsViewModel
 import run.ostrom.app.presentation.viewmodels.words
 import run.ostrom.app.resources.Res
 import run.ostrom.app.resources.action_close
+import run.ostrom.app.resources.notifications_title
 import run.ostrom.app.resources.settings_about
 import run.ostrom.app.resources.settings_account_active
 import run.ostrom.app.resources.settings_account_signed_out
@@ -68,6 +71,7 @@ import run.ostrom.app.resources.settings_change_organization
 import run.ostrom.app.resources.settings_end_demo
 import run.ostrom.app.resources.settings_memory_only
 import run.ostrom.app.resources.settings_no_organization
+import run.ostrom.app.resources.settings_notifications_row
 import run.ostrom.app.resources.settings_organization
 import run.ostrom.app.resources.settings_server_version
 import run.ostrom.app.resources.settings_sign_in_again
@@ -86,6 +90,7 @@ import run.ostrom.app.resources.theme_system
 fun SettingsScreen(
     onAddAccount: () -> Unit,
     onSignInAgain: (Account) -> Unit,
+    onOpenNotifications: (accountId: String) -> Unit = {},
     viewModel: SettingsViewModel = koinViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -132,6 +137,16 @@ fun SettingsScreen(
                     GroupRow(Modifier.testTag("organization"), onClick = { choosingOrganization = true; viewModel.loadOrganizations() }) {
                         Text(active.organizationName ?: stringResource(Res.string.settings_no_organization), color = colors.text, fontSize = 15.sp, modifier = Modifier.weight(1f))
                         Text(stringResource(Res.string.settings_change_organization), color = colors.accentText, fontSize = 14.sp)
+                    }
+                }
+            }
+
+            if (active != null && active.signedIn && state.server?.features?.contains(Features.NOTIFICATIONS) == true) {
+                SectionTitle(stringResource(Res.string.notifications_title))
+                Group {
+                    GroupRow(Modifier.testTag("settings-notifications"), onClick = { onOpenNotifications(active.id) }) {
+                        Text(stringResource(Res.string.settings_notifications_row), color = colors.text, fontSize = 15.sp, modifier = Modifier.weight(1f))
+                        Icon(PhosphorIcons.Regular.CaretRight, contentDescription = null, tint = colors.muted)
                     }
                 }
             }

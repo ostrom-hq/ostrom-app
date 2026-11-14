@@ -22,3 +22,7 @@ object MainRoute
  */
 @Serializable
 data class RequestRoute(val accountId: String, val id: String)
+
+/** The notification preferences of an account (`notifications.v1`), opened from Settings. */
+@Serializable
+data class NotificationPreferencesRoute(val accountId: String)

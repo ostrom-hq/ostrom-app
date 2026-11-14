@@ -283,4 +283,14 @@
     <string name="activity_error">The activity could not be loaded.</string>
     <string name="activity_load_failed">Could not refresh the activity.</string>
     <string name="activity_actor_agent">Agent %1$s</string>
+    <!-- Notification preferences (notifications.v1) -->
+    <string name="notifications_title">Notifications</string>
+    <string name="settings_notifications_row">What you are notified of</string>
+    <string name="notifications_requests">A request waits for my yes</string>
+    <string name="notifications_decisions">Someone decided my request</string>
+    <string name="notifications_spending">Spending passes a budget threshold</string>
+    <string name="notifications_quiet_hours">Quiet hours</string>
+    <string name="notifications_quiet_hours_range">No notification from %1$s to %2$s (%3$s)</string>
+    <string name="notifications_save_failed">The change could not be saved. It has been undone.</string>
+    <string name="notifications_note">Kept by the server for you: they hold on all your phones.</string>
 </resources>

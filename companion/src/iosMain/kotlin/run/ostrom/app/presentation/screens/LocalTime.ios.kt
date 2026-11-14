@@ -9,3 +9,5 @@ import platform.Foundation.localTimeZone
 
 actual fun deviceUtcOffsetMinutes(epochMillis: Long): Int =
     (NSTimeZone.localTimeZone.secondsFromGMTForDate(NSDate.dateWithTimeIntervalSince1970(epochMillis / 1000.0)) / 60).toInt()
+
+actual fun deviceTimeZoneId(): String = NSTimeZone.localTimeZone.name
