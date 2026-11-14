@@ -13,12 +13,13 @@ final class NotificationService: UNNotificationServiceExtension {
         handler = contentHandler
         generic = request.content
         guard let content = request.content.mutableCopy() as? UNMutableNotificationContent,
-              (request.content.userInfo["v"] as? String).map({ $0 == "1" }) ?? true,
+              request.content.userInfo["v"] == nil || request.content.userInfo["v"] as? String == "1",
               let payload = request.content.userInfo["p"] as? String, payload.count <= 4_096,
               let key = PushCrypto.privateKey(create: false),
               let json = try? PushCrypto.decrypt(payload, with: key),
               let push = try? JSONDecoder().decode(PushCrypto.Payload.self, from: json),
-              !push.title.isEmpty
+              !push.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              PushCrypto.isId(push.orgId), PushCrypto.isId(push.memberId)
         else { return contentHandler(request.content) }
         content.title = String(push.title.prefix(200))
         content.body = String(push.body.prefix(1_000))

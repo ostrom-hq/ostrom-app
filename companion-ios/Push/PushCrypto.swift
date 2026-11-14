@@ -22,16 +22,23 @@ enum PushCrypto {
         return query.merging(extra) { _, new in new } as CFDictionary
     }
 
-    /// The device's key, made and stored on first use when [create] (the app); the extension only reads it.
+    /// One maker at a time: two registrations at once must not each make (and delete) a key.
+    private static let lock = NSLock()
+
+    /// The device's key, made and stored on first use when [create] (the app); the extension only reads it. A Keychain
+    /// that cannot be read now (locked before the first unlock after a restart) gives nil: the key is replaced only when
+    /// it is missing or its entry does not hold a key, so a key registered with the servers is never dropped by mistake.
     static func privateKey(create: Bool) -> P256.KeyAgreement.PrivateKey? {
+        lock.lock()
+        defer { lock.unlock() }
         var item: CFTypeRef?
-        if SecItemCopyMatching(query([kSecReturnData: true, kSecMatchLimit: kSecMatchLimitOne]), &item) == errSecSuccess,
-           let data = item as? Data, let key = try? P256.KeyAgreement.PrivateKey(rawRepresentation: data) {
+        let status = SecItemCopyMatching(query([kSecReturnData: true, kSecMatchLimit: kSecMatchLimitOne]), &item)
+        if status == errSecSuccess, let data = item as? Data, let key = try? P256.KeyAgreement.PrivateKey(rawRepresentation: data) {
             return key
         }
-        guard create else { return nil }
+        guard create, status == errSecSuccess || status == errSecItemNotFound else { return nil }
         let key = P256.KeyAgreement.PrivateKey()
-        SecItemDelete(query([:])) // An unreadable entry is replaced: the next sync registers the new public key.
+        SecItemDelete(query([:])) // An entry that holds no key is replaced: the next sync registers the new public key.
         let added = SecItemAdd(query([kSecValueData: key.rawRepresentation, kSecAttrAccessible: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly]), nil)
         return added == errSecSuccess ? key : nil
     }
@@ -70,7 +77,14 @@ enum PushCrypto {
         let unreserved = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~")
         func encode(_ value: String) -> String { value.addingPercentEncoding(withAllowedCharacters: unreserved) ?? "" }
         var link = "ostrom://notification?origin=\(encode(push.origin))&org=\(encode(push.orgId))&member=\(encode(push.memberId))"
-        if let approval = push.approvalId { link += "&approval=\(encode(approval))" }
+        // A request id the app would refuse is left out, as NotificationLinks does: the tap still opens the account.
+        if let approval = push.approvalId, isId(approval) { link += "&approval=\(encode(approval))" }
         return link
+    }
+
+    /// The ids a link carries (NotificationLinks): `[A-Za-z0-9_-]{1,64}`.
+    static func isId(_ value: String) -> Bool {
+        let allowed = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-")
+        return (1...64).contains(value.count) && value.unicodeScalars.allSatisfy(allowed.contains)
     }
 }
