@@ -29,6 +29,7 @@ import run.ostrom.app.domain.usecases.push.NotificationLinks
 import run.ostrom.app.domain.usecases.push.NotificationTarget
 import run.ostrom.app.domain.usecases.push.ReadPushUseCase
 import run.ostrom.app.domain.usecases.push.ResolveNotificationUseCase
+import run.ostrom.app.domain.usecases.push.ShareSignedInAccountsUseCase
 import run.ostrom.app.domain.usecases.push.SyncPushUseCase
 import run.ostrom.app.domain.usecases.push.pushLocale
 import run.ostrom.app.infrastructure.push.PushPayloadReader
@@ -43,6 +44,8 @@ class PushUseCasesTest {
         override var locale: String? = "fr-FR"
         override val token = MutableStateFlow<String?>(null)
         override suspend fun publicKey() = "spki"
+        val shared = mutableListOf<Set<String>>()
+        override suspend fun signedIn(accounts: Set<String>) { shared += accounts }
 
         // The "encryption" of these tests: a payload is its JSON reversed.
         override suspend fun open(payload: String) =
@@ -74,6 +77,32 @@ class PushUseCasesTest {
     private val accounts = accounts()
 
     private fun sync(skip: (String) -> Boolean = { false }) = SyncPushUseCase(accounts, features, push, auth, platform, skip)
+
+    @Test
+    fun theSignedInAccountsAreSharedByOrganizationAndMemberAtEachChange() = runTest {
+        accounts.save(account("a1").copy(organizationId = "o1", memberId = "m1"))
+        // Not signed in, a member not read yet, an id a link would refuse, the demo: left out.
+        accounts.save(account("a2", signedIn = false).copy(organizationId = "o1", memberId = "m2"))
+        accounts.save(account("a3").copy(organizationId = "o2"))
+        accounts.save(account("a4").copy(organizationId = "o 3", memberId = "m4"))
+        accounts.save(account("demo").copy(organizationId = "o5", memberId = "m5"))
+        backgroundScope.launch { ShareSignedInAccountsUseCase(accounts, platform, skip = { it == "demo" })() }
+        runCurrent()
+        assertEquals(listOf(setOf("o1 m1")), platform.shared)
+
+        accounts.update(accounts.find("a3")!!.copy(memberId = "m3"))
+        runCurrent()
+        assertEquals(setOf("o1 m1", "o2 m3"), platform.shared.last())
+
+        // A change that leaves the list as it was writes nothing.
+        accounts.update(accounts.find("a1")!!.copy(name = "Ada"))
+        runCurrent()
+        assertEquals(2, platform.shared.size)
+
+        accounts.update(accounts.find("a1")!!.copy(signedIn = false))
+        runCurrent()
+        assertEquals(setOf("o2 m3"), platform.shared.last())
+    }
 
     @Test
     fun everySignedInAccountIsRegisteredOnceTheTokenArrives() = runTest {

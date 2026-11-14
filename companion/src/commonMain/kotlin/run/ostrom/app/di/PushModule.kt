@@ -12,6 +12,7 @@ import run.ostrom.app.domain.services.PushPlatform
 import run.ostrom.app.domain.usecases.push.ClearPushUseCase
 import run.ostrom.app.domain.usecases.push.ReadPushUseCase
 import run.ostrom.app.domain.usecases.push.ResolveNotificationUseCase
+import run.ostrom.app.domain.usecases.push.ShareSignedInAccountsUseCase
 import run.ostrom.app.domain.usecases.push.SyncPushUseCase
 import run.ostrom.app.infrastructure.repositories.RemotePushRepository
 
@@ -22,17 +23,22 @@ import run.ostrom.app.infrastructure.repositories.RemotePushRepository
 val pushModule = module {
     single<PushRepository> { RemotePushRepository(get()) }
     single { SyncPushUseCase(get(), get(), get(), get(), get(), skip = { isDemo(it) }) }
+    single { ShareSignedInAccountsUseCase(get(), get(), skip = { isDemo(it) }) }
     single { ClearPushUseCase(get()) }
     single { ReadPushUseCase(get(), get()) }
     single { ResolveNotificationUseCase(get()) }
 }
 
 /**
- * Keeps the servers of the signed-in accounts told where to push ([SyncPushUseCase]), on a phone whose shell binds a
+ * Keeps the servers of the signed-in accounts told where to push ([SyncPushUseCase]), and the phone's platform told
+ * which accounts are signed in ([ShareSignedInAccountsUseCase]), on a phone whose shell binds a
  * [PushPlatform]; nothing elsewhere. Called once after [initKoin].
  */
 fun startPush(koin: Koin) {
     if (koin.getOrNull<PushPlatform>() == null) return
     val sync = koin.get<SyncPushUseCase>()
-    koin.get<CoroutineScope>().launch { sync() }
+    val share = koin.get<ShareSignedInAccountsUseCase>()
+    val scope = koin.get<CoroutineScope>()
+    scope.launch { sync() }
+    scope.launch { share() }
 }

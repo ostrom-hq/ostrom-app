@@ -26,4 +26,11 @@ interface PushPlatform {
 
     /** Decrypts and reads a push's payload (`PushPayload`); throws when it is not for this key. */
     suspend fun open(payload: String): PushMessage
+
+    /**
+     * The organization and member of every account signed in on this phone, each as `orgId memberId`, at each change.
+     * For a reader outside the app (the iOS notification service extension), which shows a push's text only for one of
+     * them, as [run.ostrom.app.domain.usecases.push.ReadPushUseCase] does in the app. Nothing by default.
+     */
+    suspend fun signedIn(accounts: Set<String>) {}
 }

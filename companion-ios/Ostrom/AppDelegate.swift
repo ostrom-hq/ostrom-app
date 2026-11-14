@@ -52,4 +52,8 @@ final class PushKeys: NSObject, IosPushKeys {
     func requestAuthorization() {
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { _, _ in }
     }
+
+    func saveSignedIn(accounts: String) {
+        PushCrypto.saveSignedIn(accounts)
+    }
 }

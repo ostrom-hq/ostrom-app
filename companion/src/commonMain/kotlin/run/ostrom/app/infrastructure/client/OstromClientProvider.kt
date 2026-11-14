@@ -38,6 +38,13 @@ class OstromClientProvider(
     /** A client for calls before an account exists (discovery, sign-in, the new session's first reads); close it after use. */
     fun detached(origin: String, token: String? = null): OstromClient = create(origin, { token }, { null })
 
+    /**
+     * A client of the account that acts in [organizationId] whatever the account chose since (a registration kept in
+     * the organization it was made in); close it after use.
+     */
+    fun inOrganization(accountId: String, origin: String, organizationId: String?): OstromClient =
+        create(origin, { readToken(accountId) }, { organizationId })
+
     suspend fun release(accountId: String) {
         lock.withLock { clients.remove(accountId) }?.second?.close()
     }

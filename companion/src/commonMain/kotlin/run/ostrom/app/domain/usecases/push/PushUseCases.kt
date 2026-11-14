@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import run.ostrom.app.domain.models.Account
 import run.ostrom.app.domain.models.AppException
 import run.ostrom.app.domain.models.Features
@@ -100,6 +101,32 @@ class SyncPushUseCase(
 
     private companion object {
         const val MAX_RETRY_MILLIS = 3_600_000L
+    }
+}
+
+/**
+ * Tells the [PushPlatform] which accounts are signed in on this phone, at each change, until cancelled: their
+ * organization and member, never a token. An account whose member id is not read yet is left out, as its pushes cannot
+ * be told apart; so is one [skip] leaves out (the demo account).
+ */
+class ShareSignedInAccountsUseCase(
+    private val accounts: AccountRepository,
+    private val platform: PushPlatform,
+    private val skip: (String) -> Boolean = { false },
+) {
+    suspend operator fun invoke() {
+        accounts.accounts
+            .map { list ->
+                list.filter { it.signedIn && !skip(it.id) }
+                    .mapNotNull { account ->
+                        val org = account.organizationId?.takeIf(NotificationLinks::isId) ?: return@mapNotNull null
+                        val member = account.memberId?.takeIf(NotificationLinks::isId) ?: return@mapNotNull null
+                        "$org $member"
+                    }
+                    .toSet()
+            }
+            .distinctUntilChanged()
+            .collect { platform.signedIn(it) }
     }
 }
 

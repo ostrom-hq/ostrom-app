@@ -22,6 +22,16 @@ class AccountCalls(private val clients: OstromClientProvider, private val accoun
     suspend fun <T> withAccount(accountId: String, resource: Boolean = false, call: suspend (OstromClient) -> T): T =
         translateFailures(resource) { call(client(accountId)) }
 
+    /** The organization the account's calls act in now (`Ostrom-Org`); an unknown account is signed out. */
+    fun organizationOf(accountId: String): String? =
+        (accounts.find(accountId) ?: throw AppException.Unauthorized()).organizationId
+
+    /** Like [withAccount], acting in [organizationId] instead of the account's current choice. */
+    suspend fun <T> withAccountIn(accountId: String, organizationId: String?, call: suspend (OstromClient) -> T): T {
+        val account = accounts.find(accountId) ?: throw AppException.Unauthorized()
+        return clients.inOrganization(accountId, account.origin, organizationId).use { client -> translateFailures { call(client) } }
+    }
+
     /** The account's client; an unknown account is signed out. */
     suspend fun client(accountId: String): OstromClient {
         val account = accounts.find(accountId) ?: throw AppException.Unauthorized()
