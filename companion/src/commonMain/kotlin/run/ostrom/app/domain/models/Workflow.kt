@@ -13,8 +13,11 @@ enum class RunStatus(val wire: String) {
 /** What a node of a workflow is. [UNKNOWN] is a kind a newer server added. */
 enum class NodeKind { TRIGGER, STEP, CHECK, GATE, NOTIFY, AGENT, WAIT, WORKFLOW, UNKNOWN }
 
-/** The chips of the runs list; the server filters on one status, so "Done" is the succeeded ones. [ALL] shows every run. */
-enum class RunFilter(val status: String?) { ALL(null), RUNNING("running"), WAITING("waiting"), DONE("succeeded"), FAILED("failed") }
+/**
+ * The chips of the runs list; the server filters on one status, so "Done" is the succeeded ones. [ALL] shows every
+ * run; [CANCELLED] the runs someone cancelled, which no other chip shows.
+ */
+enum class RunFilter(val status: String?) { ALL(null), RUNNING("running"), WAITING("waiting"), DONE("succeeded"), FAILED("failed"), CANCELLED("cancelled") }
 
 /**
  * One pass through a node of a run. [title] is the node's title in the definition the run started with, else its id.

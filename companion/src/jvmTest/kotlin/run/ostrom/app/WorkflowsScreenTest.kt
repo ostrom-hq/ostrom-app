@@ -37,6 +37,8 @@ class WorkflowsScreenTest {
             "GET /api/v1/auth/me" to """{"dev":{"login":"ada","verified":true,"via":"device"},"capabilities":[]}""",
             "GET /api/v1/activity" to """{"items":[]}""",
             "GET /api/v1/sessions" to """{"items":[]}""",
+            "GET /api/v1/runs?status=cancelled" to """{"items":[${run("r4", "cancelled", ""","endedAt":"2026-11-14T09:20:00Z"""")}]}""",
+            "GET /api/v1/workflows/wf1/runs?status=cancelled" to """{"items":[${run("r5", "cancelled", ""","endedAt":"2026-11-14T09:25:00Z"""")}]}""",
             "GET /api/v1/runs?status=failed" to """{"items":[${run("r3", "failed", ""","failure":"The build broke"""")}]}""",
             "GET /api/v1/runs" to """{"items":[${run("r1", "waiting")},${run("r2", "succeeded", ""","endedAt":"2026-11-14T09:30:00Z"""")}]}""",
             "GET /api/v1/runs/r1" to run("r1", "waiting", ""","inputs":{"version":"1.4.0"},"sessionId":"s9","visits":[
@@ -90,6 +92,28 @@ class WorkflowsScreenTest {
             click("workflow-run-session")
             waitFor("session-overview")
             waitForText("codex")
+        }
+    }
+
+    @Test
+    fun cancelledRunsHaveTheirOwnFilterOnTheMembersRunsAndAWorkflowsRuns() {
+        val server = server()
+        signedIn(server) {
+            click("tab-workflows")
+            waitFor("workflow-run-r1")
+            onNodeWithTag("workflow-run-r4").assertDoesNotExist()
+            click("runs-filter-cancelled")
+            waitFor("workflow-run-r4")
+            waitFor("workflow-run-status-r4")
+            onNodeWithTag("workflow-run-r1").assertDoesNotExist()
+            assertTrue("GET /api/v1/runs" in server.asked)
+            click("runs-filter-all")
+            click("workflows-part-definitions")
+            click("workflow-wf1")
+            waitFor("workflow-run-r1")
+            click("runs-filter-cancelled")
+            waitFor("workflow-run-r5")
+            onNodeWithTag("workflow-run-r1").assertDoesNotExist()
         }
     }
 

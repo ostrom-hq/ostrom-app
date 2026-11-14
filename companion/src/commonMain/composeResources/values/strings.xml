@@ -441,6 +441,7 @@
     <string name="workflows_filter_waiting">Waiting</string>
     <string name="workflows_filter_done">Done</string>
     <string name="workflows_filter_failed">Failed</string>
+    <string name="workflows_filter_cancelled">Cancelled</string>
     <string name="workflows_reconnecting">Reconnecting…</string>
     <string name="workflows_edit_note">Read only here: the console edits workflows.</string>
     <string name="workflows_empty">No workflows yet</string>
