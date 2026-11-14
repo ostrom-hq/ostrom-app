@@ -158,7 +158,7 @@ fun WorkflowsScreen(
                 val rights = definitionsState.rights
                 val account = definitionsState.account
                 if (rights != null && definitionsState.administers && account != null) {
-                    item(key = "editors") { WorkflowEditorsCard(rights, if (account.isDemo) null else "${account.origin}/workflows") }
+                    item(key = "editors") { WorkflowEditorsCard(rights, if (account.isDemo) null else "${account.origin.trimEnd('/')}/workflows") }
                 }
                 items(definitionsState.workflows.orEmpty(), key = { it.id }) { workflow ->
                     WorkflowCard(workflow) { definitionsState.account?.let { onOpenWorkflow(it.id, workflow.id) } }

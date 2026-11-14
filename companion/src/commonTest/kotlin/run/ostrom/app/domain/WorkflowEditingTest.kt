@@ -177,6 +177,9 @@ class WorkflowEditingTest {
         assertEquals(setOf(ProblemRule.CALLEE_SELF), rules(calling("wf1"), others, "wf1"))
         assertEquals(listOf("wf1 -> b -> c -> wf1"), WorkflowChecks.check(calling("b"), others, "wf1").filter { it.rule == ProblemRule.CALLEE_LOOP }.map { it.args.first() })
         assertEquals(setOf(ProblemRule.CALLEE_DEPTH), rules(calling("d1", limits = DraftLimits(maxDepth = 2)), others, "wf1"))
+        val diamond = listOf(callee("top", calls = "d1"), callee("d1", calls = "d3").let { it.copy(nodes = it.nodes + WorkflowNode("e", NodeKind.WORKFLOW, "E", null, "d2")) },
+            callee("d2", calls = "d3"), callee("d3"))
+        assertEquals(setOf(ProblemRule.CALLEE_DEPTH), rules(calling("top", limits = DraftLimits(maxDepth = 3)), diamond, "wf1"), "A shared sub-workflow counts at its deepest")
         assertEquals(emptySet(), rules(calling("d1"), others, "wf1"))
         assertEquals(setOf(ProblemRule.ARGUMENT_MISSING), rules(calling("needs"), others, "wf1"))
         assertEquals(setOf(ProblemRule.ARGUMENT_UNKNOWN), rules(calling("needs", mapOf("v" to "1", "w" to "2")), others, "wf1"))
@@ -212,7 +215,35 @@ class WorkflowEditingTest {
         assertEquals(playedDraft(), WorkflowEdits.setKind(playedDraft(), "write", NodeKind.AGENT))
         val removed = WorkflowEdits.removeNode(playedDraft(), "write")
         assertEquals("ask", removed.start)
-        assertEquals(listOf(DraftEdge("ask", null, "yes")), removed.edges)
+        assertEquals(listOf(DraftEdge("ask", null, "yes"), DraftEdge("ask", "ask", "again")), removed.edges, "What led to it goes where it went")
+        val chain = WorkflowEdits.addNode(WorkflowEdits.addNode(WorkflowEdits.newDraft(), NodeKind.AGENT), NodeKind.AGENT)
+        assertEquals(listOf(DraftEdge("agent", "agent3", "delivered"), DraftEdge("agent3", null, "delivered")), WorkflowEdits.removeNode(chain, "agent2").edges)
+    }
+
+    @Test fun aRenameNeverMergesTwoEntriesNorTouchesAnotherName() {
+        val two = WorkflowEdits.addNode(WorkflowEdits.newDraft(), NodeKind.AGENT)
+        assertEquals(two, WorkflowEdits.renameNode(two, "agent2", "agent"), "An id another step has is not taken")
+        val inputs = playedDraft().copy(
+            inputs = listOf(WorkflowInput("a", "A", required = false, default = null), WorkflowInput("ab", "AB", required = false, default = null)),
+            nodes = playedDraft().nodes.map { if (it.id == "write") it.copy(instruction = "{{inputs.a}} {{ inputs.a }} {{inputs.ab}}", deliverable = DraftDeliverable("text", "{{inputs.a}}")) else it },
+        )
+        val renamed = WorkflowEdits.renameInput(inputs, "a", "x")
+        assertEquals("{{inputs.x}} {{ inputs.x }} {{inputs.ab}}", renamed.node("write")?.instruction)
+        assertEquals("{{inputs.x}}", renamed.node("write")?.deliverable?.label)
+        assertEquals(inputs, WorkflowEdits.renameInput(inputs, "a", "ab"))
+        assertEquals(playedDraft(), WorkflowEdits.renameAction(playedDraft(), "ask", "again", "yes"))
+        val retyped = WorkflowEdits.setKind(playedDraft(), "ask", NodeKind.AGENT)
+        assertEquals(listOf(DraftEdge("ask", null, "delivered")), retyped.edgesFrom("ask"))
+        val byDefault = playedDraft().copy(edges = listOf(DraftEdge("write", "ask"), DraftEdge("ask", null)))
+        assertEquals(listOf(DraftEdge("write", "ask")), WorkflowEdits.setKind(byDefault, "write", NodeKind.WAIT).edgesFrom("write"))
+    }
+
+    @Test fun aProblemOfTheGraphIsShownAgainstItsStep() {
+        val island = playedDraft().copy(edges = listOf(DraftEdge("write", null, "delivered"), DraftEdge("write", "ghost", "next")))
+        val problems = WorkflowChecks.check(island)
+        assertEquals("ask", problems.single { it.rule == ProblemRule.NOT_REACHABLE }.nodeId)
+        assertEquals("write", problems.single { it.rule == ProblemRule.TRANSITION_TARGET }.nodeId)
+        assertEquals("ask", WorkflowChecks.check(playedDraft().copy(start = "ask")).single { it.rule == ProblemRule.START_WAIT }.nodeId)
     }
 
     @Test fun anOutcomeIsRoutedAndAnInputOrAButtonRenamedWithWhatNamesIt() {

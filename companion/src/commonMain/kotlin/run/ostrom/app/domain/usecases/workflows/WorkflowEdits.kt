@@ -54,31 +54,48 @@ object WorkflowEdits {
 
     private fun blank(id: String, kind: NodeKind) = DraftNode(id, kind, "", deliverable = if (kind == NodeKind.AGENT) DraftDeliverable("text") else null)
 
-    /** Changes a node's kind: what the old kind held is dropped, its edges take the new kind's outcomes. */
+    /**
+     * Changes a node's kind: what the old kind held is dropped. Its default edge and the edges on an outcome the new
+     * kind also has stay; every other outcome goes where its first edge went.
+     */
     fun setKind(draft: WorkflowDraft, id: String, kind: NodeKind): WorkflowDraft {
         val node = draft.node(id) ?: return draft
         if (node.kind == kind) return draft
         val changed = blank(id, kind).copy(title = node.title, maxVisits = node.maxVisits, originId = node.originId)
         val out = draft.edgesFrom(id)
+        val kept = out.filter { it.outcome == DraftNode.NEXT || it.outcome in changed.outcomes }
         val target = out.firstOrNull()?.to
-        val edges = draft.edges.filter { it.from != id } + if (out.isEmpty()) emptyList() else changed.outcomes.map { DraftEdge(id, target, it) }
-        return draft.copy(nodes = draft.nodes.map { if (it.id == id) changed else it }, edges = edges)
+        val covered = kept.any { it.outcome == DraftNode.NEXT }
+        val added = if (out.isEmpty() || covered) emptyList() else changed.outcomes.filter { o -> kept.none { it.outcome == o } }.map { DraftEdge(id, target, it) }
+        return draft.copy(nodes = draft.nodes.map { if (it.id == id) changed else it }, edges = draft.edges.filter { it.from != id } + kept + added)
     }
 
-    /** Removes a node and the edges that leave it or lead to it; the start moves to the first node left. */
+    /**
+     * Removes a node and the edges that leave it. The edges that led to it go where it went (its first edge's target,
+     * or the end), so the steps before it stay routed; the start moves to the first node left.
+     */
     fun removeNode(draft: WorkflowDraft, id: String): WorkflowDraft {
         val nodes = draft.nodes.filter { it.id != id }
+        val next = draft.edgesFrom(id).firstOrNull { it.to != id }?.to
         return draft.copy(
             nodes = nodes,
-            edges = draft.edges.filter { it.from != id && it.to != id },
+            edges = draft.edges.filter { it.from != id }.map { if (it.to == id) it.copy(to = next) else it },
             start = draft.start.takeIf { it != id } ?: nodes.firstOrNull()?.id,
         )
     }
 
-    /** Renames a node: its edges, the start and the `{{nodes.<id>.output}}` that name it follow. */
+    // `{{ <name> }}` with exactly [name] inside, spaces allowed as the server reads it.
+    private fun placeholder(name: String) = Regex("\\{\\{(\\s*)" + Regex.escape(name) + "(\\s*)\\}\\}")
+
+    private fun String.renamed(old: String, new: String) = replace(placeholder(old)) { "{{" + it.groupValues[1] + new + it.groupValues[2] + "}}" }
+
+    /**
+     * Renames a node: its edges, the start and the `{{nodes.<id>.output}}` that name it follow. A name another node
+     * already has is not taken (it would merge the two), so the field keeps its value.
+     */
     fun renameNode(draft: WorkflowDraft, old: String, new: String): WorkflowDraft {
-        if (old == new) return draft
-        fun text(value: String) = value.replace("nodes.$old.output", "nodes.$new.output")
+        if (old == new || draft.nodes.any { it.id == new } || draft.nodes.count { it.id == old } != 1) return draft
+        fun text(value: String) = value.renamed("nodes.$old.output", "nodes.$new.output")
         return draft.copy(
             nodes = draft.nodes.map { node ->
                 val renamed = if (node.id == old) node.copy(id = new) else node
@@ -113,13 +130,19 @@ object WorkflowEdits {
     fun newInput(draft: WorkflowDraft): WorkflowInput =
         WorkflowInput(fresh("input", draft.inputs.map { it.id }.toSet()), "", required = true, default = null, maxLength = DEFAULT_INPUT_LENGTH)
 
-    /** Renames an input: the `{{inputs.<id>}}` that name it follow. */
+    /** Renames an input: the `{{inputs.<id>}}` that name it follow. An id another input has is not taken. */
     fun renameInput(draft: WorkflowDraft, old: String, new: String): WorkflowDraft {
-        if (old == new) return draft
-        fun text(value: String) = value.replace("inputs.$old", "inputs.$new")
+        if (old == new || draft.inputs.any { it.id == new } || draft.inputs.count { it.id == old } != 1) return draft
+        fun text(value: String) = value.renamed("inputs.$old", "inputs.$new")
         return draft.copy(
             inputs = draft.inputs.map { if (it.id == old) it.copy(id = new) else it },
-            nodes = draft.nodes.map { node -> node.copy(instruction = text(node.instruction), arguments = node.arguments.mapValues { text(it.value) }) },
+            nodes = draft.nodes.map { node ->
+                node.copy(
+                    instruction = text(node.instruction),
+                    deliverable = node.deliverable?.let { d -> d.copy(label = d.label?.let(::text)) },
+                    arguments = node.arguments.mapValues { text(it.value) },
+                )
+            },
         )
     }
 
@@ -136,8 +159,14 @@ object WorkflowEdits {
         )
     }
 
-    /** Renames a wait's action: the edge on its outcome follows. */
-    fun renameAction(draft: WorkflowDraft, nodeId: String, old: String, new: String): WorkflowDraft = draft.copy(
+    /** Renames a wait's action: the edge on its outcome follows. An id another button of the node has is not taken. */
+    fun renameAction(draft: WorkflowDraft, nodeId: String, old: String, new: String): WorkflowDraft {
+        val actions = draft.node(nodeId)?.actions.orEmpty()
+        if (old == new || actions.any { it.id == new } || actions.count { it.id == old } != 1) return draft
+        return renamedAction(draft, nodeId, old, new)
+    }
+
+    private fun renamedAction(draft: WorkflowDraft, nodeId: String, old: String, new: String): WorkflowDraft = draft.copy(
         nodes = draft.nodes.map { node -> if (node.id == nodeId) node.copy(actions = node.actions.map { if (it.id == old) it.copy(id = new) else it }) else node },
         edges = draft.edges.map { if (it.from == nodeId && it.on == old) it.copy(on = new) else it },
     )

@@ -84,8 +84,11 @@ object WorkflowChecks {
 
     private class Sink(val nodeId: String?) {
         val out = mutableListOf<WorkflowProblem>()
-        fun add(rule: ProblemRule, vararg args: String) {
-            out += WorkflowProblem(rule, nodeId, args.toList())
+        fun add(rule: ProblemRule, vararg args: String) = at(nodeId, rule, *args)
+
+        /** A problem of the graph shown against the step it concerns. */
+        fun at(node: String?, rule: ProblemRule, vararg args: String) {
+            out += WorkflowProblem(rule, node, args.toList())
         }
     }
 
@@ -109,17 +112,17 @@ object WorkflowChecks {
         val ids = nodes.map { it.id }
         val maxNodes = draft.limits.maxNodes ?: DEFAULT_NODES
         if (limitsOk && nodes.size > maxNodes) sink.add(ProblemRule.TOO_MANY_NODES, maxNodes.toString())
-        ids.groupBy { it }.filter { it.value.size > 1 }.keys.forEach { sink.add(ProblemRule.NODE_DUPLICATE, it) }
-        draft.edges.filter { it.to != null && it.to !in ids }.forEach { sink.add(ProblemRule.TRANSITION_TARGET, it.from, it.to.orEmpty()) }
+        ids.groupBy { it }.filter { it.value.size > 1 }.keys.forEach { sink.at(it, ProblemRule.NODE_DUPLICATE, it) }
+        draft.edges.filter { it.to != null && it.to !in ids }.forEach { sink.at(it.from.takeIf { from -> from in ids }, ProblemRule.TRANSITION_TARGET, it.from, it.to.orEmpty()) }
         val start = draft.first ?: return
         val first = draft.node(start)
         if (first == null) {
             sink.add(ProblemRule.START_MISSING, start)
             return
         }
-        if (first.kind == NodeKind.WAIT) sink.add(ProblemRule.START_WAIT, first.title.ifBlank { first.id })
+        if (first.kind == NodeKind.WAIT) sink.at(first.id, ProblemRule.START_WAIT, first.title.ifBlank { first.id })
         val reached = reachable(start, draft.edges)
-        nodes.filter { it.id !in reached }.forEach { sink.add(ProblemRule.NOT_REACHABLE, it.title.ifBlank { it.id }) }
+        nodes.filter { it.id !in reached }.forEach { sink.at(it.id, ProblemRule.NOT_REACHABLE, it.title.ifBlank { it.id }) }
         val ends = draft.edges.any { it.to == null } || nodes.any { node -> draft.edges.none { it.from == node.id } }
         if (!ends) sink.add(ProblemRule.NO_ENDING)
     }
@@ -213,7 +216,7 @@ object WorkflowChecks {
             sink.add(ProblemRule.CALLEE_UNKNOWN, callee)
             return
         }
-        val deepest = depth(callee, listOfNotNull(selfId), byId, sink) ?: return
+        val deepest = depth(callee, listOfNotNull(selfId), byId, sink, mutableMapOf()) ?: return
         val maxDepth = draft.limits.maxDepth ?: DEFAULT_DEPTH
         if (deepest > maxDepth) sink.add(ProblemRule.CALLEE_DEPTH, deepest.toString(), maxDepth.toString())
         val given = node.arguments.keys
@@ -221,16 +224,18 @@ object WorkflowChecks {
         given.filter { key -> called.inputs.none { it.id == key } }.forEach { sink.add(ProblemRule.ARGUMENT_UNKNOWN, it, called.name) }
     }
 
-    // How deep the chain below [id] goes; null after a loop (reported with its path).
-    private fun depth(id: String, path: List<String>, others: Map<String, Workflow>, sink: Sink): Int? {
+    // How deep the chain below [id] goes; null after a loop (reported with its path). [known] keeps the depth of a
+    // workflow already walked, so shared sub-workflows are walked once, not once per path.
+    private fun depth(id: String, path: List<String>, others: Map<String, Workflow>, sink: Sink, known: MutableMap<String, Int>): Int? {
         if (id in path) {
             sink.add(ProblemRule.CALLEE_LOOP, (path + id).joinToString(" -> "))
             return null
         }
+        known[id]?.let { return it }
         var deepest = 0
         for (next in others[id]?.nodes.orEmpty().mapNotNull { it.calls }.toSet()) {
-            deepest = maxOf(deepest, depth(next, path + id, others, sink) ?: return null)
+            deepest = maxOf(deepest, depth(next, path + id, others, sink, known) ?: return null)
         }
-        return 1 + deepest
+        return (1 + deepest).also { known[id] = it }
     }
 }

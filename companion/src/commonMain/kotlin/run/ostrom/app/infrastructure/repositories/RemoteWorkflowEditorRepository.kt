@@ -36,8 +36,9 @@ import run.ostrom.core.api.models.WorkflowNode as ApiWorkflowNode
 
 /**
  * The workflow definitions over the typed client (`/api/v1/workflows`, `/api/v1/workflows/settings`). A save reads
- * the stored workflow first and changes only what the editor edits, so what it does not know (a gate's approvers, a
- * wait's fields, the analysis' suggestions, positions) is kept; the version read is sent, so a newer one is refused.
+ * the stored workflow first and changes only what the editor edits, so what it does not edit (a gate's approvers, a
+ * wait's fields, the analysis' suggestions, positions) is kept as far as the pinned core's model knows it; the version
+ * read is checked and sent, so a newer one is refused.
  */
 class RemoteWorkflowEditorRepository(
     private val calls: AccountCalls,
@@ -60,6 +61,8 @@ class RemoteWorkflowEditorRepository(
     override suspend fun save(accountId: String, workflow: EditableWorkflow, draft: WorkflowDraft): WorkflowWrite<String> =
         calls.withAccount(accountId, resource = true) { client ->
             val stored = client.workflows.get(workflow.id)
+            // Saved since it was read: refused here too, so a read without a version never overwrites a newer one.
+            if (stored.version != workflow.version) throw AppException.WorkflowEditRefused(WorkflowEditRefusal.STALE)
             val saved = draft.apply(stored, workflow.id, now())
             refusals(creating = false) { client.workflows.save(workflow.id, saved, workflow.version).domain { it.id } }
         }

@@ -39,6 +39,7 @@ import run.ostrom.app.infrastructure.repositories.RemoteWorkflowEditorRepository
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -230,6 +231,10 @@ class RemoteWorkflowEditorRepositoryTest {
         val editable = repository.editable("a1", "wf1")
         answers.clear()
         assertFailsWith<AppException.NotFound> { repository.save("a1", editable, editable.draft) }
+        answers["GET /api/v1/workflows/wf1"] = HttpStatusCode.OK to stored.replace("\"version\":3", "\"version\":4")
+        val stale = assertFailsWith<AppException.WorkflowEditRefused> { repository.save("a1", editable, editable.draft) }
+        assertEquals(WorkflowEditRefusal.STALE, stale.reason, "Saved since it was read: refused before anything is sent")
+        assertFalse(asked.any { it.startsWith("PUT") })
         answers["PUT /api/v1/workflows/wf1"] = HttpStatusCode.Conflict to """{"error":{"type":"conflict","message":"m"}}"""
         answers["GET /api/v1/workflows/wf1"] = HttpStatusCode.OK to stored
         assertFailsWith<AppException.Server> { repository.save("a1", editable, editable.draft) }
