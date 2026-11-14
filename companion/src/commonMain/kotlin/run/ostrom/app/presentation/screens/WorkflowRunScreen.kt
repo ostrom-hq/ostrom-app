@@ -3,6 +3,7 @@
 package run.ostrom.app.presentation.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
@@ -17,13 +18,18 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.LifecycleStartEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.adamglin.PhosphorIcons
@@ -47,10 +53,15 @@ import run.ostrom.app.presentation.components.rememberNow
 import run.ostrom.app.presentation.theme.MetaStyle
 import run.ostrom.app.presentation.theme.MonospaceStyle
 import run.ostrom.app.presentation.theme.Ostrom
+import run.ostrom.app.presentation.theme.Radii
 import run.ostrom.app.presentation.viewmodels.WorkflowRunViewModel
 import run.ostrom.app.presentation.viewmodels.words
 import run.ostrom.app.resources.Res
 import run.ostrom.app.resources.action_retry
+import run.ostrom.app.resources.workflow_cancel
+import run.ostrom.app.resources.workflow_cancel_body
+import run.ostrom.app.resources.workflow_cancel_keep
+import run.ostrom.app.resources.workflow_cancel_title
 import run.ostrom.app.resources.workflow_open_parent
 import run.ostrom.app.resources.workflow_open_run
 import run.ostrom.app.resources.workflow_open_session
@@ -71,8 +82,8 @@ import run.ostrom.app.resources.workflows_title
 
 /**
  * One run: its status and failure, its inputs, the visits as a timeline (node, kind, status, outcome, output, times,
- * the session it ran in, the sub-workflow's run), and its result. Read again at each change of the run the feed
- * announces. Starting and cancelling runs stay in the console.
+ * the session it ran in, the sub-workflow's run), and its result, with Cancel (confirmed first) on a run that has not
+ * ended, for an owner or an admin. Read again at each change of the run the feed announces.
  */
 @Composable
 fun WorkflowRunScreen(
@@ -90,6 +101,7 @@ fun WorkflowRunScreen(
     val now = rememberNow()
     val colors = Ostrom.colors
     val run = state.run
+    var confirmCancel by rememberSaveable { mutableStateOf(false) }
     Column(Modifier.fillMaxSize().background(colors.background), horizontalAlignment = Alignment.CenterHorizontally) {
         NavBar(backLabel, onBack, run?.workflowName ?: stringResource(Res.string.workflow_run_title)) {
             AppIconButton(PhosphorIcons.Regular.ArrowsClockwise, stringResource(Res.string.workflow_run_refresh), onClick = viewModel::load, enabled = !state.loading,
@@ -106,6 +118,7 @@ fun WorkflowRunScreen(
                     { AppButton(stringResource(Res.string.action_retry), onClick = viewModel::load, kind = ButtonKind.SECONDARY, small = true, fill = false, modifier = Modifier.testTag("workflow-run-retry")) }
                 } else null)
             }
+            state.actionError?.let { Banner(it.words(), Tone.DANGER, Modifier.testTag("workflow-run-action-error")) }
             BusyRow(state.loading && run == null)
             if (run != null) {
                 val today = localEpochDay(now)
@@ -127,6 +140,10 @@ fun WorkflowRunScreen(
                                 modifier = Modifier.testTag("workflow-run-parent"))
                         }
                     }
+                    if (state.canCancel || state.cancelling) {
+                        AppButton(stringResource(Res.string.workflow_cancel), onClick = { confirmCancel = true }, kind = ButtonKind.DANGER, enabled = !state.cancelling,
+                            busy = state.cancelling, modifier = Modifier.testTag("workflow-run-cancel"))
+                    }
                 }
                 if (run.status == RunStatus.FAILED) (run.failure ?: run.failureCode)?.let { Banner(it, Tone.DANGER, Modifier.testTag("workflow-run-failure")) }
                 if (run.inputs.isNotEmpty()) {
@@ -142,6 +159,27 @@ fun WorkflowRunScreen(
                     SectionTitle(stringResource(Res.string.workflow_run_result))
                     AppCard(Modifier.testTag("workflow-run-result")) { SelectionContainer { Text(it, color = colors.text, fontSize = 14.sp) } }
                 }
+            }
+        }
+    }
+    if (confirmCancel) ConfirmCancel(onConfirm = { confirmCancel = false; viewModel.cancel() }, onDismiss = { confirmCancel = false })
+}
+
+/** Asks before a run is cancelled: what it ends (its open wait or gate is withdrawn) cannot be undone. */
+@Composable
+private fun ConfirmCancel(onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    val colors = Ostrom.colors
+    Dialog(onDismissRequest = onDismiss) {
+        Column(
+            Modifier.widthIn(max = 420.dp).fillMaxWidth().clip(Radii.card).background(colors.panel).border(1.dp, colors.line, Radii.card).padding(18.dp)
+                .testTag("workflow-cancel-confirm"),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(stringResource(Res.string.workflow_cancel_title), color = colors.text, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+            Text(stringResource(Res.string.workflow_cancel_body), color = colors.text, fontSize = 14.sp)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                AppButton(stringResource(Res.string.workflow_cancel_keep), onClick = onDismiss, kind = ButtonKind.SECONDARY, modifier = Modifier.weight(1f).testTag("workflow-cancel-keep"))
+                AppButton(stringResource(Res.string.workflow_cancel), onClick = onConfirm, kind = ButtonKind.DANGER, modifier = Modifier.weight(1f).testTag("workflow-cancel-yes"))
             }
         }
     }

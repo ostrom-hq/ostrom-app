@@ -2,6 +2,7 @@
 // Ported from TeamCode (Apache-2.0), companion/.../domain/usecases/workflows/WorkflowUseCases.kt; see NOTICE.
 package run.ostrom.app.domain.usecases.workflows
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
@@ -11,9 +12,13 @@ import run.ostrom.app.domain.models.OrgChange
 import run.ostrom.app.domain.models.RunFilter
 import run.ostrom.app.domain.models.Workflow
 import run.ostrom.app.domain.models.WorkflowRun
+import run.ostrom.app.domain.models.WorkflowRefusal
 import run.ostrom.app.domain.models.WorkflowRunPage
+import run.ostrom.app.domain.repositories.AccountRepository
+import run.ostrom.app.domain.repositories.AuthRepository
 import run.ostrom.app.domain.repositories.FeaturesRepository
 import run.ostrom.app.domain.repositories.WorkflowRepository
+import run.ostrom.app.domain.repositories.find
 import run.ostrom.app.domain.usecases.auth.AccountGuard
 import run.ostrom.app.domain.usecases.events.FeedSignal
 import run.ostrom.app.domain.usecases.events.OrgFeed
@@ -50,6 +55,64 @@ class GetWorkflowRunUseCase(private val access: WorkflowAccess) {
     suspend operator fun invoke(accountId: String, runId: String): WorkflowRun {
         if (runId.isBlank()) throw AppException.NotFound()
         return access.call(accountId) { access.repository.run(accountId, runId) }
+    }
+}
+
+/**
+ * Whether the person may start and cancel runs: the server lets an owner or an admin of the organization do it
+ * (`403 forbidden` otherwise). Their role is read from `GET /me/organizations`; when it cannot be read (offline, a
+ * server that does not say) the actions show and a refusal is worded by its key.
+ */
+class CanManageRunsUseCase(private val auth: AuthRepository, private val accounts: AccountRepository) {
+    suspend operator fun invoke(accountId: String): Boolean {
+        val account = accounts.find(accountId)?.takeIf { it.signedIn } ?: return false
+        val role = try {
+            val organizations = auth.organizations(accountId)
+            val current = account.organizationId?.let { id -> organizations.firstOrNull { it.id == id } } ?: organizations.singleOrNull()
+            current?.role
+        } catch (error: CancellationException) {
+            throw error
+        } catch (_: Exception) {
+            null
+        }
+        return role == null || role in MANAGERS
+    }
+
+    private companion object {
+        val MANAGERS = setOf("owner", "admin")
+    }
+}
+
+/**
+ * Checks what is entered before anything is sent (the server checks again and its refusals are worded by key): a
+ * value for each required input (its default counts), none longer than its maximum. Returns the inputs to send:
+ * trimmed, without the empty optional ones.
+ */
+fun checkRunStart(workflow: Workflow, entered: Map<String, String>): Map<String, String> {
+    val sent = linkedMapOf<String, String>()
+    for (input in workflow.inputs) {
+        val value = (entered[input.id] ?: input.default.orEmpty()).trim()
+        if (value.isEmpty() && input.required) throw AppException.WorkflowInputMissing(input.label)
+        if (value.length > input.maxLength) throw AppException.WorkflowRefused(WorkflowRefusal.INVALID_INPUTS)
+        if (value.isNotEmpty()) sent[input.id] = value
+    }
+    return sent
+}
+
+/** Starts a run of an accepted [workflow] as the person, with what they [entered] (by input id). */
+class StartWorkflowRunUseCase(private val access: WorkflowAccess) {
+    suspend operator fun invoke(accountId: String, workflow: Workflow, entered: Map<String, String>): WorkflowRun {
+        if (!workflow.runnable) throw AppException.WorkflowRefused(WorkflowRefusal.NOT_RUNNABLE)
+        val inputs = checkRunStart(workflow, entered)
+        return access.call(accountId) { access.repository.start(accountId, workflow.id, inputs) }
+    }
+}
+
+/** Cancels a run that has not ended; the engine ends it on its next pass. The answer carries no visits. */
+class CancelWorkflowRunUseCase(private val access: WorkflowAccess) {
+    suspend operator fun invoke(accountId: String, run: WorkflowRun): WorkflowRun {
+        if (!run.status.active) throw AppException.WorkflowRefused(WorkflowRefusal.RUN_ENDED)
+        return access.call(accountId) { access.repository.cancel(accountId, run.id) }
     }
 }
 

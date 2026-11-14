@@ -115,7 +115,7 @@ class RemoteAuthRepository(
         }
     }
 
-    private suspend fun OstromClient.organizationsOf(): List<Organization> = organizations.mine().map { Organization(it.id, it.name) }
+    private suspend fun OstromClient.organizationsOf(): List<Organization> = organizations.mine().map { Organization(it.id, it.name, it.role.value) }
 
     private suspend fun OstromClient.member(): Member {
         val me = auth.me()

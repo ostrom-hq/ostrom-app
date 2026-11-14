@@ -14,6 +14,8 @@ import kotlinx.coroutines.launch
 import run.ostrom.app.domain.models.AppException
 import run.ostrom.app.domain.models.WorkflowRun
 import run.ostrom.app.domain.usecases.events.FeedSignal
+import run.ostrom.app.domain.usecases.workflows.CanManageRunsUseCase
+import run.ostrom.app.domain.usecases.workflows.CancelWorkflowRunUseCase
 import run.ostrom.app.domain.usecases.workflows.FollowWorkflowRunsUseCase
 import run.ostrom.app.domain.usecases.workflows.GetWorkflowRunUseCase
 import run.ostrom.app.domain.usecases.workflows.concernsRun
@@ -25,23 +27,39 @@ data class WorkflowRunUiState(
     val gone: Boolean = false,
     val reconnecting: Boolean = false,
     val error: Failure? = null,
-)
+    /** The person may start and cancel runs (an owner or an admin); false until known, so Cancel never flashes. */
+    val managesRuns: Boolean = false,
+    val cancelling: Boolean = false,
+    /** The failure of the cancel, apart from the page's. */
+    val actionError: Failure? = null,
+) {
+    /** Cancel shows on a run that has not ended, for who may cancel it. */
+    val canCancel: Boolean get() = managesRuns && run?.status?.active == true && !cancelling
+}
 
 /**
- * One run with its visits: read on open and on [load]; while shown ([start], [stop]) read again at each change of the
- * run (or of a sub-workflow's run it shows) the app's one feed announces, when it opens and after a gap.
+ * One run with its visits, and Cancel: read on open and on [load]; while shown ([start], [stop]) read again at each
+ * change of the run (or of a sub-workflow's run it shows) the app's one feed announces, when it opens and after a gap.
  */
 class WorkflowRunViewModel(
     private val route: WorkflowRunRoute,
     private val getRun: GetWorkflowRunUseCase,
     private val followRuns: FollowWorkflowRunsUseCase,
+    private val cancelRun: CancelWorkflowRunUseCase,
+    private val canManageRuns: CanManageRunsUseCase,
 ) : ViewModel() {
     private val state = MutableStateFlow(WorkflowRunUiState())
     val uiState: StateFlow<WorkflowRunUiState> = state.asStateFlow()
     private var loading: Job? = null
     private var follow: Job? = null
 
-    init { load() }
+    init {
+        load()
+        viewModelScope.launch {
+            val manages = canManageRuns(route.accountId)
+            state.update { it.copy(managesRuns = manages) }
+        }
+    }
 
     fun start() {
         follow?.cancel()
@@ -81,6 +99,26 @@ class WorkflowRunViewModel(
             } catch (error: Exception) {
                 state.update { it.copy(loading = false, error = error.userMessage()) }
             }
+        }
+    }
+
+    /** Cancels the run (the screen confirms first); the run takes the server's answer, then is read again with its visits. */
+    fun cancel() {
+        val run = state.value.run ?: return
+        if (!state.value.canCancel) return
+        state.update { it.copy(cancelling = true, actionError = null) }
+        viewModelScope.launch {
+            try {
+                val cancelled = cancelRun(route.accountId, run)
+                // The answer carries no visits: keep the timeline, take the status.
+                state.update { it.copy(cancelling = false, run = cancelled.copy(visits = run.visits)) }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                state.update { it.copy(cancelling = false, actionError = error.userMessage()) }
+            }
+            // Either way, read it again: a run that ended meanwhile (`run_ended`) shows how.
+            load()
         }
     }
 }

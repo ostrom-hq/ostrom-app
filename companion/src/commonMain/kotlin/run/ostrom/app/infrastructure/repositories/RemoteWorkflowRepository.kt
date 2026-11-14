@@ -2,22 +2,25 @@
 // Ported from TeamCode (Apache-2.0), companion/.../infrastructure/repositories/RemoteWorkflowRepository.kt; see NOTICE.
 package run.ostrom.app.infrastructure.repositories
 
+import run.ostrom.app.domain.models.AppException
 import run.ostrom.app.domain.models.NodeKind
 import run.ostrom.app.domain.models.RunStatus
 import run.ostrom.app.domain.models.RunVisit
 import run.ostrom.app.domain.models.Workflow
 import run.ostrom.app.domain.models.WorkflowInput
 import run.ostrom.app.domain.models.WorkflowNode
+import run.ostrom.app.domain.models.WorkflowRefusal
 import run.ostrom.app.domain.models.WorkflowRun
 import run.ostrom.app.domain.models.WorkflowRunPage
 import run.ostrom.app.domain.repositories.WorkflowRepository
 import run.ostrom.core.api.models.WorkflowNodeKind
+import run.ostrom.core.client.OstromException
 import run.ostrom.core.api.models.RunStatus as ApiRunStatus
 import run.ostrom.core.api.models.Workflow as ApiWorkflow
 import run.ostrom.core.api.models.WorkflowNode as ApiWorkflowNode
 import run.ostrom.core.api.models.WorkflowRun as ApiWorkflowRun
 
-/** The workflows and their runs over the typed client (`/api/v1/workflows`, `/api/v1/runs`), read only. */
+/** The workflows and their runs over the typed client (`/api/v1/workflows`, `/api/v1/runs`): read, started and cancelled. */
 class RemoteWorkflowRepository(private val calls: AccountCalls) : WorkflowRepository {
     override suspend fun workflows(accountId: String): List<Workflow> = calls.withAccount(accountId) { client ->
         client.workflows.list().items.map { it.domain() }
@@ -34,6 +37,32 @@ class RemoteWorkflowRepository(private val calls: AccountCalls) : WorkflowReposi
 
     override suspend fun run(accountId: String, runId: String): WorkflowRun =
         calls.withAccount(accountId, resource = true) { it.workflows.run(runId).domain() }
+
+    override suspend fun start(accountId: String, workflowId: String, inputs: Map<String, String>): WorkflowRun =
+        calls.withAccount(accountId, resource = true) { client -> refusals { client.workflows.start(workflowId, inputs).domain() } }
+
+    override suspend fun cancel(accountId: String, runId: String): WorkflowRun =
+        calls.withAccount(accountId, resource = true) { client -> refusals { client.workflows.cancel(runId).domain() } }
+
+    /** The refusals of a start or a cancel, by their error key; the server's message is read only for its leading key, never shown. */
+    private suspend fun <T> refusals(call: suspend () -> T): T = try {
+        call()
+    } catch (error: OstromException) {
+        throw refusalOf(error)?.let { AppException.WorkflowRefused(it) } ?: error
+    }
+
+    private fun refusalOf(error: OstromException): WorkflowRefusal? {
+        val key = error.message.orEmpty().substringBefore(':').trim()
+        return when {
+            error.status == 403 && error.type == "forbidden" -> WorkflowRefusal.FORBIDDEN
+            error.status == 400 && error.type == "invalid_request" -> WorkflowRefusal.INVALID_INPUTS
+            error.status == 409 && error.type == "run_limit" -> WorkflowRefusal.RUN_LIMIT
+            error.status == 409 && key == "workflow_not_accepted" -> WorkflowRefusal.NOT_RUNNABLE
+            error.status == 409 && (key == "run_ended" || error.type == "run_ended") -> WorkflowRefusal.RUN_ENDED
+            error.status == 409 && key == "run_busy" -> WorkflowRefusal.RUN_BUSY
+            else -> null
+        }
+    }
 }
 
 internal fun WorkflowNodeKind.domain(): NodeKind = when (this) {
@@ -57,7 +86,7 @@ private fun ApiWorkflowNode.detailLine(): String? =
 
 internal fun ApiWorkflow.domain() = Workflow(
     id = id, name = name, domain = domain, description = description, version = version, repos = repos.orEmpty(), status = status.value,
-    start = start, inputs = inputs.map { WorkflowInput(it.id, it.label, it.required, it.default) },
+    start = start, inputs = inputs.map { WorkflowInput(it.id, it.label, it.required, it.default, it.maxLength) },
     nodes = nodes.map { WorkflowNode(it.id, it.kind.domain(), it.label, it.detailLine()) }, updatedAt = millisOf(updatedAt ?: foundAt),
 )
 

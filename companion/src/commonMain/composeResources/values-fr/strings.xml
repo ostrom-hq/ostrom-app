@@ -442,7 +442,7 @@
     <string name="workflows_filter_done">Réussies</string>
     <string name="workflows_filter_failed">Échouées</string>
     <string name="workflows_reconnecting">Reconnexion…</string>
-    <string name="workflows_edit_note">Lecture seule ici : la console modifie les workflows et lance les exécutions.</string>
+    <string name="workflows_edit_note">Lecture seule ici : la console modifie les workflows.</string>
     <string name="workflows_empty">Aucun workflow pour l'instant</string>
     <string name="workflows_empty_body">Les workflows enregistrés par ton organisation apparaissent ici.</string>
     <string name="workflows_runs_empty">Aucune exécution</string>
@@ -548,4 +548,22 @@
     <string name="member_mcp_secrets">Secrets : %1$s</string>
     <string name="member_mcp_console_note">Ajoute, modifie ou supprime tes serveurs dans la console. Le lanceur, le paquet, les arguments et les variables d'une commande hébergée ne changent plus après sa création ; seuls ses secrets peuvent changer.</string>
     <string name="member_setup_open_console">Ouvrir dans la console</string>
+    <string name="workflow_start">Lancer une exécution</string>
+    <string name="workflow_start_title">Lancer une exécution</string>
+    <string name="workflow_start_button">Lancer</string>
+    <string name="workflow_start_no_inputs">Ce workflow ne prend aucune entrée.</string>
+    <string name="workflow_start_input_required">%1$s (obligatoire)</string>
+    <string name="workflow_start_input_optional">%1$s (facultatif)</string>
+    <string name="workflow_input_max">Jusqu'à %1$d caractères</string>
+    <string name="workflow_cancel">Annuler l'exécution</string>
+    <string name="workflow_cancel_title">Annuler cette exécution ?</string>
+    <string name="workflow_cancel_body">L'exécution s'arrête à sa prochaine étape, et l'attente ou la validation en cours est retirée. Impossible de revenir en arrière.</string>
+    <string name="workflow_cancel_keep">La garder</string>
+    <string name="error_workflow_forbidden">Seuls un propriétaire ou un administrateur de l'organisation lancent et annulent les exécutions de workflows.</string>
+    <string name="error_workflow_not_runnable">Ce workflow n'est pas accepté : accepte-le dans la console avant de l'exécuter.</string>
+    <string name="error_workflow_run_limit">Trop d'exécutions sont en cours. Attends qu'une se termine, ou annules-en une, puis réessaie.</string>
+    <string name="error_workflow_invalid_inputs">Le serveur a refusé ces entrées : vérifie les entrées obligatoires et leur longueur.</string>
+    <string name="error_workflow_run_ended">Cette exécution est déjà terminée.</string>
+    <string name="error_workflow_run_busy">L'exécution a avancé entre-temps. Réessaie.</string>
+    <string name="error_workflow_input_missing">Renseigne %1$s.</string>
 </resources>

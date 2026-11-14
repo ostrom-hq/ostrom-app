@@ -57,13 +57,15 @@ import run.ostrom.app.resources.workflow_nodes
 import run.ostrom.app.resources.workflow_refresh
 import run.ostrom.app.resources.workflow_repos
 import run.ostrom.app.resources.workflow_runs
+import run.ostrom.app.resources.workflow_start
 import run.ostrom.app.resources.workflow_summary
 import run.ostrom.app.resources.workflow_title
 import run.ostrom.app.resources.workflows_edit_note
 import run.ostrom.app.resources.workflows_title
 
 /**
- * One saved workflow, read only: its status, version and repositories, its inputs, a summary of its nodes, then its
+ * One saved workflow, read only, with Start for who may run it (an accepted workflow, an owner or an admin): its
+ * status, version and repositories, its inputs, a summary of its nodes, then its
  * runs (newest first, filtered by status, kept live by the app's one feed while shown). [onOpenRun] pushes a run.
  */
 @Composable
@@ -72,6 +74,7 @@ fun WorkflowScreen(
     runs: WorkflowRunsViewModel,
     onBack: (() -> Unit)?,
     onOpenRun: (runId: String) -> Unit,
+    onStart: () -> Unit = {},
     backLabel: String = stringResource(Res.string.workflows_title),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -104,7 +107,7 @@ fun WorkflowScreen(
                 }
             }
             if (workflow != null) {
-                item(key = "overview") { Overview(workflow) }
+                item(key = "overview") { Overview(workflow, canStart = state.canStart, onStart = onStart) }
                 if (workflow.inputs.isNotEmpty()) {
                     item(key = "inputs-title") { SectionTitle(stringResource(Res.string.workflow_inputs)) }
                     item(key = "inputs") {
@@ -135,7 +138,7 @@ fun WorkflowScreen(
 }
 
 @Composable
-private fun Overview(workflow: Workflow) {
+private fun Overview(workflow: Workflow, canStart: Boolean, onStart: () -> Unit) {
     val colors = Ostrom.colors
     AppCard(Modifier.testTag("workflow-overview")) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -145,6 +148,7 @@ private fun Overview(workflow: Workflow) {
         workflow.description?.let { Text(it, color = colors.text, fontSize = 14.sp) }
         Text(stringResource(Res.string.workflow_summary, workflow.version ?: 1, workflow.nodes.size, workflow.domain), style = MetaStyle, color = colors.muted)
         if (workflow.repos.isNotEmpty()) Text(stringResource(Res.string.workflow_repos, workflow.repos.joinToString(", ")), style = MetaStyle, color = colors.muted)
+        if (canStart) AppButton(stringResource(Res.string.workflow_start), onClick = onStart, modifier = Modifier.testTag("workflow-start"))
         Text(stringResource(Res.string.workflows_edit_note), fontSize = 12.sp, color = colors.muted)
     }
 }

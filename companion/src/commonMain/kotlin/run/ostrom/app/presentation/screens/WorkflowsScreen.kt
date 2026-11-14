@@ -82,7 +82,7 @@ private enum class WorkflowsPart { RUNS, DEFINITIONS }
 
 /**
  * The Workflows tab: the member's runs, newest first, with the status filter, kept live by the app's one feed; and the
- * saved workflows, read only (the console edits them and starts runs). [onOpenRun] and [onOpenWorkflow] push a run or a
+ * saved workflows, read only (the console edits them; a workflow's page starts a run). [onOpenRun] and [onOpenWorkflow] push a run or a
  * workflow.
  */
 @Composable

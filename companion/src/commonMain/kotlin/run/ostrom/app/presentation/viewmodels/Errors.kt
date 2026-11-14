@@ -6,6 +6,7 @@ import androidx.compose.runtime.Composable
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 import run.ostrom.app.domain.models.AppException
+import run.ostrom.app.domain.models.WorkflowRefusal
 import run.ostrom.app.domain.models.visibleCode
 import run.ostrom.app.resources.Res
 import run.ostrom.app.resources.error_check_input
@@ -30,6 +31,13 @@ import run.ostrom.app.resources.error_unreachable
 import run.ostrom.app.resources.error_unsupported
 import run.ostrom.app.resources.error_unsupported_api
 import run.ostrom.app.resources.error_untrusted_page
+import run.ostrom.app.resources.error_workflow_forbidden
+import run.ostrom.app.resources.error_workflow_input_missing
+import run.ostrom.app.resources.error_workflow_invalid_inputs
+import run.ostrom.app.resources.error_workflow_not_runnable
+import run.ostrom.app.resources.error_workflow_run_busy
+import run.ostrom.app.resources.error_workflow_run_ended
+import run.ostrom.app.resources.error_workflow_run_limit
 
 /**
  * A failure shown to the person. [text] is the English sentence (logs, tests); [resource] and [args] word the same
@@ -70,6 +78,15 @@ private fun AppException.sentence(): Pair<StringResource, List<Any>> = when (thi
     is AppException.Unsupported -> Res.string.error_unsupported to emptyList()
     is AppException.StepUpRequired -> Res.string.error_step_up to emptyList()
     is AppException.CredentialStorage -> Res.string.error_credential_storage to emptyList()
+    is AppException.WorkflowRefused -> when (reason) {
+        WorkflowRefusal.FORBIDDEN -> Res.string.error_workflow_forbidden
+        WorkflowRefusal.NOT_RUNNABLE -> Res.string.error_workflow_not_runnable
+        WorkflowRefusal.RUN_LIMIT -> Res.string.error_workflow_run_limit
+        WorkflowRefusal.INVALID_INPUTS -> Res.string.error_workflow_invalid_inputs
+        WorkflowRefusal.RUN_ENDED -> Res.string.error_workflow_run_ended
+        WorkflowRefusal.RUN_BUSY -> Res.string.error_workflow_run_busy
+    } to emptyList()
+    is AppException.WorkflowInputMissing -> Res.string.error_workflow_input_missing to listOf<Any>(label)
     is AppException.Server -> visibleCode(code)?.let { Res.string.error_server_http_code to listOf<Any>(statusCode, it) }
         ?: (Res.string.error_server_http to listOf<Any>(statusCode))
 }

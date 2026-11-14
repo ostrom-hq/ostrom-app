@@ -76,7 +76,11 @@ data class WorkflowRun(
 
 data class WorkflowRunPage(val runs: List<WorkflowRun>, val next: String?)
 
-data class WorkflowInput(val id: String, val label: String, val required: Boolean, val default: String?)
+/** An input a run starts with: [required] ones need a value (their [default] counts), none longer than [maxLength]. */
+data class WorkflowInput(val id: String, val label: String, val required: Boolean, val default: String?, val maxLength: Int = DEFAULT_INPUT_LENGTH)
+
+/** The longest input value a server takes when the definition names no maximum. */
+const val DEFAULT_INPUT_LENGTH = 4096
 
 /** One node of a definition, read only: its [label] and what it does ([detail]: the command, the message, the instructions...). */
 data class WorkflowNode(val id: String, val kind: NodeKind, val label: String, val detail: String?)
@@ -96,4 +100,28 @@ data class Workflow(
     val updatedAt: Long?,
 ) {
     fun node(id: String): WorkflowNode? = nodes.firstOrNull { it.id == id }
+
+    /** Whether a run of it may start: an accepted workflow, or one accepted then edited (a proposal or a rejected one may not). */
+    val runnable: Boolean get() = status == "accepted" || status == "edited"
+}
+
+/** Why the server refused to start or cancel a run, by its error key; worded by the app, never by the server. */
+enum class WorkflowRefusal {
+    /** `403 forbidden`: only an owner or an admin of the organization starts and cancels runs. */
+    FORBIDDEN,
+
+    /** `409 conflict` `workflow_not_accepted`: a proposal or a rejected workflow does not run. */
+    NOT_RUNNABLE,
+
+    /** `409 run_limit`: too many of the organization's runs are unfinished. */
+    RUN_LIMIT,
+
+    /** `400 invalid_request`: an undeclared input, a required one missing or one too long. */
+    INVALID_INPUTS,
+
+    /** `409 conflict` `run_ended`: the run already succeeded, failed or was cancelled. */
+    RUN_ENDED,
+
+    /** `409 conflict` `run_busy`: the engine moved the run meanwhile; trying again works. */
+    RUN_BUSY,
 }
