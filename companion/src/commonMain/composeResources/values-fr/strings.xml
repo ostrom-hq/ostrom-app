@@ -798,7 +798,7 @@
     <string name="cloud_new_email_domain_hint">Pour un propriétaire sans lien GitHub</string>
     <string name="cloud_new_secrets_note">La recette ne contient aucun secret : les valeurs des variables sont les vôtres, saisies dans la console.</string>
     <string name="cloud_new_start">Démarrer</string>
-    <string name="error_cloud_invalid">Le serveur a refusé ces valeurs : vérifiez les dépôts, chemins, références, commandes et noms de variables.</string>
+    <string name="error_cloud_invalid">Le serveur a refusé ces valeurs : vérifiez les dépôts, chemins, références, commandes, noms de variables et domaine d'adresse.</string>
     <string name="error_cloud_plan_limit">Les sessions cloud simultanées de votre offre, ou ses heures de cette période, sont épuisées. Mettez-en une en pause ou arrêtez-la, puis réessayez.</string>
     <string name="error_cloud_state">L'état de cette session ne le permet pas maintenant : elle est peut-être terminée.</string>
     <string name="error_cloud_forbidden">Les sessions cloud ne vous sont pas ouvertes sur ce serveur.</string>
@@ -808,6 +808,8 @@
     <string name="error_cloud_name">Nommez la session en 120 caractères au plus.</string>
     <string name="error_cloud_prompt">Écrivez un premier message de 20 000 caractères au plus.</string>
     <string name="error_cloud_repository">Utilisez une adresse de dépôt https://github.com/&lt;propriétaire&gt;/&lt;nom&gt;.</string>
-    <string name="error_cloud_too_many">Utilisez au plus 16 dépôts, et 16 commandes par liste de préparation.</string>
-    <string name="error_cloud_variables">Nommez chaque variable requise une seule fois, en UPPER_SNAKE_CASE.</string>
+    <string name="error_cloud_too_many">Utilisez au plus 16 dépôts, et 16 commandes de 4 096 caractères au plus par liste de préparation.</string>
+    <string name="error_cloud_variables">Nommez au plus 64 variables requises, chacune une seule fois, en UPPER_SNAKE_CASE.</string>
+    <string name="error_cloud_email_domain">Utilisez un nom de domaine en minuscules, comme example.com, pour le domaine de l'adresse Git.</string>
+    <string name="cloud_failure_preparation_new">Démarrez une nouvelle session pour réessayer.</string>
 </resources>

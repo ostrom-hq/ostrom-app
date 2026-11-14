@@ -66,7 +66,7 @@ sealed class AppException(message: String) : Exception(message) {
     /** The server refused to start, pause, resume or stop a cloud session, for [reason]. */
     class CloudSessionRefused(val reason: CloudSessionRefusal) : AppException(
         when (reason) {
-            CloudSessionRefusal.INVALID -> "The server refused these values: check the repositories, paths, refs, commands and variable names."
+            CloudSessionRefusal.INVALID -> "The server refused these values: check the repositories, paths, refs, commands, variable names and e-mail domain."
             CloudSessionRefusal.PLAN_LIMIT -> "Your plan's cloud sessions at once, or its hours of this period, are used up. Pause or stop one, then try again."
             CloudSessionRefusal.STATE -> "This session's state does not allow it now: it may be over."
             CloudSessionRefusal.FORBIDDEN -> "Cloud sessions are not open to you on this server."
@@ -81,8 +81,9 @@ sealed class AppException(message: String) : Exception(message) {
             CloudSessionProblem.NAME -> "Name the session in up to 120 characters."
             CloudSessionProblem.PROMPT -> "Write a first message of up to 20,000 characters."
             CloudSessionProblem.REPOSITORY -> "Use an https://github.com/<owner>/<name> repository address."
-            CloudSessionProblem.TOO_MANY -> "Use at most 16 repositories, and 16 commands per setup list."
-            CloudSessionProblem.VARIABLES -> "Name each required variable once, in UPPER_SNAKE_CASE."
+            CloudSessionProblem.TOO_MANY -> "Use at most 16 repositories, and 16 commands of up to 4,096 characters per setup list."
+            CloudSessionProblem.VARIABLES -> "Name at most 64 required variables, each once, in UPPER_SNAKE_CASE."
+            CloudSessionProblem.EMAIL_DOMAIN -> "Use a lowercase domain name, such as example.com, for the Git e-mail domain."
         },
     )
     /** The server refused with [code] (its stable error key, shown only when it is one) and [statusCode]. */

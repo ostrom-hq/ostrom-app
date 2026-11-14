@@ -117,6 +117,11 @@ class CloudSessionsScreenTest {
             waitForText("must be fixed in the console")
             onNodeWithTag("cloud-session-resume").assertDoesNotExist()
             onNodeWithTag("cloud-session-stop").assertDoesNotExist()
+            // A clone that may pass on a session that failed for good: it is started anew, not resumed.
+            server.routes["GET /api/v1/cloud/sessions/c4"] = session("c4", "Tables", "failed", "running",
+                ""","failure":{"code":"preparation_failed","message":"Cloning repository 1 failed.","retryable":true}""")
+            click("cloud-session-refresh")
+            waitForText("Start a new session to try again.")
         }
     }
 

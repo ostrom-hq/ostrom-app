@@ -84,11 +84,15 @@ object CloudSessionRules {
     const val MAX_PROMPT = 20_000
     const val MAX_REPOSITORIES = 16
     const val MAX_COMMANDS = 16
+    const val MAX_COMMAND_LENGTH = 4096
+    const val MAX_VARIABLES = 64
     private val GITHUB = Regex("https://github\\.com/[A-Za-z0-9][A-Za-z0-9-]{0,38}/[A-Za-z0-9._-]{1,100}")
     private val VARIABLE = Regex("[A-Z_][A-Z0-9_]{0,127}")
+    private val DOMAIN = Regex("[a-z0-9]([-a-z0-9.]{0,251}[a-z0-9])?")
 
     fun githubUrl(url: String): Boolean = GITHUB.matches(url.removeSuffix(".git"))
     fun variable(name: String): Boolean = VARIABLE.matches(name)
+    fun domain(name: String): Boolean = DOMAIN.matches(name)
 }
 
 /**
@@ -104,12 +108,17 @@ fun checkNewCloudSession(form: NewCloudSession, recipeServed: Boolean): NewCloud
     val base = NewCloudSession(form.agent, name = name, model = form.model.orNull(), prompt = prompt)
     val recipe = form.recipe?.takeIf { recipeServed }?.tidy()?.takeIf { !it.empty }
     if (recipe != null) {
+        val commands = recipe.setupCreate + recipe.setupStart
         if (recipe.repositories.size > CloudSessionRules.MAX_REPOSITORIES || recipe.setupCreate.size > CloudSessionRules.MAX_COMMANDS ||
-            recipe.setupStart.size > CloudSessionRules.MAX_COMMANDS
+            recipe.setupStart.size > CloudSessionRules.MAX_COMMANDS || commands.any { it.length > CloudSessionRules.MAX_COMMAND_LENGTH }
         ) throw AppException.CloudSessionInvalid(CloudSessionProblem.TOO_MANY)
+        // A row with a directory, a ref or a branch but no address is a mistake, never dropped silently.
         if (recipe.repositories.any { !CloudSessionRules.githubUrl(it.url) }) throw AppException.CloudSessionInvalid(CloudSessionProblem.REPOSITORY)
         val variables = recipe.requiredVariables
-        if (variables.any { !CloudSessionRules.variable(it) } || variables.toSet().size != variables.size) throw AppException.CloudSessionInvalid(CloudSessionProblem.VARIABLES)
+        if (variables.size > CloudSessionRules.MAX_VARIABLES || variables.any { !CloudSessionRules.variable(it) } || variables.toSet().size != variables.size) {
+            throw AppException.CloudSessionInvalid(CloudSessionProblem.VARIABLES)
+        }
+        if (recipe.gitEmailDomain?.let(CloudSessionRules::domain) == false) throw AppException.CloudSessionInvalid(CloudSessionProblem.EMAIL_DOMAIN)
         return base.copy(recipe = recipe)
     }
     val repo = form.repo.orNull() ?: return base
@@ -120,9 +129,9 @@ fun checkNewCloudSession(form: NewCloudSession, recipeServed: Boolean): NewCloud
 private fun String?.orNull(): String? = this?.trim()?.takeIf { it.isNotEmpty() }
 
 private fun CloudRecipe.tidy() = CloudRecipe(
-    repositories = repositories.mapNotNull { repository ->
-        repository.url.orNull()?.let { CloudRepository(it, repository.path.orNull(), repository.ref.orNull(), repository.branch.orNull()) }
-    },
+    // Only a row left wholly empty is dropped; one with a directory, ref or branch but no address is kept, and refused.
+    repositories = repositories.map { CloudRepository(it.url.trim(), it.path.orNull(), it.ref.orNull(), it.branch.orNull()) }
+        .filterNot { it.url.isEmpty() && it.path == null && it.ref == null && it.branch == null },
     workingDirectory = workingDirectory.orNull(),
     setupCreate = setupCreate.mapNotNull { it.orNull() },
     setupStart = setupStart.mapNotNull { it.orNull() },

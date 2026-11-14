@@ -106,13 +106,17 @@ data class CloudSession(
     /** Pause keeps the workspace: offered while it runs or is about to, unless a pause or a stop is asked already. */
     val canPause: Boolean get() = status in PAUSABLE && desiredStatus != PAUSED && desiredStatus != TERMINATED
 
-    /** Resume starts a new execution on the kept workspace: offered on a paused session (or one pausing). */
-    val canResume: Boolean get() = (status == CloudSessionStatus.PAUSED || status == CloudSessionStatus.PAUSING) && desiredStatus != TERMINATED
+    /**
+     * Resume starts a new execution on the kept workspace: offered on a paused session (or one pausing), unless a resume
+     * is asked already (the server then resumes it by itself) or a stop.
+     */
+    val canResume: Boolean get() = (status == CloudSessionStatus.PAUSED || status == CloudSessionStatus.PAUSING) && desiredStatus != RUNNING && desiredStatus != TERMINATED
 
     /** Stop ends it for good and deletes its workspace: offered until it ended or a stop is asked already. */
     val canStop: Boolean get() = !status.ended && desiredStatus != TERMINATED
 
     companion object {
+        const val RUNNING = "running"
         const val PAUSED = "paused"
         const val TERMINATED = "terminated"
         private val PAUSABLE = setOf(CloudSessionStatus.CREATING, CloudSessionStatus.RUNNING, CloudSessionStatus.RESUMING)
@@ -174,9 +178,12 @@ enum class CloudSessionProblem {
     /** A repository is not an `https://github.com/<owner>/<name>` URL. */
     REPOSITORY,
 
-    /** More than 16 repositories, or setup commands, in a list. */
+    /** More than 16 repositories, or setup commands in a list, or a command over 4,096 characters. */
     TOO_MANY,
 
-    /** A required variable is not in UPPER_SNAKE_CASE, or is named twice. */
+    /** More than 64 required variables, one not in UPPER_SNAKE_CASE, or one named twice. */
     VARIABLES,
+
+    /** The Git e-mail domain is not a lowercase DNS name. */
+    EMAIL_DOMAIN,
 }

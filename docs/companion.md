@@ -134,7 +134,7 @@ at each return and on refresh, as does a record: the server publishes no cloud s
   `fetching_repositories`, `running_setup`; any other reads as preparing the workspace). A failure is worded by its
   code; a `preparation_failed` shows the server's sentence (which step failed, never a command's output) and says to
   resume when `retryable`, otherwise that the recipe or the variables must be fixed in the console.
-- **Actions.** Pause (while it runs or is on its way), Resume (on a paused session), Stop (asked first: the workspace
+- **Actions.** Pause (while it runs or is on its way), Resume (on a paused session not already resuming), Stop (asked first: the workspace
   is deleted). Each takes the server's answer, then reads the session again. A refusal is worded by its key
   (`invalid_request`, `payment_required`, `conflict`, `forbidden`, `profile_required`, `profile_unassigned`,
   `cloud_profile_not_found`, `image_not_allowed`, `cluster_unavailable`, `namespace_not_allowed`), never with the

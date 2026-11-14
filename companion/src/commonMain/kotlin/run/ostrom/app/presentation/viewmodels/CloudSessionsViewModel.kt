@@ -31,6 +31,8 @@ data class CloudSessionsUiState(
     /** The server stopped offering cloud sessions. */
     val unavailable: Boolean = false,
     val error: Failure? = null,
+    /** The [error] is an older page's: a retry reads that page again, not the first one. */
+    val moreFailed: Boolean = false,
 ) {
     val empty: Boolean get() = loaded && !loading && sessions.isEmpty()
 }
@@ -65,11 +67,14 @@ class CloudSessionsViewModel(
 
     fun stop() { started = false }
 
-    /** The first page again; the older pages read are dropped (a cloud session list is short). */
+    /** After a failure: the page that failed again. */
+    fun retry() = if (state.value.moreFailed) loadMore() else reload()
+
+    /** The first page again; the older pages already read stay after it. */
     fun reload() {
         val account = state.value.account?.takeIf { it.signedIn } ?: return
         load?.cancel()
-        state.update { it.copy(loading = true, loadingMore = false, error = null) }
+        state.update { it.copy(loading = true, loadingMore = false, error = null, moreFailed = false) }
         load = viewModelScope.launch { page(account.id, before = null) }
     }
 
@@ -79,7 +84,7 @@ class CloudSessionsViewModel(
         val account = current.account?.takeIf { it.signedIn } ?: return
         val before = current.next ?: return
         if (load?.isActive == true) return
-        state.update { it.copy(loadingMore = true, error = null) }
+        state.update { it.copy(loadingMore = true, error = null, moreFailed = false) }
         load = viewModelScope.launch { page(account.id, before) }
     }
 
@@ -88,18 +93,25 @@ class CloudSessionsViewModel(
             val page = loadSessions(accountId, before)
             state.update { current ->
                 if (current.account?.id != accountId) return@update current
-                val sessions = if (before == null) page.sessions else {
+                if (before != null) {
                     val known = current.sessions.mapTo(HashSet()) { it.id }
-                    current.sessions + page.sessions.filter { known.add(it.id) }
+                    return@update current.copy(sessions = current.sessions + page.sessions.filter { known.add(it.id) }, next = page.next, loadingMore = false)
                 }
-                current.copy(sessions = sessions, next = page.next, loaded = true, loading = false, loadingMore = false, unavailable = false)
+                // A return or a refresh after older pages were read: the first page replaces the rows it covers, and the rows
+                // older than its last one stay after it, so the list never collapses to its first page.
+                val boundary = page.sessions.lastOrNull()?.createdAt
+                val fresh = page.sessions.mapTo(HashSet()) { it.id }
+                val older = if (page.next == null || boundary == null) emptyList()
+                else current.sessions.filter { it.id !in fresh && (it.createdAt ?: Long.MIN_VALUE) < boundary }
+                current.copy(sessions = page.sessions + older, next = if (older.isEmpty()) page.next else current.next, loaded = true, loading = false,
+                    loadingMore = false, unavailable = false)
             }
         } catch (error: CancellationException) {
             throw error
         } catch (error: AppException.Unsupported) {
             state.update { if (it.account?.id != accountId) it else it.copy(loading = false, loadingMore = false, loaded = true, unavailable = true) }
         } catch (error: Exception) {
-            state.update { if (it.account?.id != accountId) it else it.copy(loading = false, loadingMore = false, error = error.userMessage()) }
+            state.update { if (it.account?.id != accountId) it else it.copy(loading = false, loadingMore = false, error = error.userMessage(), moreFailed = before != null) }
         }
     }
 }

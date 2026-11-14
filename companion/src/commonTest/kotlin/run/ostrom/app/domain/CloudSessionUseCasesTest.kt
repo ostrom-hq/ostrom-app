@@ -133,6 +133,11 @@ class CloudSessionUseCasesTest {
         assertEquals(CloudSessionProblem.TOO_MANY, problem(NewCloudSession(CloudAgent.CLAUDE, recipe = CloudRecipe(setupStart = List(17) { "echo $it" }))))
         assertEquals(CloudSessionProblem.VARIABLES, problem(NewCloudSession(CloudAgent.CLAUDE, recipe = CloudRecipe(requiredVariables = listOf("lower")))))
         assertEquals(CloudSessionProblem.VARIABLES, problem(NewCloudSession(CloudAgent.CLAUDE, recipe = CloudRecipe(requiredVariables = listOf("A", "A")))))
+        assertEquals(CloudSessionProblem.VARIABLES, problem(NewCloudSession(CloudAgent.CLAUDE, recipe = CloudRecipe(requiredVariables = List(65) { "V$it" }))))
+        assertEquals(CloudSessionProblem.TOO_MANY, problem(NewCloudSession(CloudAgent.CLAUDE, recipe = CloudRecipe(setupCreate = listOf("x".repeat(4097))))))
+        assertEquals(CloudSessionProblem.EMAIL_DOMAIN, problem(NewCloudSession(CloudAgent.CLAUDE, recipe = CloudRecipe(gitEmailDomain = "Acme.dev"))))
+        // A row with a directory but no address is refused, never dropped.
+        assertEquals(CloudSessionProblem.REPOSITORY, problem(NewCloudSession(CloudAgent.CLAUDE, recipe = CloudRecipe(listOf(CloudRepository(" ", path = "api"))))))
     }
 
     @Test
@@ -146,6 +151,7 @@ class CloudSessionUseCasesTest {
         assertTrue(paused.canResume && paused.canStop && !paused.canPause)
         assertFalse(ended.canPause || ended.canResume || ended.canStop)
         assertFalse(cloudSession(desired = "terminated").canStop, "A stop already asked")
+        assertFalse(cloudSession(status = CloudSessionStatus.PAUSED, desired = "running").canResume, "A resume already asked")
         assertEquals(CloudSessionStatus.PAUSING, control.pause("a1", running).status)
         assertEquals(CloudSessionStatus.RESUMING, control.resume("a1", paused).status)
         control.stop("a1", paused)

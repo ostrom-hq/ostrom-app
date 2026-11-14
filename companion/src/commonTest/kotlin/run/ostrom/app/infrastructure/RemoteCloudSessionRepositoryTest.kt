@@ -133,7 +133,6 @@ class RemoteCloudSessionRepositoryTest {
                 error.reason
             }
         }
-        assertEquals(CloudSessionRefusal.INVALID, refusal(HttpStatusCode.BadRequest, "invalid_request"))
         assertEquals(CloudSessionRefusal.PLAN_LIMIT, refusal(HttpStatusCode.PaymentRequired, "payment_required"))
         assertEquals(CloudSessionRefusal.STATE, refusal(HttpStatusCode.Conflict, "conflict"))
         assertEquals(CloudSessionRefusal.FORBIDDEN, refusal(HttpStatusCode.Forbidden, "forbidden"))
@@ -143,6 +142,12 @@ class RemoteCloudSessionRepositoryTest {
         assertEquals(CloudSessionRefusal.PROFILE_UNAVAILABLE, refusal(HttpStatusCode.Forbidden, "image_not_allowed"))
         assertEquals(CloudSessionRefusal.CLUSTER_UNAVAILABLE, refusal(HttpStatusCode.Conflict, "cluster_unavailable"))
         assertEquals(CloudSessionRefusal.CLUSTER_UNAVAILABLE, refusal(HttpStatusCode.Conflict, "namespace_not_allowed"))
+        // Only a start has values to check: an action's invalid_request stays a plain server error.
+        answers["POST /api/v1/cloud/sessions/c1/resume"] = HttpStatusCode.BadRequest to """{"error":{"type":"invalid_request","message":"m"}}"""
+        assertEquals(400, assertFailsWith<AppException.Server> { repository.resume("a1", "c1") }.statusCode)
+        answers["POST /api/v1/cloud/sessions"] = HttpStatusCode.BadRequest to """{"error":{"type":"invalid_request","message":"m"}}"""
+        assertEquals(CloudSessionRefusal.INVALID,
+            assertFailsWith<AppException.CloudSessionRefused> { repository.create("a1", NewCloudSession(CloudAgent.CLAUDE)) }.reason)
         answers["POST /api/v1/cloud/sessions/c1/resume"] = HttpStatusCode.ServiceUnavailable to """{"error":{"type":"unavailable","message":"m"}}"""
         assertEquals(503, assertFailsWith<AppException.Server> { repository.resume("a1", "c1") }.statusCode)
     }

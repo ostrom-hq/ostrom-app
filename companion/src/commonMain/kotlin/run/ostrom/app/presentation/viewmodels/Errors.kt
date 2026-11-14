@@ -14,6 +14,7 @@ import run.ostrom.app.domain.models.visibleCode
 import run.ostrom.app.resources.Res
 import run.ostrom.app.resources.error_check_input
 import run.ostrom.app.resources.error_cloud_cluster_unavailable
+import run.ostrom.app.resources.error_cloud_email_domain
 import run.ostrom.app.resources.error_cloud_forbidden
 import run.ostrom.app.resources.error_cloud_invalid
 import run.ostrom.app.resources.error_cloud_name
@@ -137,6 +138,7 @@ private fun AppException.sentence(): Pair<StringResource, List<Any>> = when (thi
         CloudSessionProblem.REPOSITORY -> Res.string.error_cloud_repository
         CloudSessionProblem.TOO_MANY -> Res.string.error_cloud_too_many
         CloudSessionProblem.VARIABLES -> Res.string.error_cloud_variables
+        CloudSessionProblem.EMAIL_DOMAIN -> Res.string.error_cloud_email_domain
     } to emptyList()
     is AppException.Server -> visibleCode(code)?.let { Res.string.error_server_http_code to listOf<Any>(statusCode, it) }
         ?: (Res.string.error_server_http to listOf<Any>(statusCode))

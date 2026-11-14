@@ -71,6 +71,7 @@ import run.ostrom.app.resources.cloud_failure_namespace_not_allowed
 import run.ostrom.app.resources.cloud_failure_other
 import run.ostrom.app.resources.cloud_failure_preparation
 import run.ostrom.app.resources.cloud_failure_preparation_fix
+import run.ostrom.app.resources.cloud_failure_preparation_new
 import run.ostrom.app.resources.cloud_failure_preparation_retry
 import run.ostrom.app.resources.cloud_failure_start_failed
 import run.ostrom.app.resources.cloud_failure_unknown
@@ -144,7 +145,7 @@ fun CloudSessionScreen(viewModel: CloudSessionViewModel, onBack: (() -> Unit)?, 
                 if (session.preparing) {
                     Banner(stringResource(Res.string.cloud_session_preparing, phaseWords(session.preparationPhase)), Tone.NEUTRAL, Modifier.testTag("cloud-session-phase"))
                 }
-                session.failure?.let { FailureBanner(it) }
+                session.failure?.let { FailureBanner(it, session.canResume) }
                 Actions(session, state.acting, onPause = viewModel::pause, onResume = viewModel::resume, onStop = { confirmStop = true })
                 session.recipe?.takeIf { !it.empty }?.let { Recipe(it) }
                 Text(stringResource(Res.string.cloud_session_not_served), style = MetaStyle, color = colors.muted)
@@ -187,12 +188,20 @@ private fun Overview(session: CloudSession, today: Long) {
 
 /**
  * Why it failed or paused on its own. A failed preparation shows the server's sentence (which step failed), then
- * whether a resume may pass or the recipe or the variables must be fixed; every other code is worded here.
+ * whether a resume may pass ([resumable]: only on a session that can still be resumed; a failed one is started anew) or
+ * the recipe or the variables must be fixed; every other code is worded here.
  */
 @Composable
-private fun FailureBanner(failure: CloudFailure) {
+private fun FailureBanner(failure: CloudFailure, resumable: Boolean) {
+    val retry = failure.retryable == true
     val text = if (failure.preparation) {
-        val next = stringResource(if (failure.retryable == true) Res.string.cloud_failure_preparation_retry else Res.string.cloud_failure_preparation_fix)
+        val next = stringResource(
+            when {
+                !retry -> Res.string.cloud_failure_preparation_fix
+                resumable -> Res.string.cloud_failure_preparation_retry
+                else -> Res.string.cloud_failure_preparation_new
+            },
+        )
         stringResource(Res.string.cloud_failure_preparation, failure.message) + " " + next
     } else {
         when (failure.code) {
@@ -206,7 +215,7 @@ private fun FailureBanner(failure: CloudFailure) {
             else -> visibleCode(failure.code)?.let { stringResource(Res.string.cloud_failure_other, it) } ?: stringResource(Res.string.cloud_failure_unknown)
         }
     }
-    val tone = if (failure.preparation && failure.retryable == true || failure.code in PAUSES) Tone.WARN else Tone.DANGER
+    val tone = if (failure.preparation && retry && resumable || failure.code in PAUSES) Tone.WARN else Tone.DANGER
     Banner(text, tone, Modifier.testTag("cloud-session-failure"))
 }
 

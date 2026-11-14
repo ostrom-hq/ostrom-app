@@ -163,7 +163,7 @@ fun CloudSessionsScreen(
             if (state.unavailable) Banner(stringResource(Res.string.cloud_sessions_unavailable), Tone.WARN, Modifier.testTag("cloud-sessions-unavailable"))
             state.error?.let { error ->
                 Banner(error.words(), Tone.DANGER, Modifier.testTag("cloud-sessions-error"), action = {
-                    AppButton(stringResource(Res.string.action_retry), onClick = viewModel::reload, kind = ButtonKind.SECONDARY, small = true, fill = false,
+                    AppButton(stringResource(Res.string.action_retry), onClick = viewModel::retry, kind = ButtonKind.SECONDARY, small = true, fill = false,
                         modifier = Modifier.testTag("cloud-sessions-retry"))
                 })
             }

@@ -32,7 +32,7 @@ class RemoteCloudSessionRepository(private val calls: AccountCalls) : CloudSessi
         calls.withAccount(accountId, resource = true) { it.cloudSessions.get(sessionId).domain() }
 
     override suspend fun create(accountId: String, session: NewCloudSession): CloudSession =
-        calls.withAccount(accountId) { client -> refusals { client.cloudSessions.create(session.request()).domain() } }
+        calls.withAccount(accountId) { client -> refusals(creating = true) { client.cloudSessions.create(session.request()).domain() } }
 
     override suspend fun pause(accountId: String, sessionId: String): CloudSession =
         calls.withAccount(accountId, resource = true) { client -> refusals { client.cloudSessions.pause(sessionId).domain() } }
@@ -44,18 +44,21 @@ class RemoteCloudSessionRepository(private val calls: AccountCalls) : CloudSessi
         calls.withAccount(accountId, resource = true) { client -> refusals { client.cloudSessions.stop(sessionId).domain() } }
 
     /** The refusals of an action, by their error key; the server's message is never read nor shown. */
-    private suspend fun <T> refusals(call: suspend () -> T): T = try {
+    private suspend fun <T> refusals(creating: Boolean = false, call: suspend () -> T): T = try {
         call()
     } catch (error: OstromException) {
-        throw cloudRefusalOf(error.status, error.type)?.let { AppException.CloudSessionRefused(it) } ?: error
+        throw cloudRefusalOf(error.status, error.type, creating)?.let { AppException.CloudSessionRefused(it) } ?: error
     }
 
     private companion object { const val PAGE = 50 }
 }
 
-/** The refusal a status and error key stand for; null for any other failure (translated as usual). */
-internal fun cloudRefusalOf(status: Int, type: String?): CloudSessionRefusal? = when (type) {
-    "invalid_request" -> CloudSessionRefusal.INVALID
+/**
+ * The refusal a status and error key stand for; null for any other failure (translated as usual). Only a start
+ * ([creating]) has values to check: an action's `invalid_request` stays a plain server error.
+ */
+internal fun cloudRefusalOf(status: Int, type: String?, creating: Boolean): CloudSessionRefusal? = when (type) {
+    "invalid_request" -> CloudSessionRefusal.INVALID.takeIf { creating }
     "payment_required" -> CloudSessionRefusal.PLAN_LIMIT
     "conflict" -> CloudSessionRefusal.STATE
     "forbidden" -> CloudSessionRefusal.FORBIDDEN
