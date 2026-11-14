@@ -4,14 +4,16 @@ package run.ostrom.app.presentation.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.consumeWindowInsets
-import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
@@ -26,6 +28,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -172,8 +175,8 @@ fun MainScreen(
         requestedTab?.let { selected = it; onTabRequestShown() }
     }
     val wide = LocalWideLayout.current
-    val bar = if (wide) tabs else phoneTabs(tabs)
-    val more = if (wide) emptyList() else phoneMoreTabs(tabs)
+    val bar = remember(tabs, wide) { if (wide) tabs else phoneTabs(tabs) }
+    val more = remember(tabs, bar) { tabs.filter { it !in bar } }
     // On a phone, a tab its bar has no room for (asked for, chosen on a wide window that narrowed, or served once the
     // features are read) opens above Settings, with back to it.
     val opensRequests = state.serves(Features.GATES)
@@ -271,7 +274,7 @@ fun MoreTabScreen(
     onOpenRequest: (accountId: String, id: String) -> Unit,
     onOpenArtifact: (accountId: String, artifactId: String) -> Unit,
 ) {
-    Column(Modifier.fillMaxSize().background(Ostrom.colors.background).testTag("more-tab-${tab.name.lowercase()}")) {
+    Column(Modifier.fillMaxSize().background(Ostrom.colors.background).windowInsetsPadding(WindowInsets.navigationBars).testTag("more-tab-${tab.name.lowercase()}")) {
         // The screen's own large title names it: the bar holds only the way back.
         NavBar(stringResource(MainTab.SETTINGS.label), onBack, "")
         Box(Modifier.weight(1f).consumeWindowInsets(WindowInsets.statusBars)) {
@@ -280,8 +283,8 @@ fun MoreTabScreen(
                 MainTab.SPENDING -> SpendingScreen()
                 MainTab.ACTIVITY -> ActivityScreen(onOpen = if (opensRequests) onOpenRequest else null)
                 MainTab.ARTIFACTS -> ArtifactsScreen(onOpen = onOpenArtifact)
-                // Always in the phone's bar when served: never opened from Settings.
-                MainTab.INBOX, MainTab.WAITING, MainTab.SESSIONS, MainTab.WORKFLOWS, MainTab.SETTINGS -> Unit
+                // Always in the phone's bar when served: never opened from Settings, and closed if it ever is.
+                MainTab.INBOX, MainTab.WAITING, MainTab.SESSIONS, MainTab.WORKFLOWS, MainTab.SETTINGS -> LaunchedEffect(tab) { onBack() }
             }
         }
     }

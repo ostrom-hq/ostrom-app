@@ -27,6 +27,7 @@ import run.ostrom.app.domain.repositories.FeaturesRepository
 import run.ostrom.app.domain.repositories.has
 import run.ostrom.app.domain.usecases.approvals.PhoneUnlock
 import run.ostrom.app.domain.usecases.push.NotificationTarget
+import run.ostrom.app.presentation.components.LocalWideLayout
 import run.ostrom.app.presentation.screens.AddServerScreen
 import run.ostrom.app.presentation.screens.ArtifactScreen
 import run.ostrom.app.presentation.screens.CloudSessionScreen
@@ -175,8 +176,15 @@ fun OstromNavHost(rootViewModel: RootViewModel = koinViewModel(), unlock: PhoneU
         composable<MoreTabRoute> { entry ->
             val route = entry.toRoute<MoreTabRoute>()
             val tab = MainTab.entries.firstOrNull { it.name == route.tab }
+            // The window widened: the tab returns to the rail, where it is a tab.
+            val wide = LocalWideLayout.current
             if (tab == null) {
                 LaunchedEffect(Unit) { navController.popBackStack() }
+            } else if (wide) {
+                LaunchedEffect(Unit) {
+                    navController.popBackStack(MainRoute, inclusive = false)
+                    requestedTab = tab
+                }
             } else {
                 MoreTabScreen(
                     tab, route.opensRequests, onBack = { navController.popBackStack() },

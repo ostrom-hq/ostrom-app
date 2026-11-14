@@ -5,8 +5,8 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.DesktopComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.hasTestTag
-import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performSemanticsAction
 import com.russhwolf.settings.MapSettings
@@ -19,7 +19,6 @@ import run.ostrom.app.presentation.navigation.AppCommand
 import run.ostrom.app.presentation.navigation.AppCommands
 import run.ostrom.app.presentation.screens.MainTab
 import kotlin.test.Test
-import kotlin.test.assertTrue
 
 /** The phone's bar holds five labeled tabs and Settings opens the others; a wide window's rail keeps every tab. */
 @OptIn(ExperimentalTestApi::class)
@@ -69,9 +68,8 @@ class PhoneTabsScreenTest {
         signedIn(width = 360, height = 780) {
             waitFor("tab-workflows")
             inBar.forEach { (tag, label) ->
-                onNodeWithTag("tab-$tag").assertIsDisplayed()
-                // Every label shows, not only the selected tab's.
-                assertTrue(onAllNodes(hasText(label)).fetchSemanticsNodes().isNotEmpty(), "label $label")
+                // Every label shows in its own item, not only the selected tab's.
+                onNodeWithTag("tab-$tag").assertIsDisplayed().assertTextEquals(label)
             }
             inSettings.forEach { onNodeWithTag("tab-$it").assertDoesNotExist() }
             click("tab-settings")
