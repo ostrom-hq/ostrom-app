@@ -4,6 +4,8 @@
           xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Pushes (Android 13+ asks the person, after their first sign-in). -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" tools:node="remove"/>
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" tools:node="remove"/>
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" tools:node="remove"/>
@@ -45,6 +47,14 @@
                 <data android:scheme="ostrom" android:host="auth" android:path="/callback"/>
             </intent-filter>
         </activity>
+        <!-- Pushes: FCM data messages, decrypted on the phone (notifications.push.v1). -->
+        <service
+                android:name=".OstromMessagingService"
+                android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT"/>
+            </intent-filter>
+        </service>
     </application>
 
 </manifest>

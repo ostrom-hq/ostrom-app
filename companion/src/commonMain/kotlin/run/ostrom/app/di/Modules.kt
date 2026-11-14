@@ -18,6 +18,7 @@ import run.ostrom.app.domain.usecases.auth.InspectServerUseCase
 import run.ostrom.app.domain.usecases.auth.OrganizationUseCases
 import run.ostrom.app.domain.usecases.auth.RefreshAccountUseCase
 import run.ostrom.app.domain.usecases.auth.SignOutUseCase
+import run.ostrom.app.domain.usecases.push.ClearPushUseCase
 import run.ostrom.app.infrastructure.client.OstromClientProvider
 import run.ostrom.app.infrastructure.repositories.AccountCalls
 import run.ostrom.app.infrastructure.repositories.CachedFeaturesRepository
@@ -51,7 +52,11 @@ val domainModule = module {
     // Resolved only where a BrowserSignIn exists (the phones' platform modules).
     single { BrowserSignInUseCase(get(), get(), get(), get()) }
     single { DeviceSignInUseCase(get(), get(), get()) }
-    single { SignOutUseCase(get(), get(), get<DemoCredentialStore>()) }
+    // This phone stops taking the account's push first, while its session can still speak.
+    single {
+        val clearPush = get<ClearPushUseCase>()
+        SignOutUseCase(get(), get(), get<DemoCredentialStore>()) { clearPush(it) }
+    }
     single { RefreshAccountUseCase(get(), get(), get<DemoCredentialStore>(), get()) }
     single { AccountGuard(get()) }
     single { OrganizationUseCases(get(), get(), get()) }

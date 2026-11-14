@@ -14,7 +14,7 @@ import run.ostrom.app.presentation.viewmodels.RootViewModel
 import run.ostrom.app.presentation.viewmodels.SettingsViewModel
 
 val presentationModule = module {
-    viewModel { RootViewModel(get(), get()) }
+    viewModel { RootViewModel(get(), get(), get()) }
     viewModel { AddServerViewModel(get(), get(), get()) }
     viewModel { (route: LoginRoute) ->
         // A phone signs in with its browser; a computer (no BrowserSignIn bound) with the device flow.

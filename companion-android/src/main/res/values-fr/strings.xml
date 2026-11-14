@@ -2,4 +2,6 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 <resources>
     <string name="app_name">Ostrom</string>
+    <!-- The notification channel of pushes, shown in the system settings. -->
+    <string name="push_channel">Activité</string>
 </resources>

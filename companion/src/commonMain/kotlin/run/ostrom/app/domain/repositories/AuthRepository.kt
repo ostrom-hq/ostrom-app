@@ -30,8 +30,11 @@ sealed interface DevicePoll {
     class Done(val session: NewSession) : DevicePoll
 }
 
-/** The person behind an account, read again with its token. */
-data class Member(val login: String, val organization: Organization?)
+/**
+ * The person behind an account, read again with its token: [memberId] is their membership of the [organization] the
+ * call acted in (what a push names), null outside one.
+ */
+data class Member(val login: String, val organization: Organization?, val memberId: String? = null)
 
 /**
  * Authentication calls of an Ostrom server. Failures are [run.ostrom.app.domain.models.AppException]s. Calls with an
