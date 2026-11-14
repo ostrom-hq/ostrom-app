@@ -12,6 +12,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.NavController
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -173,7 +174,7 @@ fun OstromNavHost(rootViewModel: RootViewModel = koinViewModel(), unlock: PhoneU
                 viewModel,
                 onBack = { navController.popBackStack() },
                 onOpenReceipt = { receiptId -> navController.navigate(ReceiptRoute(route.accountId, receiptId)) },
-                onOpenRun = { runId -> navController.navigate(WorkflowRunRoute(route.accountId, runId)) },
+                onOpenRun = { runId -> navController.openOnce(WorkflowRunRoute(route.accountId, runId)) },
             )
         }
         composable<ReceiptRoute> { entry ->
@@ -186,7 +187,7 @@ fun OstromNavHost(rootViewModel: RootViewModel = koinViewModel(), unlock: PhoneU
             val viewModel: WorkflowViewModel = koinViewModel { parametersOf(route) }
             val runs: WorkflowRunsViewModel = koinViewModel(key = "runs-${route.accountId}-${route.workflowId}") { parametersOf(route) }
             WorkflowScreen(
-                viewModel, runs, onBack = { navController.popBackStack() }, onOpenRun = { runId -> navController.navigate(WorkflowRunRoute(route.accountId, runId)) },
+                viewModel, runs, onBack = { navController.popBackStack() }, onOpenRun = { runId -> navController.openOnce(WorkflowRunRoute(route.accountId, runId)) },
                 onStart = { navController.navigate(WorkflowStartRoute(route.accountId, route.workflowId)) },
                 onEdit = { navController.navigate(WorkflowEditRoute(route.accountId, route.workflowId)) },
                 onDeleted = { navController.popBackStack() },
@@ -216,8 +217,8 @@ fun OstromNavHost(rootViewModel: RootViewModel = koinViewModel(), unlock: PhoneU
             WorkflowRunScreen(
                 viewModel,
                 onBack = { navController.popBackStack() },
-                onOpenSession = if (opensSessions(route.accountId)) ({ sessionId -> navController.navigate(SessionRoute(route.accountId, sessionId)) }) else null,
-                onOpenRun = { runId -> navController.navigate(WorkflowRunRoute(route.accountId, runId)) },
+                onOpenSession = if (opensSessions(route.accountId)) ({ sessionId -> navController.openOnce(SessionRoute(route.accountId, sessionId)) }) else null,
+                onOpenRun = { runId -> navController.openOnce(WorkflowRunRoute(route.accountId, runId)) },
             )
         }
         composable<CloudSessionRoute> { entry ->
@@ -257,4 +258,17 @@ fun OstromNavHost(rootViewModel: RootViewModel = koinViewModel(), unlock: PhoneU
             RequestScreen(viewModel, onBack = { navController.popBackStack() })
         }
     }
+}
+
+/**
+ * Opens [route] (a session's record, a run) without stacking a second copy of it: when it is already on the stack (the
+ * run a session was opened from, the parent a child run was opened from), back to it, what was above it dropped;
+ * otherwise pushed. Going back and forth between a run and its session keeps one screen of each, and back then
+ * returns to where the first of them was opened from.
+ */
+internal inline fun <reified T : Any> NavController.openOnce(route: T) {
+    // Already the screen shown (a run that names itself): nothing to open.
+    val top = currentBackStackEntry
+    if (top != null && top.destination.hasRoute<T>() && top.toRoute<T>() == route) return
+    if (!popBackStack(route, inclusive = false)) navigate(route)
 }
