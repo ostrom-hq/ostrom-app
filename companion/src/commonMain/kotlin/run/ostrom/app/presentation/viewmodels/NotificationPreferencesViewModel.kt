@@ -65,7 +65,8 @@ class NotificationPreferencesViewModel(
     private fun change(edit: (NotificationPreferences) -> NotificationPreferences) {
         val current = state.value
         val before = current.preferences ?: return
-        if (current.saving) return
+        // A read on its way would overwrite the change when it lands: the switches wait for it.
+        if (current.saving || current.loading) return
         val after = edit(before)
         if (after == before) return
         state.update { it.copy(preferences = after, saving = true, saveFailed = false) }

@@ -77,7 +77,7 @@ fun NotificationPreferencesScreen(viewModel: NotificationPreferencesViewModel, o
                     NotificationToggle.entries.forEach { toggle ->
                         GroupRow {
                             Text(stringResource(toggle.label()), color = colors.text, fontSize = 15.sp, modifier = Modifier.weight(1f))
-                            Switch(preferences[toggle], { viewModel.toggle(toggle, it) }, enabled = !state.saving,
+                            Switch(preferences[toggle], { viewModel.toggle(toggle, it) }, enabled = !state.saving && !state.loading,
                                 modifier = Modifier.testTag("notifications-${toggle.name.lowercase()}"))
                         }
                         GroupDivider()
@@ -92,7 +92,7 @@ fun NotificationPreferencesScreen(viewModel: NotificationPreferencesViewModel, o
                                 )
                             }
                         }
-                        Switch(preferences.quietHours != null, viewModel::setQuietHours, enabled = !state.saving, modifier = Modifier.testTag("notifications-quiet"))
+                        Switch(preferences.quietHours != null, viewModel::setQuietHours, enabled = !state.saving && !state.loading, modifier = Modifier.testTag("notifications-quiet"))
                     }
                 }
                 Text(stringResource(Res.string.notifications_note), color = colors.muted, fontSize = 12.5.sp, lineHeight = 17.sp)
