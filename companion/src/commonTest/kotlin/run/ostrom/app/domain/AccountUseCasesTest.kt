@@ -46,6 +46,7 @@ class AccountUseCasesTest {
         assertEquals(ServerFeatures.BUDGETS, Features.BUDGETS)
         assertEquals(ServerFeatures.NOTIFICATIONS, Features.NOTIFICATIONS)
         assertEquals(ServerFeatures.NOTIFICATIONS_PUSH, Features.NOTIFICATIONS_PUSH)
+        assertEquals(ServerFeatures.NOTIFICATIONS_PUSH_TEST, Features.NOTIFICATIONS_PUSH_TEST)
         assertEquals(ServerFeatures.WAITS, Features.WAITS)
         assertEquals(ServerFeatures.ARTIFACTS, Features.ARTIFACTS)
         requireSupportedApi(Features.SUPPORTED_API_VERSION)

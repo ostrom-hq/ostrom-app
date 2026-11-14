@@ -11,6 +11,6 @@ object PushPayloadReader {
     private val json = Json { ignoreUnknownKeys = true }
 
     fun read(text: String): PushMessage = json.decodeFromString(PushPayload.serializer(), text).run {
-        PushMessage(id, origin, orgId, memberId, kind, title, body, approvalId)
+        PushMessage(id, origin, orgId, memberId, kind, title, body, approvalId, sessionId, waitId)
     }
 }

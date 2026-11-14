@@ -69,16 +69,20 @@ enum PushCrypto {
         let title: String
         let body: String
         let approvalId: String?
+        let sessionId: String?
+        let waitId: String?
     }
 
     /// The link a tap opens, as the app's `NotificationLinks` builds it:
-    /// `ostrom://notification?origin=…&org=…&member=…[&approval=…]`.
+    /// `ostrom://notification?origin=…&org=…&member=…[&approval=…][&session=…][&wait=…]`.
     static func link(for push: Payload) -> String {
         let unreserved = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~")
         func encode(_ value: String) -> String { value.addingPercentEncoding(withAllowedCharacters: unreserved) ?? "" }
         var link = "ostrom://notification?origin=\(encode(push.origin))&org=\(encode(push.orgId))&member=\(encode(push.memberId))"
-        // A request id the app would refuse is left out, as NotificationLinks does: the tap still opens the account.
+        // An id the app would refuse is left out, as ReadPushUseCase does: the tap still opens the account.
         if let approval = push.approvalId, isId(approval) { link += "&approval=\(encode(approval))" }
+        if let session = push.sessionId, isId(session) { link += "&session=\(encode(session))" }
+        if let wait = push.waitId, isId(wait) { link += "&wait=\(encode(wait))" }
         return link
     }
 

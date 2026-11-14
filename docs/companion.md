@@ -88,8 +88,11 @@ Ported from TeamCode's companion (`PushPlatform`, `PushCipher`, `SyncPushUseCase
   and tag), the key HKDF-SHA256 of the ECDH secret with salt = ephemeral point | phone point and info `ostrom-push-v1`;
   the plaintext is ostrom-core's `PushPayload`. Android's messaging service decrypts it and shows it only for a
   signed-in account of that server (its origin normalized), organization and member.
-- A tap opens `ostrom://notification?origin=…&org=…&member=…[&approval=…]` (`NotificationLinks`): the account becomes
-  the active one and its request opens (`RequestRoute`); an answer still asks for the unlock.
+- A tap opens `ostrom://notification?origin=…&org=…&member=…[&approval=…][&session=…][&wait=…]` (`NotificationLinks`,
+  built from the payload's `approvalId`, `sessionId` and `waitId`): the account becomes the active one and its request
+  opens (`RequestRoute`; an answer still asks for the unlock). A push about a session (`waiting`, `turn_failed`) or a
+  wait outside a session opens the Waiting tab, where that wait is, until the app has a session screen; a test push
+  opens the account.
 - Before a sign-out the device registered in this process is deleted (`DELETE /api/v1/push-devices/{id}`), best effort;
   the server also forgets the phones of a session it revokes.
 - On iOS the relay sends a generic alert ("Ostrom" / "New activity in Ostrom", `mutable-content`) with `p`: the
@@ -128,6 +131,8 @@ What the React Native app did, what TeamCode's companion does that an Ostrom ser
 | Spending | `budgets.v1` | Ported (week and month, budget bar, budgets passed, by agent, repository and person) |
 | Activity | none | Ported (newest first, paged; a line about an approval opens its request on a server with `gates.v1`) |
 | Notification preferences (requests, decisions, spending, quiet hours) | `notifications.v1` | Ported: Settings, Notifications, shaped like TeamCode's `NotificationPreferencesScreen` |
+| Notification switches per channel and kind (`waiting`, `turn_completed`, `turn_failed`, `session_failed`) | `notifications.v1` | Ported from TeamCode's `NotificationPreferencesScreen`: one section per channel the server offers (`GET /notifications/settings`), a switch saved at once (`PUT`) and undone if refused, on the same Notifications screen above the requests and budgets |
+| Send a test to my phone, each phone's result | `notifications.push.test.v1` | Ported from TeamCode: `POST /notifications/push/test`; `push_off` and `push_no_device` say what to do, `push_test_rate_limited` when to try again |
 | Push registration, encrypted pushes, a tap opens the request | `notifications.push.v1` | Ported (see [Push](#push)) on Android and iOS (the notification service extension replaces the generic alert). A Firebase project for the published apps, and the APNs key in it, are still to create |
 | Artifacts gallery and viewer | `artifacts.v1` | Ported from TeamCode's `ArtifactsScreen` and `ArtifactScreen`: the gallery (newest first, paged, searched in the loaded titles), the viewer with its versions, the page in a sandboxed web view on iOS and Android from a reading ticket on the server's content origin (`/a/<id>/<ticket>/`), the console page in the browser on the desktop. No Mine/Team filter and no pasted link (the list route has no scope, the console page lives on an origin the app does not know) |
 | Sessions (list, transcript, follow live) | `sessions.v1` | To port from TeamCode, once ostrom-core's client has the session routes |

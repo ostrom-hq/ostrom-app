@@ -14,9 +14,12 @@ import com.russhwolf.settings.MapSettings
 import kotlinx.coroutines.runBlocking
 import run.ostrom.app.domain.models.Account
 import run.ostrom.app.domain.models.SignInMethod
+import run.ostrom.app.domain.usecases.push.NotificationLinks
 import run.ostrom.app.infrastructure.credentials.MemoryCredentialStore
 import run.ostrom.app.infrastructure.settings.SettingsAccountRepository
+import run.ostrom.app.presentation.navigation.IncomingLinks
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /** The Waiting tab of a signed-in account: open waits answered in place, the filters, what is in progress, failures, the demo. */
@@ -45,15 +48,33 @@ class WaitsScreenTest {
     )
 
     /** A device with one signed-in account on [server]. */
-    private fun signedIn(server: FakeServer, block: DesktopComposeUiTest.() -> Unit) {
+    private fun signedIn(server: FakeServer, member: Boolean = false, block: DesktopComposeUiTest.() -> Unit) {
         val settings = MapSettings()
-        SettingsAccountRepository(settings).save(Account(id = "a1", origin = origin, login = "ada", method = SignInMethod.DEVICE))
+        val account = Account(id = "a1", origin = origin, login = "ada", method = SignInMethod.DEVICE)
+        // The organization and member a push names.
+        SettingsAccountRepository(settings).save(if (member) account.copy(organizationId = "o1", memberId = "m1") else account)
         val credentials = MemoryCredentialStore().also { runBlocking { it.write("a1", "osm_token") } }
         testApp(server, credentials = credentials, settings = settings) { block() }
     }
 
     private fun DesktopComposeUiTest.waitFor(tag: String) =
         waitUntil(timeoutMillis = 10_000) { onAllNodes(hasTestTag(tag)).fetchSemanticsNodes().isNotEmpty() }
+
+    @Test
+    fun aTappedNotificationAboutASessionOrAWaitOpensTheWaits() {
+        val server = server(features = "\"gates.v1\",\"waits.v1\"")
+        server.routes["GET /api/v1/approvals/queue"] = """{"operator":"ada","you":{"login":"ada","via":"app"},"pending":[],"recent":[]}"""
+        signedIn(server, member = true) {
+            // The inbox is the first tab of a server with gates.
+            waitFor("tab-inbox")
+            settle()
+            onNodeWithTag("wait-w1").assertDoesNotExist()
+            // The agent of a session waits for the member: the app has no session screen yet, the waits show it.
+            IncomingLinks.open(NotificationLinks.link("$origin/", "o1", "m1", null, sessionId = "s1", waitId = "w1"))
+            waitFor("wait-w1")
+            assertEquals(null, IncomingLinks.link.value)
+        }
+    }
 
     @Test
     fun anOpenWaitIsAnsweredInPlaceAndAMissingFieldIsSaidFirst() {

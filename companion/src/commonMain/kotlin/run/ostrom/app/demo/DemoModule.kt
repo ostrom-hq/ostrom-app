@@ -9,6 +9,7 @@ import run.ostrom.app.domain.repositories.ArtifactRepository
 import run.ostrom.app.domain.repositories.AuthRepository
 import run.ostrom.app.domain.repositories.FeaturesRepository
 import run.ostrom.app.domain.repositories.NotificationPreferencesRepository
+import run.ostrom.app.domain.repositories.NotificationSettingsRepository
 import run.ostrom.app.domain.repositories.ReceiptKeyPinRepository
 import run.ostrom.app.domain.repositories.ReceiptRepository
 import run.ostrom.app.domain.repositories.SpendingRepository
@@ -20,6 +21,7 @@ import run.ostrom.app.infrastructure.repositories.RemoteActivityRepository
 import run.ostrom.app.infrastructure.repositories.RemoteArtifactRepository
 import run.ostrom.app.infrastructure.repositories.RemoteAuthRepository
 import run.ostrom.app.infrastructure.repositories.RemoteNotificationPreferencesRepository
+import run.ostrom.app.infrastructure.repositories.RemoteNotificationSettingsRepository
 import run.ostrom.app.infrastructure.repositories.RemoteReceiptRepository
 import run.ostrom.app.infrastructure.repositories.RemoteSpendingRepository
 import run.ostrom.app.infrastructure.repositories.RemoteWaitRepository
@@ -41,6 +43,9 @@ val demoModule = module {
     single<WaitRepository> { DemoAwareWaitRepository(get<RemoteWaitRepository>(), DemoWaitRepository(get(), get())) }
     single<NotificationPreferencesRepository> {
         DemoAwareNotificationPreferencesRepository(get<RemoteNotificationPreferencesRepository>(), DemoNotificationPreferencesRepository(get()))
+    }
+    single<NotificationSettingsRepository> {
+        DemoAwareNotificationSettingsRepository(get<RemoteNotificationSettingsRepository>(), DemoNotificationSettingsRepository(get()))
     }
     single<SpendingRepository> { DemoAwareSpendingRepository(get<RemoteSpendingRepository>(), DemoSpendingRepository(get())) }
     single<ActivityRepository> { DemoAwareActivityRepository(get<RemoteActivityRepository>(), DemoActivityRepository(get())) }

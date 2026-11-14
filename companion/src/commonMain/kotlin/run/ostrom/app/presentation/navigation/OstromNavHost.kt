@@ -5,7 +5,9 @@ package run.ostrom.app.presentation.navigation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -23,10 +25,12 @@ import run.ostrom.app.presentation.screens.AddServerScreen
 import run.ostrom.app.presentation.screens.ArtifactScreen
 import run.ostrom.app.presentation.screens.LoginScreen
 import run.ostrom.app.presentation.screens.MainScreen
+import run.ostrom.app.presentation.screens.MainTab
 import run.ostrom.app.presentation.screens.NotificationPreferencesScreen
 import run.ostrom.app.presentation.screens.RequestScreen
 import run.ostrom.app.presentation.viewmodels.ArtifactViewModel
 import run.ostrom.app.presentation.viewmodels.NotificationPreferencesViewModel
+import run.ostrom.app.presentation.viewmodels.NotificationSettingsViewModel
 import run.ostrom.app.presentation.viewmodels.RequestViewModel
 import run.ostrom.app.presentation.viewmodels.RootViewModel
 
@@ -41,6 +45,8 @@ fun OstromNavHost(rootViewModel: RootViewModel = koinViewModel(), unlock: PhoneU
     LifecycleEventEffect(Lifecycle.Event.ON_STOP) { unlock.onBackground() }
     val hasAccounts by rootViewModel.hasAccounts.collectAsStateWithLifecycle()
     val navController = rememberNavController()
+    // A tab a tapped notification asks the tabs to show.
+    var requestedTab by remember { mutableStateOf<MainTab?>(null) }
     // Captured once: the first sign-in navigates explicitly instead of rebuilding the graph.
     val startDestination: Any = remember { if (rootViewModel.hasAccounts.value) MainRoute else AddServerRoute }
     // The last account signed out (or the demo ended): back to the first screen, with nothing to go back to.
@@ -52,14 +58,21 @@ fun OstromNavHost(rootViewModel: RootViewModel = koinViewModel(), unlock: PhoneU
             navController.navigate(MainRoute) { popUpTo(0) { inclusive = true } }
         }
     }
-    // A tapped notification: its request, above the tabs of its account.
+    // A tapped notification: its request above the tabs of its account, or its waits. The app has no session screen
+    // yet: a session's notification (its agent waits, its turn failed) opens the waits, where that wait is.
     val incoming by IncomingLinks.link.collectAsStateWithLifecycle()
     LaunchedEffect(incoming, hasAccounts) {
         val link = incoming ?: return@LaunchedEffect
         if (!hasAccounts) return@LaunchedEffect
         IncomingLinks.consumed(link)
-        val target = rootViewModel.openNotification(link)
-        if (target is NotificationTarget.Request) navController.navigate(RequestRoute(target.accountId, target.approvalId))
+        when (val target = rootViewModel.openNotification(link)) {
+            is NotificationTarget.Request -> navController.navigate(RequestRoute(target.accountId, target.approvalId))
+            is NotificationTarget.Session, is NotificationTarget.Waits -> {
+                navController.popBackStack(MainRoute, inclusive = false)
+                requestedTab = MainTab.WAITING
+            }
+            is NotificationTarget.Home, null -> Unit
+        }
     }
     NavHost(navController, startDestination = startDestination) {
         composable<AddServerRoute> {
@@ -83,12 +96,15 @@ fun OstromNavHost(rootViewModel: RootViewModel = koinViewModel(), unlock: PhoneU
                 onOpenRequest = { accountId, id -> navController.navigate(RequestRoute(accountId, id)) },
                 onOpenNotifications = { accountId -> navController.navigate(NotificationPreferencesRoute(accountId)) },
                 onOpenArtifact = { accountId, artifactId -> navController.navigate(ArtifactRoute(accountId, artifactId)) },
+                requestedTab = requestedTab,
+                onTabRequestShown = { requestedTab = null },
             )
         }
         composable<NotificationPreferencesRoute> { entry ->
             val route = entry.toRoute<NotificationPreferencesRoute>()
             val viewModel: NotificationPreferencesViewModel = koinViewModel { parametersOf(route) }
-            NotificationPreferencesScreen(viewModel, onBack = { navController.popBackStack() })
+            val settings: NotificationSettingsViewModel = koinViewModel { parametersOf(route) }
+            NotificationPreferencesScreen(viewModel, settings, onBack = { navController.popBackStack() })
         }
         composable<ArtifactRoute> { entry ->
             val route = entry.toRoute<ArtifactRoute>()

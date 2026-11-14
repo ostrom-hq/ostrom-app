@@ -19,6 +19,7 @@ import androidx.compose.material3.NavigationRailItemDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -97,6 +98,8 @@ fun MainScreen(
     onOpenRequest: (accountId: String, id: String) -> Unit = { _, _ -> },
     onOpenNotifications: (accountId: String) -> Unit = {},
     onOpenArtifact: (accountId: String, artifactId: String) -> Unit = { _, _ -> },
+    requestedTab: MainTab? = null,
+    onTabRequestShown: () -> Unit = {},
     viewModel: HomeViewModel = koinViewModel(),
     waits: WaitsViewModel = koinViewModel(),
 ) {
@@ -117,6 +120,10 @@ fun MainScreen(
     }
     val tabs = state.tabs()
     var selected by rememberSaveable { mutableStateOf<MainTab?>(null) }
+    // A tapped notification asked for a tab (a wait's opens the waits).
+    LaunchedEffect(requestedTab) {
+        requestedTab?.let { selected = it; onTabRequestShown() }
+    }
     val tab = selected?.takeIf { it in tabs } ?: tabs.first()
     val wide = LocalWideLayout.current
     val colors = Ostrom.colors

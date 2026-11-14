@@ -236,9 +236,14 @@ class PushUseCasesTest {
         member: String = "m1",
         approval: String? = "ap1",
         title: String = "Deploy to production",
+        kind: String = "approval",
+        session: String? = null,
+        wait: String? = null,
     ) = buildString {
-        append("""{"v":1,"id":"n1","origin":"$origin","orgId":"$org","memberId":"$member","kind":"approval","title":"$title","body":"ada asks for your yes",""")
+        append("""{"v":1,"id":"n1","origin":"$origin","orgId":"$org","memberId":"$member","kind":"$kind","title":"$title","body":"ada asks for your yes",""")
         approval?.let { append(""""approvalId":"$it",""") }
+        session?.let { append(""""sessionId":"$it",""") }
+        wait?.let { append(""""waitId":"$it",""") }
         append(""""at":1,"future":true}""")
     }.reversed()
 
@@ -260,6 +265,32 @@ class PushUseCasesTest {
         assertNull(read("not for this key"))
         accounts.update(accounts.find("a2")!!.copy(signedIn = false))
         assertNull(read(payload()), "signed out on this phone")
+    }
+
+    @Test
+    fun aPushAboutASessionOrAWaitCarriesThemInItsLink() = runTest {
+        accounts.save(account("a1").copy(organizationId = "o1", memberId = "m1"))
+        val read = ReadPushUseCase(accounts, platform)
+        val waiting = read(payload(approval = null, kind = "waiting", session = "s-1", wait = "w_1"))
+        assertEquals(NotificationLinks.link(ORIGIN, "o1", "m1", null, sessionId = "s-1", waitId = "w_1"), waiting?.link)
+        val failed = read(payload(approval = null, kind = "turn_failed", session = "s-1"))
+        assertEquals(NotificationLinks.link(ORIGIN, "o1", "m1", null, sessionId = "s-1"), failed?.link)
+        // An id the app would refuse is left out: the tap still opens the account.
+        val crafted = read(payload(approval = null, kind = "waiting", session = "../s", wait = "w 1"))
+        assertEquals(NotificationLinks.link(ORIGIN, "o1", "m1", null), crafted?.link)
+    }
+
+    @Test
+    fun aTappedNotificationOpensItsSessionOrTheWaitsOfItsAccount() {
+        accounts.save(account("a1").copy(organizationId = "o1", memberId = "m1"))
+        val resolve = ResolveNotificationUseCase(accounts)
+        assertEquals(NotificationTarget.Session("a1", "s1"), resolve(NotificationLinks.link(ORIGIN, "o1", "m1", null, sessionId = "s1", waitId = "w1")))
+        assertEquals(NotificationTarget.Waits("a1"), resolve(NotificationLinks.link(ORIGIN, "o1", "m1", null, waitId = "w1")))
+        // An approval keeps opening its request.
+        assertEquals(NotificationTarget.Request("a1", "ap1"), resolve(NotificationLinks.link(ORIGIN, "o1", "m1", "ap1", sessionId = "s1")))
+        val origin = "https%3A%2F%2Fostrom.example.org"
+        assertNull(resolve("ostrom://notification?origin=$origin&org=o1&member=m1&session=../x"))
+        assertNull(resolve("ostrom://notification?origin=$origin&org=o1&member=m1&wait=w1&wait=w2"))
     }
 
     @Test
