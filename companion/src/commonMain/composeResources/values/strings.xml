@@ -495,4 +495,26 @@
     <string name="workflow_visit_started">Started %1$s</string>
     <string name="workflow_visit_finished">Finished %1$s</string>
     <string name="workflow_visit_waiting">Waits for an answer.</string>
+    <string name="home_cli_signed_out">The CLI's session on %1$s ended. Run ostrom login in a terminal to sign it in again.</string>
+    <string name="settings_account_cli">CLI</string>
+    <string name="settings_cli_account">This account is the ostrom CLI's on this computer: it follows ostrom login and ostrom logout. Signing it out here runs ostrom logout.</string>
+    <string name="update_available_title">ostrom %1$s is available</string>
+    <string name="update_available_detail">The CLI on this computer is %1$s. ostrom update checks and installs the signed release.</string>
+    <string name="update_action">Update</string>
+    <string name="update_not_now">Not now</string>
+    <string name="update_updating_title">Updating ostrom to %1$s…</string>
+    <string name="update_updated_title">ostrom %1$s is installed</string>
+    <string name="update_updated_detail">The CLI on this computer was updated.</string>
+    <string name="update_failed_title">ostrom %1$s could not be installed</string>
+    <string name="update_failed_not_installed">No ostrom CLI answers on this computer. Run ostrom version in a terminal.</string>
+    <string name="update_failed_still_running">ostrom update is still running and is left to finish. Try again once it is done.</string>
+    <string name="update_failed_failed">ostrom update stopped with an error.</string>
+    <string name="update_failed_unexpected">ostrom update answered something this app does not recognize.</string>
+    <string name="update_try_again">Try again</string>
+    <string name="tray_open">Open Ostrom</string>
+    <string name="tray_quit">Quit Ostrom</string>
+    <string name="menu_file">File</string>
+    <string name="menu_add_account">Add an account…</string>
+    <string name="menu_close_window">Close window</string>
+    <string name="menu_view">View</string>
 </resources>

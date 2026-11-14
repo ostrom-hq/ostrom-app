@@ -7,6 +7,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
@@ -100,6 +101,21 @@ fun OstromNavHost(rootViewModel: RootViewModel = koinViewModel(), unlock: PhoneU
                 requestedTab = MainTab.WAITING
             }
             is NotificationTarget.Home, null -> Unit
+        }
+    }
+    // The desktop's menu bar: a tab above whatever was opened over the tabs, or a new account.
+    val signedIn by rememberUpdatedState(hasAccounts)
+    LaunchedEffect(navController) {
+        AppCommands.commands.collect { command ->
+            when (command) {
+                is AppCommand.ShowTab -> if (signedIn) {
+                    navController.popBackStack(MainRoute, inclusive = false)
+                    requestedTab = command.tab
+                }
+                AppCommand.AddAccount -> if (navController.currentBackStackEntry?.destination?.hasRoute<AddServerRoute>() != true) {
+                    navController.navigate(AddServerRoute)
+                }
+            }
         }
     }
     NavHost(navController, startDestination = startDestination) {

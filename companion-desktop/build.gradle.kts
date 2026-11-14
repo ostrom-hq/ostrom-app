@@ -8,7 +8,8 @@ plugins {
     alias(libs.plugins.compose.compiler)
 }
 
-// The desktop app (macOS, Windows, Linux): the shared app of :companion in a window.
+// The desktop app (macOS, Windows, Linux): the shared app of :companion in a window, plus what only makes sense on a
+// computer: the menu bar icon, the `ostrom` CLI's account, the CLI's update banner.
 kotlin { jvmToolchain(21) }
 
 dependencies {
@@ -18,7 +19,16 @@ dependencies {
     implementation(libs.compose.foundation)
     implementation(libs.compose.ui)
     implementation(libs.coroutines.swing)
+    implementation(libs.multiplatform.settings)
+    implementation(libs.serialization.json)
+    testImplementation(kotlin("test"))
+    testImplementation(libs.coroutines.test)
+    testImplementation(libs.multiplatform.settings.test)
+    testRuntimeOnly(libs.junit)
+    testRuntimeOnly(libs.junit.platform.launcher)
 }
+
+tasks.test { useJUnitPlatform() }
 
 // Installers take MAJOR.MINOR.PATCH only, and macOS refuses a major version of 0: packaging a 0.x fails instead of
 // publishing another number than the app's.
@@ -40,6 +50,8 @@ compose.desktop {
             packageName = "Ostrom"
             packageVersion = desktopPackageVersion
             macOS { bundleID = "run.ostrom.app.desktop" }
+            // The phones' icon (companion-ios's AppIcon); macOS and Windows installers would need an .icns and an .ico of it.
+            linux { iconFile.set(project.file("src/main/resources/ostrom-icon.png")) }
             windows {
                 perUserInstall = true
                 // Never changes, so a new version replaces the previous one.

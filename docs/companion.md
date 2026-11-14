@@ -121,6 +121,44 @@ server without the feed, each screen loads once, then again on return and on ref
 The server does not publish the run and todo events yet: until it does, the runs and the todo are current at the
 feed's opening, after a gap, on return and on refresh, and become live by themselves once it does.
 
+## Desktop
+
+`companion-desktop/` adds what only makes sense on a computer, ported from TeamCode's `companion-desktop`.
+
+- **Menu bar icon.** The app has an icon in the menu bar (the notification area on Windows and Linux) with Open and
+  Quit; activating it shows the window. Closing the window keeps the app there; where the desktop has no tray (some
+  Linux desktops), closing the window quits. On macOS a click on the Dock icon shows the hidden window again. The
+  window reopens where it was left, at its size, maximized or not, checked against the screens connected then
+  (`WindowPlacementStore`). The icon is the phones' (`companion-ios`'s AppIcon), for the window, the Dock and the
+  menu bar; the macOS and Windows installers keep the default one until an `.icns` and an `.ico` of it exist.
+- **Menu bar.** File: Add an account (Cmd/Ctrl+N), Close window (Cmd/Ctrl+W). View: each tab in its order
+  (Cmd/Ctrl+1 to 8; a tab the server does not serve changes nothing) and Settings (Cmd/Ctrl+,). The menu sends
+  `AppCommands`, which the navigation follows.
+- **The CLI's account.** When the `ostrom` CLI of this computer is signed in, its session is an account of the app
+  (`Account.CLI_ACCOUNT_ID`, a "CLI" chip in Settings), kept equal to what the CLI says (`CliAccountSync`): the CLI's
+  folder (`$OSTROM_HOME`, else `$XDG_CONFIG_HOME/ostrom`, else `~/.config/ostrom`, as the CLI resolves it, the login
+  shell's variables included) is checked every 2 s by the stamps (modification time, size, file identity) of
+  `config.toml` (its `server`) and `credentials.json` (an entry per server signed in). A change adds the account when
+  the CLI signs in, describes it again when it signs in to another server, removes it when it signs out. It is
+  described with the CLI's token (`GET /auth/me`, `GET /capabilities`); a `401` lists it as signed out until the CLI's
+  files change, any other failure is tried again after 60 s. The same person on the same server signed in in the app
+  is merged into it (that app session is revoked). The token is read from the OS secret store where the CLI keeps it
+  (service `run.ostrom.cli`, account the server URL), only for the server the account describes, and kept in memory
+  while the CLI's files do not change. The app never writes the CLI's files or its secret: signing that account out
+  runs the CLI's own `ostrom logout --server <url>`, and only when no CLI is found does the app revoke the session on
+  the server, as any sign-out. Signed out, the account says to run `ostrom login` in a terminal.
+  - On macOS the Keychain may ask once to let Ostrom read the CLI's item: choose Always Allow.
+  - Not on Windows: java-keyring names and encodes Credential Manager entries otherwise than the CLI, so the app cannot
+    read its token there. Nor on a Linux without Secret Service, where the CLI keeps its token in an encrypted file.
+- **Update banner.** At the top of the signed-in app, the banner checks the installed CLI with `ostrom update --check`
+  at start, then every 6 hours, at most once an hour across restarts, and reads its two answers
+  (`✓ ostrom X is up to date.`, `! ostrom Y is available. Run …`; anything else shows nothing, and so does a failed
+  check). "Update" runs `ostrom update`, its lines shown as they come, then says which version the CLI now reports; a
+  failure says why with the CLI's last lines and offers to try again. A version closed with "Not now" does not show
+  again; a newer one does. The CLI is found where its installers put it (`$OSTROM_INSTALL_DIR`, else `~/.ostrom/bin`;
+  Homebrew's and Scoop's folders), then on the `PATH`, the login shell's included. The app only runs the CLI: it
+  never downloads or verifies a release itself, and it does not update itself (no desktop release is published yet).
+
 ## Tests
 
 - `companion/src/commonTest`: use cases with fakes, repositories against Ktor's `MockEngine`.
@@ -131,6 +169,8 @@ feed's opening, after a gap, on return and on refresh, and become live by themse
   waiting for the person, a budget passed, the phone's session and unlock key) and runs this test with that session in
   `OSTROM_E2E_*`; it says yes and no, sees their receipts verified in the history, reads the spending, the activity
   and the account, and the workflow checks the gates and their signed receipts. Without `OSTROM_E2E_SERVER` it is skipped.
+- `companion-desktop/src/test`: the CLI's account against a temporary CLI folder and a fake secret store, finding and
+  running the CLI with fake processes, the window placement.
 - `testAndroidHostTest` runs the common tests on Android's host JVM. Kover's gate covers the domain.
 
 ## Parity
@@ -155,6 +195,6 @@ What the React Native app did, what TeamCode's companion does that an Ostrom ser
 | A session's todo: items, state, proof, added along the way, dropped with why, the Stop hook's errors | `todos.v1` | Ported from TeamCode's `TodoPanel` and `FollowTodoUseCase`, read only (no shortcut messages: no session actions) |
 | Workflows: the member's runs with their status filter, the workflows read only (inputs, nodes), a workflow's runs, a run's visits | `workflows.v1` | Ported from TeamCode's `WorkflowsScreen`, `WorkflowScreen`, `WorkflowRunScreen` and their view models. No editor, no start, no cancel (the console does them) |
 | Automations, MCP servers, GitHub link, sharing | `automations.v1`, `mcp.v1`, `github.link.v1`, `sharing.v1` | Later, each with its client routes in ostrom-core |
-| Desktop: menu bar icon, the CLI's account, update banner | none | To port from TeamCode's `companion-desktop` |
+| Desktop: menu bar icon, the CLI's account, update banner | none | Ported (see [Desktop](#desktop)). Left: tray notifications of new waits and approvals while the window is hidden (no use case emits them across accounts yet), making an app sign-in the CLI's (it would write the CLI's secret store), the CLI's account on Windows, an install button when no CLI is found, the app's own update (no desktop release), installer icons for macOS and Windows |
 | Store builds (TestFlight, Play internal track) | none | Ported: TeamCode's fastlane lanes as is ([distribution.md](distribution.md)) |
 | Desktop distribution (signed installers) | none | With 1.0.0 and a Developer ID ([distribution.md](distribution.md)) |

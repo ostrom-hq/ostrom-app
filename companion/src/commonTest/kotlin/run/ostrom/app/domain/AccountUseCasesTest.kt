@@ -1,16 +1,19 @@
 // SPDX-License-Identifier: Apache-2.0
 package run.ostrom.app.domain
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
 import run.ostrom.app.FakeAuthRepository
 import run.ostrom.app.FixedClock
 import run.ostrom.app.account
 import run.ostrom.app.accounts
+import run.ostrom.app.domain.models.Account
 import run.ostrom.app.domain.models.AppException
 import run.ostrom.app.domain.models.Features
 import run.ostrom.app.domain.models.Organization
 import run.ostrom.app.domain.models.requireSupportedApi
 import run.ostrom.app.domain.repositories.Member
+import run.ostrom.app.domain.services.CliSession
 import run.ostrom.app.domain.services.unlockKeyEntry
 import run.ostrom.app.domain.usecases.auth.AccountGuard
 import run.ostrom.app.domain.usecases.auth.OrganizationUseCases
@@ -81,6 +84,53 @@ class AccountUseCasesTest {
         accounts.save(account)
         assertEquals(SignOutUseCase.Result.REVOKED, SignOutUseCase(auth, accounts, credentials)(account.id))
         assertEquals(SignOutUseCase.Result.REVOKED, SignOutUseCase(auth, accounts, credentials)("unknown"))
+    }
+
+    @Test
+    fun theCliAccountSignsOutWithTheCliOwnCommand() = runTest {
+        val account = account(id = Account.CLI_ACCOUNT_ID).also { accounts.save(it) }
+        val cli = FakeCliSession(signsOut = true)
+        assertEquals(SignOutUseCase.Result.REVOKED, SignOutUseCase(auth, accounts, credentials, cli)(account.id))
+        assertEquals(listOf(account.origin), cli.signedOut, "ostrom logout --server ran for the account's server")
+        assertTrue(auth.loggedOut.isEmpty(), "The app did not revoke the CLI's session itself")
+        assertTrue(accounts.accounts.value.isEmpty())
+    }
+
+    @Test
+    fun withoutACliTheCliAccountsSessionIsRevokedAsAnyOther() = runTest {
+        val account = account(id = Account.CLI_ACCOUNT_ID).also { accounts.save(it) }
+        val cli = FakeCliSession(signsOut = false)
+        assertEquals(SignOutUseCase.Result.REVOKED, SignOutUseCase(auth, accounts, credentials, cli)(account.id))
+        assertEquals(listOf(account.id), auth.loggedOut)
+        accounts.save(account)
+        val broken = FakeCliSession(error = IllegalStateException("no such file"))
+        assertEquals(SignOutUseCase.Result.REVOKED, SignOutUseCase(auth, accounts, credentials, broken)(account.id))
+        assertEquals(listOf(account.id, account.id), auth.loggedOut)
+    }
+
+    @Test
+    fun anAppAccountNeverRunsTheCli() = runTest {
+        val account = signedIn()
+        val cli = FakeCliSession(signsOut = true)
+        SignOutUseCase(auth, accounts, credentials, cli)(account.id)
+        assertTrue(cli.signedOut.isEmpty())
+        assertEquals(listOf(account.id), auth.loggedOut)
+    }
+
+    @Test
+    fun aCancelledCliSignOutPropagates() = runTest {
+        val account = account(id = Account.CLI_ACCOUNT_ID).also { accounts.save(it) }
+        val cli = FakeCliSession(error = CancellationException("closed"))
+        assertFailsWith<CancellationException> { SignOutUseCase(auth, accounts, credentials, cli)(account.id) }
+    }
+
+    private class FakeCliSession(private val signsOut: Boolean = false, private val error: Exception? = null) : CliSession {
+        val signedOut = mutableListOf<String>()
+        override suspend fun signOut(origin: String): Boolean {
+            error?.let { throw it }
+            signedOut += origin
+            return signsOut
+        }
     }
 
     @Test
