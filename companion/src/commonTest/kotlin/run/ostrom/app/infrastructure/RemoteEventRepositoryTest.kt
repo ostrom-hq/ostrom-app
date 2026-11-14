@@ -108,6 +108,29 @@ class RemoteEventRepositoryTest {
     }
 
     @Test
+    fun aRunEventNamesItsWorkflowAndATodoEventItsSession() = runTest {
+        signedIn()
+        val run = "id: 7\nevent: cloud.workflow.run.updated\ndata: {\"seq\":7,\"type\":\"cloud.workflow.run.updated\",\"subject\":\"workflow_run\",\"subjectId\":\"r1\"," +
+            "\"memberId\":\"m1\",\"at\":\"2026-11-14T10:00:00Z\",\"data\":{\"runId\":\"r1\",\"workflowId\":\"wf1\",\"status\":\"running\",\"ownerId\":\"m1\"}}\n\n"
+        val todo = "id: 8\nevent: cloud.todo\ndata: {\"seq\":8,\"type\":\"cloud.todo\",\"subject\":\"session\",\"subjectId\":\"s1\"," +
+            "\"memberId\":\"m1\",\"at\":\"2026-11-14T10:00:00Z\",\"data\":{\"sessionId\":\"s1\",\"status\":\"active\",\"done\":1,\"total\":3}}\n\n"
+        answers += HttpStatusCode.OK to run + todo + "event: denied\ndata: {}\n\n"
+        val updates = mutableListOf<LiveUpdate<OrgChange>>()
+        assertFailsWith<AppException.Unauthorized> {
+            repository.changes("a1", setOf(OrgChange.RUN_UPDATED, OrgChange.TODO_UPDATED)).collect { updates += it }
+        }
+        assertEquals(
+            listOf(
+                LiveUpdate.Opened(resumed = false),
+                LiveUpdate.Item(OrgChange(OrgChange.RUN_UPDATED, "r1", "m1", "wf1")),
+                LiveUpdate.Item(OrgChange(OrgChange.TODO_UPDATED, "s1", "m1")),
+            ),
+            updates,
+        )
+        assertEquals("cloud.todo,cloud.workflow.run.updated", requests[0].url.parameters["types"])
+    }
+
+    @Test
     fun aSignedOutAccountHasNoFeed() = runTest {
         assertFailsWith<AppException.Unauthorized> { repository.changes("a1", OrgChange.WAIT_TYPES).collect { } }
         assertEquals(emptyList(), requests)

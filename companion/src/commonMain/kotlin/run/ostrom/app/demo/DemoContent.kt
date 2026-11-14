@@ -34,7 +34,10 @@ object DemoContent {
     const val PUSH_APPROVAL_ID = "demo-push"
 
     /** What the demo server announces: the features whose demo content exists. */
-    val features: Set<String> = setOf(Features.GATES, Features.WAITS, Features.RECEIPTS, Features.BUDGETS, Features.NOTIFICATIONS, Features.ARTIFACTS)
+    val features: Set<String> = setOf(
+        Features.GATES, Features.WAITS, Features.RECEIPTS, Features.BUDGETS, Features.NOTIFICATIONS, Features.ARTIFACTS, Features.SESSIONS, Features.TODOS,
+        Features.WORKFLOWS,
+    )
 
     /**
      * The approvals inbox: a high-risk push and a low-risk tool waiting for Ada's yes, and a merge she approved. The

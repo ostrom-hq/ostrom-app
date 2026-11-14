@@ -69,7 +69,7 @@ class WaitsScreenTest {
             waitFor("tab-inbox")
             settle()
             onNodeWithTag("wait-w1").assertDoesNotExist()
-            // The agent of a session waits for the member: the app has no session screen yet, the waits show it.
+            // The agent of a session waits for the member: this server serves no sessions, the waits show it.
             IncomingLinks.open(NotificationLinks.link("$origin/", "o1", "m1", null, sessionId = "s1", waitId = "w1"))
             waitFor("wait-w1")
             assertEquals(null, IncomingLinks.link.value)

@@ -21,11 +21,11 @@ import run.ostrom.app.domain.models.initialInput
 import run.ostrom.app.domain.models.Features
 import run.ostrom.app.domain.models.LiveUpdate
 import run.ostrom.app.domain.models.OrgChange
-import run.ostrom.app.domain.repositories.EventRepository
 import run.ostrom.app.domain.repositories.FeaturesRepository
 import run.ostrom.app.domain.repositories.has
 import run.ostrom.app.domain.repositories.WaitRepository
 import run.ostrom.app.domain.usecases.auth.AccountGuard
+import run.ostrom.app.domain.usecases.events.OrgFeed
 
 /** Whether the account's server has waits: the screen, its tab and the banner stay hidden otherwise. */
 class WaitsAvailabilityUseCase(private val features: FeaturesRepository) {
@@ -103,23 +103,23 @@ sealed interface WaitsSignal {
 }
 
 /**
- * Keeps the waits current, as TeamCode's does: from a server with the event feed (`events.v1`), a load once the feed
- * is open (a return to the app opens it again), after a gap, and at each wait asked, answered or withdrawn that the
- * member sees (the server sends a member the events of their own waits, an owner or an admin those of everyone, and
- * each one loads again: the waits list reads the member's own); the connection's state on the way. From an older
- * server, one load, then again on return to the screen and on refresh.
+ * Keeps the waits current, as TeamCode's does: from a server with the event feed (`events.v1`), through the app's one
+ * connection ([OrgFeed]), a load once the feed is open (a return to the app opens it again), after a gap, and at each
+ * wait asked, answered or withdrawn that the member sees (the server sends a member the events of their own waits, an
+ * owner or an admin those of everyone, and each one loads again: the waits list reads the member's own); the
+ * connection's state on the way. From an older server, one load, then again on return to the screen and on refresh.
  */
-class FollowWaitsUseCase(private val events: EventRepository, private val features: FeaturesRepository, private val guard: AccountGuard) {
+class FollowWaitsUseCase(private val feed: OrgFeed, private val features: FeaturesRepository, private val guard: AccountGuard) {
     operator fun invoke(accountId: String): Flow<WaitsSignal> = guard.flow(accountId, flow {
         val announced = features.capabilities(accountId).features
         if (Features.WAITS !in announced) return@flow
         if (Features.EVENTS !in announced) { emit(WaitsSignal.Reload); return@flow }
-        events.changes(accountId, OrgChange.WAIT_TYPES).collect { update ->
+        feed.follow(accountId).collect { update ->
             when (update) {
                 is LiveUpdate.Opened -> { emit(WaitsSignal.Connection(reconnecting = false)); if (!update.resumed) emit(WaitsSignal.Reload) }
                 LiveUpdate.Gap -> emit(WaitsSignal.Reload)
-                // Only the wait types are asked of the server.
-                is LiveUpdate.Item -> emit(WaitsSignal.Reload)
+                // The feed carries every type the app reads: the waits keep theirs.
+                is LiveUpdate.Item -> if (update.value.type in OrgChange.WAIT_TYPES) emit(WaitsSignal.Reload)
                 is LiveUpdate.Reconnecting -> emit(WaitsSignal.Connection(reconnecting = true))
             }
         }

@@ -2,6 +2,14 @@
 package run.ostrom.app
 
 import com.russhwolf.settings.MapSettings
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
+import run.ostrom.app.domain.models.LiveUpdate
+import run.ostrom.app.domain.models.OrgChange
+import run.ostrom.app.domain.repositories.EventRepository
+import run.ostrom.app.domain.usecases.auth.AccountGuard
+import run.ostrom.app.domain.usecases.auth.RefreshAccountUseCase
+import run.ostrom.app.infrastructure.credentials.MemoryCredentialStore
 import run.ostrom.app.domain.models.Account
 import run.ostrom.app.domain.models.DeviceLogin
 import run.ostrom.app.domain.models.Organization
@@ -113,3 +121,12 @@ class FakeFeatures(var features: Set<String> = emptySet()) : run.ostrom.app.doma
     override suspend fun capabilities(accountId: String, refresh: Boolean) = ServerCapabilities("1.4.0", 1, features)
     override fun cached(accountId: String) = ServerCapabilities("1.4.0", 1, features)
 }
+
+/** The organization's feed of a test: [changes] is what every connection streams; [asked] records the types of each connection. */
+class FakeEventRepository(var changes: Flow<LiveUpdate<OrgChange>> = emptyFlow()) : EventRepository {
+    val asked = mutableListOf<Set<String>>()
+    override fun changes(accountId: String, types: Set<String>): Flow<LiveUpdate<OrgChange>> { asked += types; return changes }
+}
+
+/** An [AccountGuard] over fakes: a `401` checks the account once and goes on. */
+fun fakeGuard() = AccountGuard(RefreshAccountUseCase(FakeAuthRepository(), accounts(), MemoryCredentialStore(), FixedClock()))
