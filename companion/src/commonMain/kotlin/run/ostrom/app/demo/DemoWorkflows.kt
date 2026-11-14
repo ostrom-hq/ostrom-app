@@ -23,6 +23,7 @@ internal object DemoWorkflowIds {
     const val TRIAGE = "demo-workflow-triage"
     const val RUN_WAITING = "demo-run-waiting"
     const val RUN_DONE = "demo-run-done"
+    const val RUN_CANCELLED = "demo-run-cancelled"
 }
 
 private val release = Workflow(
@@ -50,7 +51,7 @@ private val triage = Workflow(
     null,
 )
 
-/** The demo's runs, relative to [startedAt]: one waiting at its gate, one that succeeded. */
+/** The demo's runs, relative to [startedAt]: one waiting at its gate, one that succeeded, one cancelled at its gate. */
 internal fun demoRuns(startedAt: Long): List<WorkflowRun> {
     val login = DemoContent.account().login
     fun visit(seq: Int, node: WorkflowNode, status: String, start: Int, end: Int?, outcome: String? = null, output: String? = null, sessionId: String? = null, gateId: String? = null) =
@@ -79,6 +80,17 @@ internal fun demoRuns(startedAt: Long): List<WorkflowRun> {
                 visit(5, tag, "done", 25 * 60 + 10, 25 * 60 + 9, outcome = "passed", output = "v1.3.2"),
             ),
             null, null, "Tagged v1.3.2", null, startedAt - 26 * 60 * MINUTE, startedAt - (25 * 60 + 9) * MINUTE,
+        ),
+        WorkflowRun(
+            DemoWorkflowIds.RUN_CANCELLED, release.id, release.name, 2, RunStatus.CANCELLED, login, "manual", mapOf("version" to "1.3.1"), null, null,
+            null, null, "analytical-engines/engine",
+            listOf(
+                visit(1, trigger, "done", 50 * 60, 50 * 60),
+                visit(2, build, "done", 50 * 60, 49 * 60 + 50, outcome = "passed"),
+                // As the server cancels: the visit under way fails with the outcome `cancelled`.
+                visit(3, merge, "failed", 49 * 60 + 50, 49 * 60, outcome = "cancelled"),
+            ),
+            null, null, null, null, startedAt - 50 * 60 * MINUTE, startedAt - 49 * 60 * MINUTE,
         ),
     )
 }

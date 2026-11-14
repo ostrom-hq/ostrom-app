@@ -7,11 +7,12 @@ import run.ostrom.app.presentation.viewmodels.words
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.FlowRow
@@ -32,6 +33,8 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
@@ -52,6 +55,7 @@ import androidx.compose.material3.TooltipAnchorPosition
 import androidx.compose.material3.TooltipBox
 import androidx.compose.material3.TooltipDefaults
 import androidx.compose.material3.rememberTooltipState
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
@@ -230,7 +234,8 @@ fun LinkButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier,
 
 /**
  * Mutually exclusive filters in one pill: Active / Paused / Ended, Mine / Team, System / Light / Dark. [scrollable]
- * sizes each option to its label and scrolls sideways, for more options than a phone's width holds.
+ * is for more options than a phone's width holds: where they fit they share the pill as usual; where they do not, each
+ * is sized to its label, the pill scrolls sideways, and the selected option is scrolled into view.
  */
 @Composable
 fun <T> Segmented(
@@ -241,17 +246,30 @@ fun <T> Segmented(
     tag: (T) -> String? = { null },
     scrollable: Boolean = false,
 ) {
+    if (!scrollable) return SegmentedRow(options, selected, onSelect, modifier, tag, scroll = false)
+    BoxWithConstraints(modifier) {
+        SegmentedRow(options, selected, onSelect, Modifier.fillMaxWidth(), tag, scroll = maxWidth < ScrollingOptionWidth * options.size)
+    }
+}
+
+/** Below this width per option, a scrollable [Segmented] scrolls instead of sharing its width. */
+private val ScrollingOptionWidth = 96.dp
+
+@Composable
+private fun <T> SegmentedRow(options: List<Pair<T, String>>, selected: T, onSelect: (T) -> Unit, modifier: Modifier, tag: (T) -> String?, scroll: Boolean) {
     val colors = Ostrom.colors
     Row(
         modifier.clip(Radii.segment).background(colors.panelAlt).border(1.dp, colors.line, Radii.segment)
-            .then(if (scrollable) Modifier.horizontalScroll(rememberScrollState()) else Modifier).padding(3.dp).selectableGroup(),
+            .then(if (scroll) Modifier.horizontalScroll(rememberScrollState()) else Modifier).padding(3.dp).selectableGroup(),
         horizontalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         for ((value, label) in options) {
             val on = value == selected
+            val shown = remember { BringIntoViewRequester() }
+            if (scroll && on) LaunchedEffect(value) { shown.bringIntoView() }
             Box(
                 Modifier
-                    .then(if (scrollable) Modifier.widthIn(min = 64.dp) else Modifier.weight(1f))
+                    .then(if (scroll) Modifier.widthIn(min = 64.dp).bringIntoViewRequester(shown) else Modifier.weight(1f))
                     .heightIn(min = if (LocalDense.current) 30.dp else 38.dp)
                     .clip(Radii.segmentItem)
                     .background(if (on) colors.panel else Color.Transparent)
@@ -262,7 +280,7 @@ fun <T> Segmented(
                 contentAlignment = Alignment.Center,
             ) {
                 Text(label, color = if (on) colors.text else colors.muted, fontSize = if (LocalDense.current) 12.5.sp else 13.5.sp, fontWeight = FontWeight.SemiBold, maxLines = 1,
-                    modifier = if (scrollable) Modifier.padding(horizontal = 12.dp) else Modifier)
+                    modifier = if (scroll) Modifier.padding(horizontal = 12.dp) else Modifier)
             }
         }
     }

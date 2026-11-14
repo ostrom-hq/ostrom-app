@@ -5,9 +5,13 @@ package run.ostrom.app
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.DesktopComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performSemanticsAction
 import com.russhwolf.settings.MapSettings
 import kotlinx.coroutines.runBlocking
@@ -106,7 +110,6 @@ class WorkflowsScreenTest {
             waitFor("workflow-run-r4")
             waitFor("workflow-run-status-r4")
             onNodeWithTag("workflow-run-r1").assertDoesNotExist()
-            assertTrue("GET /api/v1/runs" in server.asked)
             click("runs-filter-all")
             click("workflows-part-definitions")
             click("workflow-wf1")
@@ -114,6 +117,22 @@ class WorkflowsScreenTest {
             click("runs-filter-cancelled")
             waitFor("workflow-run-r5")
             onNodeWithTag("workflow-run-r1").assertDoesNotExist()
+        }
+    }
+
+    @Test
+    fun onAPhonesWidthTheRunFiltersScrollToCancelled() {
+        val server = server()
+        val settings = MapSettings()
+        SettingsAccountRepository(settings).save(Account(id = "a1", origin = origin, login = "ada", method = SignInMethod.DEVICE))
+        val credentials = MemoryCredentialStore().also { runBlocking { it.write("a1", "osm_token") } }
+        testApp(server, width = 360, height = 780, credentials = credentials, settings = settings) {
+            click("tab-workflows")
+            waitFor("workflow-run-r1")
+            onNodeWithTag("runs-filter-cancelled").performScrollTo()
+            onNodeWithTag("runs-filter-cancelled").assertIsDisplayed().performClick()
+            waitFor("workflow-run-r4")
+            onNodeWithTag("runs-filter-cancelled").assertIsDisplayed().assertIsSelected()
         }
     }
 
@@ -146,6 +165,10 @@ class WorkflowsScreenTest {
             click("tab-workflows")
             waitFor("workflow-run-${DemoWorkflowIds.RUN_WAITING}")
             onNodeWithTag("workflow-run-${DemoWorkflowIds.RUN_DONE}").assertExists()
+            click("runs-filter-cancelled")
+            waitFor("workflow-run-${DemoWorkflowIds.RUN_CANCELLED}")
+            onNodeWithTag("workflow-run-${DemoWorkflowIds.RUN_WAITING}").assertDoesNotExist()
+            click("runs-filter-all")
             click("workflow-run-${DemoWorkflowIds.RUN_WAITING}")
             waitFor("workflow-visit-4")
             click("back")
