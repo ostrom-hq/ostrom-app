@@ -123,8 +123,10 @@ fun HistoryScreen(viewModel: HistoryViewModel = koinViewModel()) {
         val listState = rememberLazyListState()
         val nearEnd by remember { derivedStateOf { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index?.let { it >= listState.layoutInfo.totalItemsCount - 3 } == true } }
         LaunchedEffect(nearEnd, state.next, state.refreshing) { if (nearEnd && !state.moreFailed) viewModel.loadMore() }
-        val keys = remember(state.entries) { rowKeys(state.entries) }
-        KeepAtTopOnNewFirstRow(listState, keys.firstOrNull() ?: "end")
+        // Each entry with its key, computed together: the list never reads one without the other.
+        val entries = state.entries
+        val rows = remember(entries) { entries.zip(rowKeys(entries)) }
+        KeepAtTopOnNewFirstRow(listState, rows.firstOrNull()?.second ?: "end")
         PullToRefreshBox(
             isRefreshing = state.refreshing && state.loaded, onRefresh = viewModel::refresh,
             modifier = Modifier.weight(1f).widthIn(max = ContentWidth).fillMaxWidth(),
@@ -135,7 +137,7 @@ fun HistoryScreen(viewModel: HistoryViewModel = koinViewModel()) {
                 contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                itemsIndexed(state.entries, key = { index, _ -> keys[index] }) { index, entry -> ReceiptRow(index, entry, today) }
+                itemsIndexed(rows, key = { _, row -> row.second }) { index, row -> ReceiptRow(index, row.first, today) }
                 item(key = "end") {
                     BusyRow(state.loadingMore || (state.refreshing && !state.loaded))
                     if (state.loaded && state.entries.isEmpty() && !state.failed) EmptyState(
