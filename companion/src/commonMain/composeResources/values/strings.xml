@@ -814,4 +814,5 @@
     <string name="session_gate_receipt">Its receipt</string>
     <string name="receipt_title">Receipt</string>
     <string name="receipt_refresh">Read the receipt again</string>
+    <string name="settings_more_section">More</string>
 </resources>

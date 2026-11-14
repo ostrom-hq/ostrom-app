@@ -27,6 +27,7 @@ import run.ostrom.app.domain.repositories.FeaturesRepository
 import run.ostrom.app.domain.repositories.has
 import run.ostrom.app.domain.usecases.approvals.PhoneUnlock
 import run.ostrom.app.domain.usecases.push.NotificationTarget
+import run.ostrom.app.presentation.components.LocalWideLayout
 import run.ostrom.app.presentation.screens.AddServerScreen
 import run.ostrom.app.presentation.screens.ArtifactScreen
 import run.ostrom.app.presentation.screens.CloudSessionScreen
@@ -34,6 +35,7 @@ import run.ostrom.app.presentation.screens.LoginScreen
 import run.ostrom.app.presentation.screens.MainScreen
 import run.ostrom.app.presentation.screens.MainTab
 import run.ostrom.app.presentation.screens.MemberEnvironmentScreen
+import run.ostrom.app.presentation.screens.MoreTabScreen
 import run.ostrom.app.presentation.screens.NewCloudSessionScreen
 import run.ostrom.app.presentation.screens.NotificationPreferencesScreen
 import run.ostrom.app.presentation.screens.PersonalMcpServersScreen
@@ -163,9 +165,33 @@ fun OstromNavHost(rootViewModel: RootViewModel = koinViewModel(), unlock: PhoneU
                 onOpenWorkflow = { accountId, workflowId -> navController.navigate(WorkflowRoute(accountId, workflowId)) },
                 onNewWorkflow = { accountId -> navController.navigate(WorkflowEditRoute(accountId)) },
                 onOpenRun = { accountId, runId -> navController.navigate(WorkflowRunRoute(accountId, runId)) },
+                onOpenTab = { tab, opensRequests ->
+                    // Above the tabs only: one tab screen at a time, the one asked replacing another.
+                    navController.navigate(MoreTabRoute(tab.name, opensRequests)) { popUpTo<MainRoute>() }
+                },
                 requestedTab = requestedTab,
                 onTabRequestShown = { requestedTab = null },
             )
+        }
+        composable<MoreTabRoute> { entry ->
+            val route = entry.toRoute<MoreTabRoute>()
+            val tab = MainTab.entries.firstOrNull { it.name == route.tab }
+            // The window widened: the tab returns to the rail, where it is a tab.
+            val wide = LocalWideLayout.current
+            if (tab == null) {
+                LaunchedEffect(Unit) { navController.popBackStack() }
+            } else if (wide) {
+                LaunchedEffect(Unit) {
+                    navController.popBackStack(MainRoute, inclusive = false)
+                    requestedTab = tab
+                }
+            } else {
+                MoreTabScreen(
+                    tab, route.opensRequests, onBack = { navController.popBackStack() },
+                    onOpenRequest = { accountId, id -> navController.navigate(RequestRoute(accountId, id)) },
+                    onOpenArtifact = { accountId, artifactId -> navController.navigate(ArtifactRoute(accountId, artifactId)) },
+                )
+            }
         }
         composable<SessionRoute> { entry ->
             val route = entry.toRoute<SessionRoute>()

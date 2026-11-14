@@ -75,6 +75,7 @@ import run.ostrom.app.resources.settings_memory_only
 import run.ostrom.app.resources.settings_no_organization
 import run.ostrom.app.resources.settings_environment_row
 import run.ostrom.app.resources.settings_mcp_row
+import run.ostrom.app.resources.settings_more_section
 import run.ostrom.app.resources.settings_notifications_row
 import run.ostrom.app.resources.settings_setup_section
 import run.ostrom.app.resources.settings_organization
@@ -88,8 +89,9 @@ import run.ostrom.app.resources.theme_light
 import run.ostrom.app.resources.theme_system
 
 /**
- * The accounts on this device (switch, add, sign out or in again), the organization the active one acts in, the
- * theme, and the versions of the app, of the server and of the API they speak.
+ * On a phone, first the screens of the tabs its bar has no room for ([moreTabs]); then the accounts on this device
+ * (switch, add, sign out or in again), the organization the active one acts in, the theme, and the versions of the
+ * app, of the server and of the API they speak.
  */
 @Composable
 fun SettingsScreen(
@@ -98,6 +100,8 @@ fun SettingsScreen(
     onOpenNotifications: (accountId: String) -> Unit = {},
     onOpenEnvironment: (accountId: String) -> Unit = {},
     onOpenMcpServers: (accountId: String) -> Unit = {},
+    moreTabs: List<MainTab> = emptyList(),
+    onOpenTab: (MainTab) -> Unit = {},
     viewModel: SettingsViewModel = koinViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -112,6 +116,21 @@ fun SettingsScreen(
             LargeTitle(stringResource(Res.string.settings_title))
             state.message?.let { Banner(it.words(), Tone.NEUTRAL, Modifier.testTag("settings-message")) }
             if (!state.persistentCredentials) Banner(stringResource(Res.string.settings_memory_only), Tone.WARN, Modifier.testTag("memory-only"))
+
+            // The phone's bar holds five tabs: the screens of the others open from here, with back.
+            if (moreTabs.isNotEmpty()) {
+                SectionTitle(stringResource(Res.string.settings_more_section))
+                Group(Modifier.testTag("settings-more")) {
+                    moreTabs.forEachIndexed { index, tab ->
+                        if (index > 0) GroupDivider()
+                        GroupRow(Modifier.testTag("settings-more-${tab.name.lowercase()}"), onClick = { onOpenTab(tab) }) {
+                            Icon(tab.icon, contentDescription = null, tint = colors.muted)
+                            Text(stringResource(tab.label), color = colors.text, fontSize = 15.sp, modifier = Modifier.weight(1f))
+                            Icon(PhosphorIcons.Regular.CaretRight, contentDescription = null, tint = colors.muted)
+                        }
+                    }
+                }
+            }
 
             SectionTitle(stringResource(Res.string.settings_accounts))
             Group {
