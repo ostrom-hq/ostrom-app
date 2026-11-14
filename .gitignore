@@ -39,6 +39,8 @@ Gemfile.lock
 
 # Android push configuration of a published build
 companion-android/google-services.json
+# iOS push configuration of a published build
+companion-ios/Ostrom/GoogleService-Info.plist
 
 # macOS
 .DS_Store
