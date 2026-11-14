@@ -3,30 +3,39 @@
 package run.ostrom.app.presentation.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.LifecycleStartEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.adamglin.PhosphorIcons
 import com.adamglin.phosphoricons.Regular
 import com.adamglin.phosphoricons.regular.ArrowsClockwise
+import com.adamglin.phosphoricons.regular.PencilSimple
 import org.jetbrains.compose.resources.stringResource
 import run.ostrom.app.domain.models.Workflow
 import run.ostrom.app.domain.models.WorkflowNode
@@ -45,11 +54,17 @@ import run.ostrom.app.presentation.components.rememberNow
 import run.ostrom.app.presentation.theme.MetaStyle
 import run.ostrom.app.presentation.theme.MonospaceStyle
 import run.ostrom.app.presentation.theme.Ostrom
+import run.ostrom.app.presentation.theme.Radii
 import run.ostrom.app.presentation.viewmodels.WorkflowRunsViewModel
 import run.ostrom.app.presentation.viewmodels.WorkflowViewModel
 import run.ostrom.app.presentation.viewmodels.words
 import run.ostrom.app.resources.Res
 import run.ostrom.app.resources.action_retry
+import run.ostrom.app.resources.wfe_delete
+import run.ostrom.app.resources.wfe_delete_body
+import run.ostrom.app.resources.wfe_delete_keep
+import run.ostrom.app.resources.wfe_delete_title
+import run.ostrom.app.resources.wfe_edit
 import run.ostrom.app.resources.workflow_input_default
 import run.ostrom.app.resources.workflow_input_required
 import run.ostrom.app.resources.workflow_inputs
@@ -75,6 +90,8 @@ fun WorkflowScreen(
     onBack: (() -> Unit)?,
     onOpenRun: (runId: String) -> Unit,
     onStart: () -> Unit = {},
+    onEdit: () -> Unit = {},
+    onDeleted: () -> Unit = {},
     backLabel: String = stringResource(Res.string.workflows_title),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -86,6 +103,8 @@ fun WorkflowScreen(
     val now = rememberNow()
     val colors = Ostrom.colors
     val workflow = state.workflow
+    var confirmDelete by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(state.deleted) { if (state.deleted) onDeleted() }
     Column(Modifier.fillMaxSize().background(colors.background), horizontalAlignment = Alignment.CenterHorizontally) {
         NavBar(backLabel, onBack, workflow?.name ?: stringResource(Res.string.workflow_title)) {
             AppIconButton(PhosphorIcons.Regular.ArrowsClockwise, stringResource(Res.string.workflow_refresh), onClick = { viewModel.load(); runs.reload() },
@@ -104,10 +123,23 @@ fun WorkflowScreen(
                         } else null)
                     }
                     BusyRow(state.loading && workflow == null)
+                    state.deleteHeld?.let { HeldNotice(it, "workflow-delete-held") }
+                    state.deleteError?.let { Banner(it.words(), Tone.DANGER, Modifier.testTag("workflow-delete-error")) }
                 }
             }
             if (workflow != null) {
-                item(key = "overview") { Overview(workflow, canStart = state.canStart, onStart = onStart) }
+                item(key = "overview") {
+                    Overview(workflow, canStart = state.canStart, onStart = onStart) {
+                        if (state.canEdit || state.mayDecide) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                if (state.canEdit) AppButton(stringResource(Res.string.wfe_edit), onClick = onEdit, kind = ButtonKind.SECONDARY, icon = PhosphorIcons.Regular.PencilSimple,
+                                    modifier = Modifier.weight(1f).testTag("workflow-edit"))
+                                AppButton(stringResource(Res.string.wfe_delete), onClick = { confirmDelete = true }, kind = ButtonKind.DANGER, enabled = state.canDelete, busy = state.deleting,
+                                    modifier = Modifier.weight(1f).testTag("workflow-delete"))
+                            }
+                        }
+                    }
+                }
                 if (workflow.inputs.isNotEmpty()) {
                     item(key = "inputs-title") { SectionTitle(stringResource(Res.string.workflow_inputs)) }
                     item(key = "inputs") {
@@ -135,10 +167,30 @@ fun WorkflowScreen(
             }
         }
     }
+    if (confirmDelete) ConfirmDelete(onConfirm = { confirmDelete = false; viewModel.delete() }, onDismiss = { confirmDelete = false })
+}
+
+/** Asks before a workflow is deleted: runs in flight keep their copy, but the deletion cannot be undone. */
+@Composable
+private fun ConfirmDelete(onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    val colors = Ostrom.colors
+    Dialog(onDismissRequest = onDismiss) {
+        Column(
+            Modifier.widthIn(max = 420.dp).fillMaxWidth().clip(Radii.card).background(colors.panel).border(1.dp, colors.line, Radii.card).padding(18.dp).testTag("workflow-delete-confirm"),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(stringResource(Res.string.wfe_delete_title), color = colors.text, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+            Text(stringResource(Res.string.wfe_delete_body), color = colors.text, fontSize = 14.sp)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                AppButton(stringResource(Res.string.wfe_delete_keep), onClick = onDismiss, kind = ButtonKind.SECONDARY, modifier = Modifier.weight(1f).testTag("workflow-delete-keep"))
+                AppButton(stringResource(Res.string.wfe_delete), onClick = onConfirm, kind = ButtonKind.DANGER, modifier = Modifier.weight(1f).testTag("workflow-delete-yes"))
+            }
+        }
+    }
 }
 
 @Composable
-private fun Overview(workflow: Workflow, canStart: Boolean, onStart: () -> Unit) {
+private fun Overview(workflow: Workflow, canStart: Boolean, onStart: () -> Unit, decisions: @Composable () -> Unit) {
     val colors = Ostrom.colors
     AppCard(Modifier.testTag("workflow-overview")) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -149,6 +201,7 @@ private fun Overview(workflow: Workflow, canStart: Boolean, onStart: () -> Unit)
         Text(stringResource(Res.string.workflow_summary, workflow.version ?: 1, workflow.nodes.size, workflow.domain), style = MetaStyle, color = colors.muted)
         if (workflow.repos.isNotEmpty()) Text(stringResource(Res.string.workflow_repos, workflow.repos.joinToString(", ")), style = MetaStyle, color = colors.muted)
         if (canStart) AppButton(stringResource(Res.string.workflow_start), onClick = onStart, modifier = Modifier.testTag("workflow-start"))
+        decisions()
         Text(stringResource(Res.string.workflows_edit_note), fontSize = 12.sp, color = colors.muted)
     }
 }

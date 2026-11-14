@@ -17,6 +17,7 @@ import run.ostrom.app.domain.repositories.SessionRepository
 import run.ostrom.app.domain.repositories.SpendingRepository
 import run.ostrom.app.domain.repositories.TodoRepository
 import run.ostrom.app.domain.repositories.WaitRepository
+import run.ostrom.app.domain.repositories.WorkflowEditorRepository
 import run.ostrom.app.domain.repositories.WorkflowRepository
 import run.ostrom.app.domain.services.CredentialStore
 import run.ostrom.app.infrastructure.credentials.SecureReceiptKeyPinRepository
@@ -32,6 +33,7 @@ import run.ostrom.app.infrastructure.repositories.RemoteSessionRepository
 import run.ostrom.app.infrastructure.repositories.RemoteSpendingRepository
 import run.ostrom.app.infrastructure.repositories.RemoteTodoRepository
 import run.ostrom.app.infrastructure.repositories.RemoteWaitRepository
+import run.ostrom.app.infrastructure.repositories.RemoteWorkflowEditorRepository
 import run.ostrom.app.infrastructure.repositories.RemoteWorkflowRepository
 import run.ostrom.app.infrastructure.settings.SettingsAccountRepository
 
@@ -62,6 +64,7 @@ val demoModule = module {
     single<SessionRepository> { DemoAwareSessionRepository(get<RemoteSessionRepository>(), DemoSessionRepository(get())) }
     single<TodoRepository> { DemoAwareTodoRepository(get<RemoteTodoRepository>(), DemoTodoRepository(get())) }
     single<WorkflowRepository> { DemoAwareWorkflowRepository(get<RemoteWorkflowRepository>(), DemoWorkflowRepository(get(), get())) }
+    single<WorkflowEditorRepository> { DemoAwareWorkflowEditorRepository(get<RemoteWorkflowEditorRepository>(), DemoWorkflowEditorRepository(get(), get())) }
     single<MemberSetupRepository> { DemoAwareMemberSetupRepository(get<RemoteMemberSetupRepository>(), DemoMemberSetupRepository(get())) }
     single<ReceiptKeyPinRepository> { DemoAwareReceiptKeyPinRepository(get<SecureReceiptKeyPinRepository>(), get()) }
 }
