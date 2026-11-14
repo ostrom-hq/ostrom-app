@@ -77,7 +77,8 @@ object PushNotifications {
 
     fun show(context: Context, notice: PushNotice) {
         if (Build.VERSION.SDK_INT >= 33 && context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return
-        // The tap opens the link through MainActivity, explicitly: no other app can send it there.
+        // The tap opens the link in MainActivity. Another app can send it one too: a link only opens a request of a
+        // signed-in account, whose answer still asks for the unlock.
         val open = Intent(Intent.ACTION_VIEW, Uri.parse(notice.link), context, MainActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
         val pending = PendingIntent.getActivity(context, notice.link.hashCode(), open, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)

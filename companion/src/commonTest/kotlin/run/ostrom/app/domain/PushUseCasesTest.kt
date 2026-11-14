@@ -4,6 +4,7 @@ package run.ostrom.app.domain
 
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import run.ostrom.app.FakeAuthRepository
@@ -150,6 +151,58 @@ class PushUseCasesTest {
     }
 
     @Test
+    fun aFailedRegistrationIsTriedAgainLaterUntilItsMemberIsKnown() = runTest {
+        accounts.save(account("a1").copy(organizationId = "o1"))
+        push.failing = true
+        backgroundScope.launch { sync()() }
+        platform.token.value = "t1"
+        runCurrent()
+        assertEquals(emptyList(), push.registered)
+
+        // Back online: the next try registers, but the member cannot be read yet.
+        push.failing = false
+        auth.meError = IllegalStateException("offline")
+        advanceTimeBy(60_001)
+        assertEquals(1, push.registered.size)
+        assertNull(accounts.find("a1")?.memberId)
+
+        // The one after waits twice as long, and counts once the member is read.
+        auth.meError = null
+        advanceTimeBy(60_001)
+        assertEquals(1, push.registered.size)
+        advanceTimeBy(60_001)
+        assertEquals(2, push.registered.size)
+        assertEquals("m1", accounts.find("a1")?.memberId)
+        advanceTimeBy(10 * 3_600_000L)
+        assertEquals(2, push.registered.size)
+    }
+
+    @Test
+    fun aSlowServerDelaysNoOtherAccount() = runTest {
+        accounts.save(account("a1").copy(organizationId = "o1"))
+        accounts.save(account("a2").copy(organizationId = "o1"))
+        val slow = object : PushRepository by push {
+            override suspend fun register(accountId: String, token: String, publicKey: String, platform: String, locale: String?) {
+                if (accountId == "a1") kotlinx.coroutines.awaitCancellation()
+                push.register(accountId, token, publicKey, platform, locale)
+            }
+        }
+        backgroundScope.launch { SyncPushUseCase(accounts, features, slow, auth, platform)() }
+        platform.token.value = "t1"
+        runCurrent()
+        assertEquals(listOf("a2"), push.registered.map { it.accountId })
+    }
+
+    @Test
+    fun clearingGivesUpOnAServerThatDoesNotAnswer() = runTest {
+        val hung = object : PushRepository by push {
+            override suspend fun clear(accountId: String) = kotlinx.coroutines.awaitCancellation()
+        }
+        ClearPushUseCase(hung, timeoutMillis = 5_000)("a1")
+        assertEquals(5_000, testScheduler.currentTime)
+    }
+
+    @Test
     fun theDemoAccountIsLeftOut() = runTest {
         accounts.save(account("demo"))
         backgroundScope.launch { sync(skip = { it == "demo" })() }
@@ -198,6 +251,7 @@ class PushUseCasesTest {
         val notice = read(payload(origin = "$ORIGIN/"))
         assertEquals(PushNotice("n1", "a2", "Deploy to production", "ada asks for your yes", NotificationLinks.link("$ORIGIN/", "o1", "m1", "ap1")), notice)
 
+        assertEquals("a2", read(payload(origin = "$ORIGIN/console"))?.accountId, "a public URL with a path")
         assertNull(read(payload(org = "o2")), "another organization")
         assertNull(read(payload(member = "m9")), "another member")
         assertNull(read(payload(origin = "https://other.example")), "another server")

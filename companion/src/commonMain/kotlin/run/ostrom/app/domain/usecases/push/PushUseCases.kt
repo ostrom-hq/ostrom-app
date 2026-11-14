@@ -3,7 +3,13 @@
 package run.ostrom.app.domain.usecases.push
 
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.flow.distinctUntilChanged
 import run.ostrom.app.domain.models.Account
 import run.ostrom.app.domain.models.AppException
@@ -22,8 +28,10 @@ import run.ostrom.app.domain.usecases.auth.normalizeOrigin
  * Keeps every signed-in account's server told where to push (`POST /api/v1/push-devices`): at each start of the app,
  * when FCM rotates the token, when an account signs in and when its organization changes (a phone is registered in
  * one organization). Each server receives the same token and key; a notification names its server, organization and
- * member, so a phone signed in to several accounts tells them apart: the account's member id is read for that once it
- * is registered. A failure is left for the next start or change: the server keeps the last token it had.
+ * member, so a phone signed in to several accounts tells them apart: the account's member id is read once it is
+ * registered, and the registration counts only with it. The accounts register side by side, so a server that does not
+ * answer delays no other; a failed one is tried again after [retryMillis], doubled each time up to an hour, and at the
+ * next change of the token or the accounts.
  */
 class SyncPushUseCase(
     private val accounts: AccountRepository,
@@ -33,57 +41,65 @@ class SyncPushUseCase(
     private val platform: PushPlatform,
     /** Accounts left out: the demo account, which has no server. */
     private val skip: (String) -> Boolean = { false },
+    private val retryMillis: Long = 60_000,
 ) {
     private data class Registration(val accountId: String, val organizationId: String?, val token: String)
 
+    private enum class Outcome { REGISTERED, NOT_OFFERED, FAILED }
+
     /** Runs until cancelled. */
     suspend operator fun invoke() {
-        val registered = mutableSetOf<Registration>()
+        // Touched by one pass at a time: collectLatest cancels and joins a pass before the next starts.
+        val done = mutableSetOf<Registration>()
         combine(platform.token, accounts.accounts) { token, list ->
             token to list.filter { it.signedIn && !skip(it.id) }.map { it.id to it.organizationId }.toSet()
         }
             .distinctUntilChanged()
-            .collect { (token, signedIn) ->
-                if (token == null) return@collect
+            .collectLatest { (token, signedIn) ->
+                if (token == null) return@collectLatest
                 val wanted = signedIn.map { (id, organization) -> Registration(id, organization, token) }.toSet()
-                registered.retainAll(wanted)
-                for (registration in wanted) {
-                    if (registration in registered) continue
-                    if (register(registration.accountId, token)) registered += registration
+                done.retainAll(wanted)
+                var wait = retryMillis
+                while (true) {
+                    val outcomes = coroutineScope {
+                        (wanted - done).map { registration -> async { registration to register(registration.accountId, token) } }.awaitAll()
+                    }
+                    // A server without push is asked again at the next change: its capabilities may have been stale.
+                    done += outcomes.filter { it.second == Outcome.REGISTERED }.map { it.first }
+                    if (outcomes.none { it.second == Outcome.FAILED }) break
+                    delay(wait)
+                    wait = (wait * 2).coerceAtMost(MAX_RETRY_MILLIS)
                 }
             }
     }
 
-    private suspend fun register(accountId: String, token: String): Boolean = try {
+    private suspend fun register(accountId: String, token: String): Outcome = try {
         if (!features.has(accountId, Features.NOTIFICATIONS_PUSH)) {
-            false
+            Outcome.NOT_OFFERED
         } else {
             push.register(accountId, token, platform.publicKey(), platform.platform, pushLocale(platform.locale))
-            readMember(accountId)
-            true
+            if (readMember(accountId)) Outcome.REGISTERED else Outcome.FAILED
         }
     } catch (error: CancellationException) {
         throw error
     } catch (_: Exception) {
-        false
+        Outcome.FAILED
     }
 
-    /** The account's member id, which its pushes name, when it was not read yet. */
-    private suspend fun readMember(accountId: String) {
-        if (accounts.find(accountId)?.memberId != null) return
-        val member = try {
-            auth.me(accountId)
-        } catch (error: CancellationException) {
-            throw error
-        } catch (_: Exception) {
-            return
-        }
-        val current = accounts.find(accountId) ?: return
-        val memberId = member.memberId ?: return
+    /** Whether the account has its member id, which its pushes name: read when it was not yet. */
+    private suspend fun readMember(accountId: String): Boolean {
+        if (accounts.find(accountId)?.memberId != null) return true
+        val member = auth.me(accountId)
+        val current = accounts.find(accountId) ?: return false
+        val memberId = member.memberId ?: return false
         // Only for the organization the call acted in: one chosen meanwhile has another membership.
-        if (current.signedIn && current.memberId == null && member.organization?.id == current.organizationId) {
-            accounts.update(current.copy(memberId = memberId))
-        }
+        if (!current.signedIn || member.organization?.id != current.organizationId) return false
+        if (current.memberId == null) accounts.update(current.copy(memberId = memberId))
+        return true
+    }
+
+    private companion object {
+        const val MAX_RETRY_MILLIS = 3_600_000L
     }
 }
 
@@ -105,11 +121,14 @@ private const val UNDETERMINED = "und"
 // The server's pattern (ostrom-server RegisterPushDeviceUseCase).
 private val LOCALE = Regex("[A-Za-z]{2,3}([_-][A-Za-z0-9]{2,8}){0,2}")
 
-/** Before a sign-out: the server stops pushing to this phone for the account. Best effort, never blocks the sign-out. */
-class ClearPushUseCase(private val push: PushRepository) {
+/**
+ * Before a sign-out: the server stops pushing to this phone for the account. Best effort, and at most [timeoutMillis]:
+ * an unreachable server does not hold the sign-out for a second timeout.
+ */
+class ClearPushUseCase(private val push: PushRepository, private val timeoutMillis: Long = 5_000) {
     suspend operator fun invoke(accountId: String) {
         try {
-            push.clear(accountId)
+            withTimeoutOrNull(timeoutMillis) { push.clear(accountId) }
         } catch (error: CancellationException) {
             throw error
         } catch (_: Exception) {
@@ -146,11 +165,13 @@ class ReadPushUseCase(private val accounts: AccountRepository, private val platf
 
 /** Where a tapped notification leads. */
 sealed interface NotificationTarget {
+    val accountId: String
+
     /** The request waiting for the member's yes. */
-    data class Request(val accountId: String, val approvalId: String) : NotificationTarget
+    data class Request(override val accountId: String, val approvalId: String) : NotificationTarget
 
     /** A notification about nothing to open (a test push, a session): the app opens on the account. */
-    data class Home(val accountId: String) : NotificationTarget
+    data class Home(override val accountId: String) : NotificationTarget
 }
 
 /**
@@ -241,10 +262,14 @@ class ResolveNotificationUseCase(private val accounts: AccountRepository) {
     }
 }
 
-/** The signed-in account of that server (its public URL, normalized as the app's origins are), organization and member. */
+/**
+ * The signed-in account of that server (its public URL's origin, normalized as the app's origins are), organization and
+ * member. A server reached under another name than its public URL is not recognized: its pushes are not shown.
+ */
 private fun List<Account>.accountFor(origin: String, orgId: String, memberId: String): Account? {
     val normalized = try {
-        normalizeOrigin(origin)
+        // A public URL with a path names the server at its origin.
+        normalizeOrigin(origin.substringBefore("://") + "://" + origin.substringAfter("://").substringBefore('/'))
     } catch (_: AppException.InvalidOrigin) {
         return null
     }

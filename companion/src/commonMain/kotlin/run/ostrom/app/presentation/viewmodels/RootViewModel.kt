@@ -31,11 +31,7 @@ class RootViewModel(
      */
     fun openNotification(link: String): NotificationTarget? {
         val target = resolveNotification(link) ?: return null
-        val accountId = when (target) {
-            is NotificationTarget.Request -> target.accountId
-            is NotificationTarget.Home -> target.accountId
-        }
-        accounts.setActive(accountId)
+        accounts.setActive(target.accountId)
         return target
     }
 }

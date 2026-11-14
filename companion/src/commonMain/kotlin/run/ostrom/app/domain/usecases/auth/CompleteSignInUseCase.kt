@@ -49,6 +49,8 @@ class CompleteSignInUseCase(
             expiresAt = session.expiresAt,
             serverVersion = capabilities.serverVersion,
             method = method,
+            // The same membership while the organization is the same: the pushes name it.
+            memberId = existing?.memberId?.takeIf { existing.organizationId == (organization?.id ?: existing.organizationId) },
         )
         val replaced = existing?.let { readQuietly(it.id) }
         // The token first: an account is never listed as signed in without its credential.
