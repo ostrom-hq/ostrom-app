@@ -92,8 +92,14 @@ Ported from TeamCode's companion (`PushPlatform`, `PushCipher`, `SyncPushUseCase
   the active one and its request opens (`RequestRoute`); an answer still asks for the unlock.
 - Before a sign-out the device registered in this process is deleted (`DELETE /api/v1/push-devices/{id}`), best effort;
   the server also forgets the phones of a session it revokes.
+- On iOS the relay sends a generic alert ("Ostrom" / "New activity in Ostrom", `mutable-content`) with `p`: the
+  notification service extension (`companion-ios/NotificationService`) decrypts it with CryptoKit
+  (`companion-ios/Push/PushCrypto.swift`, shared by both targets) and replaces the alert with the real title and body,
+  threaded by request; a payload it cannot read keeps the generic alert. The key is in the Keychain group
+  `run.ostrom.app.push`, the only one the extension lists: it never sees the accounts' tokens or unlock keys. The
+  alert permission is asked when the first account whose server offers push is registered.
 - Push is on only in a build that carries the Firebase project (`companion-android/google-services.json`,
-  git-ignored); without it the app builds and runs without push. Android 13+ asks the notification permission once,
+  `companion-ios/Ostrom/GoogleService-Info.plist`, both git-ignored); without it the app builds and runs without push. Android 13+ asks the notification permission once,
   after the first sign-in.
 
 ## Tests
@@ -122,7 +128,7 @@ What the React Native app did, what TeamCode's companion does that an Ostrom ser
 | Spending | `budgets.v1` | Ported (week and month, budget bar, budgets passed, by agent, repository and person) |
 | Activity | none | Ported (newest first, paged; a line about an approval opens its request on a server with `gates.v1`) |
 | Notification preferences (requests, decisions, spending, quiet hours) | `notifications.v1` | Ported: Settings, Notifications, shaped like TeamCode's `NotificationPreferencesScreen` |
-| Push registration, encrypted pushes, a tap opens the request | `notifications.push.v1` | Ported (see [Push](#push)) on Android and in the shared code; the iOS shell (Firebase, the notification service extension) follows. A Firebase project for the published apps is still to create |
+| Push registration, encrypted pushes, a tap opens the request | `notifications.push.v1` | Ported (see [Push](#push)) on Android and iOS (the notification service extension replaces the generic alert). A Firebase project for the published apps, and the APNs key in it, are still to create |
 | Artifacts gallery and viewer | `artifacts.v1` | Ported from TeamCode's `ArtifactsScreen` and `ArtifactScreen`: the gallery (newest first, paged, searched in the loaded titles), the viewer with its versions, the page in a sandboxed web view on iOS and Android from a reading ticket on the server's content origin (`/a/<id>/<ticket>/`), the console page in the browser on the desktop. No Mine/Team filter and no pasted link (the list route has no scope, the console page lives on an origin the app does not know) |
 | Sessions (list, transcript, follow live) | `sessions.v1` | To port from TeamCode, once ostrom-core's client has the session routes |
 | Todos, workflows, automations, MCP servers, GitHub link, sharing | `todos.v1`, `workflows.v1`, `automations.v1`, `mcp.v1`, `github.link.v1`, `sharing.v1` | Later, each with its client routes in ostrom-core |

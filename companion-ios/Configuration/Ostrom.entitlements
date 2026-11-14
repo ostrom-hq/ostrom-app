@@ -3,10 +3,14 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 <plist version="1.0">
 <dict>
-	<!-- The accounts' tokens and unlock keys stay in the app's own Keychain group (the default one). -->
+	<key>aps-environment</key>
+	<string>development</string>
+	<!-- The app's own group first, so the accounts' tokens and unlock keys stay where they were (the default group); the
+	     push key is in the second, the only one the notification service extension lists. -->
 	<key>keychain-access-groups</key>
 	<array>
 		<string>$(AppIdentifierPrefix)run.ostrom.app$(TEAM_ID)</string>
+		<string>$(AppIdentifierPrefix)run.ostrom.app$(TEAM_ID).push</string>
 	</array>
 </dict>
 </plist>
