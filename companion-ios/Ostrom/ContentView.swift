@@ -17,5 +17,11 @@ struct ContentView: View {
     var body: some View {
         ComposeView()
             .ignoresSafeArea()
+            // An artifact's page handed to the app (ostrom://open?url=…); the sign-in's return reaches its own session.
+            .onOpenURL { url in
+                if url.absoluteString.lowercased().hasPrefix("ostrom://open?") {
+                    MainViewControllerKt.openLink(link: url.absoluteString)
+                }
+            }
     }
 }

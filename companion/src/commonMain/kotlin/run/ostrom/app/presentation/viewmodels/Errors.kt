@@ -8,6 +8,7 @@ import org.jetbrains.compose.resources.stringResource
 import run.ostrom.app.domain.models.AppException
 import run.ostrom.app.domain.models.CloudSessionProblem
 import run.ostrom.app.domain.models.CloudSessionRefusal
+import run.ostrom.app.domain.models.LinkRefusal
 import run.ostrom.app.domain.models.WorkflowEditRefusal
 import run.ostrom.app.domain.models.WorkflowRefusal
 import run.ostrom.app.domain.models.visibleCode
@@ -29,6 +30,9 @@ import run.ostrom.app.resources.error_cloud_variables
 import run.ostrom.app.resources.error_credential_storage
 import run.ostrom.app.resources.error_generic
 import run.ostrom.app.resources.error_invalid_origin
+import run.ostrom.app.resources.error_link_not_artifact
+import run.ostrom.app.resources.error_link_signed_out
+import run.ostrom.app.resources.error_link_unknown_server
 import run.ostrom.app.resources.error_no_github
 import run.ostrom.app.resources.error_not_found
 import run.ostrom.app.resources.error_not_ostrom
@@ -139,6 +143,11 @@ private fun AppException.sentence(): Pair<StringResource, List<Any>> = when (thi
         CloudSessionProblem.TOO_MANY -> Res.string.error_cloud_too_many
         CloudSessionProblem.VARIABLES -> Res.string.error_cloud_variables
         CloudSessionProblem.EMAIL_DOMAIN -> Res.string.error_cloud_email_domain
+    } to emptyList()
+    is AppException.LinkRefused -> when (reason) {
+        LinkRefusal.NOT_AN_ARTIFACT -> Res.string.error_link_not_artifact
+        LinkRefusal.UNKNOWN_SERVER -> Res.string.error_link_unknown_server
+        LinkRefusal.SIGNED_OUT -> Res.string.error_link_signed_out
     } to emptyList()
     is AppException.Server -> visibleCode(code)?.let { Res.string.error_server_http_code to listOf<Any>(statusCode, it) }
         ?: (Res.string.error_server_http to listOf<Any>(statusCode))

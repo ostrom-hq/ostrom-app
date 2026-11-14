@@ -17,6 +17,7 @@ import kotlinx.coroutines.launch
 import org.koin.core.context.GlobalContext
 import run.ostrom.app.App
 import run.ostrom.app.domain.repositories.AccountRepository
+import run.ostrom.app.domain.usecases.links.ArtifactLinks
 import run.ostrom.app.domain.usecases.push.NotificationLinks
 import run.ostrom.app.infrastructure.auth.AuthRedirects
 import run.ostrom.app.infrastructure.biometrics.ForegroundActivity
@@ -73,13 +74,13 @@ class MainActivity : FragmentActivity() {
         }
     }
 
-    /** A tapped notification's link, or the sign-in's redirect (`ostrom://auth/callback?…`) for the sign-in waiting for it. */
+    /** A tapped notification's link, an artifact link (`ostrom://open?url=…`), or the sign-in's redirect (`ostrom://auth/callback?…`) for the sign-in waiting for it. */
     private fun handle(intent: Intent?) {
         // Relaunched from Recents, the activity gets its first intent again: that link was already used.
         if (intent == null || intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY != 0) return
         if (intent.action != Intent.ACTION_VIEW) return
         val link = intent.dataString?.take(MAX_LINK) ?: return
-        if (link.startsWith(NotificationLinks.SCHEME, ignoreCase = true)) IncomingLinks.open(link) else AuthRedirects.deliver(link)
+        if (link.startsWith(NotificationLinks.SCHEME, ignoreCase = true) || ArtifactLinks.isOpenLink(link)) IncomingLinks.open(link) else AuthRedirects.deliver(link)
     }
 
     private companion object {

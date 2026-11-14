@@ -8,17 +8,28 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import run.ostrom.app.domain.models.AppException
 import run.ostrom.app.domain.models.ThemePreference
 import run.ostrom.app.domain.repositories.AccountRepository
 import run.ostrom.app.domain.repositories.PreferencesRepository
+import run.ostrom.app.domain.usecases.links.ArtifactLinkTarget
+import run.ostrom.app.domain.usecases.links.OpenArtifactLinkUseCase
 import run.ostrom.app.domain.usecases.push.NotificationTarget
 import run.ostrom.app.domain.usecases.push.ResolveNotificationUseCase
+
+/** What an `ostrom://open?url=` link does: open its artifact, or say why not. */
+sealed interface ArtifactLinkOutcome {
+    data class Open(val target: ArtifactLinkTarget) : ArtifactLinkOutcome
+
+    data class Refused(val failure: Failure) : ArtifactLinkOutcome
+}
 
 /** The start destination (adding a server when there is no account yet), the theme, and the tapped notifications. */
 class RootViewModel(
     private val accounts: AccountRepository,
     preferences: PreferencesRepository,
     private val resolveNotification: ResolveNotificationUseCase,
+    private val openArtifactLink: OpenArtifactLinkUseCase,
 ) : ViewModel() {
     val hasAccounts: StateFlow<Boolean> = accounts.accounts
         .map { it.isNotEmpty() }
@@ -29,6 +40,16 @@ class RootViewModel(
      * Where a tapped notification leads, its account made the active one; null when no signed-in account of this device
      * is the one it names.
      */
+    /**
+     * The artifact an `ostrom://open?url=` link leads to, its account made the active one; a [Failure] worded by its
+     * reason when the link is refused, and then nothing is opened.
+     */
+    fun openArtifactLink(link: String): ArtifactLinkOutcome = try {
+        ArtifactLinkOutcome.Open(openArtifactLink.invoke(link))
+    } catch (error: AppException.LinkRefused) {
+        ArtifactLinkOutcome.Refused(error.userMessage())
+    }
+
     fun openNotification(link: String): NotificationTarget? {
         val target = resolveNotification(link) ?: return null
         accounts.setActive(target.accountId)

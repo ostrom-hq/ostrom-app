@@ -815,4 +815,8 @@
     <string name="receipt_title">Reçu</string>
     <string name="receipt_refresh">Relire le reçu</string>
     <string name="settings_more_section">Plus</string>
+    <string name="error_link_not_artifact">Ce lien ne mène pas à un artefact Ostrom.</string>
+    <string name="error_link_unknown_server">Cet artefact est sur un serveur où aucun de vos comptes n'est. Ajoutez ce compte, puis rouvrez le lien.</string>
+    <string name="error_link_signed_out">Votre compte sur le serveur de cet artefact est déconnecté. Reconnectez-vous, puis rouvrez le lien.</string>
+    <string name="link_refused_title">Lien non ouvert</string>
 </resources>

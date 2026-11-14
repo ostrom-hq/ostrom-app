@@ -815,4 +815,8 @@
     <string name="receipt_title">Receipt</string>
     <string name="receipt_refresh">Read the receipt again</string>
     <string name="settings_more_section">More</string>
+    <string name="error_link_not_artifact">This link does not lead to an Ostrom artifact.</string>
+    <string name="error_link_unknown_server">This artifact is on a server none of your accounts is on. Add that account, then open the link again.</string>
+    <string name="error_link_signed_out">Your account on this artifact's server is signed out. Sign in again, then open the link again.</string>
+    <string name="link_refused_title">Link not opened</string>
 </resources>

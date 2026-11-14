@@ -46,6 +46,13 @@
                 <category android:name="android.intent.category.BROWSABLE"/>
                 <data android:scheme="ostrom" android:host="auth" android:path="/callback"/>
             </intent-filter>
+            <!-- An artifact's page handed to the app: ostrom://open?url=<console>/artifacts/<id> (TC-COM-29). -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="ostrom" android:host="open"/>
+            </intent-filter>
         </activity>
         <!-- Pushes: FCM data messages, decrypted on the phone (notifications.push.v1). -->
         <service
