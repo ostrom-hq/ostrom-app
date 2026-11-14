@@ -41,6 +41,7 @@ import org.jetbrains.compose.resources.stringResource
 import run.ostrom.app.domain.models.CloudFailure
 import run.ostrom.app.domain.models.CloudRecipe
 import run.ostrom.app.domain.models.CloudSession
+import run.ostrom.app.domain.models.GitHubAccess
 import run.ostrom.app.domain.models.visibleCode
 import run.ostrom.app.presentation.components.AppButton
 import run.ostrom.app.presentation.components.AppCard
@@ -51,6 +52,7 @@ import run.ostrom.app.presentation.components.BusyRow
 import run.ostrom.app.presentation.components.ContentWidth
 import run.ostrom.app.presentation.components.NavBar
 import run.ostrom.app.presentation.components.SectionTitle
+import run.ostrom.app.presentation.components.Segmented
 import run.ostrom.app.presentation.components.Tone
 import run.ostrom.app.presentation.components.rememberNow
 import run.ostrom.app.presentation.theme.MetaStyle
@@ -75,6 +77,13 @@ import run.ostrom.app.resources.cloud_failure_preparation_new
 import run.ostrom.app.resources.cloud_failure_preparation_retry
 import run.ostrom.app.resources.cloud_failure_start_failed
 import run.ostrom.app.resources.cloud_failure_unknown
+import run.ostrom.app.resources.cloud_github_none
+import run.ostrom.app.resources.cloud_github_none_hint
+import run.ostrom.app.resources.cloud_github_owner
+import run.ostrom.app.resources.cloud_github_owner_hint
+import run.ostrom.app.resources.cloud_github_shared
+import run.ostrom.app.resources.cloud_github_shared_hint
+import run.ostrom.app.resources.cloud_github_title
 import run.ostrom.app.resources.cloud_pause
 import run.ostrom.app.resources.cloud_recipe
 import run.ostrom.app.resources.cloud_recipe_email_domain
@@ -147,6 +156,7 @@ fun CloudSessionScreen(viewModel: CloudSessionViewModel, onBack: (() -> Unit)?, 
                 }
                 session.failure?.let { FailureBanner(it, session.canResume) }
                 Actions(session, state.acting, onPause = viewModel::pause, onResume = viewModel::resume, onStop = { confirmStop = true })
+                if (state.canChooseAccess) GitHubAccessChoice(session.githubAccess, state.settingAccess, onChoose = viewModel::chooseGitHubAccess)
                 session.recipe?.takeIf { !it.empty }?.let { Recipe(it) }
                 Text(stringResource(Res.string.cloud_session_not_served), style = MetaStyle, color = colors.muted)
             }
@@ -238,6 +248,39 @@ private fun Actions(session: CloudSession, acting: CloudAction?, onPause: () -> 
             AppButton(stringResource(Res.string.cloud_stop), onClick = onStop, kind = ButtonKind.DANGER, small = true, fill = false, enabled = acting == null,
                 busy = acting == CloudAction.STOP, modifier = Modifier.testTag("cloud-session-stop"))
         }
+    }
+}
+
+/**
+ * Whose GitHub access the session's Git and `gh` use (`runners.cloud.github.v1`): the person's own linked account, the
+ * same with the terminal shared, or none. Taking it away needs the session paused: the server's refusal is worded above.
+ */
+@Composable
+private fun GitHubAccessChoice(current: GitHubAccess?, setting: GitHubAccess?, onChoose: (GitHubAccess) -> Unit) {
+    val colors = Ostrom.colors
+    val shown = setting ?: current ?: return
+    SectionTitle(stringResource(Res.string.cloud_github_title))
+    AppCard(Modifier.testTag("cloud-session-github")) {
+        Segmented(
+            options = listOf(
+                GitHubAccess.OWNER to stringResource(Res.string.cloud_github_owner),
+                GitHubAccess.SHARED to stringResource(Res.string.cloud_github_shared),
+                GitHubAccess.NONE to stringResource(Res.string.cloud_github_none),
+            ),
+            selected = shown,
+            onSelect = onChoose,
+            tag = { "cloud-session-github-${it.wire}" },
+        )
+        Text(
+            stringResource(
+                when (shown) {
+                    GitHubAccess.SHARED -> Res.string.cloud_github_shared_hint
+                    GitHubAccess.NONE -> Res.string.cloud_github_none_hint
+                    else -> Res.string.cloud_github_owner_hint
+                },
+            ),
+            style = MetaStyle, color = colors.muted, modifier = Modifier.testTag("cloud-session-github-hint"),
+        )
     }
 }
 

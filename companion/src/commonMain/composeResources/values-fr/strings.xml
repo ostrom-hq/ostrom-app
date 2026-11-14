@@ -819,4 +819,44 @@
     <string name="error_link_unknown_server">Cet artefact est sur un serveur où aucun de vos comptes n'est. Ajoutez ce compte, puis rouvrez le lien.</string>
     <string name="error_link_signed_out">Votre compte sur le serveur de cet artefact est déconnecté. Reconnectez-vous, puis rouvrez le lien.</string>
     <string name="link_refused_title">Lien non ouvert</string>
+
+    <!-- Lien GitHub (github.link.v1) -->
+    <string name="github_title">GitHub</string>
+    <string name="github_row_hint">Lie ton compte GitHub pour que tes sessions cloud puissent utiliser Git et gh en ton nom.</string>
+    <string name="github_refresh">Actualiser</string>
+    <string name="github_not_offered">Ce serveur ne propose pas de liaison GitHub (elle vient avec les sessions cloud).</string>
+    <string name="github_app_not_configured">Un administrateur n'a pas encore configuré la GitHub App de l'instance : rien ne peut être lié.</string>
+    <string name="github_not_linked">Aucun compte GitHub n'est lié. Tes sessions cloud n'ont pas d'accès à Git ni à gh en ton nom.</string>
+    <string name="github_linked_as">Lié en tant que %1$s</string>
+    <string name="github_reconnect_required">L'accès GitHub de %1$s doit être renouvelé. Lie-le à nouveau pour rendre leur accès à tes sessions cloud.</string>
+    <string name="github_unknown_state">Ce serveur signale un état du lien que cette app ne connaît pas. Lie à nouveau, ou délie.</string>
+    <string name="github_link">Lier GitHub</string>
+    <string name="github_link_again">Lier à nouveau</string>
+    <string name="github_unlink">Délier</string>
+    <string name="github_unlink_hint">Délier supprime la liaison et révoque son token chez GitHub. Tes sessions cloud perdent alors l'accès à GitHub.</string>
+    <string name="github_just_linked">Lié en tant que %1$s.</string>
+    <string name="github_code_title">Saisis ce code sur GitHub</string>
+    <string name="github_code_body">Le code est copié et la page de GitHub s'ouvre dans ton navigateur. Colles-y le code et autorise l'accès. Ne saisis qu'un code affiché par cet écran.</string>
+    <string name="github_waiting">En attente de GitHub…</string>
+    <string name="github_copy_code">Copier le code</string>
+    <string name="github_copied">Copié</string>
+    <string name="github_open_again">Rouvrir GitHub</string>
+    <string name="github_ended_expired">Le code a expiré. Recommence pour en obtenir un nouveau.</string>
+    <string name="github_ended_denied">L'autorisation GitHub a été annulée.</string>
+    <string name="error_github_app_not_configured">Un administrateur n'a pas encore configuré la GitHub App de l'instance.</string>
+    <string name="error_github_device_flow_disabled">La GitHub App de l'instance n'autorise pas le device flow. Demande à un administrateur de l'activer dans les réglages de l'App.</string>
+    <string name="error_github_app_misconfigured">GitHub a refusé la GitHub App de l'instance. Demande à un administrateur de la vérifier.</string>
+    <string name="error_github_account_in_use">Ce compte GitHub est déjà lié à un autre membre de l'organisation.</string>
+    <string name="error_github_unreachable">GitHub n'a pas pu être joint. Réessaie.</string>
+
+    <!-- L'accès GitHub d'une session cloud (runners.cloud.github.v1) -->
+    <string name="cloud_github_title">Accès GitHub</string>
+    <string name="cloud_github_owner">Le mien</string>
+    <string name="cloud_github_shared">Partagé</string>
+    <string name="cloud_github_none">Aucun</string>
+    <string name="cloud_github_owner_hint">Git et gh agissent dans cette session avec ton compte GitHub lié.</string>
+    <string name="cloud_github_shared_hint">Git et gh agissent avec ton compte GitHub lié, et celui qui partage le terminal de la session agit avec lui.</string>
+    <string name="cloud_github_none_hint">Aucun identifiant GitHub : dépôts publics seulement. Mets d'abord la session en pause pour le choisir.</string>
+    <string name="error_cloud_github_owner_only">Seul le propriétaire de la session, connecté en personne, change son accès GitHub.</string>
+    <string name="error_cloud_github_not_paused">Mets la session en pause avant de lui retirer l'accès GitHub : une session en marche peut déjà détenir un jeton.</string>
 </resources>

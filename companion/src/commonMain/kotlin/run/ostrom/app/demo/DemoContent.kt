@@ -37,6 +37,7 @@ object DemoContent {
     val features: Set<String> = setOf(
         Features.GATES, Features.WAITS, Features.RECEIPTS, Features.BUDGETS, Features.NOTIFICATIONS, Features.ARTIFACTS, Features.SESSIONS, Features.TODOS,
         Features.WORKFLOWS, Features.ENVIRONMENT, Features.MCP_PERSONAL, Features.RUNNERS_CLOUD, Features.RUNNERS_CLOUD_ENVIRONMENT,
+        Features.GITHUB_LINK, Features.RUNNERS_CLOUD_GITHUB,
     )
 
     /**

@@ -96,6 +96,8 @@ data class CloudSession(
     val pausedAt: Long?,
     val endedAt: Long?,
     val recipe: CloudRecipe?,
+    /** Whose GitHub access it uses (`runners.cloud.github.v1`); null when the server does not say or says something new. */
+    val githubAccess: GitHubAccess? = null,
 ) {
     /** Creating or resuming: the runner prepares the workspace, and [phase] says which step. */
     val preparing: Boolean get() = status == CloudSessionStatus.CREATING || status == CloudSessionStatus.RESUMING
@@ -120,6 +122,22 @@ data class CloudSession(
         const val PAUSED = "paused"
         const val TERMINATED = "terminated"
         private val PAUSABLE = setOf(CloudSessionStatus.CREATING, CloudSessionStatus.RUNNING, CloudSessionStatus.RESUMING)
+    }
+}
+
+/**
+ * Whose GitHub access a cloud session's Git and `gh` use, through the runner (the agent never holds a token): the
+ * owner's linked account ([OWNER], the default), the same with the terminal shared ([SHARED]), or none ([NONE]).
+ */
+enum class GitHubAccess(val wire: String) {
+    OWNER("owner"),
+    SHARED("shared"),
+    NONE("none"),
+    ;
+
+    companion object {
+        /** Null for a value this app does not know (one a newer server added). */
+        fun of(wire: String?): GitHubAccess? = entries.firstOrNull { it.wire == wire }
     }
 }
 
@@ -165,6 +183,12 @@ enum class CloudSessionRefusal {
 
     /** `cluster_unavailable`, `namespace_not_allowed`: the profile's cluster cannot run sessions now. */
     CLUSTER_UNAVAILABLE,
+
+    /** `403 github_owner_only`: only the session's owner, in person, changes its GitHub access. */
+    GITHUB_OWNER_ONLY,
+
+    /** `409 session_not_paused`: removing the GitHub access needs the session paused (a running execution may hold a token). */
+    GITHUB_NOT_PAUSED,
 }
 
 /** A field of the new cloud session form that breaks a rule the server checks: nothing was sent. */

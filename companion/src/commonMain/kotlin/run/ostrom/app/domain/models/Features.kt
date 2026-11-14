@@ -56,6 +56,12 @@ object Features {
 
     /** A cloud session's preparation recipe: the new cloud session form takes repositories, setup and variables. */
     const val RUNNERS_CLOUD_ENVIRONMENT = "runners.cloud.environment.v1"
+
+    /** The member's GitHub link: Settings > GitHub. */
+    const val GITHUB_LINK = "github.link.v1"
+
+    /** A cloud session's GitHub access (`owner`, `shared`, `none`): the choice on its record. */
+    const val RUNNERS_CLOUD_GITHUB = "runners.cloud.github.v1"
 }
 
 /** Throws [AppException.UnsupportedApi] for a server that speaks another API version than this app. */

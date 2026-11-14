@@ -4,6 +4,7 @@ package run.ostrom.app.domain.repositories
 
 import run.ostrom.app.domain.models.CloudSession
 import run.ostrom.app.domain.models.CloudSessionPage
+import run.ostrom.app.domain.models.GitHubAccess
 import run.ostrom.app.domain.models.NewCloudSession
 
 /**
@@ -25,4 +26,7 @@ interface CloudSessionRepository {
     suspend fun resume(accountId: String, sessionId: String): CloudSession
 
     suspend fun stop(accountId: String, sessionId: String): CloudSession
+
+    /** Chooses whose GitHub access the session uses (`runners.cloud.github.v1`); the answer is the session after the change. */
+    suspend fun setGitHubAccess(accountId: String, sessionId: String, access: GitHubAccess): CloudSession
 }

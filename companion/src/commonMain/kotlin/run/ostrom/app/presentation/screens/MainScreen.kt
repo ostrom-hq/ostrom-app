@@ -139,6 +139,7 @@ fun MainScreen(
     onOpenNotifications: (accountId: String) -> Unit = {},
     onOpenEnvironment: (accountId: String) -> Unit = {},
     onOpenMcpServers: (accountId: String) -> Unit = {},
+    onOpenGitHub: (accountId: String) -> Unit = {},
     onOpenArtifact: (accountId: String, artifactId: String) -> Unit = { _, _ -> },
     onOpenSession: (accountId: String, sessionId: String) -> Unit = { _, _ -> },
     onOpenCloudSession: (accountId: String, sessionId: String) -> Unit = { _, _ -> },
@@ -228,7 +229,7 @@ fun MainScreen(
                         MainTab.ARTIFACTS -> ArtifactsScreen(onOpen = onOpenArtifact)
                         MainTab.WORKFLOWS -> WorkflowsScreen(onOpenRun = onOpenRun, onOpenWorkflow = onOpenWorkflow, onNewWorkflow = onNewWorkflow)
                         MainTab.SETTINGS -> SettingsScreen(onAddAccount = onAddAccount, onSignInAgain = onSignInAgain, onOpenNotifications = onOpenNotifications,
-                            onOpenEnvironment = onOpenEnvironment, onOpenMcpServers = onOpenMcpServers, moreTabs = more,
+                            onOpenEnvironment = onOpenEnvironment, onOpenMcpServers = onOpenMcpServers, onOpenGitHub = onOpenGitHub, moreTabs = more,
                             onOpenTab = { onOpenTab(it, opensRequests) })
                     }
                 }

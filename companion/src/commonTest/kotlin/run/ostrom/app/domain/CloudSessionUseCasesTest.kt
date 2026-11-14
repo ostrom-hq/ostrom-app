@@ -16,6 +16,7 @@ import run.ostrom.app.domain.models.CloudSessionProblem
 import run.ostrom.app.domain.models.CloudSessionRefusal
 import run.ostrom.app.domain.models.CloudSessionStatus
 import run.ostrom.app.domain.models.Features
+import run.ostrom.app.domain.models.GitHubAccess
 import run.ostrom.app.domain.models.NewCloudSession
 import run.ostrom.app.domain.repositories.CloudSessionRepository
 import run.ostrom.app.domain.usecases.sessions.CloudSessionAccess
@@ -24,6 +25,7 @@ import run.ostrom.app.domain.usecases.sessions.CreateCloudSessionUseCase
 import run.ostrom.app.domain.usecases.sessions.GetCloudSessionUseCase
 import run.ostrom.app.domain.usecases.sessions.LoadCloudSessionOptionsUseCase
 import run.ostrom.app.domain.usecases.sessions.LoadCloudSessionsUseCase
+import run.ostrom.app.domain.usecases.sessions.SetCloudSessionGitHubAccessUseCase
 import run.ostrom.app.domain.usecases.sessions.checkNewCloudSession
 import run.ostrom.app.fakeGuard
 import kotlin.test.Test
@@ -51,6 +53,10 @@ class CloudSessionUseCasesTest {
         override suspend fun pause(accountId: String, sessionId: String): CloudSession { calls += "pause $sessionId"; return cloudSession(sessionId, CloudSessionStatus.PAUSING, "paused") }
         override suspend fun resume(accountId: String, sessionId: String): CloudSession { calls += "resume $sessionId"; return cloudSession(sessionId, CloudSessionStatus.RESUMING) }
         override suspend fun stop(accountId: String, sessionId: String): CloudSession { calls += "stop $sessionId"; return cloudSession(sessionId, CloudSessionStatus.RUNNING, "terminated") }
+        override suspend fun setGitHubAccess(accountId: String, sessionId: String, access: GitHubAccess): CloudSession {
+            calls += "github $sessionId ${access.wire}"
+            return cloudSession(sessionId).copy(githubAccess = access)
+        }
     }
 
     private val sessions = FakeCloudSessions()
@@ -171,5 +177,30 @@ class CloudSessionUseCasesTest {
         assertEquals(CloudSessionStatus.UNKNOWN, CloudSessionStatus.of("hibernating"))
         assertTrue(CloudFailure(CloudFailure.PREPARATION_FAILED, "m", true).preparation)
         assertFalse(CloudFailure("idle_timeout", "m", null).preparation)
+    }
+
+    @Test
+    fun theGitHubAccessIsChosenOnlyOnAServerThatAnnouncesIt() = runTest {
+        val set = SetCloudSessionGitHubAccessUseCase(access)
+        val current = cloudSession().copy(githubAccess = GitHubAccess.OWNER)
+        features.features = setOf(Features.RUNNERS_CLOUD)
+        assertEquals(Features.RUNNERS_CLOUD_GITHUB, assertFailsWith<AppException.Unsupported> { set("a1", current, GitHubAccess.SHARED) }.feature)
+        assertFalse(LoadCloudSessionOptionsUseCase(access)("a1").githubAccess)
+        assertTrue(sessions.calls.isEmpty())
+        features.features = setOf(Features.RUNNERS_CLOUD, Features.RUNNERS_CLOUD_GITHUB)
+        assertTrue(LoadCloudSessionOptionsUseCase(access)("a1").githubAccess)
+        assertEquals(GitHubAccess.SHARED, set("a1", current, GitHubAccess.SHARED).githubAccess)
+        assertEquals(listOf("github c1 shared"), sessions.calls)
+    }
+
+    @Test
+    fun theSameAccessOrAnEndedSessionSendsNothing() = runTest {
+        features.features = setOf(Features.RUNNERS_CLOUD, Features.RUNNERS_CLOUD_GITHUB)
+        val set = SetCloudSessionGitHubAccessUseCase(access)
+        val current = cloudSession().copy(githubAccess = GitHubAccess.OWNER)
+        assertEquals(current, set("a1", current, GitHubAccess.OWNER))
+        val refusal = assertFailsWith<AppException.CloudSessionRefused> { set("a1", cloudSession(status = CloudSessionStatus.TERMINATED), GitHubAccess.NONE) }
+        assertEquals(CloudSessionRefusal.STATE, refusal.reason)
+        assertTrue(sessions.calls.isEmpty())
     }
 }

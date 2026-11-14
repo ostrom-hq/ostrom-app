@@ -73,6 +73,18 @@ sealed class AppException(message: String) : Exception(message) {
             CloudSessionRefusal.PROFILE_REQUIRED -> "Several cloud profiles, or none, are open to you: start this session from the console."
             CloudSessionRefusal.PROFILE_UNAVAILABLE -> "Your cloud profile cannot be used for this session. Ask an administrator."
             CloudSessionRefusal.CLUSTER_UNAVAILABLE -> "The cloud cluster cannot run sessions now. Ask an administrator."
+            CloudSessionRefusal.GITHUB_OWNER_ONLY -> "Only the session's owner, in person, changes its GitHub access."
+            CloudSessionRefusal.GITHUB_NOT_PAUSED -> "Pause the session before removing its GitHub access."
+        },
+    )
+    /** The server refused to start or follow the GitHub link, for [reason]. */
+    class GitHubRefused(val reason: GitHubRefusal) : AppException(
+        when (reason) {
+            GitHubRefusal.APP_NOT_CONFIGURED -> "An administrator has not configured the instance's GitHub App yet."
+            GitHubRefusal.DEVICE_FLOW_DISABLED -> "The instance's GitHub App does not allow the device flow."
+            GitHubRefusal.APP_MISCONFIGURED -> "GitHub refused the instance's GitHub App: ask an administrator to check it."
+            GitHubRefusal.ACCOUNT_IN_USE -> "This GitHub account is already linked to another member of the organization."
+            GitHubRefusal.UNREACHABLE -> "GitHub could not be reached. Try again."
         },
     )
     /** A field of the new cloud session breaks [problem]: nothing was sent. */

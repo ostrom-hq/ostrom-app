@@ -73,6 +73,8 @@ import run.ostrom.app.resources.settings_cli_account
 import run.ostrom.app.resources.settings_end_demo
 import run.ostrom.app.resources.settings_memory_only
 import run.ostrom.app.resources.settings_no_organization
+import run.ostrom.app.resources.github_row_hint
+import run.ostrom.app.resources.github_title
 import run.ostrom.app.resources.settings_environment_row
 import run.ostrom.app.resources.settings_mcp_row
 import run.ostrom.app.resources.settings_more_section
@@ -100,6 +102,7 @@ fun SettingsScreen(
     onOpenNotifications: (accountId: String) -> Unit = {},
     onOpenEnvironment: (accountId: String) -> Unit = {},
     onOpenMcpServers: (accountId: String) -> Unit = {},
+    onOpenGitHub: (accountId: String) -> Unit = {},
     moreTabs: List<MainTab> = emptyList(),
     onOpenTab: (MainTab) -> Unit = {},
     viewModel: SettingsViewModel = koinViewModel(),
@@ -195,6 +198,19 @@ fun SettingsScreen(
                             Text(stringResource(Res.string.settings_mcp_row), color = colors.text, fontSize = 15.sp, modifier = Modifier.weight(1f))
                             Icon(PhosphorIcons.Regular.CaretRight, contentDescription = null, tint = colors.muted)
                         }
+                    }
+                }
+            }
+
+            if (active != null && active.signedIn && Features.GITHUB_LINK in features) {
+                SectionTitle(stringResource(Res.string.github_title))
+                Group {
+                    GroupRow(Modifier.testTag("settings-github"), onClick = { onOpenGitHub(active.id) }) {
+                        Column(Modifier.weight(1f)) {
+                            Text(stringResource(Res.string.github_title), color = colors.text, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+                            Text(stringResource(Res.string.github_row_hint), color = colors.muted, fontSize = 12.5.sp)
+                        }
+                        Icon(PhosphorIcons.Regular.CaretRight, contentDescription = null, tint = colors.muted)
                     }
                 }
             }

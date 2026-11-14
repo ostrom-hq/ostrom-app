@@ -819,4 +819,44 @@
     <string name="error_link_unknown_server">This artifact is on a server none of your accounts is on. Add that account, then open the link again.</string>
     <string name="error_link_signed_out">Your account on this artifact's server is signed out. Sign in again, then open the link again.</string>
     <string name="link_refused_title">Link not opened</string>
+
+    <!-- GitHub link (github.link.v1) -->
+    <string name="github_title">GitHub</string>
+    <string name="github_row_hint">Link your GitHub account so your cloud sessions can use Git and gh as you.</string>
+    <string name="github_refresh">Refresh</string>
+    <string name="github_not_offered">This server does not offer GitHub links (they come with cloud sessions).</string>
+    <string name="github_app_not_configured">An administrator has not configured the instance's GitHub App yet, so nothing can be linked.</string>
+    <string name="github_not_linked">No GitHub account is linked. Your cloud sessions have no Git or gh access as you.</string>
+    <string name="github_linked_as">Linked as %1$s</string>
+    <string name="github_reconnect_required">GitHub access for %1$s must be renewed. Link again to give your cloud sessions their access back.</string>
+    <string name="github_unknown_state">This server reports a state of the link this app does not know. Link again, or unlink.</string>
+    <string name="github_link">Link GitHub</string>
+    <string name="github_link_again">Link again</string>
+    <string name="github_unlink">Unlink</string>
+    <string name="github_unlink_hint">Unlinking removes the link and revokes its token at GitHub. Your cloud sessions then lose GitHub access.</string>
+    <string name="github_just_linked">Linked as %1$s.</string>
+    <string name="github_code_title">Enter this code on GitHub</string>
+    <string name="github_code_body">The code is copied and GitHub's page opened in your browser. Paste the code there and authorize. Enter only a code this screen shows you.</string>
+    <string name="github_waiting">Waiting for GitHub…</string>
+    <string name="github_copy_code">Copy the code</string>
+    <string name="github_copied">Copied</string>
+    <string name="github_open_again">Open GitHub again</string>
+    <string name="github_ended_expired">The code expired. Start again to get a new one.</string>
+    <string name="github_ended_denied">GitHub authorization was cancelled.</string>
+    <string name="error_github_app_not_configured">An administrator has not configured the instance's GitHub App yet.</string>
+    <string name="error_github_device_flow_disabled">The instance's GitHub App does not allow the device flow. Ask an administrator to enable it in the App's settings.</string>
+    <string name="error_github_app_misconfigured">GitHub refused the instance's GitHub App. Ask an administrator to check it.</string>
+    <string name="error_github_account_in_use">This GitHub account is already linked to another member of the organization.</string>
+    <string name="error_github_unreachable">GitHub could not be reached. Try again.</string>
+
+    <!-- A cloud session's GitHub access (runners.cloud.github.v1) -->
+    <string name="cloud_github_title">GitHub access</string>
+    <string name="cloud_github_owner">Mine</string>
+    <string name="cloud_github_shared">Shared</string>
+    <string name="cloud_github_none">None</string>
+    <string name="cloud_github_owner_hint">Git and gh in this session act as your linked GitHub account.</string>
+    <string name="cloud_github_shared_hint">Git and gh act as your linked GitHub account, and whoever shares the session's terminal acts with it.</string>
+    <string name="cloud_github_none_hint">No GitHub credential: public repositories only. Pause the session first to choose this.</string>
+    <string name="error_cloud_github_owner_only">Only the session's owner, signed in in person, changes its GitHub access.</string>
+    <string name="error_cloud_github_not_paused">Pause the session before removing its GitHub access: a running one may hold a token already.</string>
 </resources>

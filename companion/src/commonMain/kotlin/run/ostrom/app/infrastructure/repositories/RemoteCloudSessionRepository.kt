@@ -11,6 +11,7 @@ import run.ostrom.app.domain.models.CloudSession
 import run.ostrom.app.domain.models.CloudSessionPage
 import run.ostrom.app.domain.models.CloudSessionRefusal
 import run.ostrom.app.domain.models.CloudSessionStatus
+import run.ostrom.app.domain.models.GitHubAccess
 import run.ostrom.app.domain.models.NewCloudSession
 import run.ostrom.app.domain.repositories.CloudSessionRepository
 import run.ostrom.core.api.models.CloudAgentKind
@@ -43,6 +44,9 @@ class RemoteCloudSessionRepository(private val calls: AccountCalls) : CloudSessi
     override suspend fun stop(accountId: String, sessionId: String): CloudSession =
         calls.withAccount(accountId, resource = true) { client -> refusals { client.cloudSessions.stop(sessionId).domain() } }
 
+    override suspend fun setGitHubAccess(accountId: String, sessionId: String, access: GitHubAccess): CloudSession =
+        calls.withAccount(accountId, resource = true) { client -> refusals { client.cloudSessions.setGitHubAccess(sessionId, access.wire).domain() } }
+
     /** The refusals of an action, by their error key; the server's message is never read nor shown. */
     private suspend fun <T> refusals(creating: Boolean = false, call: suspend () -> T): T = try {
         call()
@@ -65,6 +69,8 @@ internal fun cloudRefusalOf(status: Int, type: String?, creating: Boolean): Clou
     "profile_required" -> CloudSessionRefusal.PROFILE_REQUIRED
     "cloud_profile_not_found", "profile_unassigned", "image_not_allowed" -> CloudSessionRefusal.PROFILE_UNAVAILABLE
     "cluster_unavailable", "namespace_not_allowed" -> CloudSessionRefusal.CLUSTER_UNAVAILABLE
+    "github_owner_only" -> CloudSessionRefusal.GITHUB_OWNER_ONLY
+    "session_not_paused" -> CloudSessionRefusal.GITHUB_NOT_PAUSED
     else -> null
 }.takeIf { status in 400..499 }
 
@@ -97,6 +103,7 @@ internal fun ApiCloudSession.domain() = CloudSession(
             gitEmailDomain = recipe.gitEmailDomain,
         )
     },
+    githubAccess = GitHubAccess.of(githubAccess),
 )
 
 internal fun NewCloudSession.request() = CreateCloudSessionRequest(
