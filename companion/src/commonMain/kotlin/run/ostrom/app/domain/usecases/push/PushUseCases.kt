@@ -216,7 +216,8 @@ object NotificationLinks {
             if (key.isEmpty()) null else key to part.substringAfter('=')
         }
         // A key given twice is refused: which one wins would be a guess.
-        fun single(key: String): String? = values.filter { it.first == key }.let { if (it.size > 1) return null else it.singleOrNull()?.second }
+        if (values.map { it.first }.toSet().size != values.size) return null
+        fun single(key: String): String? = values.firstOrNull { it.first == key }?.second
         val origin = single("origin")?.let(::decode) ?: return null
         val org = single("org")?.takeIf(::isId) ?: return null
         val member = single("member")?.takeIf(::isId) ?: return null
