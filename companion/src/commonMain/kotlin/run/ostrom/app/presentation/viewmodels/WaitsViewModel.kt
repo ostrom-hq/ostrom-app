@@ -78,8 +78,8 @@ data class WaitsUiState(
 }
 
 /**
- * What waits for the active account's member ("Waiting for you"). Kept current by [FollowWaitsUseCase] (a load at each
- * [start] until Ostrom serves its event feed); [start] and [stop] follow the app's lifecycle (the signed-in shell calls
+ * What waits for the active account's member ("Waiting for you"). Kept current by [FollowWaitsUseCase] (the event
+ * feed, or a load at each [start] from a server without it); [start] and [stop] follow the app's lifecycle (the signed-in shell calls
  * them, so the badge counts while no waits screen is open, and a return to the app loads again). A failure to load keeps
  * what is shown and sets [WaitsUiState.error].
  */

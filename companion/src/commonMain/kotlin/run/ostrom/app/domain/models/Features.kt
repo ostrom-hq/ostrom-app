@@ -27,6 +27,9 @@ object Features {
     /** The waits asked of the person ("Waiting for you"). */
     const val WAITS = "waits.v1"
 
+    /** The organization's live event feed (`GET /api/v1/events`): the waits follow it. */
+    const val EVENTS = "events.v1"
+
     /** Shared artifacts and their viewer. */
     const val ARTIFACTS = "artifacts.v1"
 }

@@ -2,6 +2,8 @@
 // Ported from TeamCode (Apache-2.0), companion/src/commonTest/.../domain/WaitUseCasesTest.kt; see NOTICE.
 package run.ostrom.app.domain
 
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonArray
@@ -27,6 +29,9 @@ import run.ostrom.app.domain.models.WaitOption
 import run.ostrom.app.domain.models.WaitPage
 import run.ostrom.app.domain.models.WaitStatus
 import run.ostrom.app.domain.models.WaitSource
+import run.ostrom.app.domain.models.LiveUpdate
+import run.ostrom.app.domain.models.OrgChange
+import run.ostrom.app.domain.repositories.EventRepository
 import run.ostrom.app.domain.repositories.WaitRepository
 import run.ostrom.app.domain.usecases.auth.AccountGuard
 import run.ostrom.app.domain.usecases.auth.RefreshAccountUseCase
@@ -184,11 +189,38 @@ class WaitUseCasesTest {
         assertEquals(mapOf("ok" to JsonPrimitive(true)), WaitAnswerBuilder.build(consent, consent.actions.single(), mapOf("ok" to FieldInput.Flag(true))))
     }
 
-    @Test fun theWaitsLoadOnceUntilTheServerServesItsFeed() = runTest {
-        val features = FakeFeatures()
-        assertEquals(emptyList(), FollowWaitsUseCase(features, guard())("a1").toList(), "nothing to load from a server without waits")
+    private class FakeEvents(vararg val updates: LiveUpdate<OrgChange>) : EventRepository {
+        val asked = mutableListOf<Set<String>>()
+        override fun changes(accountId: String, types: Set<String>): Flow<LiveUpdate<OrgChange>> { asked += types; return flowOf(*updates) }
+    }
+
+    @Test fun theWaitsLoadOnceFromAServerWithoutTheFeed() = runTest {
+        val features = FakeFeatures(); val events = FakeEvents()
+        assertEquals(emptyList(), FollowWaitsUseCase(events, features, guard())("a1").toList(), "nothing to load from a server without waits")
         features.features = setOf("waits.v1")
-        assertEquals(listOf(WaitsSignal.Reload), FollowWaitsUseCase(features, guard())("a1").toList())
+        assertEquals(listOf(WaitsSignal.Reload), FollowWaitsUseCase(events, features, guard())("a1").toList())
+        assertEquals(emptyList(), events.asked, "No feed asked of a server that does not serve it")
+    }
+
+    @Test fun theWaitsFollowTheFeed() = runTest {
+        val events = FakeEvents(
+            LiveUpdate.Opened(resumed = false),
+            LiveUpdate.Item(OrgChange(OrgChange.WAIT_CREATED, "w1", "m1")),
+            LiveUpdate.Reconnecting(2_000),
+            LiveUpdate.Opened(resumed = true),
+            LiveUpdate.Gap,
+            LiveUpdate.Item(OrgChange(OrgChange.WAIT_RESOLVED, "w1", "m1")),
+        )
+        val signals = FollowWaitsUseCase(events, FakeFeatures(setOf("waits.v1", "events.v1")), guard())("a1").toList()
+        assertEquals(
+            listOf(
+                WaitsSignal.Connection(false), WaitsSignal.Reload, WaitsSignal.Reload,
+                WaitsSignal.Connection(true), WaitsSignal.Connection(false), WaitsSignal.Reload, WaitsSignal.Reload,
+            ),
+            signals,
+            "A load once open, at each wait event and after a gap; none for a connection that resumed",
+        )
+        assertEquals(listOf(OrgChange.WAIT_TYPES), events.asked)
     }
 
     @Test fun theInProgressWaitsAreHiddenFromAServerWithoutWaits() = runTest {
