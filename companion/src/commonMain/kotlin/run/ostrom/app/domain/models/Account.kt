@@ -55,5 +55,8 @@ enum class SignInMethod {
     DEVICE,
 }
 
-/** One organization the person belongs to. */
-data class Organization(val id: String, val name: String)
+/**
+ * One organization the person belongs to. [role] is theirs there (`owner`, `admin`, `member`, `approver`...), null when
+ * the server did not say.
+ */
+data class Organization(val id: String, val name: String, val role: String? = null)

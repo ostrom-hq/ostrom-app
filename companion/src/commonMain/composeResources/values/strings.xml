@@ -442,7 +442,7 @@
     <string name="workflows_filter_done">Done</string>
     <string name="workflows_filter_failed">Failed</string>
     <string name="workflows_reconnecting">Reconnecting…</string>
-    <string name="workflows_edit_note">Read only here: the console edits workflows and starts runs.</string>
+    <string name="workflows_edit_note">Read only here: the console edits workflows.</string>
     <string name="workflows_empty">No workflows yet</string>
     <string name="workflows_empty_body">The workflows your organization saves show here.</string>
     <string name="workflows_runs_empty">No runs</string>
@@ -548,4 +548,22 @@
     <string name="member_mcp_secrets">Secrets: %1$s</string>
     <string name="member_mcp_console_note">Add, edit or delete your servers in the console. A hosted command's launcher, package, arguments and variables cannot change after creation; only its secrets can.</string>
     <string name="member_setup_open_console">Open in the console</string>
+    <string name="workflow_start">Start a run</string>
+    <string name="workflow_start_title">Start a run</string>
+    <string name="workflow_start_button">Start</string>
+    <string name="workflow_start_no_inputs">This workflow takes no input.</string>
+    <string name="workflow_start_input_required">%1$s (required)</string>
+    <string name="workflow_start_input_optional">%1$s (optional)</string>
+    <string name="workflow_input_max">Up to %1$d characters</string>
+    <string name="workflow_cancel">Cancel the run</string>
+    <string name="workflow_cancel_title">Cancel this run?</string>
+    <string name="workflow_cancel_body">The run stops at its next step, and the wait or gate it is on is withdrawn. This cannot be undone.</string>
+    <string name="workflow_cancel_keep">Keep it</string>
+    <string name="error_workflow_forbidden">Only an owner or an admin of the organization starts and cancels workflow runs.</string>
+    <string name="error_workflow_not_runnable">This workflow is not accepted: accept it in the console before running it.</string>
+    <string name="error_workflow_run_limit">Too many runs are unfinished. Wait for one to end, or cancel one, then try again.</string>
+    <string name="error_workflow_invalid_inputs">The server refused these inputs: check the required ones and their length.</string>
+    <string name="error_workflow_run_ended">This run has already ended.</string>
+    <string name="error_workflow_run_busy">The run moved meanwhile. Try again.</string>
+    <string name="error_workflow_input_missing">Fill in %1$s.</string>
 </resources>

@@ -10,8 +10,10 @@ import run.ostrom.app.domain.models.Workflow
 import run.ostrom.app.domain.models.WorkflowInput
 import run.ostrom.app.domain.models.WorkflowNode
 import run.ostrom.app.domain.models.WorkflowRun
+import run.ostrom.app.domain.models.WorkflowRefusal
 import run.ostrom.app.domain.models.WorkflowRunPage
 import run.ostrom.app.domain.repositories.WorkflowRepository
+import run.ostrom.app.domain.services.Clock
 
 private const val MINUTE = 60_000L
 
@@ -81,8 +83,20 @@ internal fun demoRuns(startedAt: Long): List<WorkflowRun> {
     )
 }
 
-/** The demo's workflows and runs from memory, in one page. */
-class DemoWorkflowRepository(private val demo: DemoMode) : WorkflowRepository {
+/**
+ * The demo's workflows and runs from memory, in one page. A run started here moves on its first node after the trigger; a
+ * cancelled run ends as cancelled. Nothing leaves the device.
+ */
+class DemoWorkflowRepository(private val demo: DemoMode, private val clock: Clock) : WorkflowRepository {
+    /** The built-in runs, then those the person started, each as the person last left it. */
+    private fun all(store: DemoStore): List<WorkflowRun> {
+        val cancelled = store.cancelledRuns.value
+        return (store.startedRuns.value + demoRuns(store.startedAt)).map { run ->
+            // As the server cancels: the visit under way fails with the outcome `cancelled`.
+            cancelled[run.id]?.let { at -> run.copy(status = RunStatus.CANCELLED, currentNodeId = null, currentNodeKind = null, endedAt = at, visits = run.visits.map { if (it.active) it.copy(status = "failed", outcome = "cancelled", endedAt = at) else it }) } ?: run
+        }
+    }
+
     override suspend fun workflows(accountId: String): List<Workflow> { demo.store(); return listOf(release, triage) }
 
     override suspend fun workflow(accountId: String, workflowId: String): Workflow {
@@ -91,12 +105,37 @@ class DemoWorkflowRepository(private val demo: DemoMode) : WorkflowRepository {
     }
 
     override suspend fun runs(accountId: String, workflowId: String?, status: String?, before: String?): WorkflowRunPage {
-        val runs = demoRuns(demo.store().startedAt).filter { (workflowId == null || it.workflowId == workflowId) && (status == null || it.status.wire == status) }
+        val runs = all(demo.store()).filter { (workflowId == null || it.workflowId == workflowId) && (status == null || it.status.wire == status) }
         return WorkflowRunPage(if (before == null) runs else emptyList(), null)
     }
 
     override suspend fun run(accountId: String, runId: String): WorkflowRun =
-        demoRuns(demo.store().startedAt).firstOrNull { it.id == runId } ?: throw AppException.NotFound()
+        all(demo.store()).firstOrNull { it.id == runId } ?: throw AppException.NotFound()
+
+    override suspend fun start(accountId: String, workflowId: String, inputs: Map<String, String>): WorkflowRun {
+        val store = demo.store()
+        val workflow = workflow(accountId, workflowId)
+        if (!workflow.runnable) throw AppException.WorkflowRefused(WorkflowRefusal.NOT_RUNNABLE)
+        val now = clock.nowMillis()
+        // The trigger passes at once; the run moves on its first real node.
+        val first = workflow.nodes.firstOrNull { it.kind != NodeKind.TRIGGER } ?: workflow.nodes.first()
+        val run = WorkflowRun(
+            "demo-run-started-${store.startedRuns.value.size + 1}", workflow.id, workflow.name, workflow.version ?: 1, RunStatus.RUNNING, store.account.value.login,
+            "manual", inputs, first.id, first.kind, null, null, workflow.repos.firstOrNull(),
+            listOf(RunVisit(1, first.id, first.label, first.kind, "active", null, null, null, null, null, null, now, null)),
+            null, null, null, null, now, null,
+        )
+        store.startedRuns.value = listOf(run) + store.startedRuns.value
+        return run
+    }
+
+    override suspend fun cancel(accountId: String, runId: String): WorkflowRun {
+        val store = demo.store()
+        val run = run(accountId, runId)
+        if (!run.status.active) throw AppException.WorkflowRefused(WorkflowRefusal.RUN_ENDED)
+        store.cancelledRuns.value = store.cancelledRuns.value + (runId to clock.nowMillis())
+        return run(accountId, runId).copy(visits = emptyList())
+    }
 }
 
 /** The demo account's workflows from memory, every other account's from its server. */
@@ -106,4 +145,6 @@ class DemoAwareWorkflowRepository(private val real: WorkflowRepository, private 
     override suspend fun workflow(accountId: String, workflowId: String) = of(accountId).workflow(accountId, workflowId)
     override suspend fun runs(accountId: String, workflowId: String?, status: String?, before: String?) = of(accountId).runs(accountId, workflowId, status, before)
     override suspend fun run(accountId: String, runId: String) = of(accountId).run(accountId, runId)
+    override suspend fun start(accountId: String, workflowId: String, inputs: Map<String, String>) = of(accountId).start(accountId, workflowId, inputs)
+    override suspend fun cancel(accountId: String, runId: String) = of(accountId).cancel(accountId, runId)
 }

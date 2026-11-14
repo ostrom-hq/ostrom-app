@@ -5,6 +5,7 @@ package run.ostrom.app.domain
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
+import run.ostrom.app.FakeAuthRepository
 import run.ostrom.app.FakeEventRepository
 import run.ostrom.app.FakeFeatures
 import run.ostrom.app.domain.models.AppException
@@ -12,23 +13,31 @@ import run.ostrom.app.domain.models.Features
 import run.ostrom.app.domain.models.LiveUpdate
 import run.ostrom.app.domain.models.NodeKind
 import run.ostrom.app.domain.models.OrgChange
+import run.ostrom.app.domain.models.Organization
 import run.ostrom.app.domain.models.RunFilter
 import run.ostrom.app.domain.models.RunStatus
 import run.ostrom.app.domain.models.RunVisit
 import run.ostrom.app.domain.models.Workflow
+import run.ostrom.app.domain.models.WorkflowInput
+import run.ostrom.app.domain.models.WorkflowRefusal
 import run.ostrom.app.domain.models.WorkflowRun
 import run.ostrom.app.domain.models.WorkflowRunPage
 import run.ostrom.app.domain.repositories.WorkflowRepository
 import run.ostrom.app.domain.usecases.events.FeedSignal
 import run.ostrom.app.domain.usecases.events.OrgFeed
+import run.ostrom.app.domain.usecases.workflows.CanManageRunsUseCase
+import run.ostrom.app.domain.usecases.workflows.CancelWorkflowRunUseCase
 import run.ostrom.app.domain.usecases.workflows.FollowWorkflowRunsUseCase
 import run.ostrom.app.domain.usecases.workflows.GetWorkflowRunUseCase
 import run.ostrom.app.domain.usecases.workflows.GetWorkflowUseCase
 import run.ostrom.app.domain.usecases.workflows.LoadWorkflowRunsUseCase
 import run.ostrom.app.domain.usecases.workflows.LoadWorkflowsUseCase
+import run.ostrom.app.domain.usecases.workflows.StartWorkflowRunUseCase
 import run.ostrom.app.domain.usecases.workflows.WorkflowAccess
 import run.ostrom.app.domain.usecases.workflows.concernsRun
 import run.ostrom.app.domain.usecases.workflows.concernsRunsOf
+import run.ostrom.app.account
+import run.ostrom.app.accounts
 import run.ostrom.app.fakeGuard
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -59,6 +68,10 @@ class WorkflowUseCasesTest {
             return WorkflowRunPage(listOf(workflowRun("r1")), null)
         }
         override suspend fun run(accountId: String, runId: String): WorkflowRun { calls += "run $runId"; return workflowRun(runId) }
+        override suspend fun start(accountId: String, workflowId: String, inputs: Map<String, String>): WorkflowRun {
+            calls += "start $workflowId $inputs"; return workflowRun("new", RunStatus.QUEUED)
+        }
+        override suspend fun cancel(accountId: String, runId: String): WorkflowRun { calls += "cancel $runId"; return workflowRun(runId, RunStatus.CANCELLED) }
     }
 
     @Test fun everyCallIsRefusedByAServerWithoutWorkflows() = runTest {
@@ -68,6 +81,8 @@ class WorkflowUseCasesTest {
         assertFailsWith<AppException.Unsupported> { GetWorkflowUseCase(access)("a1", "w1") }
         assertFailsWith<AppException.Unsupported> { LoadWorkflowRunsUseCase(access)("a1", null, RunFilter.ALL) }
         assertFailsWith<AppException.Unsupported> { GetWorkflowRunUseCase(access)("a1", "r1") }
+        assertFailsWith<AppException.Unsupported> { StartWorkflowRunUseCase(access)("a1", aWorkflow("w1", "Build"), emptyMap()) }
+        assertFailsWith<AppException.Unsupported> { CancelWorkflowRunUseCase(access)("a1", workflowRun("r1")) }
         assertEquals(emptyList(), repository.calls)
     }
 
@@ -118,5 +133,73 @@ class WorkflowUseCasesTest {
         assertEquals(2_000L, ended.durationMillis(9_000L))
         assertNull(workflowRun("r1", startedAt = null).durationMillis(9_000L))
         assertTrue(RunStatus.QUEUED.active); assertFalse(RunStatus.FAILED.active)
+    }
+
+    private val release = aWorkflow("w1", "Release").copy(
+        inputs = listOf(
+            WorkflowInput("version", "Version", required = true, default = null, maxLength = 10),
+            WorkflowInput("notes", "Notes", required = false, default = null),
+            WorkflowInput("channel", "Channel", required = true, default = "stable"),
+        ),
+    )
+
+    @Test fun aRunStartsWithItsRequiredInputsTrimmedAndTheDefaultsFilledIn() = runTest {
+        val repository = FakeWorkflows()
+        val start = StartWorkflowRunUseCase(WorkflowAccess(repository, FakeFeatures(setOf(Features.WORKFLOWS)), fakeGuard()))
+        assertEquals(RunStatus.QUEUED, start("a1", release, mapOf("version" to " 1.4.0 ", "notes" to "  ")).status)
+        assertEquals(listOf("start w1 {version=1.4.0, channel=stable}"), repository.calls, "An empty optional input is not sent; a default counts")
+        val missing = assertFailsWith<AppException.WorkflowInputMissing> { start("a1", release, mapOf("version" to "  ")) }
+        assertEquals("Version", missing.label)
+        assertFailsWith<AppException.WorkflowInputMissing> { start("a1", release, mapOf("version" to "1", "channel" to "")) }
+        val long = assertFailsWith<AppException.WorkflowRefused> { start("a1", release, mapOf("version" to "12345678901")) }
+        assertEquals(WorkflowRefusal.INVALID_INPUTS, long.reason)
+        assertEquals(1, repository.calls.size, "Nothing is sent before the inputs are right")
+    }
+
+    @Test fun onlyAnAcceptedWorkflowStarts() = runTest {
+        val repository = FakeWorkflows()
+        val start = StartWorkflowRunUseCase(WorkflowAccess(repository, FakeFeatures(setOf(Features.WORKFLOWS)), fakeGuard()))
+        for (status in listOf("proposed", "rejected")) {
+            val refused = assertFailsWith<AppException.WorkflowRefused> { start("a1", aWorkflow("w1", "Build").copy(status = status), emptyMap()) }
+            assertEquals(WorkflowRefusal.NOT_RUNNABLE, refused.reason)
+        }
+        start("a1", aWorkflow("w2", "Build").copy(status = "edited"), emptyMap())
+        assertEquals(listOf("start w2 {}"), repository.calls)
+    }
+
+    @Test fun onlyARunThatHasNotEndedIsCancelled() = runTest {
+        val repository = FakeWorkflows()
+        val cancel = CancelWorkflowRunUseCase(WorkflowAccess(repository, FakeFeatures(setOf(Features.WORKFLOWS)), fakeGuard()))
+        assertEquals(RunStatus.CANCELLED, cancel("a1", workflowRun("r1", RunStatus.WAITING)).status)
+        for (status in listOf(RunStatus.SUCCEEDED, RunStatus.FAILED, RunStatus.CANCELLED, RunStatus.UNKNOWN)) {
+            assertEquals(WorkflowRefusal.RUN_ENDED, assertFailsWith<AppException.WorkflowRefused> { cancel("a1", workflowRun("r2", status)) }.reason)
+        }
+        assertEquals(listOf("cancel r1"), repository.calls)
+    }
+
+    @Test fun anOwnerOrAnAdminManagesRunsAndAnUnknownRoleShowsTheActions() = runTest {
+        val auth = FakeAuthRepository()
+        val accounts = accounts().also { it.save(account().copy(organizationId = "o2")) }
+        val manages = CanManageRunsUseCase(auth, accounts)
+        auth.organizations = listOf(Organization("o1", "One", "owner"), Organization("o2", "Two", "member"))
+        assertFalse(manages("a1"), "A member of the account's organization")
+        auth.organizations = listOf(Organization("o1", "One", "member"), Organization("o2", "Two", "admin"))
+        assertTrue(manages("a1"))
+        auth.organizations = listOf(Organization("o2", "Two", "approver"))
+        assertFalse(manages("a1"))
+        auth.organizations = listOf(Organization("o2", "Two"))
+        assertTrue(manages("a1"), "A server that does not say lets the server refuse")
+        auth.organizations = emptyList()
+        assertTrue(manages("a1"))
+        accounts.save(account().copy(organizationId = null))
+        auth.organizations = listOf(Organization("o1", "One", "member"))
+        assertFalse(manages("a1"), "The only organization is the account's")
+        auth.organizationsError = AppException.Unreachable()
+        assertTrue(manages("a1"), "Offline, the actions show and the server words a refusal")
+        auth.organizationsError = AppException.Unauthorized()
+        assertFalse(manages("a1"), "Signed out meanwhile")
+        assertFalse(manages("unknown"))
+        accounts.save(account(signedIn = false))
+        assertFalse(manages("a1"))
     }
 }

@@ -9,6 +9,7 @@ import run.ostrom.app.domain.models.AppException
 import run.ostrom.app.domain.models.NotificationChannels
 import run.ostrom.app.domain.models.NotificationPreferences
 import run.ostrom.app.domain.models.NotificationSettings
+import run.ostrom.app.domain.models.WorkflowRun
 import run.ostrom.app.domain.repositories.AccountRepository
 import run.ostrom.app.domain.services.Clock
 import run.ostrom.core.receipts.ReceiptSigner
@@ -51,6 +52,10 @@ internal class DemoStore(val startedAt: Long) {
 
     /** The approvals inbox: two requests waiting, one answered; the demo's answers move them. */
     val approvals = MutableStateFlow(DemoContent.approvals(startedAt))
+
+    /** The runs the person started in the demo, newest first, and the ids of the runs they cancelled (with when). */
+    val startedRuns = MutableStateFlow<List<WorkflowRun>>(emptyList())
+    val cancelledRuns = MutableStateFlow<Map<String, Long>>(emptyMap())
 
     /** The demo server's receipt key, new for each demo and never written anywhere; its receipts are signed with it. */
     val receiptSigner: ReceiptSigner by lazy { ReceiptSignerImpl(ReceiptSigningKey.generate()) }

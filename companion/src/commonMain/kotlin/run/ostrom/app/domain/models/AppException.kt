@@ -35,6 +35,19 @@ sealed class AppException(message: String) : Exception(message) {
      */
     class StepUpRequired(val requestBound: Boolean) : AppException("Confirm this yes again.")
     class CredentialStorage : AppException("This device's secure storage refused to read or keep the sign-in. Unlock the device and try again.")
+    /** The server refused to start or cancel a workflow run, for [reason]. */
+    class WorkflowRefused(val reason: WorkflowRefusal) : AppException(
+        when (reason) {
+            WorkflowRefusal.FORBIDDEN -> "Only an owner or an admin of the organization starts and cancels workflow runs."
+            WorkflowRefusal.NOT_RUNNABLE -> "This workflow is not accepted: accept it in the console before running it."
+            WorkflowRefusal.RUN_LIMIT -> "Too many runs are unfinished. Wait for one to end, or cancel one, then try again."
+            WorkflowRefusal.INVALID_INPUTS -> "The server refused these inputs: check the required ones and their length."
+            WorkflowRefusal.RUN_ENDED -> "This run has already ended."
+            WorkflowRefusal.RUN_BUSY -> "The run moved meanwhile. Try again."
+        },
+    )
+    /** A required input of a workflow ([label]) has no value. */
+    class WorkflowInputMissing(val label: String) : AppException("Fill in $label.")
     /** The server refused with [code] (its stable error key, shown only when it is one) and [statusCode]. */
     class Server(val statusCode: Int, val code: String?) :
         AppException("The server returned HTTP $statusCode" + (visibleCode(code)?.let { " ($it)" } ?: "") + ".")

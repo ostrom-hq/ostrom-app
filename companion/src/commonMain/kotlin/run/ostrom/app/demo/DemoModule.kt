@@ -61,7 +61,7 @@ val demoModule = module {
     single<ReceiptRepository> { DemoAwareReceiptRepository(get<RemoteReceiptRepository>(), DemoReceiptRepository(get())) }
     single<SessionRepository> { DemoAwareSessionRepository(get<RemoteSessionRepository>(), DemoSessionRepository(get())) }
     single<TodoRepository> { DemoAwareTodoRepository(get<RemoteTodoRepository>(), DemoTodoRepository(get())) }
-    single<WorkflowRepository> { DemoAwareWorkflowRepository(get<RemoteWorkflowRepository>(), DemoWorkflowRepository(get())) }
+    single<WorkflowRepository> { DemoAwareWorkflowRepository(get<RemoteWorkflowRepository>(), DemoWorkflowRepository(get(), get())) }
     single<MemberSetupRepository> { DemoAwareMemberSetupRepository(get<RemoteMemberSetupRepository>(), DemoMemberSetupRepository(get())) }
     single<ReceiptKeyPinRepository> { DemoAwareReceiptKeyPinRepository(get<SecureReceiptKeyPinRepository>(), get()) }
 }

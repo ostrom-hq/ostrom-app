@@ -54,6 +54,7 @@ class FakeAuthRepository : AuthRepository {
     var capabilities: ServerCapabilities = CAPABILITIES
     var capabilitiesError: Exception? = null
     var organizations: List<Organization> = emptyList()
+    var organizationsError: Exception? = null
     var member: Member = Member("ada", null)
     var meError: Exception? = null
     var exchanged: NewSession = NewSession("osm_token", "ada", "Ada Lovelace", null, "unlock-key")
@@ -93,7 +94,7 @@ class FakeAuthRepository : AuthRepository {
     override suspend fun capabilities(accountId: String): ServerCapabilities = capabilities("", "")
 
     override suspend fun organizations(origin: String, token: String): List<Organization> = organizations
-    override suspend fun organizations(accountId: String): List<Organization> = organizations
+    override suspend fun organizations(accountId: String): List<Organization> = organizationsError?.let { throw it } ?: organizations
 
     override suspend fun me(origin: String, token: String): Member {
         meError?.let { throw it }

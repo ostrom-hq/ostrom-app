@@ -6,7 +6,7 @@ import run.ostrom.app.domain.models.Workflow
 import run.ostrom.app.domain.models.WorkflowRun
 import run.ostrom.app.domain.models.WorkflowRunPage
 
-/** The workflows of an account's server and their runs (`workflows.v1`), read only. */
+/** The workflows of an account's server and their runs (`workflows.v1`): read, and runs started and cancelled. */
 interface WorkflowRepository {
     /** The organization's saved workflows. */
     suspend fun workflows(accountId: String): List<Workflow>
@@ -21,4 +21,10 @@ interface WorkflowRepository {
 
     /** One run, with its visits. */
     suspend fun run(accountId: String, runId: String): WorkflowRun
+
+    /** Starts a run of [workflowId] as the person with [inputs] (by input id); a refusal is an [run.ostrom.app.domain.models.AppException.WorkflowRefused]. */
+    suspend fun start(accountId: String, workflowId: String, inputs: Map<String, String>): WorkflowRun
+
+    /** Cancels [runId]; the answer is the run as cancelled, without its visits. */
+    suspend fun cancel(accountId: String, runId: String): WorkflowRun
 }

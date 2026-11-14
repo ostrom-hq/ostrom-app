@@ -38,6 +38,7 @@ import run.ostrom.app.presentation.screens.RequestScreen
 import run.ostrom.app.presentation.screens.SessionScreen
 import run.ostrom.app.presentation.screens.WorkflowRunScreen
 import run.ostrom.app.presentation.screens.WorkflowScreen
+import run.ostrom.app.presentation.screens.WorkflowStartScreen
 import run.ostrom.app.presentation.viewmodels.ArtifactViewModel
 import run.ostrom.app.presentation.viewmodels.MemberEnvironmentViewModel
 import run.ostrom.app.presentation.viewmodels.NotificationPreferencesViewModel
@@ -48,6 +49,7 @@ import run.ostrom.app.presentation.viewmodels.RootViewModel
 import run.ostrom.app.presentation.viewmodels.SessionViewModel
 import run.ostrom.app.presentation.viewmodels.WorkflowRunViewModel
 import run.ostrom.app.presentation.viewmodels.WorkflowRunsViewModel
+import run.ostrom.app.presentation.viewmodels.WorkflowStartViewModel
 import run.ostrom.app.presentation.viewmodels.WorkflowViewModel
 
 /**
@@ -167,7 +169,18 @@ fun OstromNavHost(rootViewModel: RootViewModel = koinViewModel(), unlock: PhoneU
             val route = entry.toRoute<WorkflowRoute>()
             val viewModel: WorkflowViewModel = koinViewModel { parametersOf(route) }
             val runs: WorkflowRunsViewModel = koinViewModel(key = "runs-${route.accountId}-${route.workflowId}") { parametersOf(route) }
-            WorkflowScreen(viewModel, runs, onBack = { navController.popBackStack() }, onOpenRun = { runId -> navController.navigate(WorkflowRunRoute(route.accountId, runId)) })
+            WorkflowScreen(
+                viewModel, runs, onBack = { navController.popBackStack() }, onOpenRun = { runId -> navController.navigate(WorkflowRunRoute(route.accountId, runId)) },
+                onStart = { navController.navigate(WorkflowStartRoute(route.accountId, route.workflowId)) },
+            )
+        }
+        composable<WorkflowStartRoute> { entry ->
+            val route = entry.toRoute<WorkflowStartRoute>()
+            val viewModel: WorkflowStartViewModel = koinViewModel { parametersOf(route) }
+            WorkflowStartScreen(viewModel, onBack = { navController.popBackStack() }, onStarted = { run ->
+                // The new run replaces the form: back from it returns to the workflow.
+                navController.navigate(WorkflowRunRoute(route.accountId, run.id)) { popUpTo<WorkflowStartRoute> { inclusive = true } }
+            })
         }
         composable<WorkflowRunRoute> { entry ->
             val route = entry.toRoute<WorkflowRunRoute>()

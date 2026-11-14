@@ -27,7 +27,7 @@ class DemoAuthRepository(private val demo: DemoMode) : AuthRepository {
         ServerCapabilities(DemoContent.SERVER_VERSION, Features.SUPPORTED_API_VERSION, DemoContent.features).also { demo.store() }
     override suspend fun organizations(origin: String, token: String): List<Organization> = throw AppException.NotOstrom()
     override suspend fun organizations(accountId: String): List<Organization> =
-        demo.store().account.value.let { listOf(Organization(it.organizationId.orEmpty(), it.organizationName.orEmpty())) }
+        demo.store().account.value.let { listOf(Organization(it.organizationId.orEmpty(), it.organizationName.orEmpty(), role = "owner")) }
     override suspend fun me(origin: String, token: String): Member = throw AppException.NotOstrom()
     override suspend fun me(accountId: String): Member = demo.store().account.value.let { Member(it.login, null) }
     override suspend fun logout(accountId: String) = Unit

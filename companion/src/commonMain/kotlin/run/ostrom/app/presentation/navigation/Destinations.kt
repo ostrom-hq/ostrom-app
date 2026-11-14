@@ -47,6 +47,10 @@ data class SessionRoute(val accountId: String, val sessionId: String)
 @Serializable
 data class WorkflowRoute(val accountId: String, val workflowId: String)
 
+/** The form that starts a run of a workflow, opened from the workflow's Start. */
+@Serializable
+data class WorkflowStartRoute(val accountId: String, val workflowId: String)
+
 /** One run of a workflow with its visits, opened from a runs list, a session or a parent run. */
 @Serializable
 data class WorkflowRunRoute(val accountId: String, val runId: String)
