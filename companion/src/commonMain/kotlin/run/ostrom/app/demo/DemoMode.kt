@@ -3,11 +3,15 @@
 package run.ostrom.app.demo
 
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.serialization.json.JsonObject
 import run.ostrom.app.domain.models.Account
 import run.ostrom.app.domain.models.AppException
 import run.ostrom.app.domain.models.NotificationPreferences
 import run.ostrom.app.domain.repositories.AccountRepository
 import run.ostrom.app.domain.services.Clock
+import run.ostrom.core.receipts.ReceiptSigner
+import run.ostrom.core.receipts.ReceiptSignerImpl
+import run.ostrom.core.receipts.ReceiptSigningKey
 
 /**
  * The built-in demo: an account on no server, whose content lives in memory only. Started from the first screen
@@ -42,6 +46,13 @@ internal class DemoStore(val startedAt: Long) {
 
     /** The approvals inbox: two requests waiting, one answered; the demo's answers move them. */
     val approvals = MutableStateFlow(DemoContent.approvals(startedAt))
+
+    /** The demo server's receipt key, new for each demo and never written anywhere; its receipts are signed with it. */
+    val receiptSigner: ReceiptSigner by lazy { ReceiptSignerImpl(ReceiptSigningKey.generate()) }
+    val receipts: List<JsonObject> by lazy { demoReceipts(startedAt, receiptSigner) }
+
+    /** The demo server's receipt key pins, kept on first view as for any server, in memory. */
+    val receiptPins = MutableStateFlow<Map<String, String>>(emptyMap())
 }
 
 /** "Try the demo" on the first screen: offered only on a device without any account, so a demo never mixes with a real one. */

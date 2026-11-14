@@ -26,8 +26,8 @@ import kotlin.test.Test
  * scripts/real-server-session.sh: the phone's person signed in as the app does (PKCE, `POST /auth/mobile/token`), and
  * that session and its unlock key are given here; another member asked two pushes to main that wait for them, and the
  * organization's budget is passed. The whole app, over the JDK HTTP client: the yes (biometrics stood in for, then the
- * unlock on the server) and the no with its reason, the spending past its budget, the activity, the account. The
- * workflow then checks the gates and their signed receipts through the API.
+ * unlock on the server) and the no with its reason, their signed receipts verified in the history, the spending past
+ * its budget, the activity, the account. The workflow then checks the gates and their signed receipts through the API.
  */
 @OptIn(ExperimentalTestApi::class)
 class RealServerJourneyTest {
@@ -82,6 +82,12 @@ class RealServerJourneyTest {
             tap("request-send-decline")
             waitFor("request-outcome")
             tap("back", scroll = false)
+
+            // The history: the receipts the server signed for the two answers, each verified on this device against the
+            // key it pinned on this first view.
+            tap("tab-history", scroll = false)
+            waitFor("check-verified")
+            onNodeWithTag("history-error").assertDoesNotExist()
 
             // The spending (PARCOURS 3.5): the organization's monthly budget, and the asker's own, passed.
             tap("tab-spending", scroll = false)

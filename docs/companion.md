@@ -63,6 +63,17 @@ command, the commit, the size of the change, the commits, checks and evidence be
   again, without it to open the console (`<origin>/yes/<id>`, whose address is shown to copy when no browser opens). A
   self-approval, an answer already given, `shown_digest_mismatch`, `org_required` and offline each have their sentence.
 
+## History
+
+- The receipts are read as the server wrote them (`listRaw`) and verified on the device, off the main thread, by
+  ostrom-core's `ReceiptVerifierImpl`: a schema would drop the fields this version does not know and a genuine receipt
+  would read as modified. A receipt this app cannot display still has its row and is still checked.
+- Trust on first view: the server's receipt keys are pinned in the secure store (`receipt-pins:<origin>`, the raw key
+  by key id). A key served later is trusted only through a rotation signed by a trusted key, transitively
+  (`ostrom-receipt-key-rotation/v1\n` + the new key's raw hex, Ed25519). Pins that cannot be read trust nothing.
+- A check run counts as run by Ostrom or the CI (`isolated_runner`, `ci`) only on a verified receipt.
+- Android below API 33 has no Ed25519: the app installs Bouncy Castle at start, in place of the platform's "BC".
+
 ## Tests
 
 - `companion/src/commonTest`: use cases with fakes, repositories against Ktor's `MockEngine`.
@@ -71,8 +82,8 @@ command, the commit, the size of the change, the commits, checks and evidence be
 - `RealServerJourneyTest` (jvmTest) drives the whole app against the real server: ostrom-server's `app-journey`
   workflow starts a published server image, prepares it with `scripts/real-server-session.sh` (two pushes to main
   waiting for the person, a budget passed, the phone's session and unlock key) and runs this test with that session in
-  `OSTROM_E2E_*`; it says yes and no, reads the spending, the activity and the account, and the workflow checks the
-  gates and their signed receipts. Without `OSTROM_E2E_SERVER` it is skipped.
+  `OSTROM_E2E_*`; it says yes and no, sees their receipts verified in the history, reads the spending, the activity
+  and the account, and the workflow checks the gates and their signed receipts. Without `OSTROM_E2E_SERVER` it is skipped.
 - `testAndroidHostTest` runs the common tests on Android's host JVM. Kover's gate covers the domain.
 
 ## Parity
@@ -85,7 +96,7 @@ What the React Native app did, what TeamCode's companion does that an Ostrom ser
 | Sign-in (phone browser, desktop device flow), accounts, organizations, secure storage, capabilities check, incompatible server, settings with versions, theme, English and French, demo | none | Done |
 | Approvals inbox and request, yes after a biometric unlock bound to the request (`POST /auth/mobile/unlock` with `requestId`) | `gates.v1` | Ported (see [Approvals](#approvals)) |
 | Waiting for you (waits asked of the person, answer with actions and values) | `waits.v1` | Ported from TeamCode's `WaitsScreen` (open, answered and cancelled filters, in-progress timers and webhooks, tab badge). Loaded at each return to the app until the server serves its event feed; no link to the session (no sessions screen yet), no withdraw (no route) |
-| History: receipts, verified on the device | `receipts.v1` | To port |
+| History: receipts, verified on the device | `receipts.v1` | Ported (see [History](#history)): each receipt verified on the device with ostrom-core's verifier, the server's key pinned on first view, check runs with their origin, paged, demo receipts signed by a demo key |
 | Spending | `budgets.v1` | Ported (week and month, budget bar, budgets passed, by agent, repository and person) |
 | Activity | none | Ported (newest first, paged; a line about an approval opens its request on a server with `gates.v1`) |
 | Notification preferences (requests, decisions, spending, quiet hours) | `notifications.v1` | Ported: Settings, Notifications, shaped like TeamCode's `NotificationPreferencesScreen` |
