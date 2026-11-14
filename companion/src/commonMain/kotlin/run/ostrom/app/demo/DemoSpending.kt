@@ -34,7 +34,7 @@ internal fun demoSpending(period: SpendPeriod): SpendingReport {
 
 /** The demo organization's activity, newest first, relative to [now]. */
 internal fun demoActivity(now: Long): List<ActivityItem> = listOf(
-    ActivityItem("act-1", now - 3 * MINUTE, "gate.requested", "agent", "Claude Code", "Asked to push 3 commits to main", "analytical-engines/billing", approvalId = "apr-demo-1"),
+    ActivityItem("act-1", now - 3 * MINUTE, "gate.requested", "agent", "Claude Code", "Asked to push 3 commits to main", "analytical-engines/billing", approvalId = DemoContent.PUSH_APPROVAL_ID),
     ActivityItem("act-2", now - 18 * MINUTE, "check.passed", "agent", "Codex", "CI passed on the cache pull request", "analytical-engines/web"),
     ActivityItem("act-3", now - 47 * MINUTE, "session.ended", "agent", "Claude Code", "Session ended: migrate billing to the new API", "analytical-engines/billing", costUsd = 4.12),
     ActivityItem("act-4", now - 95 * MINUTE, "gate.decided", "person", "charles", "Approved the deploy of the docs site", "analytical-engines/docs"),

@@ -87,7 +87,7 @@ What the React Native app did, what TeamCode's companion does that an Ostrom ser
 | Waiting for you (waits asked of the person, answer with actions and values) | `waits.v1` | Ported from TeamCode's `WaitsScreen` (open, answered and cancelled filters, in-progress timers and webhooks, tab badge). Loaded at each return to the app until the server serves its event feed; no link to the session (no sessions screen yet), no withdraw (no route) |
 | History: receipts, verified on the device | `receipts.v1` | To port |
 | Spending | `budgets.v1` | Ported (week and month, budget bar, budgets passed, by agent, repository and person) |
-| Activity | none | Ported (newest first, paged; a row does not open its approval yet) |
+| Activity | none | Ported (newest first, paged; a line about an approval opens its request on a server with `gates.v1`) |
 | Push registration and notification preferences | `notifications.v1`, `notifications.push.v1` | To port (the server sends Expo push today) |
 | Artifacts gallery and viewer | `artifacts.v1` | To port from TeamCode |
 | Sessions (list, transcript, follow live) | `sessions.v1` | To port from TeamCode, once ostrom-core's client has the session routes |

@@ -30,6 +30,9 @@ object DemoContent {
     const val SERVER_VERSION = "demo"
     const val REPOSITORY_URL = "https://github.com/ostrom-hq/ostrom-server"
 
+    /** The demo's high-risk push, which the demo activity's request line opens. */
+    const val PUSH_APPROVAL_ID = "demo-push"
+
     /** What the demo server announces: the features whose demo content exists. */
     val features: Set<String> = setOf(Features.GATES, Features.WAITS, Features.BUDGETS)
 
@@ -40,7 +43,7 @@ object DemoContent {
     fun approvals(startedAt: Long): ApprovalQueue {
         val minute = 60_000L
         val push = Approval(
-            id = "demo-push",
+            id = PUSH_APPROVAL_ID,
             title = "Push 2 commits to main",
             status = ApprovalStatus.PENDING,
             shownDigest = "sha256:demo-push",
