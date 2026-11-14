@@ -118,7 +118,8 @@ class FollowWaitsUseCase(private val events: EventRepository, private val featur
             when (update) {
                 is LiveUpdate.Opened -> { emit(WaitsSignal.Connection(reconnecting = false)); if (!update.resumed) emit(WaitsSignal.Reload) }
                 LiveUpdate.Gap -> emit(WaitsSignal.Reload)
-                is LiveUpdate.Item -> if (update.value.type in OrgChange.WAIT_TYPES) emit(WaitsSignal.Reload)
+                // Only the wait types are asked of the server.
+                is LiveUpdate.Item -> emit(WaitsSignal.Reload)
                 is LiveUpdate.Reconnecting -> emit(WaitsSignal.Connection(reconnecting = true))
             }
         }

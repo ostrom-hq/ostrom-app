@@ -28,7 +28,9 @@ class RemoteEventRepository(private val calls: AccountCalls, private val policy:
             client.events.follow(
                 after = cursor,
                 types = types,
-                onGap = { send(LiveUpdate.Gap) },
+                // The stream goes on at the oldest event still held: a reconnection before it resumes there, not
+                // from the purged cursor again (another gap, another load).
+                onGap = { oldest -> send(LiveUpdate.Gap); cursor = maxOf(cursor ?: 0, oldest - 1) },
                 onOpen = { progress.opened(); send(LiveUpdate.Opened(resumed)) },
             ) { event ->
                 val read = event.read()
