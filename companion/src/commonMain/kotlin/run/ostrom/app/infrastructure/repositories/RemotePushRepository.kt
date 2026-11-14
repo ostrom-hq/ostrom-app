@@ -7,7 +7,6 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeoutOrNull
 import run.ostrom.app.domain.repositories.PushRepository
 
 /**
@@ -37,12 +36,12 @@ class RemotePushRepository(private val calls: AccountCalls) : PushRepository {
     }
 
     /**
-     * Best effort, at most [FORGET_MILLIS], and not cancelled with the sync that asked (a newer change of accounts):
-     * once the new registration replaced it here, nothing else knows the old device's id.
+     * Best effort (a short call, bounded by `translateFailures`), and not cancelled with the sync that asked (a newer
+     * change of accounts): once the new registration replaced it here, nothing else knows the old device's id.
      */
     private suspend fun forget(accountId: String, device: Device) = withContext(NonCancellable) {
         try {
-            withTimeoutOrNull(FORGET_MILLIS) { calls.withAccountIn(accountId, device.organizationId) { it.pushDevices.delete(device.id) } }
+            calls.withAccountIn(accountId, device.organizationId) { it.pushDevices.delete(device.id) }
         } catch (error: CancellationException) {
             throw error
         } catch (_: Exception) {
@@ -54,7 +53,5 @@ class RemotePushRepository(private val calls: AccountCalls) : PushRepository {
     private companion object {
         /** iOS and Android alike: FCM hands an iOS push to APNs. */
         const val FCM = "fcm"
-
-        const val FORGET_MILLIS = 5_000L
     }
 }
