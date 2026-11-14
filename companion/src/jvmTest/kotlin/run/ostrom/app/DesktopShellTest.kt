@@ -63,7 +63,7 @@ class DesktopShellTest {
             onNodeWithText("Run ostrom login in a terminal", substring = true).assertExists()
             onNodeWithTag("tab-settings").performSemanticsAction(SemanticsActions.OnClick)
             settle()
-            onNodeWithTag("cli-badge").assertExists()
+            onNodeWithTag("cli-badge", useUnmergedTree = true).assertExists()
             onNodeWithTag("cli-account-hint").assertTextContains("runs ostrom logout", substring = true)
             onNodeWithTag("sign-in-again").assertDoesNotExist()
         }
