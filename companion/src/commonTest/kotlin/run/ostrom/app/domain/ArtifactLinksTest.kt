@@ -29,7 +29,10 @@ class ArtifactLinksTest {
         assertEquals("https://a.example/artifacts/x?v=2", ArtifactLinks.urlOf("OSTROM://open?url=https%3A%2F%2Fa.example%2Fartifacts%2Fx%3Fv%3D2"))
         assertTrue(ArtifactLinks.isOpenLink(" ostrom://open?url=x "))
         assertFalse(ArtifactLinks.isOpenLink("ostrom://notification?origin=x"))
+        // A sender that did not encode the page keeps its whole query.
+        assertEquals("https://a.example/artifacts/x?utm=y&v=3", ArtifactLinks.urlOf("ostrom://open?url=https://a.example/artifacts/x?utm=y&v=3"))
         assertNull(ArtifactLinks.urlOf("ostrom://open?other=1"), "no url")
+        assertNull(ArtifactLinks.urlOf("ostrom://open?other=1&url=x"), "the page is the only parameter")
         assertNull(ArtifactLinks.urlOf("ostrom://open?url=a&url=b"), "two urls")
         assertNull(ArtifactLinks.urlOf("ostrom://open?url=%zz"), "a malformed escape")
         assertNull(ArtifactLinks.urlOf("ostrom://open?url=%C3"), "bytes that are not UTF-8")
@@ -49,6 +52,8 @@ class ArtifactLinksTest {
         assertEquals("a2", list.activeAccountId.value)
         // The server's own origin, a trailing slash, a version, a tracker and a fragment.
         assertEquals(ArtifactLinkTarget("a1", id, 3), open(link("https://OSTROM.example.org:443/artifacts/$id/?utm=x&v=3#top")))
+        // Not encoded by its sender: its version is still read.
+        assertEquals(ArtifactLinkTarget("a1", id, 4), open("ostrom://open?url=https://ostrom.example.org/artifacts/$id?utm=x&v=4"))
         assertEquals("a1", list.activeAccountId.value)
     }
 
@@ -85,6 +90,8 @@ class ArtifactLinksTest {
             link("https://api.acme.dev/artifacts/$id?v=0"),
             link("https://api.acme.dev/artifacts/$id?v=1&v=2"),
             link("https://api.acme.dev/artifacts/$id?v=x"),
+            link("https://api.acme.dev/artifacts/$id?v=%2B5"),
+            link("https://api.acme.dev/artifacts/$id?v="),
         ).forEach { assertEquals(LinkRefusal.NOT_AN_ARTIFACT, reason(it), it) }
         assertEquals("a1", list.activeAccountId.value, "a refused link changes no account")
     }

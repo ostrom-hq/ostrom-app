@@ -22,13 +22,17 @@ object ArtifactLinks {
     /** Whether [link] is an `ostrom://open?` link, whatever it carries. */
     fun isOpenLink(link: String): Boolean = link.trimTyped().startsWith(SCHEME, ignoreCase = true)
 
-    /** The page URL the link carries, decoded; null when it carries none, more than one, or a malformed one. */
+    /** The page URL the link carries (`url=`, its only parameter), decoded; null when it carries none, two, or a malformed one. */
     fun urlOf(link: String): String? {
         val trimmed = link.trimTyped()
         if (!trimmed.startsWith(SCHEME, ignoreCase = true)) return null
-        val urls = trimmed.substring(SCHEME.length).substringBefore('#').split('&').filter { it.startsWith("url=") }
+        // The page is the link's only parameter, all of the rest: a sender that did not encode it keeps its own query
+        // (`?utm=x&v=3`) whole. Its fragment, ignored, is cut either way.
+        val query = trimmed.substring(SCHEME.length).substringBefore('#')
+        if (!query.startsWith("url=")) return null
+        val encoded = query.removePrefix("url=")
         // Given twice, which one wins would be a guess.
-        val encoded = urls.singleOrNull()?.removePrefix("url=") ?: return null
+        if ("&url=" in encoded) return null
         return decode(encoded)?.trimTyped()?.takeIf { it.isNotEmpty() }
     }
 
@@ -82,7 +86,7 @@ class OpenArtifactLinkUseCase(private val accounts: AccountRepository) {
         // Other query parameters (a tracker added by a chat app) are ignored; `v` must be a version when present.
         val versions = match.groupValues[3].split('&').filter { it.startsWith("v=") }.map { it.removePrefix("v=") }
         if (versions.size > 1) refuse(LinkRefusal.NOT_AN_ARTIFACT)
-        val version = versions.singleOrNull()?.let { v -> v.takeIf { it.length <= 9 }?.toIntOrNull()?.takeIf { it >= 1 } ?: refuse(LinkRefusal.NOT_AN_ARTIFACT) }
+        val version = versions.singleOrNull()?.let { v -> v.takeIf { it.length in 1..9 && it.all(Char::isDigit) }?.toIntOrNull()?.takeIf { it >= 1 } ?: refuse(LinkRefusal.NOT_AN_ARTIFACT) }
         val candidates = accounts.accounts.value.filter { origin == it.origin || origin == consoleOf(it.origin) }
         if (candidates.isEmpty()) refuse(LinkRefusal.UNKNOWN_SERVER)
         val signedIn = candidates.filter { it.signedIn }

@@ -37,10 +37,6 @@ class RootViewModel(
     val theme: StateFlow<ThemePreference> = preferences.theme
 
     /**
-     * Where a tapped notification leads, its account made the active one; null when no signed-in account of this device
-     * is the one it names.
-     */
-    /**
      * The artifact an `ostrom://open?url=` link leads to, its account made the active one; a [Failure] worded by its
      * reason when the link is refused, and then nothing is opened.
      */
@@ -50,6 +46,10 @@ class RootViewModel(
         ArtifactLinkOutcome.Refused(error.userMessage())
     }
 
+    /**
+     * Where a tapped notification leads, its account made the active one; null when no signed-in account of this device
+     * is the one it names.
+     */
     fun openNotification(link: String): NotificationTarget? {
         val target = resolveNotification(link) ?: return null
         accounts.setActive(target.accountId)
