@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -54,6 +55,7 @@ class WorkflowRunsViewModel(
     private var started = false
     private var follow: Job? = null
     private var load: Job? = null
+    private var pendingReload: Job? = null
 
     init {
         viewModelScope.launch {
@@ -72,6 +74,7 @@ class WorkflowRunsViewModel(
     fun stop() {
         started = false
         follow?.cancel(); follow = null
+        pendingReload?.cancel(); pendingReload = null
         state.update { it.copy(reconnecting = false) }
     }
 
@@ -98,6 +101,11 @@ class WorkflowRunsViewModel(
         load = viewModelScope.launch { page(accountId, current.filter, before) }
     }
 
+    private fun reloadSoon() {
+        if (pendingReload?.isActive == true) return
+        pendingReload = viewModelScope.launch { delay(BURST_MILLIS); reload() }
+    }
+
     private fun restart() {
         follow?.cancel(); follow = null
         val accountId = state.value.accountId
@@ -107,9 +115,9 @@ class WorkflowRunsViewModel(
                 followRuns(accountId).collect { signal ->
                     when (signal) {
                         FeedSignal.Reload -> reload()
-                        // The event names the run and its status only: the list is read again (a burst reads once, the
-                        // latest load winning).
-                        is FeedSignal.Changed -> if (signal.change.concernsRunsOf(of?.workflowId)) reload()
+                        // The event names the run and its status only: the list is read again, once for a burst (an
+                        // organization's runs can update many times a second; a reload per event would never finish).
+                        is FeedSignal.Changed -> if (signal.change.concernsRunsOf(of?.workflowId)) reloadSoon()
                         is FeedSignal.Connection -> state.update { it.copy(reconnecting = signal.reconnecting) }
                     }
                 }
@@ -137,3 +145,6 @@ class WorkflowRunsViewModel(
         }
     }
 }
+
+/** How long the runs list waits for the rest of a burst of run events before it reads again. */
+private const val BURST_MILLIS = 300L

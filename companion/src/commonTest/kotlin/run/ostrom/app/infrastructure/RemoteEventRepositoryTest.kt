@@ -131,6 +131,20 @@ class RemoteEventRepositoryTest {
     }
 
     @Test
+    fun anEventWhoseDataIsNotAnObjectStillReachesItsFollowers() = runTest {
+        signedIn()
+        fun event(seq: Int, data: String) = "id: $seq\nevent: cloud.wait.created\ndata: {\"seq\":$seq,\"type\":\"cloud.wait.created\",\"subject\":\"wait\"," +
+            "\"subjectId\":\"w$seq\",\"at\":\"2026-11-14T10:00:00Z\"$data}\n\n"
+        answers += HttpStatusCode.OK to event(1, ",\"data\":null") + event(2, ",\"data\":[1]") + event(3, "") + "event: denied\ndata: {}\n\n"
+        val updates = mutableListOf<LiveUpdate<OrgChange>>()
+        assertFailsWith<AppException.Unauthorized> { repository.changes("a1", OrgChange.WAIT_TYPES).collect { updates += it } }
+        assertEquals(
+            listOf(LiveUpdate.Opened(resumed = false)) + (1..3).map { LiveUpdate.Item(OrgChange(OrgChange.WAIT_CREATED, "w$it", null)) },
+            updates,
+        )
+    }
+
+    @Test
     fun aSignedOutAccountHasNoFeed() = runTest {
         assertFailsWith<AppException.Unauthorized> { repository.changes("a1", OrgChange.WAIT_TYPES).collect { } }
         assertEquals(emptyList(), requests)

@@ -112,6 +112,15 @@ class SessionUseCasesTest {
         )
     }
 
+    @Test fun aFeedWithNoTypeTheAppReadsIsNeverOpened() = runTest {
+        // Events but no waits, todos nor workflows: an empty type set would ask the server for every event type.
+        val events = FakeEventRepository()
+        val features = FakeFeatures(setOf(Features.SESSIONS, Features.EVENTS))
+        val feed = OrgFeed(events, features, backgroundScope)
+        assertEquals(listOf<FeedSignal>(FeedSignal.Reload), FollowSessionsUseCase(feed, features, fakeGuard())("a1").toList())
+        assertEquals(emptyList(), events.asked)
+    }
+
     @Test fun withoutTheFeedTheListLoadsOnceAndWithoutSessionsNever() = runTest {
         val events = FakeEventRepository()
         val features = FakeFeatures(setOf(Features.SESSIONS))

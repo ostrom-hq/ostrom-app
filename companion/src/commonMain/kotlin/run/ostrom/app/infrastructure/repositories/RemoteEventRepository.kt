@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import run.ostrom.app.domain.models.LiveUpdate
 import run.ostrom.app.domain.models.OrgChange
@@ -46,9 +47,9 @@ class RemoteEventRepository(private val calls: AccountCalls, private val policy:
 
 /** The fields of an `OrgEvent` the app reads; the others (a newer server's included) are ignored. */
 @Serializable
-private class FeedEvent(val seq: Long, val subjectId: String, val memberId: String? = null, val data: Map<String, JsonElement> = emptyMap()) {
-    /** A run event's workflow; null for the other types, or a value that is not a string. */
-    fun workflowId(): String? = (data["workflowId"] as? JsonPrimitive)?.takeIf { it.isString }?.content
+private class FeedEvent(val seq: Long, val subjectId: String, val memberId: String? = null, val data: JsonElement? = null) {
+    /** A run event's workflow; null for the other types, or a data or value of another shape (never a failed stream). */
+    fun workflowId(): String? = ((data as? JsonObject)?.get("workflowId") as? JsonPrimitive)?.takeIf { it.isString }?.content
 }
 
 private val FEED_JSON = Json { ignoreUnknownKeys = true }

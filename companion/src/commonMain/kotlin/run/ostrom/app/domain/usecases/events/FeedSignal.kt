@@ -17,12 +17,15 @@ sealed interface FeedSignal {
 }
 
 /**
- * The feed as one screen reads it: from a server without `events.v1`, one [FeedSignal.Reload] (the screen loads again
- * on return and on refresh); otherwise the app's one connection ([OrgFeed]): a load once it is open (so nothing changed
- * between loading and following is missed), after a gap, and [FeedSignal.Changed] for each event of [types].
+ * The feed as one screen reads it: from a server without `events.v1` (or with none of the types the app reads), one
+ * [FeedSignal.Reload] (the screen loads again on return and on refresh); otherwise the app's one connection
+ * ([OrgFeed]): a load once it is open (so nothing changed between loading and following is missed), after a gap, and
+ * [FeedSignal.Changed] for each event of [types].
  */
 internal fun OrgFeed.signals(accountId: String, features: FeaturesRepository, types: Set<String>): Flow<FeedSignal> = flow {
-    if (Features.EVENTS !in features.capabilities(accountId).features) { emit(FeedSignal.Reload); return@flow }
+    val served = features.capabilities(accountId).features
+    // No feed, or none of the types the app reads (an empty set would ask the server for every type): load once.
+    if (Features.EVENTS !in served || OrgChange.typesFor(served).isEmpty()) { emit(FeedSignal.Reload); return@flow }
     follow(accountId).collect { update ->
         when (update) {
             is LiveUpdate.Opened -> { emit(FeedSignal.Connection(reconnecting = false)); if (!update.resumed) emit(FeedSignal.Reload) }
