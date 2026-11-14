@@ -24,10 +24,7 @@ object ReceiptKeyPinning {
     private val RAW_KEY_HEX = Regex("^[0-9a-f]{64}$")
     private val base64 = Base64.withPadding(Base64.PaddingOption.PRESENT_OPTIONAL)
 
-    /**
-     * The keys to verify with, the pins to keep and whether they changed (a first view, or a new key handed over).
-     * [kept] null: the pins could not be read.
-     */
+    /** The keys to verify with, the pins to keep and whether they changed (a first view, or a new key handed over). */
     data class Trust(val keys: List<ReceiptPublicKey>, val pins: Map<String, String>, val changed: Boolean)
 
     /** What the old key signs to hand over to [key]. */
@@ -58,6 +55,7 @@ object ReceiptKeyPinning {
         }
     }
 
+    /** [kept]: the pins of the server, empty before its first view, null when they could not be read (nothing trusted). */
     fun trust(served: List<ServedReceiptKey>, kept: Map<String, String>?): Trust {
         if (kept == null || kept.values.any { !RAW_KEY_HEX.matches(it) }) return Trust(emptyList(), kept.orEmpty(), changed = false)
         val candidates = served.mapNotNull { candidate -> usable(candidate)?.let { candidate to it } }

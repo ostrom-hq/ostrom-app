@@ -84,8 +84,8 @@ internal fun checkReceipt(raw: JsonObject, anyKey: Boolean, verifier: ReceiptVer
     val result = try {
         verifier.verify(raw)
     } catch (_: Exception) {
-        // A platform without Ed25519, or a body the verifier cannot read: never a verified receipt.
-        return ReceiptCheck.Rejected(ReceiptRejection.MALFORMED)
+        // A platform without Ed25519: never a verified receipt, and not a tampered one either.
+        return ReceiptCheck.Unavailable
     }
     return when (result) {
         is ReceiptVerification.Verified -> ReceiptCheck.Verified(result.kid)

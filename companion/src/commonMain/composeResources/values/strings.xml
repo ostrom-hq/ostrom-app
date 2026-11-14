@@ -349,4 +349,5 @@
     <string name="history_reason_unknown_key">signed by a key this device does not trust</string>
     <string name="history_reason_digest_mismatch">the content changed after signing</string>
     <string name="history_reason_bad_signature">the signature does not match</string>
+    <string name="history_unavailable">Not verified: this device cannot check signatures</string>
 </resources>

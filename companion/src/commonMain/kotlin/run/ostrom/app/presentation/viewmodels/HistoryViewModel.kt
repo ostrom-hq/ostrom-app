@@ -18,6 +18,7 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonObject
 import run.ostrom.app.domain.models.Account
 import run.ostrom.app.domain.models.HistoryEntry
+import run.ostrom.app.domain.models.ReceiptCheck
 import run.ostrom.app.domain.repositories.AccountRepository
 import run.ostrom.app.domain.usecases.receipts.CheckReceiptsUseCase
 import run.ostrom.app.domain.usecases.receipts.LoadReceiptsUseCase
@@ -56,10 +57,19 @@ class HistoryViewModel(
     private val state = MutableStateFlow(HistoryUiState())
     val uiState: StateFlow<HistoryUiState> = state.asStateFlow()
     private var job: Job? = null
+    private var moreJob: Job? = null
     private var started = false
 
     /** The keys of the last refresh, which also check its older pages. */
     private var keys: List<ReceiptPublicKey> = emptyList()
+
+    /**
+     * The results found with [keys], by receipt id, each with the content it was found on: a receipt read again shows its
+     * result at once instead of checking again, and one changed under the same id is checked again. Forgotten when the
+     * keys change (a rotation) or the account does.
+     */
+    private val known = HashMap<String, Pair<JsonObject, ReceiptCheck>>()
+    private var knownFor: String? = null
 
     init {
         viewModelScope.launch {
@@ -67,7 +77,10 @@ class HistoryViewModel(
                 .distinctUntilChanged { old, new -> old?.id == new?.id && old?.signedIn == new?.signedIn }
                 .collect { account ->
                     job?.cancel()
+                    moreJob?.cancel()
                     keys = emptyList()
+                    known.clear()
+                    knownFor = null
                     state.value = HistoryUiState(account = account)
                     if (started) load()
                 }
@@ -86,6 +99,7 @@ class HistoryViewModel(
     private fun load() {
         val account = state.value.account?.takeIf { it.signedIn } ?: return
         job?.cancel()
+        moreJob?.cancel()
         state.update { it.copy(refreshing = true, loadingMore = false, moreFailed = false) }
         job = viewModelScope.launch {
             try {
@@ -103,8 +117,14 @@ class HistoryViewModel(
                     loadReceipts(account.id) to trusted.await()
                 }
                 keys = trusted
-                state.update { if (it.account?.id != account.id) it else it.copy(entries = page.items, next = page.next, loaded = true, refreshing = false, failed = false) }
-                check(account.id, page.items, trusted)
+                val fingerprint = trusted.map { "${it.kid}:${it.toRaw().contentHashCode()}" }.sorted().joinToString(",")
+                if (fingerprint != knownFor) {
+                    known.clear()
+                    knownFor = fingerprint
+                }
+                val items = page.items.map(::withKnownResult)
+                state.update { if (it.account?.id != account.id) it else it.copy(entries = items, next = page.next, loaded = true, refreshing = false, failed = false) }
+                check(account.id, items, trusted)
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Exception) {
@@ -121,14 +141,14 @@ class HistoryViewModel(
         if (current.loadingMore || current.refreshing) return
         state.update { it.copy(loadingMore = true, moreFailed = false) }
         val trusted = keys
-        job = viewModelScope.launch {
+        moreJob = viewModelScope.launch {
             try {
                 val page = loadReceipts(account.id, cursor)
                 var added = emptyList<HistoryEntry>()
                 state.update { now ->
                     if (now.account?.id != account.id || now.next != cursor) return@update now.copy(loadingMore = false)
                     val seen = now.entries.mapNotNullTo(HashSet()) { it.summary?.id }
-                    added = page.items.filter { entry -> entry.summary?.id?.let(seen::add) ?: true }
+                    added = page.items.filter { entry -> entry.summary?.id?.let(seen::add) ?: true }.map(::withKnownResult)
                     now.copy(entries = now.entries + added, next = page.next, loadingMore = false)
                 }
                 check(account.id, added, trusted)
@@ -140,18 +160,27 @@ class HistoryViewModel(
         }
     }
 
-    /** Verifies [entries] off the main thread, then shows each result on the row of the same receipt. */
+    /** The entry with the result already found for the same content under the same keys, else as it is. */
+    private fun withKnownResult(entry: HistoryEntry): HistoryEntry {
+        val (content, check) = entry.summary?.id?.let(known::get) ?: return entry
+        return if (content == entry.raw) entry.copy(check = check) else entry
+    }
+
+    /** Verifies the [entries] not checked yet, off the main thread, then shows each result on the row of the same receipt. */
     private suspend fun check(accountId: String, entries: List<HistoryEntry>, trusted: List<ReceiptPublicKey>) {
-        if (entries.isEmpty()) return
-        val checked = checkReceipts(entries, trusted).associateBy { IdentityKey(it.raw) }
+        val pending = entries.filter { it.check == ReceiptCheck.Checking }
+        if (pending.isEmpty()) return
+        val results = checkReceipts(pending, trusted)
+        results.forEach { entry -> entry.summary?.id?.let { known[it] = entry.raw to entry.check } }
+        val checked = results.associateBy { IdentityKey(it.raw) }
         state.update { now ->
             if (now.account?.id != accountId) now else now.copy(entries = now.entries.map { entry -> checked[IdentityKey(entry.raw)] ?: entry })
         }
     }
 
-    /** The very object read from the server: a result found on one receipt is never shown on another. */
+    /** The very object read from the server: a result found on one receipt is never shown on another. Hashed by its id only. */
     private class IdentityKey(val raw: JsonObject) {
         override fun equals(other: Any?) = other is IdentityKey && other.raw === raw
-        override fun hashCode() = raw.hashCode()
+        override fun hashCode() = raw["id"]?.hashCode() ?: 0
     }
 }

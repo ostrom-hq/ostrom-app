@@ -31,6 +31,9 @@ sealed interface ReceiptCheck {
 
     /** No trusted key of the server could be had: nothing can be checked. */
     data object NoKey : ReceiptCheck
+
+    /** This device could not run the check (no Ed25519 in its providers): neither verified nor rejected. */
+    data object Unavailable : ReceiptCheck
 }
 
 /** Why a receipt does not verify. */

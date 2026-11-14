@@ -90,6 +90,7 @@ import run.ostrom.app.resources.history_self_approved
 import run.ostrom.app.resources.history_signed
 import run.ostrom.app.resources.history_stale
 import run.ostrom.app.resources.history_title
+import run.ostrom.app.resources.history_unavailable
 import run.ostrom.app.resources.history_unreadable
 import run.ostrom.app.resources.history_verified
 
@@ -121,8 +122,9 @@ fun HistoryScreen(viewModel: HistoryViewModel = koinViewModel()) {
         }
         val listState = rememberLazyListState()
         val nearEnd by remember { derivedStateOf { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index?.let { it >= listState.layoutInfo.totalItemsCount - 3 } == true } }
-        LaunchedEffect(nearEnd, state.next) { if (nearEnd && !state.moreFailed) viewModel.loadMore() }
-        KeepAtTopOnNewFirstRow(listState, state.entries.firstOrNull()?.let { rowKey(0, it) } ?: "end")
+        LaunchedEffect(nearEnd, state.next, state.refreshing) { if (nearEnd && !state.moreFailed) viewModel.loadMore() }
+        val keys = remember(state.entries) { rowKeys(state.entries) }
+        KeepAtTopOnNewFirstRow(listState, keys.firstOrNull() ?: "end")
         PullToRefreshBox(
             isRefreshing = state.refreshing && state.loaded, onRefresh = viewModel::refresh,
             modifier = Modifier.weight(1f).widthIn(max = ContentWidth).fillMaxWidth(),
@@ -133,8 +135,7 @@ fun HistoryScreen(viewModel: HistoryViewModel = koinViewModel()) {
                 contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                // The position first: two receipts with the same id (a server bug) still get a row each.
-                itemsIndexed(state.entries, key = { index, entry -> rowKey(index, entry) }) { index, entry -> ReceiptRow(index, entry, today) }
+                itemsIndexed(state.entries, key = { index, _ -> keys[index] }) { index, entry -> ReceiptRow(index, entry, today) }
                 item(key = "end") {
                     BusyRow(state.loadingMore || (state.refreshing && !state.loaded))
                     if (state.loaded && state.entries.isEmpty() && !state.failed) EmptyState(
@@ -158,7 +159,19 @@ fun HistoryScreen(viewModel: HistoryViewModel = koinViewModel()) {
     }
 }
 
-private fun rowKey(index: Int, entry: HistoryEntry) = "$index:${entry.summary?.id.orEmpty()}"
+/**
+ * Each row's key: the receipt's id, which stays when a newer receipt comes first; a repeated id (a server bug) gets its
+ * rank among them, and a receipt this app cannot read its position.
+ */
+private fun rowKeys(entries: List<HistoryEntry>): List<String> {
+    val seen = HashMap<String, Int>()
+    return entries.mapIndexed { index, entry ->
+        val id = entry.summary?.id ?: return@mapIndexed "unreadable:$index"
+        val rank = seen.getOrElse(id) { 0 }
+        seen[id] = rank + 1
+        if (rank == 0) "receipt:$id" else "receipt:$id#$rank"
+    }
+}
 
 /** The tag of a receipt's row: its id, or its position when this app cannot read it. */
 private fun rowTag(index: Int, entry: HistoryEntry) = "receipt-${entry.summary?.id ?: "unreadable-$index"}"
@@ -217,6 +230,7 @@ private fun CheckLine(check: ReceiptCheck) {
         is ReceiptCheck.Verified -> Triple(stringResource(Res.string.history_verified, check.kid), colors.accentText, "check-verified")
         is ReceiptCheck.Rejected -> Triple(stringResource(Res.string.history_rejected, stringResource(reasonText(check.reason))), colors.danger, "check-rejected")
         ReceiptCheck.NoKey -> Triple(stringResource(Res.string.history_no_key), colors.muted, "check-no-key")
+        ReceiptCheck.Unavailable -> Triple(stringResource(Res.string.history_unavailable), colors.muted, "check-unavailable")
     }
     Text(text, color = color, fontSize = 12.5.sp, fontWeight = FontWeight.Bold, modifier = Modifier.testTag(tag))
 }

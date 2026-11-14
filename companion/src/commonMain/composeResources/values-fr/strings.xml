@@ -349,4 +349,5 @@
     <string name="history_reason_unknown_key">signé par une clé à laquelle cet appareil ne se fie pas</string>
     <string name="history_reason_digest_mismatch">le contenu a changé après la signature</string>
     <string name="history_reason_bad_signature">la signature ne correspond pas</string>
+    <string name="history_unavailable">Non vérifié : cet appareil ne sait pas vérifier les signatures</string>
 </resources>
