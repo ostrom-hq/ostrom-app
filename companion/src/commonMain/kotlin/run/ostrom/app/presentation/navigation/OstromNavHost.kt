@@ -19,10 +19,12 @@ import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.parameter.parametersOf
 import run.ostrom.app.domain.usecases.approvals.PhoneUnlock
 import run.ostrom.app.presentation.screens.AddServerScreen
+import run.ostrom.app.presentation.screens.ArtifactScreen
 import run.ostrom.app.presentation.screens.LoginScreen
 import run.ostrom.app.presentation.screens.MainScreen
 import run.ostrom.app.presentation.screens.NotificationPreferencesScreen
 import run.ostrom.app.presentation.screens.RequestScreen
+import run.ostrom.app.presentation.viewmodels.ArtifactViewModel
 import run.ostrom.app.presentation.viewmodels.NotificationPreferencesViewModel
 import run.ostrom.app.presentation.viewmodels.RequestViewModel
 import run.ostrom.app.presentation.viewmodels.RootViewModel
@@ -70,12 +72,18 @@ fun OstromNavHost(rootViewModel: RootViewModel = koinViewModel(), unlock: PhoneU
                 onSignInAgain = { account -> navController.navigate(LoginRoute(account.origin, account.id)) },
                 onOpenRequest = { accountId, id -> navController.navigate(RequestRoute(accountId, id)) },
                 onOpenNotifications = { accountId -> navController.navigate(NotificationPreferencesRoute(accountId)) },
+                onOpenArtifact = { accountId, artifactId -> navController.navigate(ArtifactRoute(accountId, artifactId)) },
             )
         }
         composable<NotificationPreferencesRoute> { entry ->
             val route = entry.toRoute<NotificationPreferencesRoute>()
             val viewModel: NotificationPreferencesViewModel = koinViewModel { parametersOf(route) }
             NotificationPreferencesScreen(viewModel, onBack = { navController.popBackStack() })
+        }
+        composable<ArtifactRoute> { entry ->
+            val route = entry.toRoute<ArtifactRoute>()
+            val viewModel: ArtifactViewModel = koinViewModel { parametersOf(route) }
+            ArtifactScreen(viewModel, onBack = { navController.popBackStack() })
         }
         composable<RequestRoute> { entry ->
             val route = entry.toRoute<RequestRoute>()
