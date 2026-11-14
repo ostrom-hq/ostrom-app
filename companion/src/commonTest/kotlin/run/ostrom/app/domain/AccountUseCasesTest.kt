@@ -49,6 +49,10 @@ class AccountUseCasesTest {
         assertEquals(ServerFeatures.NOTIFICATIONS_PUSH_TEST, Features.NOTIFICATIONS_PUSH_TEST)
         assertEquals(ServerFeatures.WAITS, Features.WAITS)
         assertEquals(ServerFeatures.ARTIFACTS, Features.ARTIFACTS)
+        assertEquals(ServerFeatures.EVENTS, Features.EVENTS)
+        assertEquals(ServerFeatures.SESSIONS, Features.SESSIONS)
+        assertEquals(ServerFeatures.TODOS, Features.TODOS)
+        assertEquals(ServerFeatures.WORKFLOWS, Features.WORKFLOWS)
         requireSupportedApi(Features.SUPPORTED_API_VERSION)
         assertFailsWith<AppException.UnsupportedApi> { requireSupportedApi(Features.SUPPORTED_API_VERSION + 1) }
     }

@@ -36,6 +36,7 @@ import run.ostrom.app.domain.repositories.WaitRepository
 import run.ostrom.app.domain.usecases.auth.AccountGuard
 import run.ostrom.app.domain.usecases.auth.RefreshAccountUseCase
 import run.ostrom.app.domain.usecases.waits.AnswerWaitUseCase
+import run.ostrom.app.domain.usecases.events.OrgFeed
 import run.ostrom.app.domain.usecases.waits.FollowWaitsUseCase
 import run.ostrom.app.domain.usecases.waits.LoadInProgressWaitsUseCase
 import run.ostrom.app.domain.usecases.waits.LoadWaitsUseCase
@@ -196,9 +197,9 @@ class WaitUseCasesTest {
 
     @Test fun theWaitsLoadOnceFromAServerWithoutTheFeed() = runTest {
         val features = FakeFeatures(); val events = FakeEvents()
-        assertEquals(emptyList(), FollowWaitsUseCase(events, features, guard())("a1").toList(), "nothing to load from a server without waits")
+        assertEquals(emptyList(), FollowWaitsUseCase(OrgFeed(events, features, backgroundScope), features, guard())("a1").toList(), "nothing to load from a server without waits")
         features.features = setOf("waits.v1")
-        assertEquals(listOf(WaitsSignal.Reload), FollowWaitsUseCase(events, features, guard())("a1").toList())
+        assertEquals(listOf(WaitsSignal.Reload), FollowWaitsUseCase(OrgFeed(events, features, backgroundScope), features, guard())("a1").toList())
         assertEquals(emptyList(), events.asked, "No feed asked of a server that does not serve it")
     }
 
@@ -211,7 +212,8 @@ class WaitUseCasesTest {
             LiveUpdate.Gap,
             LiveUpdate.Item(OrgChange(OrgChange.WAIT_RESOLVED, "w1", "m1")),
         )
-        val signals = FollowWaitsUseCase(events, FakeFeatures(setOf("waits.v1", "events.v1")), guard())("a1").toList()
+        val features = FakeFeatures(setOf("waits.v1", "events.v1"))
+        val signals = FollowWaitsUseCase(OrgFeed(events, features, backgroundScope), features, guard())("a1").toList()
         assertEquals(
             listOf(
                 WaitsSignal.Connection(false), WaitsSignal.Reload, WaitsSignal.Reload,
@@ -221,6 +223,19 @@ class WaitUseCasesTest {
             "A load once open, at each wait event and after a gap; none for a connection that resumed",
         )
         assertEquals(listOf(OrgChange.WAIT_TYPES), events.asked)
+    }
+
+    @Test fun theWaitsKeepTheirTypesOfTheSharedFeed() = runTest {
+        val events = FakeEvents(
+            LiveUpdate.Opened(resumed = false),
+            LiveUpdate.Item(OrgChange(OrgChange.RUN_UPDATED, "r1", "m1", "wf1")),
+            LiveUpdate.Item(OrgChange(OrgChange.TODO_UPDATED, "s1", "m1")),
+            LiveUpdate.Item(OrgChange(OrgChange.WAIT_CANCELLED, "w1", "m1")),
+        )
+        val features = FakeFeatures(setOf("waits.v1", "events.v1", "workflows.v1", "todos.v1"))
+        val signals = FollowWaitsUseCase(OrgFeed(events, features, backgroundScope), features, guard())("a1").toList()
+        assertEquals(listOf(WaitsSignal.Connection(false), WaitsSignal.Reload, WaitsSignal.Reload), signals, "A run or a todo event does not load the waits again")
+        assertEquals(listOf(OrgChange.WAIT_TYPES + OrgChange.RUN_UPDATED + OrgChange.TODO_UPDATED), events.asked, "One connection for every type the app reads")
     }
 
     @Test fun theInProgressWaitsAreHiddenFromAServerWithoutWaits() = runTest {

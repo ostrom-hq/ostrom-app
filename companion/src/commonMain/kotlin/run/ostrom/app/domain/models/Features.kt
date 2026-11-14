@@ -30,11 +30,20 @@ object Features {
     /** The waits asked of the person ("Waiting for you"). */
     const val WAITS = "waits.v1"
 
-    /** The organization's live event feed (`GET /api/v1/events`): the waits follow it. */
+    /** The organization's live event feed (`GET /api/v1/events`): the waits, the sessions, the todos and the runs follow it. */
     const val EVENTS = "events.v1"
 
     /** Shared artifacts and their viewer. */
     const val ARTIFACTS = "artifacts.v1"
+
+    /** The organization's agent sessions: the Sessions tab and a session's record. */
+    const val SESSIONS = "sessions.v1"
+
+    /** A session's todo: the panel of a session's record. */
+    const val TODOS = "todos.v1"
+
+    /** Workflows and their runs, read only: the Workflows tab. */
+    const val WORKFLOWS = "workflows.v1"
 }
 
 /** Throws [AppException.UnsupportedApi] for a server that speaks another API version than this app. */

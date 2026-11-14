@@ -90,9 +90,9 @@ Ported from TeamCode's companion (`PushPlatform`, `PushCipher`, `SyncPushUseCase
   signed-in account of that server (its origin normalized), organization and member.
 - A tap opens `ostrom://notification?origin=…&org=…&member=…[&approval=…][&session=…][&wait=…]` (`NotificationLinks`,
   built from the payload's `approvalId`, `sessionId` and `waitId`): the account becomes the active one and its request
-  opens (`RequestRoute`; an answer still asks for the unlock). A push about a session (`waiting`, `turn_failed`) or a
-  wait outside a session opens the Waiting tab, where that wait is, until the app has a session screen; a test push
-  opens the account.
+  opens (`RequestRoute`; an answer still asks for the unlock). A push about a session (`waiting`, `turn_failed`) opens
+  that session's record (`SessionRoute`) when the server announces `sessions.v1`, and the Waiting tab otherwise; a
+  wait outside a session opens the Waiting tab, where that wait is; a test push opens the account.
 - Before a sign-out the device registered in this process is deleted (`DELETE /api/v1/push-devices/{id}`), best effort;
   the server also forgets the phones of a session it revokes.
 - On iOS the relay sends a generic alert ("Ostrom" / "New activity in Ostrom", `mutable-content`) with `p`: the
@@ -104,6 +104,22 @@ Ported from TeamCode's companion (`PushPlatform`, `PushCipher`, `SyncPushUseCase
 - Push is on only in a build that carries the Firebase project (`companion-android/google-services.json`,
   `companion-ios/Ostrom/GoogleService-Info.plist`, both git-ignored); without it the app builds and runs without push. Android 13+ asks the notification permission once,
   after the first sign-in.
+
+## Live updates
+
+The organization's feed (`GET /api/v1/events`, `events.v1`) is one connection per account for the whole app
+(`OrgFeed`, ported from TeamCode's `SessionFeed`): it opens with the first screen that follows it and closes five
+seconds after the last one left, so moving between screens does not reconnect. It asks the server for the union of the
+types the app reads, each only when the server has its feature (`OrgChange.typesFor`): the waits'
+(`cloud.wait.created`, `.resolved`, `.cancelled`), `cloud.workflow.run.updated` and `cloud.todo`; there is no session
+event type. Each follower keeps its types: the waits and their badge (`FollowWaitsUseCase`), the sessions list
+(`FollowSessionsUseCase`), a session's todo (`FollowTodoUseCase`, its session's `cloud.todo` only), the runs lists and a
+run (`FollowWorkflowRunsUseCase`). A follower that joins an open feed is told to load at once; every follower loads
+again after a gap or a connection that could not resume, and the screens load at each return and on refresh. From a
+server without the feed, each screen loads once, then again on return and on refresh.
+
+The server does not publish the run and todo events yet: until it does, the runs and the todo are current at the
+feed's opening, after a gap, on return and on refresh, and become live by themselves once it does.
 
 ## Tests
 
@@ -126,7 +142,7 @@ What the React Native app did, what TeamCode's companion does that an Ostrom ser
 | --- | --- | --- |
 | Sign-in (phone browser, desktop device flow), accounts, organizations, secure storage, capabilities check, incompatible server, settings with versions, theme, English and French, demo | none | Done |
 | Approvals inbox and request, yes after a biometric unlock bound to the request (`POST /auth/mobile/unlock` with `requestId`) | `gates.v1` | Ported (see [Approvals](#approvals)) |
-| Waiting for you (waits asked of the person, answer with actions and values) | `waits.v1` | Ported from TeamCode's `WaitsScreen` (open, answered and cancelled filters, in-progress timers and webhooks, tab badge). Loaded at each return to the app until the server serves its event feed; no link to the session (no sessions screen yet), no withdraw (no route) |
+| Waiting for you (waits asked of the person, answer with actions and values) | `waits.v1` | Ported from TeamCode's `WaitsScreen` (open, answered and cancelled filters, in-progress timers and webhooks, tab badge). Follows the shared feed (see [Live updates](#live-updates)); no withdraw (no route) |
 | History: receipts, verified on the device | `receipts.v1` | Ported (see [History](#history)): each receipt verified on the device with ostrom-core's verifier, the server's key pinned on first view, check runs with their origin, paged, demo receipts signed by a demo key |
 | Spending | `budgets.v1` | Ported (week and month, budget bar, budgets passed, by agent, repository and person) |
 | Activity | none | Ported (newest first, paged; a line about an approval opens its request on a server with `gates.v1`) |
@@ -135,8 +151,10 @@ What the React Native app did, what TeamCode's companion does that an Ostrom ser
 | Send a test to my phone, each phone's result | `notifications.push.test.v1` | Ported from TeamCode: `POST /notifications/push/test`; `push_off` and `push_no_device` say what to do, `push_test_rate_limited` when to try again |
 | Push registration, encrypted pushes, a tap opens the request | `notifications.push.v1` | Ported (see [Push](#push)) on Android and iOS (the notification service extension replaces the generic alert). A Firebase project for the published apps, and the APNs key in it, are still to create |
 | Artifacts gallery and viewer | `artifacts.v1` | Ported from TeamCode's `ArtifactsScreen` and `ArtifactScreen`: the gallery (newest first, paged, searched in the loaded titles), the viewer with its versions, the page in a sandboxed web view on iOS and Android from a reading ticket on the server's content origin (`/a/<id>/<ticket>/`), the console page in the browser on the desktop. No Mine/Team filter and no pasted link (the list route has no scope, the console page lives on an origin the app does not know) |
-| Sessions (list, transcript, follow live) | `sessions.v1` | To port from TeamCode, once ostrom-core's client has the session routes |
-| Todos, workflows, automations, MCP servers, GitHub link, sharing | `todos.v1`, `workflows.v1`, `automations.v1`, `mcp.v1`, `github.link.v1`, `sharing.v1` | Later, each with its client routes in ostrom-core |
+| Sessions: list (all, open, ended; keyset-paged; repository, agent, model, person, times, cost, tools) and record (gate answers, link to the History tab for its receipt, its workflow run) | `sessions.v1` | Ported from TeamCode's `SessionsScreen` and `SessionsViewModel`. No transcript, no actions, no new session, no files, no permissions: Ostrom does not serve them to the phone |
+| A session's todo: items, state, proof, added along the way, dropped with why, the Stop hook's errors | `todos.v1` | Ported from TeamCode's `TodoPanel` and `FollowTodoUseCase`, read only (no shortcut messages: no session actions) |
+| Workflows: the member's runs with their status filter, the workflows read only (inputs, nodes), a workflow's runs, a run's visits | `workflows.v1` | Ported from TeamCode's `WorkflowsScreen`, `WorkflowScreen`, `WorkflowRunScreen` and their view models. No editor, no start, no cancel (the console does them) |
+| Automations, MCP servers, GitHub link, sharing | `automations.v1`, `mcp.v1`, `github.link.v1`, `sharing.v1` | Later, each with its client routes in ostrom-core |
 | Desktop: menu bar icon, the CLI's account, update banner | none | To port from TeamCode's `companion-desktop` |
 | Store builds (TestFlight, Play internal track) | none | Ported: TeamCode's fastlane lanes as is ([distribution.md](distribution.md)) |
 | Desktop distribution (signed installers) | none | With 1.0.0 and a Developer ID ([distribution.md](distribution.md)) |

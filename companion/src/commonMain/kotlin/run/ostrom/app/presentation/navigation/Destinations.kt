@@ -30,3 +30,15 @@ data class NotificationPreferencesRoute(val accountId: String)
 /** One artifact of an account, at [version] (the latest one when null), opened from the Artifacts tab. */
 @Serializable
 data class ArtifactRoute(val accountId: String, val artifactId: String, val version: Int? = null)
+
+/** One session of an account: its record, its gate answers and its todo, opened from the Sessions tab or a run. */
+@Serializable
+data class SessionRoute(val accountId: String, val sessionId: String)
+
+/** One workflow of an account, read only, with its runs, opened from the Workflows tab. */
+@Serializable
+data class WorkflowRoute(val accountId: String, val workflowId: String)
+
+/** One run of a workflow with its visits, opened from a runs list, a session or a parent run. */
+@Serializable
+data class WorkflowRunRoute(val accountId: String, val runId: String)

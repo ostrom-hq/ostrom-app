@@ -36,10 +36,12 @@ import com.adamglin.PhosphorIcons
 import com.adamglin.phosphoricons.Regular
 import com.adamglin.phosphoricons.regular.Bell
 import com.adamglin.phosphoricons.regular.FileText
+import com.adamglin.phosphoricons.regular.FlowArrow
 import com.adamglin.phosphoricons.regular.GearSix
 import com.adamglin.phosphoricons.regular.Tray
 import com.adamglin.phosphoricons.regular.Pulse
 import com.adamglin.phosphoricons.regular.Receipt
+import com.adamglin.phosphoricons.regular.TerminalWindow
 import com.adamglin.phosphoricons.regular.Wallet
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
@@ -65,9 +67,11 @@ import run.ostrom.app.resources.tab_inbox
 import run.ostrom.app.resources.tab_activity
 import run.ostrom.app.resources.tab_artifacts
 import run.ostrom.app.resources.tab_history
+import run.ostrom.app.resources.tab_sessions
 import run.ostrom.app.resources.tab_settings
 import run.ostrom.app.resources.tab_spending
 import run.ostrom.app.resources.tab_waits
+import run.ostrom.app.resources.tab_workflows
 
 /**
  * A tab of the signed-in app. [feature] is the capability its server must announce for the tab to show; null for the
@@ -76,11 +80,13 @@ import run.ostrom.app.resources.tab_waits
 enum class MainTab(val feature: String?, val label: StringResource, val icon: ImageVector) {
     INBOX(Features.GATES, Res.string.tab_inbox, PhosphorIcons.Regular.Tray),
     WAITING(Features.WAITS, Res.string.tab_waits, PhosphorIcons.Regular.Bell),
+    SESSIONS(Features.SESSIONS, Res.string.tab_sessions, PhosphorIcons.Regular.TerminalWindow),
     HISTORY(Features.RECEIPTS, Res.string.tab_history, PhosphorIcons.Regular.Receipt),
     SPENDING(Features.BUDGETS, Res.string.tab_spending, PhosphorIcons.Regular.Wallet),
     // Every server has its activity feed.
     ACTIVITY(null, Res.string.tab_activity, PhosphorIcons.Regular.Pulse),
     ARTIFACTS(Features.ARTIFACTS, Res.string.tab_artifacts, PhosphorIcons.Regular.FileText),
+    WORKFLOWS(Features.WORKFLOWS, Res.string.tab_workflows, PhosphorIcons.Regular.FlowArrow),
     SETTINGS(null, Res.string.tab_settings, PhosphorIcons.Regular.GearSix),
 }
 
@@ -98,6 +104,9 @@ fun MainScreen(
     onOpenRequest: (accountId: String, id: String) -> Unit = { _, _ -> },
     onOpenNotifications: (accountId: String) -> Unit = {},
     onOpenArtifact: (accountId: String, artifactId: String) -> Unit = { _, _ -> },
+    onOpenSession: (accountId: String, sessionId: String) -> Unit = { _, _ -> },
+    onOpenWorkflow: (accountId: String, workflowId: String) -> Unit = { _, _ -> },
+    onOpenRun: (accountId: String, runId: String) -> Unit = { _, _ -> },
     requestedTab: MainTab? = null,
     onTabRequestShown: () -> Unit = {},
     viewModel: HomeViewModel = koinViewModel(),
@@ -120,7 +129,7 @@ fun MainScreen(
     }
     val tabs = state.tabs()
     var selected by rememberSaveable { mutableStateOf<MainTab?>(null) }
-    // A tapped notification asked for a tab (a wait's opens the waits).
+    // A tapped notification (a wait's opens the waits) or a pushed screen (a session's receipt opens the History tab) asked for a tab.
     LaunchedEffect(requestedTab) {
         requestedTab?.let { selected = it; onTabRequestShown() }
     }
@@ -154,10 +163,12 @@ fun MainScreen(
                     when (tab) {
                         MainTab.INBOX -> InboxScreen(onOpen = onOpenRequest, onOpenSettings = { selected = MainTab.SETTINGS })
                         MainTab.WAITING -> WaitsScreen(waits)
+                        MainTab.SESSIONS -> SessionsScreen(onOpen = onOpenSession)
                         MainTab.HISTORY -> HistoryScreen()
                         MainTab.SPENDING -> SpendingScreen()
                         MainTab.ACTIVITY -> ActivityScreen(onOpen = if (state.serves(Features.GATES)) onOpenRequest else null)
                         MainTab.ARTIFACTS -> ArtifactsScreen(onOpen = onOpenArtifact)
+                        MainTab.WORKFLOWS -> WorkflowsScreen(onOpenRun = onOpenRun, onOpenWorkflow = onOpenWorkflow)
                         MainTab.SETTINGS -> SettingsScreen(onAddAccount = onAddAccount, onSignInAgain = onSignInAgain, onOpenNotifications = onOpenNotifications)
                     }
                 }
@@ -169,7 +180,9 @@ fun MainScreen(
                 tabs.forEach { item ->
                     NavigationBarItem(
                         selected = item == tab, onClick = { selected = item },
-                        icon = { TabIcon(item, waitsState) }, label = { Text(stringResource(item.label)) },
+                        icon = { TabIcon(item, waitsState) }, label = { Text(stringResource(item.label), maxLines = 1) },
+                        // More tabs than a phone's width holds with their labels: only the selected one shows its label.
+                        alwaysShowLabel = tabs.size <= MAX_LABELED_TABS,
                         colors = NavigationBarItemDefaults.colors(selectedIconColor = colors.accentText, selectedTextColor = colors.accentText, indicatorColor = colors.chip),
                         modifier = Modifier.testTag("tab-${item.name.lowercase()}"),
                     )
@@ -178,6 +191,9 @@ fun MainScreen(
         }
     }
 }
+
+/** The most tabs a phone's bar shows with every label. */
+private const val MAX_LABELED_TABS = 5
 
 /** A tab's icon; the Waiting tab's carries the count of open waits, live while another tab shows. */
 @Composable
