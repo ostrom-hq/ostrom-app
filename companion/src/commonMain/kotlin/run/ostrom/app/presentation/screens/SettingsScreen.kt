@@ -73,7 +73,10 @@ import run.ostrom.app.resources.settings_cli_account
 import run.ostrom.app.resources.settings_end_demo
 import run.ostrom.app.resources.settings_memory_only
 import run.ostrom.app.resources.settings_no_organization
+import run.ostrom.app.resources.settings_environment_row
+import run.ostrom.app.resources.settings_mcp_row
 import run.ostrom.app.resources.settings_notifications_row
+import run.ostrom.app.resources.settings_setup_section
 import run.ostrom.app.resources.settings_organization
 import run.ostrom.app.resources.settings_server_version
 import run.ostrom.app.resources.settings_sign_in_again
@@ -93,6 +96,8 @@ fun SettingsScreen(
     onAddAccount: () -> Unit,
     onSignInAgain: (Account) -> Unit,
     onOpenNotifications: (accountId: String) -> Unit = {},
+    onOpenEnvironment: (accountId: String) -> Unit = {},
+    onOpenMcpServers: (accountId: String) -> Unit = {},
     viewModel: SettingsViewModel = koinViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -151,6 +156,26 @@ fun SettingsScreen(
                     GroupRow(Modifier.testTag("settings-notifications"), onClick = { onOpenNotifications(active.id) }) {
                         Text(stringResource(Res.string.settings_notifications_row), color = colors.text, fontSize = 15.sp, modifier = Modifier.weight(1f))
                         Icon(PhosphorIcons.Regular.CaretRight, contentDescription = null, tint = colors.muted)
+                    }
+                }
+            }
+
+            val features = state.server?.features.orEmpty()
+            if (active != null && active.signedIn && (Features.ENVIRONMENT in features || Features.MCP_PERSONAL in features)) {
+                SectionTitle(stringResource(Res.string.settings_setup_section))
+                Group {
+                    if (Features.ENVIRONMENT in features) {
+                        GroupRow(Modifier.testTag("settings-environment"), onClick = { onOpenEnvironment(active.id) }) {
+                            Text(stringResource(Res.string.settings_environment_row), color = colors.text, fontSize = 15.sp, modifier = Modifier.weight(1f))
+                            Icon(PhosphorIcons.Regular.CaretRight, contentDescription = null, tint = colors.muted)
+                        }
+                    }
+                    if (Features.ENVIRONMENT in features && Features.MCP_PERSONAL in features) GroupDivider()
+                    if (Features.MCP_PERSONAL in features) {
+                        GroupRow(Modifier.testTag("settings-mcp"), onClick = { onOpenMcpServers(active.id) }) {
+                            Text(stringResource(Res.string.settings_mcp_row), color = colors.text, fontSize = 15.sp, modifier = Modifier.weight(1f))
+                            Icon(PhosphorIcons.Regular.CaretRight, contentDescription = null, tint = colors.muted)
+                        }
                     }
                 }
             }

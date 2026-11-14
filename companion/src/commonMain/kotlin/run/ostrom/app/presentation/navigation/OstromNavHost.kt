@@ -31,13 +31,17 @@ import run.ostrom.app.presentation.screens.ArtifactScreen
 import run.ostrom.app.presentation.screens.LoginScreen
 import run.ostrom.app.presentation.screens.MainScreen
 import run.ostrom.app.presentation.screens.MainTab
+import run.ostrom.app.presentation.screens.MemberEnvironmentScreen
 import run.ostrom.app.presentation.screens.NotificationPreferencesScreen
+import run.ostrom.app.presentation.screens.PersonalMcpServersScreen
 import run.ostrom.app.presentation.screens.RequestScreen
 import run.ostrom.app.presentation.screens.SessionScreen
 import run.ostrom.app.presentation.screens.WorkflowRunScreen
 import run.ostrom.app.presentation.screens.WorkflowScreen
 import run.ostrom.app.presentation.viewmodels.ArtifactViewModel
+import run.ostrom.app.presentation.viewmodels.MemberEnvironmentViewModel
 import run.ostrom.app.presentation.viewmodels.NotificationPreferencesViewModel
+import run.ostrom.app.presentation.viewmodels.PersonalMcpServersViewModel
 import run.ostrom.app.presentation.viewmodels.NotificationSettingsViewModel
 import run.ostrom.app.presentation.viewmodels.RequestViewModel
 import run.ostrom.app.presentation.viewmodels.RootViewModel
@@ -139,6 +143,8 @@ fun OstromNavHost(rootViewModel: RootViewModel = koinViewModel(), unlock: PhoneU
                 onSignInAgain = { account -> navController.navigate(LoginRoute(account.origin, account.id)) },
                 onOpenRequest = { accountId, id -> navController.navigate(RequestRoute(accountId, id)) },
                 onOpenNotifications = { accountId -> navController.navigate(NotificationPreferencesRoute(accountId)) },
+                onOpenEnvironment = { accountId -> navController.navigate(MemberEnvironmentRoute(accountId)) },
+                onOpenMcpServers = { accountId -> navController.navigate(PersonalMcpServersRoute(accountId)) },
                 onOpenArtifact = { accountId, artifactId -> navController.navigate(ArtifactRoute(accountId, artifactId)) },
                 onOpenSession = { accountId, sessionId -> navController.navigate(SessionRoute(accountId, sessionId)) },
                 onOpenWorkflow = { accountId, workflowId -> navController.navigate(WorkflowRoute(accountId, workflowId)) },
@@ -178,6 +184,14 @@ fun OstromNavHost(rootViewModel: RootViewModel = koinViewModel(), unlock: PhoneU
             val viewModel: NotificationPreferencesViewModel = koinViewModel { parametersOf(route) }
             val settings: NotificationSettingsViewModel = koinViewModel { parametersOf(route) }
             NotificationPreferencesScreen(viewModel, settings, onBack = { navController.popBackStack() })
+        }
+        composable<MemberEnvironmentRoute> { entry ->
+            val viewModel: MemberEnvironmentViewModel = koinViewModel { parametersOf(entry.toRoute<MemberEnvironmentRoute>()) }
+            MemberEnvironmentScreen(viewModel, onBack = { navController.popBackStack() })
+        }
+        composable<PersonalMcpServersRoute> { entry ->
+            val viewModel: PersonalMcpServersViewModel = koinViewModel { parametersOf(entry.toRoute<PersonalMcpServersRoute>()) }
+            PersonalMcpServersScreen(viewModel, onBack = { navController.popBackStack() })
         }
         composable<ArtifactRoute> { entry ->
             val route = entry.toRoute<ArtifactRoute>()
