@@ -90,12 +90,17 @@ class ArtifactsViewModel(private val accounts: AccountRepository, private val lo
             state.update { current ->
                 if (current.account?.id != accountId) return@update current
                 val rows = if (before == null) {
-                    page.artifacts
+                    // Back on the tab after older pages were read: the first page is refreshed, the older rows kept
+                    // after it, so the list and its place stay.
+                    val fresh = page.artifacts.mapTo(HashSet()) { it.id }
+                    val older = if (current.artifacts.size > page.artifacts.size) current.artifacts.filter { it.id !in fresh } else emptyList()
+                    page.artifacts + older
                 } else {
                     val known = current.artifacts.mapTo(HashSet()) { it.id }
                     current.artifacts + page.artifacts.filter { known.add(it.id) }
                 }
-                current.copy(artifacts = rows, next = page.next, loaded = true, loading = false, loadingMore = false)
+                val next = if (before == null && current.artifacts.size > page.artifacts.size) current.next else page.next
+                current.copy(artifacts = rows, next = next, loaded = true, loading = false, loadingMore = false)
             }
         } catch (error: CancellationException) {
             throw error

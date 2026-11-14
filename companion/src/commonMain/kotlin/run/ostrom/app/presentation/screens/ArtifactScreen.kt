@@ -25,6 +25,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -44,6 +45,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.LifecycleStartEffect
+import kotlinx.coroutines.delay
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.adamglin.PhosphorIcons
 import com.adamglin.phosphoricons.Regular
@@ -113,6 +115,8 @@ fun ArtifactScreen(viewModel: ArtifactViewModel, onBack: (() -> Unit)?, backLabe
     val browser = LocalUriHandler.current
     var copied by remember { mutableStateOf(false) }
     var versionsOpen by remember { mutableStateOf(false) }
+    // The confirmation shows for a moment, then the access and the owner come back.
+    LaunchedEffect(copied) { if (copied) { delay(COPIED_MILLIS); copied = false } }
     val now = rememberNow()
     val colors = Ostrom.colors
     Column(Modifier.fillMaxSize().background(colors.background)) {
@@ -216,6 +220,8 @@ fun ArtifactScreen(viewModel: ArtifactViewModel, onBack: (() -> Unit)?, backLabe
         }
     }
 }
+
+private const val COPIED_MILLIS = 2_000L
 
 /** "Version 3 · 2 h ⌄": opens the versions sheet when there is more than one. */
 @Composable

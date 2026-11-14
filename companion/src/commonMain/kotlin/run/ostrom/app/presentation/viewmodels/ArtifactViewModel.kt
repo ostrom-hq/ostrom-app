@@ -76,7 +76,8 @@ class ArtifactViewModel(
             try {
                 val (artifact, versions, viewerUrl) = getArtifact(route.accountId, route.artifactId)
                 val version = state.value.version ?: artifact.latestVersion
-                if (versions.isNotEmpty() && versions.none { it.number == version }) throw AppException.NotFound()
+                // A version newer than every one listed was just announced (a list read a moment early): its ticket says.
+                if (versions.isNotEmpty() && versions.none { it.number == version } && version <= versions.maxOf { it.number }) throw AppException.NotFound()
                 val reopen = embedded && state.value.opened?.ticket?.version != version
                 state.update { it.copy(artifact = artifact, viewerUrl = viewerUrl, versions = versions, version = version, loading = reopen) }
                 if (reopen) open(version)

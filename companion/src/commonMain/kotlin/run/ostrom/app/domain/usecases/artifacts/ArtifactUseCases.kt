@@ -2,6 +2,8 @@
 // Ported from TeamCode (Apache-2.0), companion/.../domain/usecases/artifacts/ArtifactUseCases.kt; see NOTICE.
 package run.ostrom.app.domain.usecases.artifacts
 
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import run.ostrom.app.domain.models.AppException
 import run.ostrom.app.domain.models.Artifact
 import run.ostrom.app.domain.models.ArtifactPage
@@ -35,8 +37,12 @@ class GetArtifactUseCase(private val artifacts: ArtifactRepository, private val 
      */
     suspend operator fun invoke(accountId: String, artifactId: String): ArtifactDetails = guard(accountId) {
         if (!ARTIFACT_ID.matches(artifactId)) throw AppException.NotFound()
-        val artifact = artifacts.artifact(accountId, artifactId)
-        ArtifactDetails(artifact, artifacts.versions(accountId, artifactId), artifact.url.takeIf(::isWebLink))
+        // Read together: the viewer waits for both before it asks its ticket.
+        coroutineScope {
+            val versions = async { artifacts.versions(accountId, artifactId) }
+            val artifact = artifacts.artifact(accountId, artifactId)
+            ArtifactDetails(artifact, versions.await(), artifact.url.takeIf(::isWebLink))
+        }
     }
 
     /** The artifact alone, to see whether a newer version was published. */
