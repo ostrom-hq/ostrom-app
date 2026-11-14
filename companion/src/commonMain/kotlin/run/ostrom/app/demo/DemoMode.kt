@@ -67,6 +67,9 @@ internal class DemoStore(val startedAt: Long) {
 
     /** The demo server's receipt key pins, kept on first view as for any server, in memory. */
     val receiptPins = MutableStateFlow<Map<String, String>>(emptyMap())
+
+    /** The person's cloud sessions, newest first; the demo's starts, pauses, resumes and stops change them. */
+    val cloudSessions = MutableStateFlow(demoCloudSessions(startedAt))
 }
 
 /** "Try the demo" on the first screen: offered only on a device without any account, so a demo never mixes with a real one. */

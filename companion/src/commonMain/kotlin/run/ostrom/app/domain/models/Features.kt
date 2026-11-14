@@ -50,6 +50,12 @@ object Features {
 
     /** The member's personal MCP servers: Settings > MCP servers. */
     const val MCP_PERSONAL = "mcp.personal.v1"
+
+    /** The person's cloud sessions: listed, read, started, paused, resumed and stopped from the Sessions tab. */
+    const val RUNNERS_CLOUD = "runners.cloud.v1"
+
+    /** A cloud session's preparation recipe: the new cloud session form takes repositories, setup and variables. */
+    const val RUNNERS_CLOUD_ENVIRONMENT = "runners.cloud.environment.v1"
 }
 
 /** Throws [AppException.UnsupportedApi] for a server that speaks another API version than this app. */

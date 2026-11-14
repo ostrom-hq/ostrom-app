@@ -121,6 +121,31 @@ server without the feed, each screen loads once, then again on return and on ref
 The server does not publish the run and todo events yet: until it does, the runs and the todo are current at the
 feed's opening, after a gap, on return and on refresh, and become live by themselves once it does.
 
+## Cloud sessions
+
+The person's cloud sessions (`runners.cloud.v1`, ostrom-core's `client.cloudSessions`) are in the Sessions tab, as
+TeamCode shows its cloud sessions in its own: with `sessions.v1` too, a switch under the title picks the agent sessions
+or the cloud sessions; with only one of the two, the tab shows it. The list is newest first and keyset-paged; it loads
+at each return and on refresh, as does a record: the server publishes no cloud session event, and the app does not poll.
+
+- **Record.** Status, agent and model, the single repository and ref or the preparation recipe (repositories, working
+  directory, setup commands, required variables, GitHub requirement, Git e-mail domain), times and the plan's limits.
+  While it is creating or resuming, the step the runner reports (`configuring_git`, `cloning_repositories`,
+  `fetching_repositories`, `running_setup`; any other reads as preparing the workspace). A failure is worded by its
+  code; a `preparation_failed` shows the server's sentence (which step failed, never a command's output) and says to
+  resume when `retryable`, otherwise that the recipe or the variables must be fixed in the console.
+- **Actions.** Pause (while it runs or is on its way), Resume (on a paused session not already resuming), Stop (asked first: the workspace
+  is deleted). Each takes the server's answer, then reads the session again. A refusal is worded by its key
+  (`invalid_request`, `payment_required`, `conflict`, `forbidden`, `profile_required`, `profile_unassigned`,
+  `cloud_profile_not_found`, `image_not_allowed`, `cluster_unavailable`, `namespace_not_allowed`), never with the
+  server's text.
+- **New cloud session.** The agent, a name, a model and a first message, checked as the server checks them. With
+  `runners.cloud.environment.v1` the form takes the recipe (the fields of `CreateCloudSessionRequest.environment`);
+  without it, the single repository and ref. No profile or image is chosen: the server picks the person's only profile,
+  and asks for one (`profile_required`, worded) when there are several.
+- **Not in the app.** A cloud session's transcript (no route serves it), sending it a message, and its terminal (a
+  WebSocket the app does not open).
+
 ## Desktop
 
 `companion-desktop/` adds what only makes sense on a computer, ported from TeamCode's `companion-desktop`.
@@ -196,7 +221,8 @@ What the React Native app did, what TeamCode's companion does that an Ostrom ser
 | Workflows: the member's runs with their status filter (all, running, waiting, done, failed, cancelled), the workflows (inputs, nodes), a workflow's runs with the same filter, a run's visits; start a run of an accepted workflow with its inputs, cancel a run that has not ended; the editor: new workflow, edit (name, description, domain, session mode, inputs, agent, question and sub-workflow steps, where each outcome goes, visits, limits), save over the version read, delete | `workflows.v1` | Ported from TeamCode's `WorkflowsScreen`, `WorkflowScreen`, `WorkflowStartScreen`, `WorkflowRunScreen` and their view models. Start and Cancel show for an owner or an admin (the role from `GET /me/organizations`; when it cannot be read they show and a refusal is worded by its key: `forbidden`, `workflow_not_accepted`, `run_limit`, `invalid_request`, `run_ended`, `run_busy`). Cancel asks first. No profile picker and no idempotency key on start (Ostrom's route takes neither). The editor is ported from TeamCode's `WorkflowEditScreen`, `WorkflowNodeEditor`, `WorkflowProblemWords` and `WorkflowEditorsCard`: the server's save checks (`WorkflowChecks`, `NodeChecks`, `CallChecks`) run as the person types and are worded against their step; `invalid_workflow` from the server is one worded sentence (its problems are free text). A save reads the stored workflow and changes only what the editor edits, so a gate's approvers, a wait's fields, a check's condition and positions are kept; trigger, step, check, gate and notify steps are named and routed only (the console edits what they do); TeamCode's flow map, field editor, assignee picker, agent profiles and on-device drafts are not ported. New, Edit and Delete show when `GET /workflows/settings` says the person may decide (when it cannot be read they show, and a refusal is worded by its key: `workflow_editors_only`, `workflow_conflict` with Reload, `workflow_name_taken`, `conflict`, `workflow_limit`, `confirmation_limit`, `invalid_workflow`, `workflow_in_use`). Delete asks first. A write held for a confirmation (`202`) says so and opens its console page only when it is on the account's server. Who may edit shows read only to an owner or an admin, with "Open in the console" (the rule is changed from a console session only). TeamCode's filter has no Cancelled chip (its All is the only place cancelled runs show); the app adds one (`status=cancelled`), and the chips scroll sideways on a narrow screen |
 | The member's environment: the variable names their agents receive and those withheld (`GET /environment`, values dropped by ostrom-core's client), their personal variants (`GET /me/environment/variants`) | `environment.v1` | Settings, Environment variables, read only. A value is written in the console ("Open in the console", `/me/environment`): the server takes environment writes from a browser session only. TeamCode's companion has no such screen |
 | The member's personal MCP servers: a remote server's address, a hosted command's launcher and package, the secret names, the process state | `mcp.personal.v1` | Settings, MCP servers, read only like TeamCode's `McpServersScreen`; added, edited and deleted in the console (`/me/mcp`), whose writes need a browser session |
-| Automations, team MCP servers, GitHub link, sharing, cloud sessions | `automations.v1`, `mcp.v1`, `github.link.v1`, `sharing.v1`, `runners.cloud.v1` | Later, each with its client routes in ostrom-core (`cloudSessions` is there) |
+| Cloud sessions: list, record (status, repository or recipe, times, limits, the preparation step, why it failed), pause, resume, stop, new cloud session with its recipe | `runners.cloud.v1`, `runners.cloud.environment.v1` | Ported from TeamCode's `SessionsScreen`, `SessionScreen`, `NewSessionSheet` and their view models (see [Cloud sessions](#cloud-sessions)). No transcript, no messages, no terminal: the server serves none of them to the app |
+| Automations, team MCP servers, GitHub link, sharing | `automations.v1`, `mcp.v1`, `github.link.v1`, `sharing.v1` | Later, each with its client routes in ostrom-core |
 | Desktop: menu bar icon, the CLI's account, update banner | none | Ported (see [Desktop](#desktop)). Left: tray notifications of new waits and approvals while the window is hidden (no use case emits them across accounts yet), making an app sign-in the CLI's (it would write the CLI's secret store), the CLI's account on Windows, an install button when no CLI is found, the app's own update (no desktop release), installer icons for macOS and Windows |
 | Store builds (TestFlight, Play internal track) | none | Ported: TeamCode's fastlane lanes as is ([distribution.md](distribution.md)) |
 | Desktop distribution (signed installers) | none | With 1.0.0 and a Developer ID ([distribution.md](distribution.md)) |

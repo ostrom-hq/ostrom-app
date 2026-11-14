@@ -88,7 +88,12 @@ import run.ostrom.app.resources.sessions_unavailable
  * opens and after a gap), and at each return and refresh. [onOpen] pushes a session's record.
  */
 @Composable
-fun SessionsScreen(onOpen: (accountId: String, sessionId: String) -> Unit, viewModel: SessionsViewModel = koinViewModel()) {
+fun SessionsScreen(
+    onOpen: (accountId: String, sessionId: String) -> Unit,
+    /** The switch to the cloud sessions, under the title, when the server serves both. */
+    kindSwitch: (@Composable () -> Unit)? = null,
+    viewModel: SessionsViewModel = koinViewModel(),
+) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     LifecycleStartEffect(viewModel) {
         viewModel.start()
@@ -105,6 +110,7 @@ fun SessionsScreen(onOpen: (accountId: String, sessionId: String) -> Unit, viewM
             LargeTitle(stringResource(Res.string.sessions_title)) {
                 AppIconButton(PhosphorIcons.Regular.ArrowsClockwise, stringResource(Res.string.sessions_refresh), onClick = viewModel::reload, modifier = Modifier.testTag("sessions-refresh"))
             }
+            kindSwitch?.invoke()
             Segmented(
                 listOf(
                     SessionFilter.ALL to stringResource(Res.string.sessions_filter_all), SessionFilter.OPEN to stringResource(Res.string.sessions_filter_open),

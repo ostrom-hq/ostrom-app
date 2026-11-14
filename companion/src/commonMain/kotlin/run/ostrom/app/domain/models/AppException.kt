@@ -63,6 +63,29 @@ sealed class AppException(message: String) : Exception(message) {
     )
     /** The draft breaks [problems] the server would refuse: nothing was sent. */
     class WorkflowInvalid(val problems: List<WorkflowProblem>) : AppException("The workflow breaks ${problems.size} rule(s); fix them to save.")
+    /** The server refused to start, pause, resume or stop a cloud session, for [reason]. */
+    class CloudSessionRefused(val reason: CloudSessionRefusal) : AppException(
+        when (reason) {
+            CloudSessionRefusal.INVALID -> "The server refused these values: check the repositories, paths, refs, commands, variable names and e-mail domain."
+            CloudSessionRefusal.PLAN_LIMIT -> "Your plan's cloud sessions at once, or its hours of this period, are used up. Pause or stop one, then try again."
+            CloudSessionRefusal.STATE -> "This session's state does not allow it now: it may be over."
+            CloudSessionRefusal.FORBIDDEN -> "Cloud sessions are not open to you on this server."
+            CloudSessionRefusal.PROFILE_REQUIRED -> "Several cloud profiles, or none, are open to you: start this session from the console."
+            CloudSessionRefusal.PROFILE_UNAVAILABLE -> "Your cloud profile cannot be used for this session. Ask an administrator."
+            CloudSessionRefusal.CLUSTER_UNAVAILABLE -> "The cloud cluster cannot run sessions now. Ask an administrator."
+        },
+    )
+    /** A field of the new cloud session breaks [problem]: nothing was sent. */
+    class CloudSessionInvalid(val problem: CloudSessionProblem) : AppException(
+        when (problem) {
+            CloudSessionProblem.NAME -> "Name the session in up to 120 characters."
+            CloudSessionProblem.PROMPT -> "Write a first message of up to 20,000 characters."
+            CloudSessionProblem.REPOSITORY -> "Use an https://github.com/<owner>/<name> repository address."
+            CloudSessionProblem.TOO_MANY -> "Use at most 16 repositories, and 16 commands of up to 4,096 characters per setup list."
+            CloudSessionProblem.VARIABLES -> "Name at most 64 required variables, each once, in UPPER_SNAKE_CASE."
+            CloudSessionProblem.EMAIL_DOMAIN -> "Use a lowercase domain name, such as example.com, for the Git e-mail domain."
+        },
+    )
     /** The server refused with [code] (its stable error key, shown only when it is one) and [statusCode]. */
     class Server(val statusCode: Int, val code: String?) :
         AppException("The server returned HTTP $statusCode" + (visibleCode(code)?.let { " ($it)" } ?: "") + ".")

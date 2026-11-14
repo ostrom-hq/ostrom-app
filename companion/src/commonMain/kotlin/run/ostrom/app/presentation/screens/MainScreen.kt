@@ -93,7 +93,10 @@ enum class MainTab(val feature: String?, val label: StringResource, val icon: Im
 }
 
 /** The tabs the active account's server serves, in their order. */
-internal fun HomeUiState.tabs(): List<MainTab> = MainTab.entries.filter { tab -> tab.feature == null || serves(tab.feature) }
+internal fun HomeUiState.tabs(): List<MainTab> = MainTab.entries.filter { tab ->
+    // The Sessions tab also holds the cloud sessions: it shows for a server with either.
+    tab.feature == null || serves(tab.feature) || (tab == MainTab.SESSIONS && serves(Features.RUNNERS_CLOUD))
+}
 
 /**
  * The signed-in app: the tabs at the bottom on a phone, a rail on a wide window. A server that speaks another API
@@ -109,6 +112,8 @@ fun MainScreen(
     onOpenMcpServers: (accountId: String) -> Unit = {},
     onOpenArtifact: (accountId: String, artifactId: String) -> Unit = { _, _ -> },
     onOpenSession: (accountId: String, sessionId: String) -> Unit = { _, _ -> },
+    onOpenCloudSession: (accountId: String, sessionId: String) -> Unit = { _, _ -> },
+    onNewCloudSession: (accountId: String) -> Unit = {},
     onOpenWorkflow: (accountId: String, workflowId: String) -> Unit = { _, _ -> },
     onNewWorkflow: (accountId: String) -> Unit = {},
     onOpenRun: (accountId: String, runId: String) -> Unit = { _, _ -> },
@@ -175,7 +180,8 @@ fun MainScreen(
                     when (tab) {
                         MainTab.INBOX -> InboxScreen(onOpen = onOpenRequest, onOpenSettings = { selected = MainTab.SETTINGS })
                         MainTab.WAITING -> WaitsScreen(waits)
-                        MainTab.SESSIONS -> SessionsScreen(onOpen = onOpenSession)
+                        MainTab.SESSIONS -> SessionsTab(state.serves(Features.SESSIONS), state.serves(Features.RUNNERS_CLOUD), onOpenSession = onOpenSession,
+                            onOpenCloudSession = onOpenCloudSession, onNewCloudSession = onNewCloudSession)
                         MainTab.HISTORY -> HistoryScreen()
                         MainTab.SPENDING -> SpendingScreen()
                         MainTab.ACTIVITY -> ActivityScreen(onOpen = if (state.serves(Features.GATES)) onOpenRequest else null)

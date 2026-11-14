@@ -6,11 +6,26 @@ import androidx.compose.runtime.Composable
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 import run.ostrom.app.domain.models.AppException
+import run.ostrom.app.domain.models.CloudSessionProblem
+import run.ostrom.app.domain.models.CloudSessionRefusal
 import run.ostrom.app.domain.models.WorkflowEditRefusal
 import run.ostrom.app.domain.models.WorkflowRefusal
 import run.ostrom.app.domain.models.visibleCode
 import run.ostrom.app.resources.Res
 import run.ostrom.app.resources.error_check_input
+import run.ostrom.app.resources.error_cloud_cluster_unavailable
+import run.ostrom.app.resources.error_cloud_email_domain
+import run.ostrom.app.resources.error_cloud_forbidden
+import run.ostrom.app.resources.error_cloud_invalid
+import run.ostrom.app.resources.error_cloud_name
+import run.ostrom.app.resources.error_cloud_plan_limit
+import run.ostrom.app.resources.error_cloud_profile_required
+import run.ostrom.app.resources.error_cloud_profile_unavailable
+import run.ostrom.app.resources.error_cloud_prompt
+import run.ostrom.app.resources.error_cloud_repository
+import run.ostrom.app.resources.error_cloud_state
+import run.ostrom.app.resources.error_cloud_too_many
+import run.ostrom.app.resources.error_cloud_variables
 import run.ostrom.app.resources.error_credential_storage
 import run.ostrom.app.resources.error_generic
 import run.ostrom.app.resources.error_invalid_origin
@@ -108,6 +123,23 @@ private fun AppException.sentence(): Pair<StringResource, List<Any>> = when (thi
         WorkflowEditRefusal.IN_USE -> Res.string.wfe_error_in_use
     } to emptyList()
     is AppException.WorkflowInvalid -> Res.string.wfe_error_problems to listOf<Any>(problems.size)
+    is AppException.CloudSessionRefused -> when (reason) {
+        CloudSessionRefusal.INVALID -> Res.string.error_cloud_invalid
+        CloudSessionRefusal.PLAN_LIMIT -> Res.string.error_cloud_plan_limit
+        CloudSessionRefusal.STATE -> Res.string.error_cloud_state
+        CloudSessionRefusal.FORBIDDEN -> Res.string.error_cloud_forbidden
+        CloudSessionRefusal.PROFILE_REQUIRED -> Res.string.error_cloud_profile_required
+        CloudSessionRefusal.PROFILE_UNAVAILABLE -> Res.string.error_cloud_profile_unavailable
+        CloudSessionRefusal.CLUSTER_UNAVAILABLE -> Res.string.error_cloud_cluster_unavailable
+    } to emptyList()
+    is AppException.CloudSessionInvalid -> when (problem) {
+        CloudSessionProblem.NAME -> Res.string.error_cloud_name
+        CloudSessionProblem.PROMPT -> Res.string.error_cloud_prompt
+        CloudSessionProblem.REPOSITORY -> Res.string.error_cloud_repository
+        CloudSessionProblem.TOO_MANY -> Res.string.error_cloud_too_many
+        CloudSessionProblem.VARIABLES -> Res.string.error_cloud_variables
+        CloudSessionProblem.EMAIL_DOMAIN -> Res.string.error_cloud_email_domain
+    } to emptyList()
     is AppException.Server -> visibleCode(code)?.let { Res.string.error_server_http_code to listOf<Any>(statusCode, it) }
         ?: (Res.string.error_server_http to listOf<Any>(statusCode))
 }
