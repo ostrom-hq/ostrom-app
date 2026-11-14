@@ -187,7 +187,7 @@ fun OstromNavHost(rootViewModel: RootViewModel = koinViewModel(), unlock: PhoneU
             val viewModel: WorkflowViewModel = koinViewModel { parametersOf(route) }
             val runs: WorkflowRunsViewModel = koinViewModel(key = "runs-${route.accountId}-${route.workflowId}") { parametersOf(route) }
             WorkflowScreen(
-                viewModel, runs, onBack = { navController.popBackStack() }, onOpenRun = { runId -> navController.navigate(WorkflowRunRoute(route.accountId, runId)) },
+                viewModel, runs, onBack = { navController.popBackStack() }, onOpenRun = { runId -> navController.openOnce(WorkflowRunRoute(route.accountId, runId)) },
                 onStart = { navController.navigate(WorkflowStartRoute(route.accountId, route.workflowId)) },
                 onEdit = { navController.navigate(WorkflowEditRoute(route.accountId, route.workflowId)) },
                 onDeleted = { navController.popBackStack() },
@@ -266,6 +266,9 @@ fun OstromNavHost(rootViewModel: RootViewModel = koinViewModel(), unlock: PhoneU
  * otherwise pushed. Going back and forth between a run and its session keeps one screen of each, and back then
  * returns to where the first of them was opened from.
  */
-internal fun <T : Any> NavController.openOnce(route: T) {
+internal inline fun <reified T : Any> NavController.openOnce(route: T) {
+    // Already the screen shown (a run that names itself): nothing to open.
+    val top = currentBackStackEntry
+    if (top != null && top.destination.hasRoute<T>() && top.toRoute<T>() == route) return
     if (!popBackStack(route, inclusive = false)) navigate(route)
 }

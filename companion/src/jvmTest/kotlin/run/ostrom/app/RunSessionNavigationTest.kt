@@ -15,6 +15,7 @@ import run.ostrom.app.domain.models.SignInMethod
 import run.ostrom.app.infrastructure.credentials.MemoryCredentialStore
 import run.ostrom.app.infrastructure.settings.SettingsAccountRepository
 import kotlin.test.Test
+import kotlin.test.assertTrue
 
 /** Back and forth between a run, its session and its child run: never a second screen of the same one, and back leaves them. */
 @OptIn(ExperimentalTestApi::class)
@@ -40,11 +41,11 @@ class RunSessionNavigationTest {
         ),
     )
 
-    private fun signedIn(block: DesktopComposeUiTest.() -> Unit) {
+    private fun signedIn(server: FakeServer = server(), block: DesktopComposeUiTest.() -> Unit) {
         val settings = MapSettings()
         SettingsAccountRepository(settings).save(Account(id = "a1", origin = origin, login = "ada", method = SignInMethod.DEVICE))
         val credentials = MemoryCredentialStore().also { runBlocking { it.write("a1", "osm_token") } }
-        testApp(server(), credentials = credentials, settings = settings) { block() }
+        testApp(server, credentials = credentials, settings = settings) { block() }
     }
 
     private fun DesktopComposeUiTest.waitFor(tag: String) =
@@ -71,7 +72,8 @@ class RunSessionNavigationTest {
 
     @Test
     fun aRunItsSessionAndTheRunAgainKeepOneScreenOfEach() {
-        signedIn {
+        val server = server()
+        signedIn(server) {
             click("tab-workflows")
             click("workflow-run-r1")
             waitForText("Release, version 3")
@@ -84,6 +86,8 @@ class RunSessionNavigationTest {
                 waitFor("workflow-run-overview")
                 waitForText("Release, version 3")
             }
+            // The session shown again was read again (the server publishes no session event).
+            assertTrue(server.asked.count { it == "GET /api/v1/sessions/s9" } >= 2, server.asked.toString())
             backLandsOnTheTabs()
         }
     }

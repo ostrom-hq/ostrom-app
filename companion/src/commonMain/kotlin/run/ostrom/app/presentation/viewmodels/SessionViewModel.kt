@@ -45,10 +45,17 @@ class SessionViewModel(
     private var loading: Job? = null
     private var todo: Job? = null
     private var started = false
+    private var startedBefore = false
 
     init { load() }
 
-    fun start() { started = true; followTodo() }
+    /** Shown again (back from its run, the app back in the foreground): the record is read again, the server publishing no session event. */
+    fun start() {
+        started = true
+        // load() follows the todo again itself.
+        if (startedBefore) load() else followTodo()
+        startedBefore = true
+    }
 
     fun stop() {
         started = false
