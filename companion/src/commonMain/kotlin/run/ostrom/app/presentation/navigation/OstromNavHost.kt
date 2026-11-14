@@ -28,10 +28,12 @@ import run.ostrom.app.domain.usecases.approvals.PhoneUnlock
 import run.ostrom.app.domain.usecases.push.NotificationTarget
 import run.ostrom.app.presentation.screens.AddServerScreen
 import run.ostrom.app.presentation.screens.ArtifactScreen
+import run.ostrom.app.presentation.screens.CloudSessionScreen
 import run.ostrom.app.presentation.screens.LoginScreen
 import run.ostrom.app.presentation.screens.MainScreen
 import run.ostrom.app.presentation.screens.MainTab
 import run.ostrom.app.presentation.screens.MemberEnvironmentScreen
+import run.ostrom.app.presentation.screens.NewCloudSessionScreen
 import run.ostrom.app.presentation.screens.NotificationPreferencesScreen
 import run.ostrom.app.presentation.screens.PersonalMcpServersScreen
 import run.ostrom.app.presentation.screens.RequestScreen
@@ -41,10 +43,12 @@ import run.ostrom.app.presentation.screens.WorkflowRunScreen
 import run.ostrom.app.presentation.screens.WorkflowScreen
 import run.ostrom.app.presentation.screens.WorkflowStartScreen
 import run.ostrom.app.presentation.viewmodels.ArtifactViewModel
+import run.ostrom.app.presentation.viewmodels.CloudSessionViewModel
 import run.ostrom.app.presentation.viewmodels.MemberEnvironmentViewModel
+import run.ostrom.app.presentation.viewmodels.NewCloudSessionViewModel
 import run.ostrom.app.presentation.viewmodels.NotificationPreferencesViewModel
-import run.ostrom.app.presentation.viewmodels.PersonalMcpServersViewModel
 import run.ostrom.app.presentation.viewmodels.NotificationSettingsViewModel
+import run.ostrom.app.presentation.viewmodels.PersonalMcpServersViewModel
 import run.ostrom.app.presentation.viewmodels.RequestViewModel
 import run.ostrom.app.presentation.viewmodels.RootViewModel
 import run.ostrom.app.presentation.viewmodels.SessionViewModel
@@ -151,6 +155,8 @@ fun OstromNavHost(rootViewModel: RootViewModel = koinViewModel(), unlock: PhoneU
                 onOpenMcpServers = { accountId -> navController.navigate(PersonalMcpServersRoute(accountId)) },
                 onOpenArtifact = { accountId, artifactId -> navController.navigate(ArtifactRoute(accountId, artifactId)) },
                 onOpenSession = { accountId, sessionId -> navController.navigate(SessionRoute(accountId, sessionId)) },
+                onOpenCloudSession = { accountId, sessionId -> navController.navigate(CloudSessionRoute(accountId, sessionId)) },
+                onNewCloudSession = { accountId -> navController.navigate(NewCloudSessionRoute(accountId)) },
                 onOpenWorkflow = { accountId, workflowId -> navController.navigate(WorkflowRoute(accountId, workflowId)) },
                 onNewWorkflow = { accountId -> navController.navigate(WorkflowEditRoute(accountId)) },
                 onOpenRun = { accountId, runId -> navController.navigate(WorkflowRunRoute(accountId, runId)) },
@@ -206,6 +212,18 @@ fun OstromNavHost(rootViewModel: RootViewModel = koinViewModel(), unlock: PhoneU
                 onOpenSession = if (opensSessions(route.accountId)) ({ sessionId -> navController.navigate(SessionRoute(route.accountId, sessionId)) }) else null,
                 onOpenRun = { runId -> navController.navigate(WorkflowRunRoute(route.accountId, runId)) },
             )
+        }
+        composable<CloudSessionRoute> { entry ->
+            val viewModel: CloudSessionViewModel = koinViewModel { parametersOf(entry.toRoute<CloudSessionRoute>()) }
+            CloudSessionScreen(viewModel, onBack = { navController.popBackStack() })
+        }
+        composable<NewCloudSessionRoute> { entry ->
+            val route = entry.toRoute<NewCloudSessionRoute>()
+            val viewModel: NewCloudSessionViewModel = koinViewModel { parametersOf(route) }
+            NewCloudSessionScreen(viewModel, onBack = { navController.popBackStack() }, onCreated = { session ->
+                // The new session replaces the form: back from it returns to the list.
+                navController.navigate(CloudSessionRoute(route.accountId, session.id)) { popUpTo<NewCloudSessionRoute> { inclusive = true } }
+            })
         }
         composable<NotificationPreferencesRoute> { entry ->
             val route = entry.toRoute<NotificationPreferencesRoute>()

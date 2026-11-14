@@ -36,7 +36,7 @@ object DemoContent {
     /** What the demo server announces: the features whose demo content exists. */
     val features: Set<String> = setOf(
         Features.GATES, Features.WAITS, Features.RECEIPTS, Features.BUDGETS, Features.NOTIFICATIONS, Features.ARTIFACTS, Features.SESSIONS, Features.TODOS,
-        Features.WORKFLOWS, Features.ENVIRONMENT, Features.MCP_PERSONAL,
+        Features.WORKFLOWS, Features.ENVIRONMENT, Features.MCP_PERSONAL, Features.RUNNERS_CLOUD, Features.RUNNERS_CLOUD_ENVIRONMENT,
     )
 
     /**

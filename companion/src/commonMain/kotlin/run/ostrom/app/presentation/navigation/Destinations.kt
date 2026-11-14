@@ -58,3 +58,11 @@ data class WorkflowRunRoute(val accountId: String, val runId: String)
 /** The workflow editor: a saved workflow ([workflowId]) or a new one (null), opened from a workflow's Edit or the list's New. */
 @Serializable
 data class WorkflowEditRoute(val accountId: String, val workflowId: String? = null)
+
+/** One of the person's cloud sessions of an account (`runners.cloud.v1`), with pause, resume and stop, opened from the Sessions tab. */
+@Serializable
+data class CloudSessionRoute(val accountId: String, val sessionId: String)
+
+/** The form that starts a cloud session, opened from the cloud sessions list. */
+@Serializable
+data class NewCloudSessionRoute(val accountId: String)
