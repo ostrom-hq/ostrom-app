@@ -56,6 +56,8 @@ class AccountUseCasesTest {
         assertEquals(ServerFeatures.SESSIONS, Features.SESSIONS)
         assertEquals(ServerFeatures.TODOS, Features.TODOS)
         assertEquals(ServerFeatures.WORKFLOWS, Features.WORKFLOWS)
+        assertEquals(ServerFeatures.ENVIRONMENT, Features.ENVIRONMENT)
+        assertEquals(ServerFeatures.MCP_PERSONAL, Features.MCP_PERSONAL)
         requireSupportedApi(Features.SUPPORTED_API_VERSION)
         assertFailsWith<AppException.UnsupportedApi> { requireSupportedApi(Features.SUPPORTED_API_VERSION + 1) }
     }

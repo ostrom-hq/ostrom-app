@@ -8,6 +8,7 @@ import run.ostrom.app.domain.repositories.ActivityRepository
 import run.ostrom.app.domain.repositories.ArtifactRepository
 import run.ostrom.app.domain.repositories.AuthRepository
 import run.ostrom.app.domain.repositories.FeaturesRepository
+import run.ostrom.app.domain.repositories.MemberSetupRepository
 import run.ostrom.app.domain.repositories.NotificationPreferencesRepository
 import run.ostrom.app.domain.repositories.NotificationSettingsRepository
 import run.ostrom.app.domain.repositories.ReceiptKeyPinRepository
@@ -23,6 +24,7 @@ import run.ostrom.app.infrastructure.repositories.CachedFeaturesRepository
 import run.ostrom.app.infrastructure.repositories.RemoteActivityRepository
 import run.ostrom.app.infrastructure.repositories.RemoteArtifactRepository
 import run.ostrom.app.infrastructure.repositories.RemoteAuthRepository
+import run.ostrom.app.infrastructure.repositories.RemoteMemberSetupRepository
 import run.ostrom.app.infrastructure.repositories.RemoteNotificationPreferencesRepository
 import run.ostrom.app.infrastructure.repositories.RemoteNotificationSettingsRepository
 import run.ostrom.app.infrastructure.repositories.RemoteReceiptRepository
@@ -60,5 +62,6 @@ val demoModule = module {
     single<SessionRepository> { DemoAwareSessionRepository(get<RemoteSessionRepository>(), DemoSessionRepository(get())) }
     single<TodoRepository> { DemoAwareTodoRepository(get<RemoteTodoRepository>(), DemoTodoRepository(get())) }
     single<WorkflowRepository> { DemoAwareWorkflowRepository(get<RemoteWorkflowRepository>(), DemoWorkflowRepository(get())) }
+    single<MemberSetupRepository> { DemoAwareMemberSetupRepository(get<RemoteMemberSetupRepository>(), DemoMemberSetupRepository(get())) }
     single<ReceiptKeyPinRepository> { DemoAwareReceiptKeyPinRepository(get<SecureReceiptKeyPinRepository>(), get()) }
 }

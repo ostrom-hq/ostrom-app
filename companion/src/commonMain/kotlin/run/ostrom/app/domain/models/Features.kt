@@ -44,6 +44,12 @@ object Features {
 
     /** Workflows and their runs, read only: the Workflows tab. */
     const val WORKFLOWS = "workflows.v1"
+
+    /** The member's environment variables, names only, and their personal variants: Settings > Environment. */
+    const val ENVIRONMENT = "environment.v1"
+
+    /** The member's personal MCP servers: Settings > MCP servers. */
+    const val MCP_PERSONAL = "mcp.personal.v1"
 }
 
 /** Throws [AppException.UnsupportedApi] for a server that speaks another API version than this app. */

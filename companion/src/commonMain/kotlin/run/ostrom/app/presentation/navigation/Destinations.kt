@@ -27,6 +27,14 @@ data class RequestRoute(val accountId: String, val id: String)
 @Serializable
 data class NotificationPreferencesRoute(val accountId: String)
 
+/** The member's environment variables of an account (`environment.v1`), names only, opened from Settings. */
+@Serializable
+data class MemberEnvironmentRoute(val accountId: String)
+
+/** The member's personal MCP servers of an account (`mcp.personal.v1`), opened from Settings. */
+@Serializable
+data class PersonalMcpServersRoute(val accountId: String)
+
 /** One artifact of an account, at [version] (the latest one when null), opened from the Artifacts tab. */
 @Serializable
 data class ArtifactRoute(val accountId: String, val artifactId: String, val version: Int? = null)

@@ -105,6 +105,8 @@ fun MainScreen(
     onSignInAgain: (Account) -> Unit,
     onOpenRequest: (accountId: String, id: String) -> Unit = { _, _ -> },
     onOpenNotifications: (accountId: String) -> Unit = {},
+    onOpenEnvironment: (accountId: String) -> Unit = {},
+    onOpenMcpServers: (accountId: String) -> Unit = {},
     onOpenArtifact: (accountId: String, artifactId: String) -> Unit = { _, _ -> },
     onOpenSession: (accountId: String, sessionId: String) -> Unit = { _, _ -> },
     onOpenWorkflow: (accountId: String, workflowId: String) -> Unit = { _, _ -> },
@@ -178,7 +180,8 @@ fun MainScreen(
                         MainTab.ACTIVITY -> ActivityScreen(onOpen = if (state.serves(Features.GATES)) onOpenRequest else null)
                         MainTab.ARTIFACTS -> ArtifactsScreen(onOpen = onOpenArtifact)
                         MainTab.WORKFLOWS -> WorkflowsScreen(onOpenRun = onOpenRun, onOpenWorkflow = onOpenWorkflow)
-                        MainTab.SETTINGS -> SettingsScreen(onAddAccount = onAddAccount, onSignInAgain = onSignInAgain, onOpenNotifications = onOpenNotifications)
+                        MainTab.SETTINGS -> SettingsScreen(onAddAccount = onAddAccount, onSignInAgain = onSignInAgain, onOpenNotifications = onOpenNotifications,
+                            onOpenEnvironment = onOpenEnvironment, onOpenMcpServers = onOpenMcpServers)
                     }
                 }
             }
