@@ -47,7 +47,7 @@ import run.ostrom.app.resources.session_title
  * result, the subject, when, its check runs), and what this device found of its signature.
  */
 @Composable
-fun ReceiptScreen(viewModel: ReceiptViewModel, onBack: (() -> Unit)?, receiptId: String, backLabel: String = stringResource(Res.string.session_title)) {
+fun ReceiptScreen(viewModel: ReceiptViewModel, onBack: (() -> Unit)?, backLabel: String = stringResource(Res.string.session_title)) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val colors = Ostrom.colors
     val today = localEpochDay(rememberNow())
@@ -67,10 +67,8 @@ fun ReceiptScreen(viewModel: ReceiptViewModel, onBack: (() -> Unit)?, receiptId:
                 } else null)
             }
             BusyRow(state.loading && state.entry == null)
-            state.entry?.let { entry ->
-                ReceiptRow(0, entry, today)
-                SelectionContainer { Text(receiptId, style = MonospaceStyle, color = colors.muted) }
-            }
+            state.entry?.let { entry -> ReceiptRow(0, entry, today) }
+            SelectionContainer { Text(viewModel.receiptId, style = MonospaceStyle, color = colors.muted) }
         }
     }
 }

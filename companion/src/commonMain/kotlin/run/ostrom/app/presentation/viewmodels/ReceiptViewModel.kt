@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import run.ostrom.app.domain.models.AppException
 import run.ostrom.app.domain.models.HistoryEntry
+import run.ostrom.app.domain.models.ReceiptCheck
 import run.ostrom.app.domain.usecases.receipts.CheckReceiptsUseCase
 import run.ostrom.app.domain.usecases.receipts.GetReceiptUseCase
 import run.ostrom.app.domain.usecases.receipts.TrustedReceiptKeysUseCase
@@ -42,10 +43,13 @@ class ReceiptViewModel(
     val uiState: StateFlow<ReceiptUiState> = state.asStateFlow()
     private var loading: Job? = null
 
+    /** The receipt's id, shown under it (also while it loads or when it is gone). */
+    val receiptId: String get() = route.receiptId
+
     init { load() }
 
     fun load() {
-        state.update { it.copy(loading = true, error = null) }
+        state.update { it.copy(loading = true, error = null, gone = false) }
         // The latest load wins: an earlier, slower one never puts its older answer back.
         loading?.cancel()
         loading = viewModelScope.launch {
@@ -63,7 +67,14 @@ class ReceiptViewModel(
                     }
                     getReceipt(route.accountId, route.receiptId) to trusted.await()
                 }
-                state.update { it.copy(entry = entry, loading = false, gone = false) }
+                // Read again unchanged (a refresh): a verified or rejected result stays, instead of reading as checking again;
+                // one found without a key (or without Ed25519) is checked again.
+                val shown = state.value.entry
+                if (shown != null && shown.raw == entry.raw && (shown.check is ReceiptCheck.Verified || shown.check is ReceiptCheck.Rejected)) {
+                    state.update { it.copy(loading = false) }
+                    return@launch
+                }
+                state.update { it.copy(entry = entry, loading = false) }
                 val checked = checkReceipts(listOf(entry), trusted).single()
                 state.update { it.copy(entry = checked) }
             } catch (error: CancellationException) {

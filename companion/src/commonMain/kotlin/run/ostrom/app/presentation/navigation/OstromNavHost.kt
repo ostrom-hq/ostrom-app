@@ -179,7 +179,7 @@ fun OstromNavHost(rootViewModel: RootViewModel = koinViewModel(), unlock: PhoneU
         composable<ReceiptRoute> { entry ->
             val route = entry.toRoute<ReceiptRoute>()
             val viewModel: ReceiptViewModel = koinViewModel { parametersOf(route) }
-            ReceiptScreen(viewModel, onBack = { navController.popBackStack() }, receiptId = route.receiptId)
+            ReceiptScreen(viewModel, onBack = { navController.popBackStack() })
         }
         composable<WorkflowRoute> { entry ->
             val route = entry.toRoute<WorkflowRoute>()
