@@ -16,7 +16,9 @@ class OrganizationUseCases(private val auth: AuthRepository, private val account
 
     fun choose(accountId: String, organization: Organization): Account? {
         val account = accounts.find(accountId) ?: return null
-        val chosen = account.copy(organizationId = organization.id, organizationName = organization.name)
+        // Another organization is another membership: its id is read again (RefreshAccountUseCase, SyncPushUseCase).
+        val memberId = account.memberId.takeIf { account.organizationId == organization.id }
+        val chosen = account.copy(organizationId = organization.id, organizationName = organization.name, memberId = memberId)
         if (chosen != account) accounts.update(chosen)
         return chosen
     }

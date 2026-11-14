@@ -16,6 +16,8 @@ import run.ostrom.app.domain.models.Account
 import run.ostrom.app.domain.models.SignInMethod
 import run.ostrom.app.domain.services.BiometricOutcome
 import run.ostrom.app.domain.services.unlockKeyEntry
+import run.ostrom.app.domain.usecases.push.NotificationLinks
+import run.ostrom.app.presentation.navigation.IncomingLinks
 import run.ostrom.app.infrastructure.credentials.MemoryCredentialStore
 import run.ostrom.app.infrastructure.settings.SettingsAccountRepository
 import kotlin.test.Test
@@ -103,6 +105,22 @@ class ApprovalsFlowTest {
             onNodeWithText("Approve push", substring = true).assertExists()
             assertFalse(answer in server.asked, "Opening a request answers nothing")
             assertFalse(unlock in server.asked)
+        }
+    }
+
+    @Test
+    fun aTappedNotificationOpensItsRequestOnTheAccountItNames() {
+        val server = server()
+        val settings = MapSettings()
+        SettingsAccountRepository(settings).save(Account(id = "a1", origin = origin, login = "ada", organizationId = "o1", memberId = "m1"))
+        val credentials = MemoryCredentialStore()
+        runBlocking { credentials.write("a1", "osm_token") }
+        // A tap that starts the app arrives before its first screen.
+        IncomingLinks.open(NotificationLinks.link("$origin/", "o1", "m1", "appr_0001"))
+        testApp(server, settings = settings, credentials = credentials) {
+            waitFor("request-actions")
+            assertTrue(view in server.asked)
+            assertEquals(null, IncomingLinks.link.value)
         }
     }
 

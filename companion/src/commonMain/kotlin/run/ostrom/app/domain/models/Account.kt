@@ -14,6 +14,9 @@ import kotlinx.serialization.Serializable
  * @property expiresAt When the token expires (epoch milliseconds), null when the server did not say.
  * @property method How the account signed in: with the browser on a phone (an app token and its unlock key), or with
  *   the device flow on a computer (the CLI's kind of token).
+ * @property memberId The person's membership of [organizationId], as `GET /auth/me` names it: a push names its server,
+ *   organization and member, which tells the accounts of one phone apart. Null until read, and again once the
+ *   organization changes.
  */
 @Serializable
 data class Account(
@@ -28,6 +31,7 @@ data class Account(
     val method: SignInMethod = SignInMethod.BROWSER,
     /** False once the server refused the token or it expired: the account stays listed and asks to sign in again. */
     val signedIn: Boolean = true,
+    val memberId: String? = null,
 ) {
     /** What the account switcher and the settings show. */
     val displayName: String get() = name?.takeIf { it.isNotBlank() } ?: login

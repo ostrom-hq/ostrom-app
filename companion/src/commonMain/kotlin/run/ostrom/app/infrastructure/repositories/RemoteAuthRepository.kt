@@ -119,7 +119,7 @@ class RemoteAuthRepository(
 
     private suspend fun OstromClient.member(): Member {
         val me = auth.me()
-        return Member(me.dev.login, me.organization?.let { Organization(it.id, it.name) })
+        return Member(me.dev.login, me.organization?.let { Organization(it.id, it.name) }, me.member?.id)
     }
 
     private suspend fun <T> detached(origin: String, token: String? = null, call: suspend (OstromClient) -> T): T {

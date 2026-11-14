@@ -74,6 +74,28 @@ command, the commit, the size of the change, the commits, checks and evidence be
 - A check run counts as run by Ostrom or the CI (`isolated_runner`, `ci`) only on a verified receipt.
 - Android below API 33 has no Ed25519: the app installs Bouncy Castle at start, in place of the platform's "BC".
 
+## Push
+
+Ported from TeamCode's companion (`PushPlatform`, `PushCipher`, `SyncPushUseCase`, `ReadPushUseCase`), FCM only.
+
+- At every start, when FCM rotates the token, when an account signs in and when its organization changes, each
+  signed-in account whose server announces `notifications.push.v1` gets `POST /api/v1/push-devices` with
+  `{pushToken, provider: "fcm", platform, locale?, publicKey}`. The public key is the phone's P-256 key
+  (SubjectPublicKeyInfo DER, base64), made once: on Android in the Keystore-sealed credential store
+  (`push-device-key`), on iOS in a Keychain access group shared with the notification service extension. The
+  account's member id is read once registered (`GET /auth/me`), since a push names its server, organization and member.
+- The FCM data is `{p, v: "1"}`: `p` = base64(`0x01` | ephemeral point (65 B) | nonce (12 B) | AES-256-GCM ciphertext
+  and tag), the key HKDF-SHA256 of the ECDH secret with salt = ephemeral point | phone point and info `ostrom-push-v1`;
+  the plaintext is ostrom-core's `PushPayload`. Android's messaging service decrypts it and shows it only for a
+  signed-in account of that server (its origin normalized), organization and member.
+- A tap opens `ostrom://notification?origin=…&org=…&member=…[&approval=…]` (`NotificationLinks`): the account becomes
+  the active one and its request opens (`RequestRoute`); an answer still asks for the unlock.
+- Before a sign-out the device registered in this process is deleted (`DELETE /api/v1/push-devices/{id}`), best effort;
+  the server also forgets the phones of a session it revokes.
+- Push is on only in a build that carries the Firebase project (`companion-android/google-services.json`,
+  git-ignored); without it the app builds and runs without push. Android 13+ asks the notification permission once,
+  after the first sign-in.
+
 ## Tests
 
 - `companion/src/commonTest`: use cases with fakes, repositories against Ktor's `MockEngine`.
@@ -100,7 +122,7 @@ What the React Native app did, what TeamCode's companion does that an Ostrom ser
 | Spending | `budgets.v1` | Ported (week and month, budget bar, budgets passed, by agent, repository and person) |
 | Activity | none | Ported (newest first, paged; a line about an approval opens its request on a server with `gates.v1`) |
 | Notification preferences (requests, decisions, spending, quiet hours) | `notifications.v1` | Ported: Settings, Notifications, shaped like TeamCode's `NotificationPreferencesScreen` |
-| Push registration | `notifications.push.v1` | Waiting for the server: it accepts only `provider: "expo"`, which a native app has no token for (TeamCode's FCM push needs `fcm`/`apns` on the server) |
+| Push registration, encrypted pushes, a tap opens the request | `notifications.push.v1` | Ported (see [Push](#push)) on Android and in the shared code; the iOS shell (Firebase, the notification service extension) follows. A Firebase project for the published apps is still to create |
 | Artifacts gallery and viewer | `artifacts.v1` | Ported from TeamCode's `ArtifactsScreen` and `ArtifactScreen`: the gallery (newest first, paged, searched in the loaded titles), the viewer with its versions, the page in a sandboxed web view on iOS and Android from a reading ticket on the server's content origin (`/a/<id>/<ticket>/`), the console page in the browser on the desktop. No Mine/Team filter and no pasted link (the list route has no scope, the console page lives on an origin the app does not know) |
 | Sessions (list, transcript, follow live) | `sessions.v1` | To port from TeamCode, once ostrom-core's client has the session routes |
 | Todos, workflows, automations, MCP servers, GitHub link, sharing | `todos.v1`, `workflows.v1`, `automations.v1`, `mcp.v1`, `github.link.v1`, `sharing.v1` | Later, each with its client routes in ostrom-core |

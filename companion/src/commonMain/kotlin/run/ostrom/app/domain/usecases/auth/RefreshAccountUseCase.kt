@@ -44,7 +44,9 @@ class RefreshAccountUseCase(
         }
         val current = accounts.accounts.value.firstOrNull { it.id == accountId } ?: return null
         if (!current.signedIn) return current
-        val updated = current.copy(login = member.login)
+        // The membership only when the call acted in the account's organization (not changed while it was in flight).
+        val memberId = member.memberId?.takeIf { member.organization?.id == current.organizationId } ?: current.memberId
+        val updated = current.copy(login = member.login, memberId = memberId)
         if (updated != current) accounts.update(updated)
         return updated
     }

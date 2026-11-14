@@ -18,6 +18,7 @@ import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.parameter.parametersOf
 import run.ostrom.app.domain.usecases.approvals.PhoneUnlock
+import run.ostrom.app.domain.usecases.push.NotificationTarget
 import run.ostrom.app.presentation.screens.AddServerScreen
 import run.ostrom.app.presentation.screens.ArtifactScreen
 import run.ostrom.app.presentation.screens.LoginScreen
@@ -50,6 +51,15 @@ fun OstromNavHost(rootViewModel: RootViewModel = koinViewModel(), unlock: PhoneU
             // The demo started from the first screen: its account is there, the tabs open.
             navController.navigate(MainRoute) { popUpTo(0) { inclusive = true } }
         }
+    }
+    // A tapped notification: its request, above the tabs of its account.
+    val incoming by IncomingLinks.link.collectAsStateWithLifecycle()
+    LaunchedEffect(incoming, hasAccounts) {
+        val link = incoming ?: return@LaunchedEffect
+        if (!hasAccounts) return@LaunchedEffect
+        IncomingLinks.consumed(link)
+        val target = rootViewModel.openNotification(link)
+        if (target is NotificationTarget.Request) navController.navigate(RequestRoute(target.accountId, target.approvalId))
     }
     NavHost(navController, startDestination = startDestination) {
         composable<AddServerRoute> {

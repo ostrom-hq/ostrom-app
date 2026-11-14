@@ -11,11 +11,31 @@ import kotlinx.coroutines.flow.stateIn
 import run.ostrom.app.domain.models.ThemePreference
 import run.ostrom.app.domain.repositories.AccountRepository
 import run.ostrom.app.domain.repositories.PreferencesRepository
+import run.ostrom.app.domain.usecases.push.NotificationTarget
+import run.ostrom.app.domain.usecases.push.ResolveNotificationUseCase
 
-/** The start destination (adding a server when there is no account yet) and the theme. */
-class RootViewModel(accounts: AccountRepository, preferences: PreferencesRepository) : ViewModel() {
+/** The start destination (adding a server when there is no account yet), the theme, and the tapped notifications. */
+class RootViewModel(
+    private val accounts: AccountRepository,
+    preferences: PreferencesRepository,
+    private val resolveNotification: ResolveNotificationUseCase,
+) : ViewModel() {
     val hasAccounts: StateFlow<Boolean> = accounts.accounts
         .map { it.isNotEmpty() }
         .stateIn(viewModelScope, SharingStarted.Eagerly, accounts.accounts.value.isNotEmpty())
     val theme: StateFlow<ThemePreference> = preferences.theme
+
+    /**
+     * Where a tapped notification leads, its account made the active one; null when no signed-in account of this device
+     * is the one it names.
+     */
+    fun openNotification(link: String): NotificationTarget? {
+        val target = resolveNotification(link) ?: return null
+        val accountId = when (target) {
+            is NotificationTarget.Request -> target.accountId
+            is NotificationTarget.Home -> target.accountId
+        }
+        accounts.setActive(accountId)
+        return target
+    }
 }
