@@ -28,6 +28,10 @@ class RemoteReceiptRepository(private val calls: AccountCalls) : ReceiptReposito
         ReceiptPage(page.items.map(::readReceipt), page.next)
     }
 
+    override suspend fun get(accountId: String, id: String): HistoryEntry = calls.withAccount(accountId, resource = true) { client ->
+        readReceipt(client.receipts.getRaw(id))
+    }
+
     override suspend fun keys(accountId: String): List<ServedReceiptKey> = calls.withAccount(accountId) { client ->
         client.receipts.keys().map { key -> ServedReceiptKey(key.kid, key.alg, key.publicKeyPem, key.rotation?.let { KeyHandover(it.kid, it.signature) }) }
     }

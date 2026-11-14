@@ -404,10 +404,8 @@
     <string name="session_cost">Coût %1$s</string>
     <string name="session_exit_code">code de sortie %1$d</string>
     <string name="session_segment">segment %1$d</string>
-    <string name="session_open_history">Ouvrir l'historique</string>
     <string name="session_open_run">Ouvrir son exécution de workflow</string>
     <string name="session_receipt">Reçu %1$s</string>
-    <string name="session_receipt_hint">L'onglet Historique liste les reçus signés, chacun vérifié sur cet appareil.</string>
     <string name="session_gates">Réponses aux contrôles</string>
     <string name="session_gate_answer">%1$s · %2$s</string>
     <string name="session_todo">Todo</string>
@@ -812,4 +810,8 @@
     <string name="error_cloud_variables">Nommez au plus 64 variables requises, chacune une seule fois, en UPPER_SNAKE_CASE.</string>
     <string name="error_cloud_email_domain">Utilisez un nom de domaine en minuscules, comme example.com, pour le domaine de l'adresse Git.</string>
     <string name="cloud_failure_preparation_new">Démarrez une nouvelle session pour réessayer.</string>
+    <string name="session_open_receipt">Ouvrir le reçu</string>
+    <string name="session_gate_receipt">Son reçu</string>
+    <string name="receipt_title">Reçu</string>
+    <string name="receipt_refresh">Relire le reçu</string>
 </resources>

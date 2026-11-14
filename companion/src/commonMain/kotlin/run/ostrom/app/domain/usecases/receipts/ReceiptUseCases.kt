@@ -7,6 +7,7 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import run.ostrom.app.domain.models.AppException
 import run.ostrom.app.domain.models.Features
 import run.ostrom.app.domain.models.HistoryEntry
@@ -30,6 +31,20 @@ class LoadReceiptsUseCase(private val receipts: ReceiptRepository, private val f
     suspend operator fun invoke(accountId: String, before: String? = null): ReceiptPage = guard(accountId) {
         if (!features.has(accountId, Features.RECEIPTS)) throw AppException.Unsupported(Features.RECEIPTS)
         receipts.page(accountId, before)
+    }
+}
+
+/**
+ * One receipt by its id (a session's, a gate answer's), not checked yet; [AppException.Unsupported] from a server without
+ * receipts, [AppException.NotFound] when it is unknown or the server answers with another receipt than the one asked.
+ */
+class GetReceiptUseCase(private val receipts: ReceiptRepository, private val features: FeaturesRepository, private val guard: AccountGuard) {
+    suspend operator fun invoke(accountId: String, id: String): HistoryEntry = guard(accountId) {
+        if (!features.has(accountId, Features.RECEIPTS)) throw AppException.Unsupported(Features.RECEIPTS)
+        val entry = receipts.get(accountId, id)
+        // Its id is signed with it: a receipt answered for another id is not shown as this one.
+        if ((entry.raw["id"] as? JsonPrimitive)?.takeIf { it.isString }?.content != id) throw AppException.NotFound()
+        entry
     }
 }
 

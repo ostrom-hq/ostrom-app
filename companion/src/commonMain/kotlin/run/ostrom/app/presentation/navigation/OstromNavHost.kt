@@ -36,6 +36,7 @@ import run.ostrom.app.presentation.screens.MemberEnvironmentScreen
 import run.ostrom.app.presentation.screens.NewCloudSessionScreen
 import run.ostrom.app.presentation.screens.NotificationPreferencesScreen
 import run.ostrom.app.presentation.screens.PersonalMcpServersScreen
+import run.ostrom.app.presentation.screens.ReceiptScreen
 import run.ostrom.app.presentation.screens.RequestScreen
 import run.ostrom.app.presentation.screens.SessionScreen
 import run.ostrom.app.presentation.screens.WorkflowEditScreen
@@ -49,6 +50,7 @@ import run.ostrom.app.presentation.viewmodels.NewCloudSessionViewModel
 import run.ostrom.app.presentation.viewmodels.NotificationPreferencesViewModel
 import run.ostrom.app.presentation.viewmodels.NotificationSettingsViewModel
 import run.ostrom.app.presentation.viewmodels.PersonalMcpServersViewModel
+import run.ostrom.app.presentation.viewmodels.ReceiptViewModel
 import run.ostrom.app.presentation.viewmodels.RequestViewModel
 import run.ostrom.app.presentation.viewmodels.RootViewModel
 import run.ostrom.app.presentation.viewmodels.SessionViewModel
@@ -170,9 +172,14 @@ fun OstromNavHost(rootViewModel: RootViewModel = koinViewModel(), unlock: PhoneU
             SessionScreen(
                 viewModel,
                 onBack = { navController.popBackStack() },
-                onOpenHistory = { requestedTab = MainTab.HISTORY; navController.popBackStack(MainRoute, inclusive = false) },
+                onOpenReceipt = { receiptId -> navController.navigate(ReceiptRoute(route.accountId, receiptId)) },
                 onOpenRun = { runId -> navController.navigate(WorkflowRunRoute(route.accountId, runId)) },
             )
+        }
+        composable<ReceiptRoute> { entry ->
+            val route = entry.toRoute<ReceiptRoute>()
+            val viewModel: ReceiptViewModel = koinViewModel { parametersOf(route) }
+            ReceiptScreen(viewModel, onBack = { navController.popBackStack() }, receiptId = route.receiptId)
         }
         composable<WorkflowRoute> { entry ->
             val route = entry.toRoute<WorkflowRoute>()
