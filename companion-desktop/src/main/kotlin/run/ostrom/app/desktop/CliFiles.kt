@@ -20,9 +20,9 @@ data class CliSignIn(val server: String)
  * The two files of the `ostrom` CLI's folder the app follows, read only, never written: `config.toml` (its top-level
  * `server`, set by `ostrom login`) and `credentials.json` (`{"<server>": {"login": "<login>"}}`, an entry per server
  * signed in; `ostrom logout` removes it). The device token itself is not in a file: it is in the OS secret store
- * ([CliKeyring]).
+ * ([CliKeyring]). [serverOverride] is `OSTROM_URL`, which wins over `config.toml` for the CLI as for the app.
  */
-class CliFiles(val directory: String?) {
+class CliFiles(val directory: String?, private val serverOverride: String? = null) {
     /** What identifies one version of a file: its modification time, size and identity; null when there is none. */
     data class Stamp(val modified: Long, val size: Long, val key: Any?)
 
@@ -35,12 +35,16 @@ class CliFiles(val directory: String?) {
     fun stamps(): Stamps = Stamps(config?.let(::stamp), credentials?.let(::stamp))
 
     /**
-     * The CLI's sign-in: the server of `config.toml` (Ostrom's own when it names none, as the CLI does), when
-     * `credentials.json` has an entry for it. Null without one, and for files the CLI could not read either.
+     * The CLI's sign-in: the server of `OSTROM_URL`, else of `config.toml`, else Ostrom's own (as the CLI resolves
+     * it), when `credentials.json` has an entry for it; null without one.
+     *
+     * @throws IOException When `credentials.json` exists but does not read as the CLI's (caught while the CLI rewrites
+     *   it, or damaged): not a sign-out, the caller waits for its next version.
      */
     fun signIn(): CliSignIn? {
-        val server = (config?.let(::text)?.let(::serverOf) ?: DEFAULT_SERVER).trimEnd('/')
-        val entries = credentials?.let(::text)?.let(::entriesOf) ?: return null
+        val server = (serverOverride ?: config?.let(::text)?.let(::serverOf) ?: DEFAULT_SERVER).trimEnd('/')
+        val text = credentials?.let(::text) ?: return null
+        val entries = entriesOf(text) ?: throw IOException("$CREDENTIALS does not read as the CLI's.")
         // The login in the entry is only what the CLI shows: the account reads the person from the server.
         if (entries[server] !is JsonObject) return null
         return CliSignIn(server)

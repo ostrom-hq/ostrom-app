@@ -7,8 +7,8 @@ import java.util.concurrent.TimeUnit
 
 /**
  * The environment the app shares with the `ostrom` CLI. An app opened from the Finder or a desktop launcher inherits
- * neither the shell's `PATH` nor its `OSTROM_HOME` or `XDG_CONFIG_HOME`: without care, the CLI and the app would read two
- * different folders. So the app reads them once from a login shell ([loginShell]), and the CLI it runs gets the same
+ * neither the shell's `PATH` nor its `OSTROM_HOME`, `XDG_CONFIG_HOME` or `OSTROM_URL`: without care, the CLI and the app would read two
+ * different folders, or servers (`OSTROM_URL`). So the app reads them once from a login shell ([loginShell]), and the CLI it runs gets the same
  * values back.
  */
 class DesktopEnvironment(
@@ -69,8 +69,8 @@ class DesktopEnvironment(
     companion object {
         private const val MARKER = "__ostrom_environment__"
 
-        /** The variables that say where the CLI's folder is, read from the login shell. */
-        private val FOLDER_VARIABLES = listOf("OSTROM_HOME", "XDG_CONFIG_HOME")
+        /** The variables that say where the CLI's folder and server are, read from the login shell. */
+        private val FOLDER_VARIABLES = listOf("OSTROM_HOME", "XDG_CONFIG_HOME", "OSTROM_URL")
 
         /** The app's environment: its process, and on macOS and Linux a login shell read once. */
         fun detect(process: Map<String, String> = System.getenv()): DesktopEnvironment {
@@ -82,11 +82,11 @@ class DesktopEnvironment(
         }
 
         /**
-         * `OSTROM_HOME`, `XDG_CONFIG_HOME` and `PATH` as a login shell sets them, bounded to [timeoutMillis]; empty when
+         * `OSTROM_HOME`, `XDG_CONFIG_HOME`, `OSTROM_URL` and `PATH` as a login shell sets them, bounded to [timeoutMillis]; empty when
          * the shell fails or is slow. Only these values are read, between markers, so a profile that prints does no harm.
          */
         fun readLoginShell(shell: String, timeoutMillis: Long = 3_000): Map<String, String> = try {
-            val script = "printf '\\n$MARKER%s\\n$MARKER%s\\n$MARKER%s\\n' \"\${OSTROM_HOME-}\" \"\${XDG_CONFIG_HOME-}\" \"\${PATH-}\""
+            val script = "printf '\\n$MARKER%s\\n$MARKER%s\\n$MARKER%s\\n$MARKER%s\\n' \"\${OSTROM_HOME-}\" \"\${XDG_CONFIG_HOME-}\" \"\${OSTROM_URL-}\" \"\${PATH-}\""
             val process = ProcessBuilder(shell, "-l", "-c", script)
                 .redirectInput(ProcessBuilder.Redirect.from(File("/dev/null")))
                 .redirectError(ProcessBuilder.Redirect.DISCARD)
@@ -107,11 +107,12 @@ class DesktopEnvironment(
 
         internal fun parseLoginShell(output: String): Map<String, String> {
             val values = output.lines().filter { it.startsWith(MARKER) }.map { it.removePrefix(MARKER) }
-            if (values.size != 3) return emptyMap()
+            if (values.size != 4) return emptyMap()
             return buildMap {
                 values[0].takeIf { it.isNotBlank() && File(it).isAbsolute }?.let { put("OSTROM_HOME", it) }
                 values[1].takeIf { it.isNotBlank() && File(it).isAbsolute }?.let { put("XDG_CONFIG_HOME", it) }
-                values[2].takeIf { it.isNotBlank() }?.let { put("PATH", it) }
+                values[2].takeIf { it.isNotBlank() }?.let { put("OSTROM_URL", it) }
+                values[3].takeIf { it.isNotBlank() }?.let { put("PATH", it) }
             }
         }
     }

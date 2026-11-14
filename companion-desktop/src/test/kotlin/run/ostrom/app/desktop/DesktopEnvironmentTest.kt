@@ -23,13 +23,13 @@ class DesktopEnvironmentTest {
     fun theLoginShellFillsWhatTheProcessLacks() {
         val environment = DesktopEnvironment(
             mapOf("PATH" to "/usr/bin", "HOME" to "/Users/ada"),
-            DesktopEnvironment.parseLoginShell("profile noise\n\n__ostrom_environment__\n__ostrom_environment__/Users/ada/.cfg\n__ostrom_environment__/opt/homebrew/bin:/usr/bin\n"),
+            DesktopEnvironment.parseLoginShell("profile noise\n\n__ostrom_environment__\n__ostrom_environment__/Users/ada/.cfg\n__ostrom_environment__https://api.example\n__ostrom_environment__/opt/homebrew/bin:/usr/bin\n"),
             DesktopEnvironment.Os.MACOS,
         )
         assertEquals("/Users/ada/.cfg/ostrom", environment.cliDirectory)
         assertEquals(listOf("/usr/bin", "/opt/homebrew/bin"), environment.path)
         assertEquals(
-            mapOf("PATH" to listOf("/usr/bin", "/opt/homebrew/bin").joinToString(File.pathSeparator), "XDG_CONFIG_HOME" to "/Users/ada/.cfg"),
+            mapOf("PATH" to listOf("/usr/bin", "/opt/homebrew/bin").joinToString(File.pathSeparator), "XDG_CONFIG_HOME" to "/Users/ada/.cfg", "OSTROM_URL" to "https://api.example"),
             environment.cliVariables(),
             "The CLI the app runs reads the same folder",
         )
@@ -38,6 +38,6 @@ class DesktopEnvironmentTest {
     @Test
     fun anUnexpectedShellOutputIsIgnored() {
         assertEquals(emptyMap(), DesktopEnvironment.parseLoginShell("nothing"))
-        assertEquals(emptyMap(), DesktopEnvironment.parseLoginShell("__ostrom_environment__relative\n__ostrom_environment__\n__ostrom_environment__\n"))
+        assertEquals(emptyMap(), DesktopEnvironment.parseLoginShell("__ostrom_environment__relative\n__ostrom_environment__\n__ostrom_environment__\n__ostrom_environment__\n"))
     }
 }

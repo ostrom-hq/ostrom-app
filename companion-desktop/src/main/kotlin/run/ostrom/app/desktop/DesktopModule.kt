@@ -36,7 +36,7 @@ internal fun desktopOverrides(environment: DesktopEnvironment, keyring: KeyringB
     single<CliSession> { DesktopCliSession(get(), get()) }
     if (keyring != null) {
         val cli = CliKeyring.of(keyring)
-        single { CliFiles(environment.cliDirectory) }
+        single { CliFiles(environment.cliDirectory, environment["OSTROM_URL"]) }
         single<CredentialStore> {
             val scope = this
             CliCredentialStore(KeyringCredentialStore(keyring), get(), cli) { id -> scope.get<AccountRepository>().find(id)?.origin }

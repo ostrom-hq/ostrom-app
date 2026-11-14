@@ -9,7 +9,7 @@ import run.ostrom.app.presentation.screens.MainTab
 
 /** What the desktop's menu bar asks of the app. */
 sealed interface AppCommand {
-    /** Shows [tab] of the signed-in app, above anything opened over the tabs; nothing when its server lacks it. */
+    /** Shows [tab] of the signed-in app, above anything opened over the tabs; the first tab when its server lacks it. */
     data class ShowTab(val tab: MainTab) : AppCommand
 
     /** Opens the screen that adds an account. */

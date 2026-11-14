@@ -89,7 +89,8 @@ class UpdateBannerViewModel(
     fun update() {
         val version = when (val current = state.value) {
             is UpdateBannerState.Available -> current.version
-            is UpdateBannerState.Failed -> current.version
+            // Still running: a second `ostrom update` would race the first; the next check shows the banner again.
+            is UpdateBannerState.Failed -> current.version.takeIf { current.reason != CliUpdateException.Reason.STILL_RUNNING } ?: return
             else -> return
         }
         state.value = UpdateBannerState.Updating(version)
@@ -114,12 +115,14 @@ class UpdateBannerViewModel(
         }
     }
 
-    /** "Not now", or closing a result or a failure: the banner of this version does not show again; a newer one does. */
+    /**
+     * "Not now": the banner of this version does not show again, a newer one does. Closing a result or a failure only
+     * hides it: a version that failed to install is offered again at the next check.
+     */
     fun dismiss() {
         when (val current = state.value) {
             is UpdateBannerState.Available -> preferences.dismissedVersion = current.version
-            is UpdateBannerState.Failed -> preferences.dismissedVersion = current.version
-            is UpdateBannerState.Updated -> Unit
+            is UpdateBannerState.Failed, is UpdateBannerState.Updated -> Unit
             else -> return
         }
         state.value = UpdateBannerState.Hidden

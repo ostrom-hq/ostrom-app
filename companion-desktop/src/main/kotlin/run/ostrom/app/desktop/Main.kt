@@ -131,7 +131,7 @@ fun main() {
                     Item(desktopLabel(DesktopLabel.MENU_CLOSE_WINDOW), shortcut = shortcut(Key.W), onClick = { if (tray) visible = false else exitApplication() })
                 }
                 Menu(desktopLabel(DesktopLabel.MENU_VIEW)) {
-                    // Cmd+1 to Cmd+8 for the tabs, in their order; a tab the server does not serve changes nothing.
+                    // Cmd+1 to Cmd+8 for the tabs, in their order; a tab the server does not serve shows the first one.
                     MainTab.entries.filter { it != MainTab.SETTINGS }.forEachIndexed { index, tab ->
                         Item(tabLabel(tab), shortcut = TAB_KEYS.getOrNull(index)?.let(::shortcut), onClick = { AppCommands.send(AppCommand.ShowTab(tab)) })
                     }

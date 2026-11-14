@@ -2,6 +2,7 @@
 // Ported from TeamCode (Apache-2.0), companion-desktop/.../CliAccountSync.kt; see NOTICE.
 package run.ostrom.app.desktop
 
+import java.io.IOException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -63,7 +64,14 @@ class CliAccountSync(
     suspend fun sync() = mutex.withLock {
         val stamps = withContext(Dispatchers.IO) { files.stamps() }
         if (seen == stamps && (retryAt == 0L || clock.nowMillis() < retryAt)) return@withLock
-        val signIn = withContext(Dispatchers.IO) { files.signIn() }
+        val signIn = try {
+            withContext(Dispatchers.IO) { files.signIn() }
+        } catch (_: IOException) {
+            // Caught while the CLI rewrites it, or damaged: the account stays as it is until the file's next version.
+            seen = stamps
+            retryAt = 0L
+            return@withLock
+        }
         apply(signIn)
         seen = stamps
     }
@@ -94,8 +102,16 @@ class CliAccountSync(
         } catch (error: CancellationException) {
             throw error
         } catch (_: AppException.Unauthorized) {
-            // A token the server no longer knows: listed as signed out if the account exists, read again once the CLI's files change.
-            current?.takeIf { it.origin == signIn.server && it.signedIn }?.let { accounts.update(it.copy(signedIn = false)) }
+            // A token the server no longer knows: listed as signed out if the account exists (now on the CLI's server, whose
+            // person is unknown until the CLI signs in again), read again once the CLI's files change.
+            when {
+                current == null -> Unit
+                current.origin != signIn.server -> {
+                    auth.release(Account.CLI_ACCOUNT_ID)
+                    accounts.update(current.copy(origin = signIn.server, signedIn = false, organizationId = null, organizationName = null, memberId = null))
+                }
+                current.signedIn -> accounts.update(current.copy(signedIn = false))
+            }
             return
         } catch (_: Exception) {
             retryAt = clock.nowMillis() + retryMillis

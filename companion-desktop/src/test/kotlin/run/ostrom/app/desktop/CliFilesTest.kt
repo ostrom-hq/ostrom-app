@@ -2,7 +2,9 @@
 package run.ostrom.app.desktop
 
 import java.io.File
+import java.io.IOException
 import kotlin.test.Test
+import kotlin.test.assertFailsWith
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNull
@@ -32,11 +34,13 @@ class CliFilesTest {
         assertNull(files.signIn(), "No entry for the server of config.toml")
         File(directory, "credentials.json").writeText("""{"https://api.example": {"login": "ada"}}""")
         assertEquals(CliSignIn("https://api.example"), files.signIn())
-        File(directory, "credentials.json").writeText("{ not json")
-        assertNull(files.signIn(), "A file the CLI cannot read either")
         File(directory, "credentials.json").writeText("""{"https://api.example": "ada"}""")
         assertNull(files.signIn())
         assertNull(CliFiles(null).signIn(), "No CLI folder")
+        File(directory, "credentials.json").writeText("""{"https://staging.example": {"login": "ada"}}""")
+        assertEquals(CliSignIn("https://staging.example"), CliFiles(directory.path, "https://staging.example/").signIn(), "OSTROM_URL wins, as for the CLI")
+        File(directory, "credentials.json").writeText("{ \"https://api.exa")
+        assertFailsWith<IOException>("Caught while the CLI rewrites it: not a sign-out") { files.signIn() }
     }
 
     @Test

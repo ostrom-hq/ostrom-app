@@ -132,9 +132,9 @@ fun MainScreen(
     val tabs = state.tabs()
     var selected by rememberSaveable { mutableStateOf<MainTab?>(null) }
     // A tapped notification (a wait's opens the waits), a pushed screen (a session's receipt opens the History tab) or the
-    // desktop's menu bar asked for a tab; one the server does not serve leaves the tab shown.
+    // desktop's menu bar asked for a tab. Kept even before the server's features are read: it shows once they are.
     LaunchedEffect(requestedTab) {
-        requestedTab?.let { if (it in tabs) selected = it; onTabRequestShown() }
+        requestedTab?.let { selected = it; onTabRequestShown() }
     }
     val tab = selected?.takeIf { it in tabs } ?: tabs.first()
     val wide = LocalWideLayout.current

@@ -140,6 +140,18 @@ class UpdateBannerViewModelTest {
         viewModel.update()
         assertEquals(UpdateBannerState.Failed("0.5.0", CliUpdateException.Reason.NOT_INSTALLED), viewModel.uiState.value)
         viewModel.dismiss()
-        assertEquals("0.5.0", preferences.dismissedVersion)
+        assertEquals(UpdateBannerState.Hidden, viewModel.uiState.value)
+        assertEquals(null, preferences.dismissedVersion, "A version that failed to install is offered again")
+    }
+
+    @Test
+    fun anUpdateStillRunningIsNotStartedAgain() = banner {
+        var runs = 0
+        updater.result = { _ -> runs++; throw CliUpdateException(CliUpdateException.Reason.STILL_RUNNING) }
+        val viewModel = newViewModel()
+        viewModel.update()
+        assertEquals(UpdateBannerState.Failed("0.5.0", CliUpdateException.Reason.STILL_RUNNING), viewModel.uiState.value)
+        viewModel.update()
+        assertEquals(1, runs, "A second ostrom update would race the first")
     }
 }

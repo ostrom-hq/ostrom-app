@@ -119,7 +119,7 @@ fun UpdateBannerContent(state: UpdateBannerState, onUpdate: () -> Unit, onDismis
                     AppIconButton(PhosphorIcons.Regular.X, stringResource(Res.string.update_not_now), onDismiss, modifier = Modifier.testTag("update-banner-dismiss"))
                 }
                 is UpdateBannerState.Failed -> {
-                    AppButton(stringResource(Res.string.update_try_again), onUpdate, small = true, fill = false, kind = ButtonKind.SECONDARY, modifier = Modifier.testTag("update-banner-retry"))
+                    if (state.reason != CliUpdateException.Reason.STILL_RUNNING) AppButton(stringResource(Res.string.update_try_again), onUpdate, small = true, fill = false, kind = ButtonKind.SECONDARY, modifier = Modifier.testTag("update-banner-retry"))
                     AppIconButton(PhosphorIcons.Regular.X, stringResource(Res.string.action_close), onDismiss, modifier = Modifier.testTag("update-banner-dismiss"))
                 }
                 is UpdateBannerState.Updated ->

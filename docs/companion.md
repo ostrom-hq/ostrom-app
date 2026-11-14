@@ -132,7 +132,7 @@ feed's opening, after a gap, on return and on refresh, and become live by themse
   (`WindowPlacementStore`). The icon is the phones' (`companion-ios`'s AppIcon), for the window, the Dock and the
   menu bar; the macOS and Windows installers keep the default one until an `.icns` and an `.ico` of it exist.
 - **Menu bar.** File: Add an account (Cmd/Ctrl+N), Close window (Cmd/Ctrl+W). View: each tab in its order
-  (Cmd/Ctrl+1 to 8; a tab the server does not serve changes nothing) and Settings (Cmd/Ctrl+,). The menu sends
+  (Cmd/Ctrl+1 to 8, in the order of every tab; one the server does not serve shows the first tab) and Settings (Cmd/Ctrl+,). The menu sends
   `AppCommands`, which the navigation follows.
 - **The CLI's account.** When the `ostrom` CLI of this computer is signed in, its session is an account of the app
   (`Account.CLI_ACCOUNT_ID`, a "CLI" chip in Settings), kept equal to what the CLI says (`CliAccountSync`): the CLI's

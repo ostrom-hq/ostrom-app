@@ -121,6 +121,38 @@ class CliAccountSyncTest {
     }
 
     @Test
+    fun aRefusedTokenOnAnotherServerMovesTheAccountThereSignedOut() = withTemporaryDirectory { directory ->
+        runTest {
+            val f = Fixture(directory)
+            f.cli.login("https://api.example", "osm-1")
+            f.sync.sync()
+            f.auth.failure = AppException.Unauthorized()
+            f.cli.login("https://api.other.example", "osm-dead")
+            f.sync.sync()
+            val account = f.cliAccount()!!
+            assertEquals("https://api.other.example", account.origin, "Never the previous server, whose token the CLI no longer uses")
+            assertFalse(account.signedIn)
+            assertNull(account.organizationId)
+            assertTrue("release cli" in f.auth.calls)
+        }
+    }
+
+    @Test
+    fun aCredentialsFileCaughtMidWriteChangesNothing() = withTemporaryDirectory { directory ->
+        runTest {
+            val f = Fixture(directory)
+            f.cli.login("https://api.example", "osm-1")
+            f.sync.sync()
+            File(f.cli.directory, "credentials.json").writeText("{ \"https://api.exa")
+            f.sync.sync()
+            assertTrue(f.cliAccount()!!.signedIn, "Not a sign-out")
+            f.cli.logout("https://api.example")
+            f.sync.sync()
+            assertNull(f.cliAccount(), "Its next version is read")
+        }
+    }
+
+    @Test
     fun anUnreachableServerIsAskedAgainAfterTheDelay() = withTemporaryDirectory { directory ->
         runTest {
             val f = Fixture(directory)
