@@ -90,7 +90,7 @@ What the React Native app did, what TeamCode's companion does that an Ostrom ser
 | Activity | none | Ported (newest first, paged; a line about an approval opens its request on a server with `gates.v1`) |
 | Notification preferences (requests, decisions, spending, quiet hours) | `notifications.v1` | Ported: Settings, Notifications, shaped like TeamCode's `NotificationPreferencesScreen` |
 | Push registration | `notifications.push.v1` | Waiting for the server: it accepts only `provider: "expo"`, which a native app has no token for (TeamCode's FCM push needs `fcm`/`apns` on the server) |
-| Artifacts gallery and viewer | `artifacts.v1` | To port from TeamCode |
+| Artifacts gallery and viewer | `artifacts.v1` | Ported from TeamCode's `ArtifactsScreen` and `ArtifactScreen`: the gallery (newest first, paged, searched in the loaded titles), the viewer with its versions, the page in a sandboxed web view on iOS and Android from a reading ticket on the server's content origin (`/a/<id>/<ticket>/`), the console page in the browser on the desktop. No Mine/Team filter and no pasted link (the list route has no scope, the console page lives on an origin the app does not know) |
 | Sessions (list, transcript, follow live) | `sessions.v1` | To port from TeamCode, once ostrom-core's client has the session routes |
 | Todos, workflows, automations, MCP servers, GitHub link, sharing | `todos.v1`, `workflows.v1`, `automations.v1`, `mcp.v1`, `github.link.v1`, `sharing.v1` | Later, each with its client routes in ostrom-core |
 | Desktop: menu bar icon, the CLI's account, update banner | none | To port from TeamCode's `companion-desktop` |

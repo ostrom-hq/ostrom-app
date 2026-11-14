@@ -26,3 +26,7 @@ data class RequestRoute(val accountId: String, val id: String)
 /** The notification preferences of an account (`notifications.v1`), opened from Settings. */
 @Serializable
 data class NotificationPreferencesRoute(val accountId: String)
+
+/** One artifact of an account, at [version] (the latest one when null), opened from the Artifacts tab. */
+@Serializable
+data class ArtifactRoute(val accountId: String, val artifactId: String, val version: Int? = null)

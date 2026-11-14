@@ -34,6 +34,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.adamglin.PhosphorIcons
 import com.adamglin.phosphoricons.Regular
 import com.adamglin.phosphoricons.regular.Bell
+import com.adamglin.phosphoricons.regular.FileText
 import com.adamglin.phosphoricons.regular.GearSix
 import com.adamglin.phosphoricons.regular.Tray
 import com.adamglin.phosphoricons.regular.Pulse
@@ -60,6 +61,7 @@ import run.ostrom.app.resources.home_signed_out
 import run.ostrom.app.resources.home_sign_in_again
 import run.ostrom.app.resources.tab_inbox
 import run.ostrom.app.resources.tab_activity
+import run.ostrom.app.resources.tab_artifacts
 import run.ostrom.app.resources.tab_settings
 import run.ostrom.app.resources.tab_spending
 import run.ostrom.app.resources.tab_waits
@@ -74,6 +76,7 @@ enum class MainTab(val feature: String?, val label: StringResource, val icon: Im
     SPENDING(Features.BUDGETS, Res.string.tab_spending, PhosphorIcons.Regular.Wallet),
     // Every server has its activity feed.
     ACTIVITY(null, Res.string.tab_activity, PhosphorIcons.Regular.Pulse),
+    ARTIFACTS(Features.ARTIFACTS, Res.string.tab_artifacts, PhosphorIcons.Regular.FileText),
     SETTINGS(null, Res.string.tab_settings, PhosphorIcons.Regular.GearSix),
 }
 
@@ -90,6 +93,7 @@ fun MainScreen(
     onSignInAgain: (Account) -> Unit,
     onOpenRequest: (accountId: String, id: String) -> Unit = { _, _ -> },
     onOpenNotifications: (accountId: String) -> Unit = {},
+    onOpenArtifact: (accountId: String, artifactId: String) -> Unit = { _, _ -> },
     viewModel: HomeViewModel = koinViewModel(),
     waits: WaitsViewModel = koinViewModel(),
 ) {
@@ -142,6 +146,7 @@ fun MainScreen(
                         MainTab.WAITING -> WaitsScreen(waits)
                         MainTab.SPENDING -> SpendingScreen()
                         MainTab.ACTIVITY -> ActivityScreen(onOpen = if (state.serves(Features.GATES)) onOpenRequest else null)
+                        MainTab.ARTIFACTS -> ArtifactsScreen(onOpen = onOpenArtifact)
                         MainTab.SETTINGS -> SettingsScreen(onAddAccount = onAddAccount, onSignInAgain = onSignInAgain, onOpenNotifications = onOpenNotifications)
                     }
                 }
