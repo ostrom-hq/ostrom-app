@@ -146,6 +146,29 @@ class NotificationSettingsViewModelTest {
     }
 
     @Test
+    fun aSwitchSavedFirstKeepsTheOneStillBeingSaved() = runTest(dispatcher) {
+        val viewModel = viewModel()
+        advanceUntilIdle()
+        repository.gate = CompletableDeferred()
+        viewModel.toggle("push", NotificationKind.WAITING, false)
+        runCurrent()
+        val first = repository.gate!!
+        repository.gate = CompletableDeferred()
+        viewModel.toggle("push", NotificationKind.TURN_FAILED, false)
+        runCurrent()
+        // The first answer does not hold the second change yet: the second switch stays where it was flipped.
+        first.complete(Unit)
+        runCurrent()
+        assertFalse(viewModel.uiState.value.settings!!.isOn("push", NotificationKind.WAITING))
+        assertFalse(viewModel.uiState.value.settings!!.isOn("push", NotificationKind.TURN_FAILED))
+        assertEquals(setOf(NotificationSwitch("push", NotificationKind.TURN_FAILED)), viewModel.uiState.value.saving)
+        repository.gate!!.complete(Unit)
+        advanceUntilIdle()
+        assertEquals(emptySet(), viewModel.uiState.value.saving)
+        assertFalse(viewModel.uiState.value.settings!!.isOn("push", NotificationKind.TURN_FAILED))
+    }
+
+    @Test
     fun aRefusedSwitchGoesBackAndSaysWhy() = runTest(dispatcher) {
         val viewModel = viewModel()
         advanceUntilIdle()

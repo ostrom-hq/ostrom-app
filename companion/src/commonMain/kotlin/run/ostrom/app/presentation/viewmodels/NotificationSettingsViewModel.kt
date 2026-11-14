@@ -72,7 +72,7 @@ class NotificationSettingsViewModel(
         viewModelScope.launch {
             try {
                 val saved = set(route.accountId, channel, kind, enabled)
-                state.update { it.copy(settings = saved, saving = it.saving - switch) }
+                state.update { it.copy(settings = saved.keeping(it.saving - switch, it.settings), saving = it.saving - switch) }
             } catch (error: CancellationException) {
                 state.update { it.copy(settings = it.settings?.with(channel, kind, before), saving = it.saving - switch) }
                 throw error
@@ -98,3 +98,7 @@ class NotificationSettingsViewModel(
         }
     }
 }
+
+/** The server's answer, with the switches still being saved kept in the position they were flipped to. */
+private fun NotificationSettings.keeping(pending: Set<NotificationSwitch>, shown: NotificationSettings?): NotificationSettings =
+    pending.fold(this) { settings, switch -> settings.with(switch.channel, switch.kind, shown?.isOn(switch.channel, switch.kind) ?: true) }
