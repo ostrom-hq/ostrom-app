@@ -17,6 +17,13 @@ data class LoginRoute(val origin: String, val accountId: String? = null)
 object MainRoute
 
 /**
+ * On a phone, a tab its bar has no room for ([tab], a [run.ostrom.app.presentation.screens.MainTab] name), opened from
+ * Settings above the tabs; [opensRequests]: its server serves `gates.v1`, so an activity line opens its request.
+ */
+@Serializable
+data class MoreTabRoute(val tab: String, val opensRequests: Boolean)
+
+/**
  * One request for a yes of [accountId]'s server: opened from the inbox, and by id from a push or a link. The request is
  * read again from the server each time; an answer goes only from this screen.
  */

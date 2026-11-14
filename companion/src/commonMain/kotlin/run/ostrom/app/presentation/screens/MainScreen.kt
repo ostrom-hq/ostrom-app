@@ -2,7 +2,11 @@
 // Shaped like TeamCode's companion presentation/screens/MainScreen.kt (Apache-2.0); see NOTICE.
 package run.ostrom.app.presentation.screens
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -52,6 +56,7 @@ import run.ostrom.app.presentation.components.AppButton
 import run.ostrom.app.presentation.components.Banner
 import run.ostrom.app.presentation.components.DemoBanner
 import run.ostrom.app.presentation.components.LocalWideLayout
+import run.ostrom.app.presentation.components.NavBar
 import run.ostrom.app.presentation.components.Tone
 import run.ostrom.app.presentation.components.UpdateBanner
 import run.ostrom.app.presentation.components.underDemoBanner
@@ -98,8 +103,29 @@ internal fun HomeUiState.tabs(): List<MainTab> = MainTab.entries.filter { tab ->
     tab.feature == null || serves(tab.feature) || (tab == MainTab.SESSIONS && serves(Features.RUNNERS_CLOUD))
 }
 
+/** The tabs a phone's bar always offers first, when their server serves them; Settings comes last. */
+private val PHONE_FIRST = listOf(MainTab.INBOX, MainTab.WAITING, MainTab.SESSIONS, MainTab.WORKFLOWS)
+
+/** The most tabs a phone's bar shows, each with its label. */
+internal const val MAX_PHONE_TABS = 5
+
 /**
- * The signed-in app: the tabs at the bottom on a phone, a rail on a wide window. A server that speaks another API
+ * The phone's bar, as TeamCode's: at most [MAX_PHONE_TABS] tabs, every one labeled. The served ones of [PHONE_FIRST],
+ * then the other served tabs in their order while there is room, and Settings last. The tabs left out ([phoneMoreTabs])
+ * open from Settings.
+ */
+internal fun phoneTabs(tabs: List<MainTab>): List<MainTab> {
+    val settings = listOfNotNull(MainTab.SETTINGS.takeIf { it in tabs })
+    val others = PHONE_FIRST.filter { it in tabs } + tabs.filter { it !in PHONE_FIRST && it != MainTab.SETTINGS }
+    return others.take(MAX_PHONE_TABS - settings.size) + settings
+}
+
+/** The served tabs a phone's bar has no room for, in their order: rows of Settings. */
+internal fun phoneMoreTabs(tabs: List<MainTab>): List<MainTab> = phoneTabs(tabs).let { bar -> tabs.filter { it !in bar } }
+
+/**
+ * The signed-in app: the tabs at the bottom on a phone (at most five, the others opened from Settings), a rail with
+ * every tab on a wide window. A server that speaks another API
  * version replaces everything with [IncompatibleServerScreen]; a session the server ended asks to sign in again.
  */
 @Composable
@@ -117,6 +143,7 @@ fun MainScreen(
     onOpenWorkflow: (accountId: String, workflowId: String) -> Unit = { _, _ -> },
     onNewWorkflow: (accountId: String) -> Unit = {},
     onOpenRun: (accountId: String, runId: String) -> Unit = { _, _ -> },
+    onOpenTab: (tab: MainTab, opensRequests: Boolean) -> Unit = { _, _ -> },
     requestedTab: MainTab? = null,
     onTabRequestShown: () -> Unit = {},
     viewModel: HomeViewModel = koinViewModel(),
@@ -144,15 +171,25 @@ fun MainScreen(
     LaunchedEffect(requestedTab) {
         requestedTab?.let { selected = it; onTabRequestShown() }
     }
-    val tab = selected?.takeIf { it in tabs } ?: tabs.first()
     val wide = LocalWideLayout.current
+    val bar = if (wide) tabs else phoneTabs(tabs)
+    val more = if (wide) emptyList() else phoneMoreTabs(tabs)
+    // On a phone, a tab its bar has no room for (asked for, chosen on a wide window that narrowed, or served once the
+    // features are read) opens above Settings, with back to it.
+    val opensRequests = state.serves(Features.GATES)
+    LaunchedEffect(selected, more) {
+        val moved = selected?.takeIf { it in more } ?: return@LaunchedEffect
+        selected = MainTab.SETTINGS
+        onOpenTab(moved, opensRequests)
+    }
+    val tab = selected?.takeIf { it in bar } ?: bar.first()
     val colors = Ostrom.colors
     Column(Modifier.fillMaxSize()) {
         DemoBanner(state.account)
         Row(Modifier.weight(1f).underDemoBanner(state.account)) {
             if (wide && tabs.size > 1) {
                 NavigationRail(containerColor = colors.background, modifier = Modifier.testTag("tabs")) {
-                    tabs.forEach { item ->
+                    bar.forEach { item ->
                         NavigationRailItem(
                             selected = item == tab, onClick = { selected = item },
                             icon = { TabIcon(item, waitsState) }, label = { Text(stringResource(item.label)) },
@@ -188,20 +225,20 @@ fun MainScreen(
                         MainTab.ARTIFACTS -> ArtifactsScreen(onOpen = onOpenArtifact)
                         MainTab.WORKFLOWS -> WorkflowsScreen(onOpenRun = onOpenRun, onOpenWorkflow = onOpenWorkflow, onNewWorkflow = onNewWorkflow)
                         MainTab.SETTINGS -> SettingsScreen(onAddAccount = onAddAccount, onSignInAgain = onSignInAgain, onOpenNotifications = onOpenNotifications,
-                            onOpenEnvironment = onOpenEnvironment, onOpenMcpServers = onOpenMcpServers)
+                            onOpenEnvironment = onOpenEnvironment, onOpenMcpServers = onOpenMcpServers, moreTabs = more,
+                            onOpenTab = { onOpenTab(it, opensRequests) })
                     }
                 }
             }
         }
-        if (!wide && tabs.size > 1) {
+        if (!wide && bar.size > 1) {
             HorizontalDivider(color = colors.line)
             NavigationBar(containerColor = colors.background, modifier = Modifier.testTag("tabs")) {
-                tabs.forEach { item ->
+                bar.forEach { item ->
                     NavigationBarItem(
                         selected = item == tab, onClick = { selected = item },
                         icon = { TabIcon(item, waitsState) }, label = { Text(stringResource(item.label), maxLines = 1) },
-                        // More tabs than a phone's width holds with their labels: only the selected one shows its label.
-                        alwaysShowLabel = tabs.size <= MAX_LABELED_TABS,
+                        alwaysShowLabel = true,
                         colors = NavigationBarItemDefaults.colors(selectedIconColor = colors.accentText, selectedTextColor = colors.accentText, indicatorColor = colors.chip),
                         modifier = Modifier.testTag("tab-${item.name.lowercase()}"),
                     )
@@ -211,9 +248,6 @@ fun MainScreen(
     }
 }
 
-/** The most tabs a phone's bar shows with every label. */
-private const val MAX_LABELED_TABS = 5
-
 /** A tab's icon; the Waiting tab's carries the count of open waits, live while another tab shows. */
 @Composable
 private fun TabIcon(tab: MainTab, waits: WaitsUiState) {
@@ -221,6 +255,34 @@ private fun TabIcon(tab: MainTab, waits: WaitsUiState) {
         Icon(tab.icon, contentDescription = null)
         if (tab == MainTab.WAITING && waits.openCount > 0) {
             WaitsBadge(waits.openCount, waits.moreOpen, Modifier.align(Alignment.TopEnd).offset(x = 12.dp, y = (-6).dp).testTag("tab-badge-waits"))
+        }
+    }
+}
+
+/**
+ * A tab the phone's bar has no room for ([phoneMoreTabs]), opened from Settings above the tabs: its screen under a bar
+ * with back. [opensRequests]: an activity line opens its request (the server serves `gates.v1`).
+ */
+@Composable
+fun MoreTabScreen(
+    tab: MainTab,
+    opensRequests: Boolean,
+    onBack: () -> Unit,
+    onOpenRequest: (accountId: String, id: String) -> Unit,
+    onOpenArtifact: (accountId: String, artifactId: String) -> Unit,
+) {
+    Column(Modifier.fillMaxSize().background(Ostrom.colors.background).testTag("more-tab-${tab.name.lowercase()}")) {
+        // The screen's own large title names it: the bar holds only the way back.
+        NavBar(stringResource(MainTab.SETTINGS.label), onBack, "")
+        Box(Modifier.weight(1f).consumeWindowInsets(WindowInsets.statusBars)) {
+            when (tab) {
+                MainTab.HISTORY -> HistoryScreen()
+                MainTab.SPENDING -> SpendingScreen()
+                MainTab.ACTIVITY -> ActivityScreen(onOpen = if (opensRequests) onOpenRequest else null)
+                MainTab.ARTIFACTS -> ArtifactsScreen(onOpen = onOpenArtifact)
+                // Always in the phone's bar when served: never opened from Settings.
+                MainTab.INBOX, MainTab.WAITING, MainTab.SESSIONS, MainTab.WORKFLOWS, MainTab.SETTINGS -> Unit
+            }
         }
     }
 }

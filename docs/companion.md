@@ -42,6 +42,15 @@ too old to have the route, replaces the app with a blocking screen whose only ac
 asked again when the app comes back to the foreground, at most every ten minutes; an unreachable server changes
 nothing.
 
+## Tabs
+
+A wide window (a tablet, the desktop) has a rail with every tab its server serves. A phone's bar has at most five,
+each with its label, as TeamCode's: the served ones of Approvals, Waiting, Sessions and Workflows, then the other served
+tabs in their order while there is room, and Settings last. The tabs left out (History, Spending, Activity, Artifacts
+when everything is served) are rows of a section at the top of Settings, each opening its screen above the tabs with
+back to Settings. A tab asked for by a notification, a link or the desktop's menu bar opens there too on a phone; a
+tab shown on a wide window that narrows moves there.
+
 ## Approvals
 
 The first tab (`gates.v1`) lists what waits for the person's yes, then what was answered lately. A row only opens the
