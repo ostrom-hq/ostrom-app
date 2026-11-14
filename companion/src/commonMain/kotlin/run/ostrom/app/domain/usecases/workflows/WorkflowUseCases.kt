@@ -72,6 +72,9 @@ class CanManageRunsUseCase(private val auth: AuthRepository, private val account
             current?.role
         } catch (error: CancellationException) {
             throw error
+        } catch (_: AppException.Unauthorized) {
+            // Signed out meanwhile: no action to offer.
+            return false
         } catch (_: Exception) {
             null
         }

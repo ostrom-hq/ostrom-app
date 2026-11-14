@@ -92,7 +92,8 @@ class DemoWorkflowRepository(private val demo: DemoMode, private val clock: Cloc
     private fun all(store: DemoStore): List<WorkflowRun> {
         val cancelled = store.cancelledRuns.value
         return (store.startedRuns.value + demoRuns(store.startedAt)).map { run ->
-            cancelled[run.id]?.let { at -> run.copy(status = RunStatus.CANCELLED, currentNodeId = null, currentNodeKind = null, endedAt = at, visits = run.visits.map { if (it.active) it.copy(status = "cancelled", endedAt = at) else it }) } ?: run
+            // As the server cancels: the visit under way fails with the outcome `cancelled`.
+            cancelled[run.id]?.let { at -> run.copy(status = RunStatus.CANCELLED, currentNodeId = null, currentNodeKind = null, endedAt = at, visits = run.visits.map { if (it.active) it.copy(status = "failed", outcome = "cancelled", endedAt = at) else it }) } ?: run
         }
     }
 

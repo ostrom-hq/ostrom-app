@@ -111,7 +111,7 @@ class WorkflowRunViewModel(
             try {
                 val cancelled = cancelRun(route.accountId, run)
                 // The answer carries no visits: keep the timeline, take the status.
-                state.update { it.copy(cancelling = false, run = cancelled.copy(visits = run.visits)) }
+                state.update { it.copy(cancelling = false, run = cancelled.copy(visits = it.run?.visits ?: run.visits)) }
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Exception) {

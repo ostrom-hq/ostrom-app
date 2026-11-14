@@ -196,6 +196,8 @@ class WorkflowUseCasesTest {
         assertFalse(manages("a1"), "The only organization is the account's")
         auth.organizationsError = AppException.Unreachable()
         assertTrue(manages("a1"), "Offline, the actions show and the server words a refusal")
+        auth.organizationsError = AppException.Unauthorized()
+        assertFalse(manages("a1"), "Signed out meanwhile")
         assertFalse(manages("unknown"))
         accounts.save(account(signedIn = false))
         assertFalse(manages("a1"))

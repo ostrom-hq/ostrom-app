@@ -5,7 +5,9 @@ package run.ostrom.app.presentation.viewmodels
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -94,6 +96,8 @@ class WorkflowViewModel(
     private val state = MutableStateFlow(WorkflowUiState())
     val uiState: StateFlow<WorkflowUiState> = state.asStateFlow()
     private var loading: Job? = null
+    // The role is read alongside the first read of the workflow, once per page: it changes rarely, and never fails.
+    private val rights: Deferred<Boolean> = viewModelScope.async { canManageRuns(route.accountId) }
 
     init { load() }
 
@@ -104,10 +108,7 @@ class WorkflowViewModel(
             try {
                 val workflow = getWorkflow(route.accountId, route.workflowId)
                 state.update { it.copy(workflow = workflow, loading = false, gone = false) }
-                if (workflow.runnable) {
-                    val manages = canManageRuns(route.accountId)
-                    state.update { it.copy(managesRuns = manages) }
-                }
+                if (workflow.runnable) state.update { it.copy(managesRuns = rights.await()) }
             } catch (error: CancellationException) {
                 throw error
             } catch (error: AppException.NotFound) {
