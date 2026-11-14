@@ -35,6 +35,7 @@ import run.ostrom.app.domain.repositories.ReceiptRepository
 import run.ostrom.app.domain.usecases.auth.AccountGuard
 import run.ostrom.app.domain.usecases.auth.RefreshAccountUseCase
 import run.ostrom.app.domain.usecases.receipts.CheckReceiptsUseCase
+import run.ostrom.app.domain.usecases.receipts.GetReceiptUseCase
 import run.ostrom.app.domain.usecases.receipts.LoadReceiptsUseCase
 import run.ostrom.app.domain.usecases.receipts.ReceiptKeyPinning
 import run.ostrom.app.domain.usecases.receipts.TrustedReceiptKeysUseCase
@@ -185,8 +186,14 @@ class ReceiptUseCasesTest {
         assertTrue(HistoryEntry(body(), null).checkRuns.isEmpty())
     }
 
-    private class FakeReceipts(var keys: List<ServedReceiptKey> = emptyList()) : ReceiptRepository {
+    private class FakeReceipts(var keys: List<ServedReceiptKey> = emptyList(), var byId: Map<String, JsonObject> = emptyMap()) : ReceiptRepository {
         val asked = mutableListOf<String>()
+
+        override suspend fun get(accountId: String, id: String): HistoryEntry {
+            asked += "get $id"
+            return HistoryEntry(byId[id] ?: throw AppException.NotFound(), null)
+        }
+
         override suspend fun page(accountId: String, before: String?): ReceiptPage {
             asked += "page ${before.orEmpty()}".trim()
             return ReceiptPage(emptyList(), "c2")
@@ -218,6 +225,21 @@ class ReceiptUseCasesTest {
         assertEquals("c2", load("a1").next)
         load("a1", "c2")
         assertEquals(listOf("page", "page c2"), receipts.asked)
+    }
+
+    @Test
+    fun oneReceiptIsReadByItsIdOnlyFromAServerWithReceipts() = runTest {
+        val receipts = FakeReceipts(byId = mapOf("rcpt_1" to body("rcpt_1"), "rcpt_2" to body("rcpt_other")))
+        val features = FakeFeatures()
+        val get = GetReceiptUseCase(receipts, features, guard())
+        assertFailsWith<AppException.Unsupported> { get("a1", "rcpt_1") }
+        assertTrue(receipts.asked.isEmpty())
+        features.features = setOf(Features.RECEIPTS)
+        assertEquals(JsonPrimitive("rcpt_1"), get("a1", "rcpt_1").raw["id"])
+        assertFailsWith<AppException.NotFound> { get("a1", "rcpt_9") }
+        // The server answered another receipt than the one asked: it is not shown as this one.
+        assertFailsWith<AppException.NotFound> { get("a1", "rcpt_2") }
+        assertEquals(listOf("get rcpt_1", "get rcpt_9", "get rcpt_2"), receipts.asked)
     }
 
     @Test

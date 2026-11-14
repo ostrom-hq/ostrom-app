@@ -404,10 +404,8 @@
     <string name="session_cost">Cost %1$s</string>
     <string name="session_exit_code">exit code %1$d</string>
     <string name="session_segment">segment %1$d</string>
-    <string name="session_open_history">Open the history</string>
     <string name="session_open_run">Open its workflow run</string>
     <string name="session_receipt">Receipt %1$s</string>
-    <string name="session_receipt_hint">The History tab lists the signed receipts, each checked on this device.</string>
     <string name="session_gates">Gate answers</string>
     <string name="session_gate_answer">%1$s · %2$s</string>
     <string name="session_todo">Todo</string>
@@ -812,4 +810,8 @@
     <string name="error_cloud_variables">Name at most 64 required variables, each once, in UPPER_SNAKE_CASE.</string>
     <string name="error_cloud_email_domain">Use a lowercase domain name, such as example.com, for the Git e-mail domain.</string>
     <string name="cloud_failure_preparation_new">Start a new session to try again.</string>
+    <string name="session_open_receipt">Open the receipt</string>
+    <string name="session_gate_receipt">Its receipt</string>
+    <string name="receipt_title">Receipt</string>
+    <string name="receipt_refresh">Read the receipt again</string>
 </resources>

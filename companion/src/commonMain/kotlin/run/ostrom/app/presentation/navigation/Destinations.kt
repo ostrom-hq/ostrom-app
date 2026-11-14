@@ -43,6 +43,10 @@ data class ArtifactRoute(val accountId: String, val artifactId: String, val vers
 @Serializable
 data class SessionRoute(val accountId: String, val sessionId: String)
 
+/** One signed receipt of an account by its id, verified on this device as the History tab verifies it, opened from a session's record. */
+@Serializable
+data class ReceiptRoute(val accountId: String, val receiptId: String)
+
 /** One workflow of an account, read only, with its runs, opened from the Workflows tab. */
 @Serializable
 data class WorkflowRoute(val accountId: String, val workflowId: String)

@@ -34,8 +34,8 @@ internal fun demoSessions(startedAt: Long): List<AgentSession> {
         ),
         AgentSession(
             DemoSessionIds.ENDED, "analytical-engines/engine", "codex", "gpt-5", login, startedAt - 26 * 60 * MINUTE, startedAt - 25 * 60 * MINUTE,
-            "SessionEnd hook", startedAt - 25 * 60 * MINUTE, 64, 4.10, 0, 1, "demo-receipt-release", DemoWorkflowIds.RUN_DONE, lost = false, activity = null,
-            gateAnswers = listOf(SessionGateAnswer("demo-merge", "merge", "approved", login, startedAt - 25 * 60 * MINUTE - 10 * MINUTE, null)),
+            "SessionEnd hook", startedAt - 25 * 60 * MINUTE, 64, 4.10, 0, 1, "rcpt_demo-release", DemoWorkflowIds.RUN_DONE, lost = false, activity = null,
+            gateAnswers = listOf(SessionGateAnswer("demo-merge", "merge", "approved", login, startedAt - 25 * 60 * MINUTE - 10 * MINUTE, "rcpt_demo-merge")),
         ),
         AgentSession(
             DemoSessionIds.LOST, "analytical-engines/cards", "claude-code", "claude-sonnet", "charles", startedAt - 50 * 60 * MINUTE, null, null,

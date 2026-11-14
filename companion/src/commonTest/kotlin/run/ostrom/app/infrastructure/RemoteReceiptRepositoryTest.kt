@@ -110,6 +110,18 @@ class RemoteReceiptRepositoryTest {
     }
 
     @Test
+    fun oneReceiptIsReadByItsIdAsTheServerWroteIt() = runTest {
+        signedIn()
+        bodies["/api/v1/receipts/rcpt_w"] = workflow
+        val entry = RemoteReceiptRepository(calls).get("a1", "rcpt_w")
+        assertEquals("/api/v1/receipts/rcpt_w", requests.single().url.encodedPath)
+        assertTrue("newerField" in entry.raw)
+        assertEquals("rcpt_w", entry.summary?.id)
+        // Unknown or hidden: gone, without the server's message.
+        assertFailsWith<AppException.NotFound> { RemoteReceiptRepository(calls).get("a1", "rcpt_gone") }
+    }
+
+    @Test
     fun theServedKeysAreReadWithTheirRotation() = runTest {
         signedIn()
         bodies["/api/v1/receipts/keys"] = """

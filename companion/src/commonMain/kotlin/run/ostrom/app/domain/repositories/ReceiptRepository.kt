@@ -2,6 +2,7 @@
 // Ported from Ostrom's React Native app, src/repositories/ReceiptsRepository.ts and PinnedReceiptsRepository.ts.
 package run.ostrom.app.domain.repositories
 
+import run.ostrom.app.domain.models.HistoryEntry
 import run.ostrom.app.domain.models.ReceiptPage
 import run.ostrom.app.domain.models.ServedReceiptKey
 
@@ -9,6 +10,9 @@ import run.ostrom.app.domain.models.ServedReceiptKey
 interface ReceiptRepository {
     /** A page of receipts, newest first, the first one when [before] is null. */
     suspend fun page(accountId: String, before: String? = null): ReceiptPage
+
+    /** One receipt by its id, as the server wrote it, not checked yet; [run.ostrom.app.domain.models.AppException.NotFound] when unknown. */
+    suspend fun get(accountId: String, id: String): HistoryEntry
 
     /** The keys the server says sign its receipts; trusted only through [ReceiptKeyPinRepository]. */
     suspend fun keys(accountId: String): List<ServedReceiptKey>

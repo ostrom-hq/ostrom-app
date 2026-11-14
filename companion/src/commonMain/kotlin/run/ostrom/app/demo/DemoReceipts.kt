@@ -5,7 +5,10 @@ import kotlin.time.Instant
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
+import run.ostrom.app.domain.models.AppException
+import run.ostrom.app.domain.models.HistoryEntry
 import run.ostrom.app.domain.models.ReceiptPage
 import run.ostrom.app.domain.models.ServedReceiptKey
 import run.ostrom.app.domain.repositories.ReceiptKeyPinRepository
@@ -82,6 +85,11 @@ class DemoReceiptRepository(private val demo: DemoMode) : ReceiptRepository {
         ReceiptPage(if (before == null) store.receipts.map(::readReceipt) else emptyList(), null)
     }
 
+    override suspend fun get(accountId: String, id: String): HistoryEntry = withContext(Dispatchers.Default) {
+        val raw = demo.store().receipts.firstOrNull { (it["id"] as? JsonPrimitive)?.content == id } ?: throw AppException.NotFound()
+        readReceipt(raw)
+    }
+
     override suspend fun keys(accountId: String): List<ServedReceiptKey> = withContext(Dispatchers.Default) {
         val key = demo.store().receiptSigner.publicKey
         listOf(ServedReceiptKey(key.kid, "Ed25519", key.toSpkiPem()))
@@ -91,6 +99,7 @@ class DemoReceiptRepository(private val demo: DemoMode) : ReceiptRepository {
 /** The demo account's receipts from memory, every other account's from its server. */
 class DemoAwareReceiptRepository(private val real: ReceiptRepository, private val demo: ReceiptRepository) : ReceiptRepository {
     override suspend fun page(accountId: String, before: String?) = (if (isDemo(accountId)) demo else real).page(accountId, before)
+    override suspend fun get(accountId: String, id: String) = (if (isDemo(accountId)) demo else real).get(accountId, id)
     override suspend fun keys(accountId: String) = (if (isDemo(accountId)) demo else real).keys(accountId)
 }
 

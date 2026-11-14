@@ -27,7 +27,7 @@ class LoadSessionsUseCase(private val sessions: SessionRepository, private val f
 }
 
 /**
- * A session's record and what the app can open from it: its receipt in the History tab when the server has receipts
+ * A session's record and what the app can open from it: its receipts, verified on the device, when the server has receipts
  * ([historyServed]), its workflow run when the server has workflows ([runsServed]), its todo when it has todos
  * ([todosServed]).
  */

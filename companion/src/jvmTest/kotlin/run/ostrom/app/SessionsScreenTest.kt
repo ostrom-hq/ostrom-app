@@ -11,6 +11,11 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performSemanticsAction
 import com.russhwolf.settings.MapSettings
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonArray
+import kotlinx.serialization.json.putJsonObject
 import run.ostrom.app.demo.DemoSessionIds
 import run.ostrom.app.domain.models.Account
 import run.ostrom.app.domain.models.SignInMethod
@@ -18,6 +23,8 @@ import run.ostrom.app.domain.usecases.push.NotificationLinks
 import run.ostrom.app.infrastructure.credentials.MemoryCredentialStore
 import run.ostrom.app.infrastructure.settings.SettingsAccountRepository
 import run.ostrom.app.presentation.navigation.IncomingLinks
+import run.ostrom.core.receipts.ReceiptSignerImpl
+import run.ostrom.core.receipts.ReceiptSigningKey
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -39,18 +46,36 @@ class SessionsScreenTest {
         {"id":"c","name":"Benchmark","description":"","doneWhen":{"text":"numbers","checks":[]},"origin":"plan","status":"dropped","dropReason":"Not needed"}],
         "createdAt":"2026-11-14T09:00:00Z","updatedAt":"2026-11-14T09:20:00Z"}}"""
 
+    private val key = ReceiptSigningKey.generate()
+
+    /** A receipt of [id] signed by the server's key, as `GET /api/v1/receipts/{id}` answers it. */
+    private fun receipt(id: String) = ReceiptSignerImpl(key).sign(buildJsonObject {
+        put("id", id)
+        putJsonObject("subject") { put("kind", "gate"); put("id", "subject-$id"); put("digest", "ab".repeat(32)) }
+        put("initiator", "charles")
+        put("rules", buildJsonArray {})
+        putJsonArray("decisions") { add(buildJsonObject { put("approvalId", "g-$id"); put("by", "carol"); put("at", "2026-11-14T09:30:00Z"); put("result", "approved") }) }
+        put("createdAt", "2026-11-14T09:00:00.000Z")
+    }).toString()
+
+    private fun keys() = buildJsonObject {
+        putJsonArray("keys") { add(buildJsonObject { put("kid", key.publicKey.kid); put("alg", "Ed25519"); put("publicKeyPem", key.publicKey.toSpkiPem()) }) }
+    }.toString()
+
     private fun server(features: String = "\"sessions.v1\",\"todos.v1\",\"receipts.v1\",\"workflows.v1\"") = FakeServer(
         mutableMapOf(
             "GET /api/v1/capabilities" to """{"apiVersion":1,"serverVersion":"1.4.0","features":[$features]}""",
             "GET /api/v1/auth/me" to """{"dev":{"login":"ada","verified":true,"via":"device"},"capabilities":[]}""",
             "GET /api/v1/activity" to """{"items":[]}""",
             "GET /api/v1/receipts" to """{"items":[]}""",
-            "GET /api/v1/receipt-keys" to """{"keys":[]}""",
+            "GET /api/v1/receipts/keys" to keys(),
+            "GET /api/v1/receipts/rc1" to receipt("rc1"),
+            "GET /api/v1/receipts/rc-g1" to receipt("rc-g1"),
             "GET /api/v1/sessions?before=c2" to """{"items":[${session("s1", "acme/api")},${session("s2", "acme/web", ended = true)}]}""",
             "GET /api/v1/sessions?open=false" to """{"items":[${session("s2", "acme/web", ended = true)}]}""",
             "GET /api/v1/sessions" to """{"items":[${session("s1", "acme/api")}],"next":"c2"}""",
             "GET /api/v1/sessions/s2" to """{"session":${session("s2", "acme/web", ended = true,
-                ""","receiptId":"rc1","runId":"run1","exitCode":0,"gateAnswers":[{"gateId":"g1","actionClass":"git.push","outcome":"approved","by":"carol","at":"2026-11-14T09:30:00Z"}]""")}}""",
+                ""","receiptId":"rc1","runId":"run1","exitCode":0,"gateAnswers":[{"gateId":"g1","actionClass":"git.push","outcome":"approved","by":"carol","at":"2026-11-14T09:30:00Z","receiptId":"rc-g1"}]""")}}""",
             "GET /api/v1/sessions/s1" to """{"session":${session("s1", "acme/api")}}""",
             "GET /api/v1/todos/session" to todo,
             "GET /api/v1/runs/run1" to """{"id":"run1","workflowId":"wf1","workflowName":"Release","workflowVersion":3,"status":"succeeded","startedBy":"ada",
@@ -115,7 +140,7 @@ class SessionsScreenTest {
     }
 
     @Test
-    fun aRecordShowsItsGateAnswersItsTodoAndOpensItsRunAndTheHistory() {
+    fun aRecordShowsItsGateAnswersItsTodoAndOpensItsRunAndItsReceipt() {
         val server = server()
         signedIn(server) {
             click("tab-sessions")
@@ -131,10 +156,39 @@ class SessionsScreenTest {
             waitFor("workflow-run-overview")
             waitForText("Release, version 3")
             click("back")
-            // The receipt opens the History tab.
-            click("session-open-history")
-            waitFor("history")
-            onNodeWithTag("session-overview").assertDoesNotExist()
+            // The receipt itself opens, verified on this device, not the History tab; back returns to the record.
+            click("session-open-receipt")
+            waitFor("receipt-rc1")
+            waitFor("check-verified")
+            waitForText("Signature verified on this device · key ${key.publicKey.kid}")
+            waitForText("gate subject-rc1")
+            onNodeWithTag("history").assertDoesNotExist()
+            assertTrue("GET /api/v1/receipts/rc1" in server.asked)
+            assertTrue("GET /api/v1/receipts" !in server.asked, "the receipt is read by its id, not found in the list")
+            click("back")
+            waitFor("session-overview")
+            // A gate answer opens its own receipt.
+            click("session-gate-g1-receipt")
+            waitFor("receipt-rc-g1")
+            waitFor("check-verified")
+        }
+    }
+
+    @Test
+    fun aReceiptTheServerDoesNotHaveSaysSoAndATamperedOneIsRejected() {
+        val server = server()
+        server.routes.remove("GET /api/v1/receipts/rc1")
+        server.routes["GET /api/v1/receipts/rc-g1"] = receipt("rc-g1").replace("charles", "mallory")
+        signedIn(server) {
+            click("tab-sessions")
+            click("session-s2")
+            click("session-open-receipt")
+            waitFor("receipt-error")
+            waitForText("This no longer exists")
+            onNodeWithTag("receipt-retry").assertDoesNotExist()
+            click("back")
+            click("session-gate-g1-receipt")
+            waitFor("check-rejected")
         }
     }
 
@@ -164,7 +218,8 @@ class SessionsScreenTest {
             click("session-s2")
             waitFor("session-overview")
             onNodeWithTag("todo-view").assertDoesNotExist()
-            onNodeWithTag("session-open-history").assertDoesNotExist()
+            onNodeWithTag("session-open-receipt").assertDoesNotExist()
+            onNodeWithTag("session-gate-g1-receipt").assertDoesNotExist()
             onNodeWithTag("session-open-run").assertDoesNotExist()
         }
         signedIn(server("\"gates.v1\"")) {
@@ -188,6 +243,12 @@ class SessionsScreenTest {
             waitFor("todo-reference")
             waitFor("todo-item-docs")
             waitFor("todo-hook-errors")
+            // The ended session's receipt is one of the demo's, verified with the demo's key.
+            click("back")
+            click("session-${DemoSessionIds.ENDED}")
+            click("session-open-receipt")
+            waitFor("receipt-rcpt_demo-release")
+            waitFor("check-verified")
         }
         assertTrue(server.clients == 0, "the demo makes no request")
     }

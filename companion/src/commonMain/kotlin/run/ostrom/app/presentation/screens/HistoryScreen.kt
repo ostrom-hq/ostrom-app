@@ -178,8 +178,9 @@ private fun rowKeys(entries: List<HistoryEntry>): List<String> {
 /** The tag of a receipt's row: its id, or its position when this app cannot read it. */
 private fun rowTag(index: Int, entry: HistoryEntry) = "receipt-${entry.summary?.id ?: "unreadable-$index"}"
 
+/** A receipt as the History tab shows it: also the whole page of one receipt ([ReceiptScreen]). */
 @Composable
-private fun ReceiptRow(index: Int, entry: HistoryEntry, today: Long) {
+internal fun ReceiptRow(index: Int, entry: HistoryEntry, today: Long) {
     val colors = Ostrom.colors
     val summary = entry.summary
     AppCard(Modifier.testTag(rowTag(index, entry))) {

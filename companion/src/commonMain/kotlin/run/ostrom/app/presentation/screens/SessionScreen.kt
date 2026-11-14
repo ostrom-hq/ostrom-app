@@ -60,12 +60,12 @@ import run.ostrom.app.resources.session_ended
 import run.ostrom.app.resources.session_ended_by
 import run.ostrom.app.resources.session_exit_code
 import run.ostrom.app.resources.session_gate_answer
+import run.ostrom.app.resources.session_gate_receipt
 import run.ostrom.app.resources.session_gates
 import run.ostrom.app.resources.session_last_seen
-import run.ostrom.app.resources.session_open_history
+import run.ostrom.app.resources.session_open_receipt
 import run.ostrom.app.resources.session_open_run
 import run.ostrom.app.resources.session_receipt
-import run.ostrom.app.resources.session_receipt_hint
 import run.ostrom.app.resources.session_refresh
 import run.ostrom.app.resources.session_segment
 import run.ostrom.app.resources.session_started
@@ -77,14 +77,14 @@ import run.ostrom.app.resources.sessions_tools
 
 /**
  * One session's record: its state, agent, model and person, its times, cost and tools, the answers to its gates, a
- * link to its receipt in the History tab (where the server serves receipts) and to its workflow run, and its todo,
+ * link to its receipt and to each answer's (where the server serves receipts) and to its workflow run, and its todo,
  * kept current by the app's one feed ([TodoPanel]).
  */
 @Composable
 fun SessionScreen(
     viewModel: SessionViewModel,
     onBack: (() -> Unit)?,
-    onOpenHistory: () -> Unit,
+    onOpenReceipt: (receiptId: String) -> Unit,
     onOpenRun: (runId: String) -> Unit,
     backLabel: String = stringResource(Res.string.sessions_title),
 ) {
@@ -120,8 +120,8 @@ fun SessionScreen(
                 val run = session.runId
                 if (receipt != null || (run != null && details.runsServed)) FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (receipt != null && details.historyServed) {
-                        AppButton(stringResource(Res.string.session_open_history), onClick = onOpenHistory, kind = ButtonKind.SECONDARY, small = true, fill = false,
-                            icon = PhosphorIcons.Regular.Receipt, modifier = Modifier.testTag("session-open-history"))
+                        AppButton(stringResource(Res.string.session_open_receipt), onClick = { onOpenReceipt(receipt) }, kind = ButtonKind.SECONDARY, small = true, fill = false,
+                            icon = PhosphorIcons.Regular.Receipt, modifier = Modifier.testTag("session-open-receipt"))
                     }
                     if (run != null && details.runsServed) {
                         AppButton(stringResource(Res.string.session_open_run), onClick = { onOpenRun(run) }, kind = ButtonKind.SECONDARY, small = true, fill = false,
@@ -132,11 +132,10 @@ fun SessionScreen(
                     SelectionContainer {
                         Text(stringResource(Res.string.session_receipt, receipt), style = MetaStyle, color = colors.muted, modifier = Modifier.testTag("session-receipt"))
                     }
-                    if (details.historyServed) Text(stringResource(Res.string.session_receipt_hint), fontSize = 12.sp, color = colors.muted)
                 }
                 if (session.gateAnswers.isNotEmpty()) {
                     SectionTitle(stringResource(Res.string.session_gates))
-                    session.gateAnswers.forEach { GateAnswerRow(it, today) }
+                    session.gateAnswers.forEach { answer -> GateAnswerRow(answer, today, onOpenReceipt.takeIf { details.historyServed }) }
                 }
                 if (details.todosServed) {
                     SectionTitle(stringResource(Res.string.session_todo))
@@ -175,7 +174,7 @@ private fun Overview(session: AgentSession, today: Long) {
 }
 
 @Composable
-private fun GateAnswerRow(answer: SessionGateAnswer, today: Long) {
+private fun GateAnswerRow(answer: SessionGateAnswer, today: Long, onOpenReceipt: ((String) -> Unit)?) {
     val colors = Ostrom.colors
     AppCard(Modifier.testTag("session-gate-${answer.gateId}")) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -184,5 +183,10 @@ private fun GateAnswerRow(answer: SessionGateAnswer, today: Long) {
         }
         val at = answer.at?.let { formatEventTime(it, today) }
         Text(if (at != null) stringResource(Res.string.session_gate_answer, answer.by, at) else answer.by, style = MetaStyle, color = colors.muted)
+        val receipt = answer.receiptId
+        if (receipt != null && onOpenReceipt != null) {
+            AppButton(stringResource(Res.string.session_gate_receipt), onClick = { onOpenReceipt(receipt) }, kind = ButtonKind.GHOST, small = true, fill = false,
+                icon = PhosphorIcons.Regular.Receipt, modifier = Modifier.testTag("session-gate-${answer.gateId}-receipt"))
+        }
     }
 }
