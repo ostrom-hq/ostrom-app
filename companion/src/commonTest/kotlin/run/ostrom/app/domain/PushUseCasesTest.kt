@@ -45,7 +45,8 @@ class PushUseCasesTest {
         override val token = MutableStateFlow<String?>(null)
         override suspend fun publicKey() = "spki"
         val shared = mutableListOf<Set<String>>()
-        override suspend fun signedIn(accounts: Set<String>) { shared += accounts }
+        var failShare = false
+        override suspend fun signedIn(accounts: Set<String>) { if (failShare) error("keychain"); shared += accounts }
 
         // The "encryption" of these tests: a payload is its JSON reversed.
         override suspend fun open(payload: String) =
@@ -102,6 +103,15 @@ class PushUseCasesTest {
         accounts.update(accounts.find("a1")!!.copy(signedIn = false))
         runCurrent()
         assertEquals(setOf("o2 m3"), platform.shared.last())
+
+        // A refused write is tried again at the next change; the sharing goes on.
+        platform.failShare = true
+        accounts.update(accounts.find("a3")!!.copy(signedIn = false))
+        runCurrent()
+        platform.failShare = false
+        accounts.update(accounts.find("a1")!!.copy(signedIn = true))
+        runCurrent()
+        assertEquals(setOf("o1 m1"), platform.shared.last())
     }
 
     @Test

@@ -3,8 +3,11 @@
 package run.ostrom.app.infrastructure.repositories
 
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import run.ostrom.app.domain.repositories.PushRepository
 
 /**
@@ -33,19 +36,25 @@ class RemotePushRepository(private val calls: AccountCalls) : PushRepository {
         calls.withAccountIn(accountId, device.organizationId) { it.pushDevices.delete(device.id) }
     }
 
-    /** Best effort: the old organization's server also forgets the phone once the session is revoked. */
-    private suspend fun forget(accountId: String, device: Device) {
+    /**
+     * Best effort, at most [FORGET_MILLIS], and not cancelled with the sync that asked (a newer change of accounts):
+     * once the new registration replaced it here, nothing else knows the old device's id.
+     */
+    private suspend fun forget(accountId: String, device: Device) = withContext(NonCancellable) {
         try {
-            calls.withAccountIn(accountId, device.organizationId) { it.pushDevices.delete(device.id) }
+            withTimeoutOrNull(FORGET_MILLIS) { calls.withAccountIn(accountId, device.organizationId) { it.pushDevices.delete(device.id) } }
         } catch (error: CancellationException) {
             throw error
         } catch (_: Exception) {
-            // Offline or refused: the new registration stands; the next sign-out or revocation clears the old one.
+            // Offline or refused: the new registration stands, and the old organization's server keeps the phone
+            // until it revokes the session (the ids are kept in memory only, not across a restart).
         }
     }
 
     private companion object {
         /** iOS and Android alike: FCM hands an iOS push to APNs. */
         const val FCM = "fcm"
+
+        const val FORGET_MILLIS = 5_000L
     }
 }

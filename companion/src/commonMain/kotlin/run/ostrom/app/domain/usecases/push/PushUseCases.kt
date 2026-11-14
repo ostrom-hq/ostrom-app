@@ -126,7 +126,16 @@ class ShareSignedInAccountsUseCase(
                     .toSet()
             }
             .distinctUntilChanged()
-            .collect { platform.signedIn(it) }
+            .collect { signedIn ->
+                try {
+                    platform.signedIn(signedIn)
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (_: Exception) {
+                    // A Keychain that refused now: the next change writes the list again; meanwhile the extension
+                    // keeps the generic alert for what it does not find.
+                }
+            }
     }
 }
 
