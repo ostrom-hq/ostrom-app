@@ -6,6 +6,7 @@ import org.koin.dsl.module
 import run.ostrom.app.demo.DemoCredentialStore
 import run.ostrom.app.domain.services.BrowserSignIn
 import run.ostrom.app.domain.usecases.auth.BrowserSignInUseCase
+import run.ostrom.app.domain.usecases.links.OpenArtifactLinkUseCase
 import run.ostrom.app.presentation.navigation.LoginRoute
 import run.ostrom.app.presentation.viewmodels.AddServerViewModel
 import run.ostrom.app.presentation.viewmodels.HomeViewModel
@@ -14,7 +15,8 @@ import run.ostrom.app.presentation.viewmodels.RootViewModel
 import run.ostrom.app.presentation.viewmodels.SettingsViewModel
 
 val presentationModule = module {
-    viewModel { RootViewModel(get(), get(), get()) }
+    single { OpenArtifactLinkUseCase(get()) }
+    viewModel { RootViewModel(get(), get(), get(), get()) }
     viewModel { AddServerViewModel(get(), get(), get()) }
     viewModel { (route: LoginRoute) ->
         // A phone signs in with its browser; a computer (no BrowserSignIn bound) with the device flow.

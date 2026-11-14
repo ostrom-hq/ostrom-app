@@ -86,6 +86,14 @@ sealed class AppException(message: String) : Exception(message) {
             CloudSessionProblem.EMAIL_DOMAIN -> "Use a lowercase domain name, such as example.com, for the Git e-mail domain."
         },
     )
+    /** An `ostrom://open?url=` link this app does not open, for [reason]: nothing was opened or asked of a server. */
+    class LinkRefused(val reason: LinkRefusal) : AppException(
+        when (reason) {
+            LinkRefusal.NOT_AN_ARTIFACT -> "This link does not lead to an Ostrom artifact."
+            LinkRefusal.UNKNOWN_SERVER -> "This artifact is on a server none of your accounts is on. Add that account, then open the link again."
+            LinkRefusal.SIGNED_OUT -> "Your account on this artifact's server is signed out. Sign in again, then open the link again."
+        },
+    )
     /** The server refused with [code] (its stable error key, shown only when it is one) and [statusCode]. */
     class Server(val statusCode: Int, val code: String?) :
         AppException("The server returned HTTP $statusCode" + (visibleCode(code)?.let { " ($it)" } ?: "") + ".")
@@ -96,3 +104,15 @@ private val CODE = Regex("[a-z][a-z0-9_]{0,63}")
 
 /** [code] when it is safe to show, null otherwise. */
 fun visibleCode(code: String?): String? = code?.takeIf { it.matches(CODE) }
+
+/** Why an `ostrom://open?url=` link is not opened. */
+enum class LinkRefusal {
+    /** Not an `<origin>/artifacts/<id>` page with a readable address, id and version. */
+    NOT_AN_ARTIFACT,
+
+    /** No account of this device is on the page's server or its console. */
+    UNKNOWN_SERVER,
+
+    /** The accounts on that server are all signed out. */
+    SIGNED_OUT,
+}

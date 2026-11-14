@@ -2,6 +2,7 @@
 // Shaped like TeamCode's companion presentation/navigation/TeamCodeNavHost.kt (Apache-2.0); see NOTICE.
 package run.ostrom.app.presentation.navigation
 
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -9,6 +10,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -19,6 +23,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import kotlinx.coroutines.CancellationException
+import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.parameter.parametersOf
@@ -26,8 +31,15 @@ import run.ostrom.app.domain.models.Features
 import run.ostrom.app.domain.repositories.FeaturesRepository
 import run.ostrom.app.domain.repositories.has
 import run.ostrom.app.domain.usecases.approvals.PhoneUnlock
+import run.ostrom.app.domain.usecases.links.ArtifactLinks
 import run.ostrom.app.domain.usecases.push.NotificationTarget
+import run.ostrom.app.presentation.components.AppButton
+import run.ostrom.app.presentation.components.AppSheet
+import run.ostrom.app.presentation.components.Banner
+import run.ostrom.app.presentation.components.ButtonKind
 import run.ostrom.app.presentation.components.LocalWideLayout
+import run.ostrom.app.presentation.components.SheetHeader
+import run.ostrom.app.presentation.components.Tone
 import run.ostrom.app.presentation.screens.AddServerScreen
 import run.ostrom.app.presentation.screens.ArtifactScreen
 import run.ostrom.app.presentation.screens.CloudSessionScreen
@@ -46,8 +58,10 @@ import run.ostrom.app.presentation.screens.WorkflowEditScreen
 import run.ostrom.app.presentation.screens.WorkflowRunScreen
 import run.ostrom.app.presentation.screens.WorkflowScreen
 import run.ostrom.app.presentation.screens.WorkflowStartScreen
+import run.ostrom.app.presentation.viewmodels.ArtifactLinkOutcome
 import run.ostrom.app.presentation.viewmodels.ArtifactViewModel
 import run.ostrom.app.presentation.viewmodels.CloudSessionViewModel
+import run.ostrom.app.presentation.viewmodels.Failure
 import run.ostrom.app.presentation.viewmodels.MemberEnvironmentViewModel
 import run.ostrom.app.presentation.viewmodels.NewCloudSessionViewModel
 import run.ostrom.app.presentation.viewmodels.NotificationPreferencesViewModel
@@ -62,6 +76,10 @@ import run.ostrom.app.presentation.viewmodels.WorkflowRunViewModel
 import run.ostrom.app.presentation.viewmodels.WorkflowRunsViewModel
 import run.ostrom.app.presentation.viewmodels.WorkflowStartViewModel
 import run.ostrom.app.presentation.viewmodels.WorkflowViewModel
+import run.ostrom.app.presentation.viewmodels.words
+import run.ostrom.app.resources.Res
+import run.ostrom.app.resources.action_close
+import run.ostrom.app.resources.link_refused_title
 
 /**
  * Before any account, a stack without tabs: add a server, sign in. Then the tabs ([MainRoute]), with the sign-in
@@ -99,8 +117,22 @@ fun OstromNavHost(rootViewModel: RootViewModel = koinViewModel(), unlock: PhoneU
     // A tapped notification: its request above the tabs of its account, its session (its agent waits, its turn failed)
     // when the server serves sessions, or else its waits, where that wait is.
     val incoming by IncomingLinks.link.collectAsStateWithLifecycle()
+    // An artifact link (`ostrom://open?url=`): refused (said why, nothing opened) unless it is a signed-in account's.
+    var refusedLink by remember { mutableStateOf<Failure?>(null) }
     LaunchedEffect(incoming, hasAccounts) {
         val link = incoming ?: return@LaunchedEffect
+        if (ArtifactLinks.isOpenLink(link)) {
+            IncomingLinks.consumed(link)
+            when (val outcome = rootViewModel.openArtifactLink(link)) {
+                is ArtifactLinkOutcome.Open -> {
+                    val target = outcome.target
+                    // Above what is shown, as TeamCode opens its links: a form or a sign-in in progress is kept, and back returns to it.
+                    navController.navigate(ArtifactRoute(target.accountId, target.artifactId, target.version))
+                }
+                is ArtifactLinkOutcome.Refused -> refusedLink = outcome.failure
+            }
+            return@LaunchedEffect
+        }
         if (!hasAccounts) return@LaunchedEffect
         IncomingLinks.consumed(link)
         when (val target = rootViewModel.openNotification(link)) {
@@ -135,6 +167,7 @@ fun OstromNavHost(rootViewModel: RootViewModel = koinViewModel(), unlock: PhoneU
             }
         }
     }
+    refusedLink?.let { failure -> RefusedLinkSheet(failure, onDismiss = { refusedLink = null }) }
     NavHost(navController, startDestination = startDestination) {
         composable<AddServerRoute> {
             AddServerScreen(
@@ -297,4 +330,15 @@ internal inline fun <reified T : Any> NavController.openOnce(route: T) {
     val top = currentBackStackEntry
     if (top != null && top.destination.hasRoute<T>() && top.toRoute<T>() == route) return
     if (!popBackStack(route, inclusive = false)) navigate(route)
+}
+
+/** Why a link was not opened, until the person closes it. */
+@Composable
+private fun RefusedLinkSheet(failure: Failure, onDismiss: () -> Unit) {
+    AppSheet(onDismiss = onDismiss, modifier = Modifier.testTag("link-refused")) {
+        SheetHeader(stringResource(Res.string.link_refused_title), trailing = {
+            AppButton(stringResource(Res.string.action_close), onClick = onDismiss, kind = ButtonKind.GHOST, small = true, fill = false, modifier = Modifier.testTag("link-refused-close"))
+        })
+        Banner(failure.words(), Tone.WARN, Modifier.padding(16.dp))
+    }
 }
