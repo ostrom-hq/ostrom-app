@@ -89,6 +89,7 @@ fun MainScreen(
     onAddAccount: () -> Unit,
     onSignInAgain: (Account) -> Unit,
     onOpenRequest: (accountId: String, id: String) -> Unit = { _, _ -> },
+    onOpenNotifications: (accountId: String) -> Unit = {},
     viewModel: HomeViewModel = koinViewModel(),
     waits: WaitsViewModel = koinViewModel(),
 ) {
@@ -141,7 +142,7 @@ fun MainScreen(
                         MainTab.WAITING -> WaitsScreen(waits)
                         MainTab.SPENDING -> SpendingScreen()
                         MainTab.ACTIVITY -> ActivityScreen(onOpen = if (state.serves(Features.GATES)) onOpenRequest else null)
-                        MainTab.SETTINGS -> SettingsScreen(onAddAccount = onAddAccount, onSignInAgain = onSignInAgain)
+                        MainTab.SETTINGS -> SettingsScreen(onAddAccount = onAddAccount, onSignInAgain = onSignInAgain, onOpenNotifications = onOpenNotifications)
                     }
                 }
             }

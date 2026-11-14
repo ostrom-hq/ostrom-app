@@ -283,4 +283,14 @@
     <string name="activity_error">L'activité n'a pas pu être chargée.</string>
     <string name="activity_load_failed">Impossible d'actualiser l'activité.</string>
     <string name="activity_actor_agent">Agent %1$s</string>
+    <!-- Notification preferences (notifications.v1) -->
+    <string name="notifications_title">Notifications</string>
+    <string name="settings_notifications_row">Ce qui te notifie</string>
+    <string name="notifications_requests">Une demande attend mon oui</string>
+    <string name="notifications_decisions">Quelqu'un a décidé de ma demande</string>
+    <string name="notifications_spending">Les dépenses passent un seuil du budget</string>
+    <string name="notifications_quiet_hours">Heures calmes</string>
+    <string name="notifications_quiet_hours_range">Aucune notification de %1$s à %2$s (%3$s)</string>
+    <string name="notifications_save_failed">La modification n'a pas pu être enregistrée. Elle a été annulée.</string>
+    <string name="notifications_note">Gardées par le serveur pour toi : elles valent sur tous tes téléphones.</string>
 </resources>

@@ -37,6 +37,7 @@ class DemoMode(private val clock: Clock) {
 internal class DemoStore(val startedAt: Long) {
     val account = MutableStateFlow(DemoContent.account())
     val waits = MutableStateFlow(demoWaits(startedAt))
+    val notifications = MutableStateFlow(run.ostrom.app.domain.models.NotificationPreferences(requests = true, decisions = true, spending = true))
 
     /** The approvals inbox: two requests waiting, one answered; the demo's answers move them. */
     val approvals = MutableStateFlow(DemoContent.approvals(startedAt))

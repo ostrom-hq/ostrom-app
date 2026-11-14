@@ -7,6 +7,9 @@ private const val DAY_MILLIS = 86_400_000L
 /** The offset of the device's time zone from UTC, in minutes, at an instant in epoch milliseconds (daylight saving included). */
 expect fun deviceUtcOffsetMinutes(epochMillis: Long): Int
 
+/** The device's time zone, as an IANA id (`Europe/Paris`): quiet hours are kept with it. */
+expect fun deviceTimeZoneId(): String
+
 /** The zone every dated line is shown in: the device's. Tests replace it to be independent of the machine they run on. */
 internal var utcOffsetMinutes: (Long) -> Int = ::deviceUtcOffsetMinutes
 
