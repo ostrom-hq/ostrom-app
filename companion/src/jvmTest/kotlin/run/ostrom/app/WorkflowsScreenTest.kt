@@ -5,9 +5,13 @@ package run.ostrom.app
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.DesktopComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performSemanticsAction
 import com.russhwolf.settings.MapSettings
 import kotlinx.coroutines.runBlocking
@@ -37,6 +41,8 @@ class WorkflowsScreenTest {
             "GET /api/v1/auth/me" to """{"dev":{"login":"ada","verified":true,"via":"device"},"capabilities":[]}""",
             "GET /api/v1/activity" to """{"items":[]}""",
             "GET /api/v1/sessions" to """{"items":[]}""",
+            "GET /api/v1/runs?status=cancelled" to """{"items":[${run("r4", "cancelled", ""","endedAt":"2026-11-14T09:20:00Z"""")}]}""",
+            "GET /api/v1/workflows/wf1/runs?status=cancelled" to """{"items":[${run("r5", "cancelled", ""","endedAt":"2026-11-14T09:25:00Z"""")}]}""",
             "GET /api/v1/runs?status=failed" to """{"items":[${run("r3", "failed", ""","failure":"The build broke"""")}]}""",
             "GET /api/v1/runs" to """{"items":[${run("r1", "waiting")},${run("r2", "succeeded", ""","endedAt":"2026-11-14T09:30:00Z"""")}]}""",
             "GET /api/v1/runs/r1" to run("r1", "waiting", ""","inputs":{"version":"1.4.0"},"sessionId":"s9","visits":[
@@ -94,6 +100,43 @@ class WorkflowsScreenTest {
     }
 
     @Test
+    fun cancelledRunsHaveTheirOwnFilterOnTheMembersRunsAndAWorkflowsRuns() {
+        val server = server()
+        signedIn(server) {
+            click("tab-workflows")
+            waitFor("workflow-run-r1")
+            onNodeWithTag("workflow-run-r4").assertDoesNotExist()
+            click("runs-filter-cancelled")
+            waitFor("workflow-run-r4")
+            waitFor("workflow-run-status-r4")
+            onNodeWithTag("workflow-run-r1").assertDoesNotExist()
+            click("runs-filter-all")
+            click("workflows-part-definitions")
+            click("workflow-wf1")
+            waitFor("workflow-run-r1")
+            click("runs-filter-cancelled")
+            waitFor("workflow-run-r5")
+            onNodeWithTag("workflow-run-r1").assertDoesNotExist()
+        }
+    }
+
+    @Test
+    fun onAPhonesWidthTheRunFiltersScrollToCancelled() {
+        val server = server()
+        val settings = MapSettings()
+        SettingsAccountRepository(settings).save(Account(id = "a1", origin = origin, login = "ada", method = SignInMethod.DEVICE))
+        val credentials = MemoryCredentialStore().also { runBlocking { it.write("a1", "osm_token") } }
+        testApp(server, width = 360, height = 780, credentials = credentials, settings = settings) {
+            click("tab-workflows")
+            waitFor("workflow-run-r1")
+            onNodeWithTag("runs-filter-cancelled").performScrollTo()
+            onNodeWithTag("runs-filter-cancelled").assertIsDisplayed().performClick()
+            waitFor("workflow-run-r4")
+            onNodeWithTag("runs-filter-cancelled").assertIsDisplayed().assertIsSelected()
+        }
+    }
+
+    @Test
     fun aWorkflowIsReadOnlyWithItsInputsNodesAndRuns() {
         val server = server()
         signedIn(server) {
@@ -122,6 +165,10 @@ class WorkflowsScreenTest {
             click("tab-workflows")
             waitFor("workflow-run-${DemoWorkflowIds.RUN_WAITING}")
             onNodeWithTag("workflow-run-${DemoWorkflowIds.RUN_DONE}").assertExists()
+            click("runs-filter-cancelled")
+            waitFor("workflow-run-${DemoWorkflowIds.RUN_CANCELLED}")
+            onNodeWithTag("workflow-run-${DemoWorkflowIds.RUN_WAITING}").assertDoesNotExist()
+            click("runs-filter-all")
             click("workflow-run-${DemoWorkflowIds.RUN_WAITING}")
             waitFor("workflow-visit-4")
             click("back")

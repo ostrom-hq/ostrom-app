@@ -93,10 +93,11 @@ class WorkflowUseCasesTest {
         GetWorkflowUseCase(access)("a1", "w1")
         LoadWorkflowRunsUseCase(access)("a1", null, RunFilter.ALL)
         LoadWorkflowRunsUseCase(access)("a1", "w1", RunFilter.DONE, "c2")
+        LoadWorkflowRunsUseCase(access)("a1", null, RunFilter.CANCELLED)
         GetWorkflowRunUseCase(access)("a1", "r1")
         assertFailsWith<AppException.NotFound> { GetWorkflowRunUseCase(access)("a1", "") }
         assertFailsWith<AppException.NotFound> { GetWorkflowUseCase(access)("a1", "") }
-        assertEquals(listOf("get w1", "runs mine all", "runs w1 succeeded c2", "run r1"), repository.calls)
+        assertEquals(listOf("get w1", "runs mine all", "runs w1 succeeded c2", "runs mine cancelled", "run r1"), repository.calls)
     }
 
     @Test fun theRunsFollowTheRunEventsOfTheSharedFeed() = runTest {

@@ -49,6 +49,7 @@ import run.ostrom.app.resources.workflow_status_succeeded
 import run.ostrom.app.resources.workflow_status_unknown
 import run.ostrom.app.resources.workflow_status_waiting
 import run.ostrom.app.resources.workflows_filter_all
+import run.ostrom.app.resources.workflows_filter_cancelled
 import run.ostrom.app.resources.workflows_filter_done
 import run.ostrom.app.resources.workflows_filter_failed
 import run.ostrom.app.resources.workflows_filter_running
@@ -97,16 +98,16 @@ internal fun durationWords(millis: Long): String {
     }
 }
 
-/** The status chips of a runs list. */
+/** The status chips of a runs list; six of them, so they scroll sideways on a narrow screen. */
 @Composable
 internal fun RunFilters(selected: RunFilter, onSelect: (RunFilter) -> Unit, modifier: Modifier = Modifier) {
     Segmented(
         listOf(
             RunFilter.ALL to stringResource(Res.string.workflows_filter_all), RunFilter.RUNNING to stringResource(Res.string.workflows_filter_running),
             RunFilter.WAITING to stringResource(Res.string.workflows_filter_waiting), RunFilter.DONE to stringResource(Res.string.workflows_filter_done),
-            RunFilter.FAILED to stringResource(Res.string.workflows_filter_failed),
+            RunFilter.FAILED to stringResource(Res.string.workflows_filter_failed), RunFilter.CANCELLED to stringResource(Res.string.workflows_filter_cancelled),
         ),
-        selected, onSelect, modifier, tag = { "runs-filter-${it.name.lowercase()}" },
+        selected, onSelect, modifier, tag = { "runs-filter-${it.name.lowercase()}" }, scrollable = true,
     )
 }
 
