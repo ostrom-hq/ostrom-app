@@ -24,6 +24,9 @@ object Features {
     /** Push to this phone. */
     const val NOTIFICATIONS_PUSH = "notifications.push.v1"
 
+    /** Any member may send a test push to their own phones: the "Send a test" button of Notifications. */
+    const val NOTIFICATIONS_PUSH_TEST = "notifications.push.test.v1"
+
     /** The waits asked of the person ("Waiting for you"). */
     const val WAITS = "waits.v1"
 

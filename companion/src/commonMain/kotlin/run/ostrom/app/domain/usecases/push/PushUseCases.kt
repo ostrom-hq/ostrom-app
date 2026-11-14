@@ -153,7 +153,13 @@ class ReadPushUseCase(private val accounts: AccountRepository, private val platf
         }
         val account = accounts.accounts.value.accountFor(push.origin, push.orgId, push.memberId) ?: return null
         val title = push.title.take(MAX_TITLE).ifBlank { return null }
-        val link = NotificationLinks.link(push.origin, push.orgId, push.memberId, push.approvalId?.takeIf(NotificationLinks::isId))
+        // An id the app would refuse is left out: the tap still opens the account.
+        val link = NotificationLinks.link(
+            push.origin, push.orgId, push.memberId,
+            approvalId = push.approvalId?.takeIf(NotificationLinks::isId),
+            sessionId = push.sessionId?.takeIf(NotificationLinks::isId),
+            waitId = push.waitId?.takeIf(NotificationLinks::isId),
+        )
         return PushNotice(push.id, account.id, title, push.body.take(MAX_BODY), link)
     }
 
@@ -170,15 +176,22 @@ sealed interface NotificationTarget {
     /** The request waiting for the member's yes. */
     data class Request(override val accountId: String, val approvalId: String) : NotificationTarget
 
-    /** A notification about nothing to open (a test push, a session): the app opens on the account. */
+    /** A notification about a session (its agent waits for the member, its turn failed). */
+    data class Session(override val accountId: String, val sessionId: String) : NotificationTarget
+
+    /** A notification about a wait outside any session: the account's waits. */
+    data class Waits(override val accountId: String) : NotificationTarget
+
+    /** A notification about nothing to open (a test push): the app opens on the account. */
     data class Home(override val accountId: String) : NotificationTarget
 }
 
 /**
- * The link a tapped notification opens: `ostrom://notification?origin=<encoded origin>&org=<id>&member=<id>[&approval=<id>]`.
+ * The link a tapped notification opens:
+ * `ostrom://notification?origin=<encoded origin>&org=<id>&member=<id>[&approval=<id>][&session=<id>][&wait=<id>]`.
  * It names the server, organization and member, not the account id, because the iOS service extension that builds it
- * does not see the app's accounts. A crafted one only opens a request of an account already signed in on this device,
- * where the answer still asks for the person's unlock.
+ * does not see the app's accounts. A crafted one only opens a screen of an account already signed in on this device;
+ * a request's answer still asks for the person's unlock.
  */
 object NotificationLinks {
     const val SCHEME = "ostrom://notification?"
@@ -187,13 +200,15 @@ object NotificationLinks {
 
     internal fun isId(value: String): Boolean = ID.matches(value)
 
-    fun link(origin: String, orgId: String, memberId: String, approvalId: String?): String = buildString {
+    fun link(origin: String, orgId: String, memberId: String, approvalId: String?, sessionId: String? = null, waitId: String? = null): String = buildString {
         append(SCHEME).append("origin=").append(encode(origin))
         append("&org=").append(encode(orgId)).append("&member=").append(encode(memberId))
         approvalId?.let { append("&approval=").append(encode(it)) }
+        sessionId?.let { append("&session=").append(encode(it)) }
+        waitId?.let { append("&wait=").append(encode(it)) }
     }
 
-    /** The link's origin, organization, member and request; null for anything else. */
+    /** The link's origin, organization, member, request, session and wait; null for anything else. */
     internal fun parse(link: String): Parsed? {
         if (!link.startsWith(SCHEME, ignoreCase = true)) return null
         val values = link.substring(SCHEME.length).substringBefore('#').split('&').mapNotNull { part ->
@@ -201,15 +216,25 @@ object NotificationLinks {
             if (key.isEmpty()) null else key to part.substringAfter('=')
         }
         // A key given twice is refused: which one wins would be a guess.
-        fun single(key: String): String? = values.filter { it.first == key }.let { if (it.size > 1) return null else it.singleOrNull()?.second }
+        if (values.map { it.first }.toSet().size != values.size) return null
+        fun single(key: String): String? = values.firstOrNull { it.first == key }?.second
         val origin = single("origin")?.let(::decode) ?: return null
         val org = single("org")?.takeIf(::isId) ?: return null
         val member = single("member")?.takeIf(::isId) ?: return null
         val approval = single("approval")?.let { it.takeIf(::isId) ?: return null }
-        return Parsed(origin, org, member, approval)
+        val session = single("session")?.let { it.takeIf(::isId) ?: return null }
+        val wait = single("wait")?.let { it.takeIf(::isId) ?: return null }
+        return Parsed(origin, org, member, approval, session, wait)
     }
 
-    internal data class Parsed(val origin: String, val orgId: String, val memberId: String, val approvalId: String?)
+    internal data class Parsed(
+        val origin: String,
+        val orgId: String,
+        val memberId: String,
+        val approvalId: String?,
+        val sessionId: String? = null,
+        val waitId: String? = null,
+    )
 
     private fun encode(value: String): String = buildString {
         for (byte in value.encodeToByteArray()) {
@@ -252,13 +277,19 @@ object NotificationLinks {
 
 /**
  * Resolves a tapped notification's link ([NotificationLinks]) to a signed-in account of its server, organization and
- * member. Null for another link, or when no such account is signed in on this device: nothing opens.
+ * member, and what it opens: its request, else its session, else the account's waits for a wait outside a session,
+ * else the account. Null for another link, or when no such account is signed in on this device: nothing opens.
  */
 class ResolveNotificationUseCase(private val accounts: AccountRepository) {
     operator fun invoke(link: String): NotificationTarget? {
         val parsed = NotificationLinks.parse(link) ?: return null
         val account = accounts.accounts.value.accountFor(parsed.origin, parsed.orgId, parsed.memberId) ?: return null
-        return parsed.approvalId?.let { NotificationTarget.Request(account.id, it) } ?: NotificationTarget.Home(account.id)
+        return when {
+            parsed.approvalId != null -> NotificationTarget.Request(account.id, parsed.approvalId)
+            parsed.sessionId != null -> NotificationTarget.Session(account.id, parsed.sessionId)
+            parsed.waitId != null -> NotificationTarget.Waits(account.id)
+            else -> NotificationTarget.Home(account.id)
+        }
     }
 }
 
