@@ -71,8 +71,18 @@ DMG, MSI, DEB and RPM installers refuse a 0.x). It builds on four runners and up
 | `linux-x64`, `linux-arm64` | `ubuntu-24.04`, `ubuntu-24.04-arm` | `.tar.gz` (the app folder), `.deb`, `.rpm` |
 
 Each target also has a `SHA256SUMS-<target>` file. With `release_tag` set to an **existing** release, the `attach` job
-uploads the files and one `SHA256SUMS-desktop` to it; it never creates or publishes a release. Not ported, because
-Ostrom's release has no CLI manifest yet: TeamCode's signed `desktop-manifest.json` and the CLI's `ui` install command.
+uploads the files and one `SHA256SUMS-desktop` to it; it never creates or publishes a release.
+
+**The signed manifest.** The `manifest` job assembles `desktop-manifest.json` (`product: desktop`, the version, the
+source commit, and for each target the file name, SHA-256 and size of the package `ostrom ui` installs: the zipped
+`.app`, the `.msi`, the `.tar.gz`; the DMG, DEB and RPM are for people downloading by hand), as TeamCode's
+`release-desktop.py` does. With `release_tag` it signs it with the CLI's release key, the way ostrom-cli signs
+`latest.json` (Ed25519 over the raw bytes, base64 in `desktop-manifest.json.sig`), and checks the signature against the
+pinned root `release/trust/ostrom-release-2026.pem` before anything is attached. The key is the repository secret
+`OSTROM_RELEASE_SIGNING_KEY` (the value of ostrom-cli's `RELEASE_SIGNING_KEY`, a PEM PKCS#8 Ed25519 key). `ostrom ui`
+downloads the manifest of the CLI's own version from this repository's release of that tag and authenticates it with the
+roots compiled into the CLI. The app carries its version in `ostrom-desktop-version` in its resources, which `ostrom ui`
+reads.
 
 **Signing and notarization (macOS).** Without the secrets below the macOS build is unsigned (Gatekeeper warns), which is
 what a validation run wants. Set `require_signing` for a real release: the job then fails unless every secret exists.
@@ -88,6 +98,7 @@ Windows installers are not signed (no paid signing service): SmartScreen warns o
 | `OSTROM_NOTARY_KEY` | secret | the App Store Connect API key (`.p8`) used by `notarytool`, as text |
 | `OSTROM_NOTARY_KEY_ID` | secret | that key's ID |
 | `OSTROM_NOTARY_ISSUER_ID` | secret | the issuer ID of the App Store Connect team |
+| `OSTROM_RELEASE_SIGNING_KEY` | secret | the release key that signs `desktop-manifest.json` (same value as ostrom-cli's `RELEASE_SIGNING_KEY`); needed with `release_tag` |
 | `OSTROM_MACOS_TEAM_ID` | variable | the Apple Team ID (`Z8T3MHFW48`), public |
 
 The build reads `OSTROM_MACOS_SIGNING_IDENTITY` and `OSTROM_MACOS_SIGNING_KEYCHAIN` (set by the job) to sign, and
