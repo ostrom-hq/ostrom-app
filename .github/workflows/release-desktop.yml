@@ -1,0 +1,246 @@
+name: Desktop release
+
+# The desktop app's installers (DMG, MSI, DEB, RPM) and runnable packages, built on each system. Ported from the
+# `desktop` job of TeamCode's build.yml. Started by hand only. It builds and uploads workflow artifacts; it attaches them
+# to a GitHub release only when `release_tag` names an existing release. The macOS app is signed and notarized when the
+# Developer ID secrets exist (all of them, or none: docs/distribution.md); without them the build is unsigned.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to package (MAJOR.MINOR.PATCH, 1.0.0 or later: installers refuse a 0.x)'
+        required: true
+        type: string
+      release_tag:
+        description: 'Existing GitHub release tag to attach the packages to (empty: workflow artifacts only)'
+        required: false
+        default: ''
+        type: string
+      require_signing:
+        description: 'Fail when the macOS Developer ID secrets are missing (always on with release_tag)'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  # Fails before the long builds when the version is wrong or the release to attach to is not there.
+  check:
+    name: check the inputs
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      VERSION: ${{ inputs.version }}
+      TAG: ${{ inputs.release_tag }}
+    steps:
+      - name: Check the version and the release
+        run: |
+          if ! [[ "$VERSION" =~ ^[1-9][0-9]*\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::version must be MAJOR.MINOR.PATCH with a major of 1 or later, got '$VERSION'."
+            exit 1
+          fi
+          [ -z "$TAG" ] && exit 0
+          if [ "$TAG" != "$VERSION" ]; then
+            echo "::error::release_tag '$TAG' must be the version '$VERSION' (tags carry no v)."
+            exit 1
+          fi
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" > /dev/null || { echo "::error::No release '$TAG' to attach to: create it first."; exit 1; }
+
+  desktop:
+    name: desktop (${{ matrix.target }})
+    needs: [check]
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            target: macos-arm64
+          - os: windows-latest
+            target: windows-x64
+          - os: ubuntu-24.04
+            target: linux-x64
+          - os: ubuntu-24.04-arm
+            target: linux-arm64
+    runs-on: ${{ matrix.os }}
+    env:
+      DESKTOP_TARGET: ${{ matrix.target }}
+      VERSION: ${{ inputs.version }}
+      BINARIES: companion-desktop/build/compose/binaries/main
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Read the pinned ostrom-core commit
+        id: core
+        run: echo "sha=$(tr -d '[:space:]' < gradle/ostrom-core.ref)" >> "$GITHUB_OUTPUT"
+      - name: Check out ostrom-core at that commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ostrom-hq/ostrom-core
+          ref: ${{ steps.core.outputs.sha }}
+          path: .core
+          persist-credentials: false
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+        with:
+          cache-provider: basic
+      - name: Install the Linux packaging tools
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y fakeroot rpm
+      - name: Import the Developer ID into a temporary keychain
+        if: runner.os == 'macOS'
+        env:
+          CERTIFICATE_P12: ${{ secrets.OSTROM_MACOS_CERTIFICATE_P12 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.OSTROM_MACOS_CERTIFICATE_PASSWORD }}
+          NOTARY_KEY: ${{ secrets.OSTROM_NOTARY_KEY }}
+          NOTARY_KEY_ID: ${{ secrets.OSTROM_NOTARY_KEY_ID }}
+          NOTARY_ISSUER_ID: ${{ secrets.OSTROM_NOTARY_ISSUER_ID }}
+          TEAM_ID: ${{ vars.OSTROM_MACOS_TEAM_ID }}
+          # Attaching to a release always requires signing.
+          REQUIRE_SIGNING: ${{ inputs.require_signing || inputs.release_tag != '' }}
+        run: |
+          present=0
+          for value in "$CERTIFICATE_P12" "$CERTIFICATE_PASSWORD" "$NOTARY_KEY" "$NOTARY_KEY_ID" "$NOTARY_ISSUER_ID" "$TEAM_ID"; do
+            if [ -n "$value" ]; then present=$((present + 1)); fi
+          done
+          if [ "$present" -eq 0 ] && [ "$REQUIRE_SIGNING" != true ]; then
+            echo "::warning::No Developer ID configured: this builds an unsigned macOS app (Gatekeeper will warn)."
+            echo "DESKTOP_SIGNED=false" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          if [ "$present" -ne 6 ]; then
+            echo "::error::A signed build needs the Developer ID and notarization secrets (OSTROM_MACOS_CERTIFICATE_P12, OSTROM_MACOS_CERTIFICATE_PASSWORD, OSTROM_NOTARY_KEY, OSTROM_NOTARY_KEY_ID, OSTROM_NOTARY_ISSUER_ID) and the OSTROM_MACOS_TEAM_ID variable, all of them."
+            exit 1
+          fi
+          keychain="$RUNNER_TEMP/ostrom-signing.keychain-db"
+          keychain_password="$(openssl rand -hex 24)"
+          umask 077
+          printf '%s' "$CERTIFICATE_P12" | base64 --decode > "$RUNNER_TEMP/developer-id.p12"
+          printf '%s\n' "$NOTARY_KEY" > "$RUNNER_TEMP/notary-key.p8"
+          security create-keychain -p "$keychain_password" "$keychain"
+          security set-keychain-settings -lut 3600 "$keychain"
+          security unlock-keychain -p "$keychain_password" "$keychain"
+          security import "$RUNNER_TEMP/developer-id.p12" -k "$keychain" -P "$CERTIFICATE_PASSWORD" -T /usr/bin/codesign -T /usr/bin/security > /dev/null
+          rm -f "$RUNNER_TEMP/developer-id.p12"
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$keychain_password" "$keychain" > /dev/null
+          # shellcheck disable=SC2046 # one argument per keychain already in the search list
+          security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
+          identity="$(security find-identity -v -p codesigning "$keychain" | sed -n 's/.*"Developer ID Application: \(.*\)"$/\1/p' | head -n 1)"
+          case "$identity" in
+            *"($TEAM_ID)") ;;
+            *) echo "::error::The imported certificate is not a Developer ID Application of team $TEAM_ID."; exit 1 ;;
+          esac
+          {
+            echo "DESKTOP_SIGNED=true"
+            # Compose prefixes "Developer ID Application: " itself.
+            echo "OSTROM_MACOS_SIGNING_IDENTITY=$identity"
+            echo "OSTROM_MACOS_SIGNING_KEYCHAIN=$keychain"
+          } >> "$GITHUB_ENV"
+      - name: Build the desktop packages
+        run: |
+          case "$DESKTOP_TARGET" in
+            macos-*) tasks=(createDistributable packageDmg) ;;
+            windows-*) tasks=(packageMsi) ;;
+            linux-*) tasks=(createDistributable packageDeb packageRpm) ;;
+          esac
+          ./gradlew -Postrom.core.path=.core "-PostromAppVersion=$VERSION" "${tasks[@]/#/:companion-desktop:}"
+      - name: Check that no jar of the macOS app hides an unsigned native library
+        if: runner.os == 'macOS' && env.DESKTOP_SIGNED == 'true'
+        env:
+          TEAM_ID: ${{ vars.OSTROM_MACOS_TEAM_ID }}
+        run: |
+          # jpackage signs the files of the app, not the native libraries inside its jars, and notarization rejects those.
+          app="$BINARIES/app/Ostrom.app"
+          scratch="$(mktemp -d)"
+          failed=0
+          while IFS= read -r -d '' jar; do
+            while IFS= read -r entry; do
+              rm -rf "$scratch/entry" && mkdir "$scratch/entry"
+              unzip -q -o "$jar" "$entry" -d "$scratch/entry"
+              # Only Mach-O files matter to notarization: jars also carry the libraries of other systems.
+              file "$scratch/entry/$entry" | grep -q 'Mach-O' || continue
+              details="$(codesign -dvv "$scratch/entry/$entry" 2>&1 || true)"
+              if ! grep -q "^TeamIdentifier=$TEAM_ID\$" <<< "$details" || ! grep -q '^Timestamp=' <<< "$details" || ! grep -q 'flags=.*runtime' <<< "$details"; then
+                echo "::error::$(basename "$jar")!$entry is not signed with the Developer ID, a secure timestamp and the hardened runtime."
+                failed=1
+              fi
+            done < <(unzip -Z1 "$jar" | grep -E '\.(so|dylib|jnilib)$' || true)
+          done < <(find "$app" -name '*.jar' -print0)
+          exit "$failed"
+      - name: Notarize, staple and check the macOS app and disk image
+        if: runner.os == 'macOS' && env.DESKTOP_SIGNED == 'true'
+        env:
+          NOTARY_KEY_ID: ${{ secrets.OSTROM_NOTARY_KEY_ID }}
+          NOTARY_ISSUER_ID: ${{ secrets.OSTROM_NOTARY_ISSUER_ID }}
+          TEAM_ID: ${{ vars.OSTROM_MACOS_TEAM_ID }}
+        run: scripts/notarize-macos.sh
+      - name: Stage the packages and their checksums
+        run: |
+          mkdir -p staged
+          case "$DESKTOP_TARGET" in
+            macos-*)
+              ditto -c -k --keepParent "$BINARIES/app/Ostrom.app" "staged/ostrom-desktop-$VERSION-$DESKTOP_TARGET.zip"
+              cp "$BINARIES"/dmg/*.dmg "staged/ostrom-desktop-$VERSION-$DESKTOP_TARGET.dmg" ;;
+            windows-*)
+              cp "$BINARIES"/msi/*.msi "staged/ostrom-desktop-$VERSION-$DESKTOP_TARGET.msi" ;;
+            linux-*)
+              tar -czf "staged/ostrom-desktop-$VERSION-$DESKTOP_TARGET.tar.gz" -C "$BINARIES/app" Ostrom
+              cp "$BINARIES"/deb/*.deb "staged/ostrom-desktop-$VERSION-$DESKTOP_TARGET.deb"
+              cp "$BINARIES"/rpm/*.rpm "staged/ostrom-desktop-$VERSION-$DESKTOP_TARGET.rpm" ;;
+          esac
+          cd staged
+          for file in *; do
+            if command -v sha256sum > /dev/null; then sha256sum "$file"; else shasum -a 256 "$file"; fi
+          done > "SHA256SUMS-$DESKTOP_TARGET"
+          cat "SHA256SUMS-$DESKTOP_TARGET"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ostrom-desktop-${{ matrix.target }}
+          path: staged/*
+          retention-days: 14
+      - name: Remove the temporary keychain and notarization key
+        if: always() && runner.os == 'macOS'
+        run: |
+          if [ -n "${OSTROM_MACOS_SIGNING_KEYCHAIN:-}" ]; then security delete-keychain "$OSTROM_MACOS_SIGNING_KEYCHAIN" || true; fi
+          rm -f "$RUNNER_TEMP/notary-key.p8" "$RUNNER_TEMP/developer-id.p12"
+
+  # Attaches the packages to an existing release, only when asked for. It never creates or publishes a release.
+  attach:
+    name: attach to the release
+    if: inputs.release_tag != ''
+    needs: [desktop]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: ostrom-desktop-*
+          merge-multiple: true
+          path: staged
+      - name: Attach to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.release_tag }}
+        run: |
+          cat staged/SHA256SUMS-* > SHA256SUMS-desktop
+          rm staged/SHA256SUMS-*
+          mv SHA256SUMS-desktop staged/SHA256SUMS-desktop
+          gh release upload "$TAG" staged/* --clobber --repo "$GITHUB_REPOSITORY"
