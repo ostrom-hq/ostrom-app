@@ -98,12 +98,13 @@ class RemoteCloudSessionRepositoryTest {
     fun aSessionStartsWithTheSingleRepositoryOrItsRecipe() = runTest {
         signedIn()
         answers["POST /api/v1/cloud/sessions"] = HttpStatusCode.Created to session("c9", "creating")
-        assertEquals("c9", repository.create("a1", NewCloudSession(CloudAgent.CODEX, name = "Fix", repo = "https://github.com/acme/api", ref = "main")).id)
+        assertEquals("c9", repository.create("a1", NewCloudSession(CloudAgent.CODEX, name = "Fix", repo = "https://github.com/acme/api", ref = "main"), "press-1").id)
+        assertEquals("press-1", requests.last().headers["Idempotency-Key"])
         val single = (requests.last().body as OutgoingContent.ByteArrayContent).bytes().decodeToString()
         assertTrue(""""agent":"codex"""" in single && """"repo":"https://github.com/acme/api"""" in single && """"ref":"main"""" in single, single)
         assertFalse("environment" in single, single)
         repository.create("a1", NewCloudSession(CloudAgent.CLAUDE, recipe = CloudRecipe(listOf(CloudRepository("https://github.com/acme/api", "api")),
-            setupCreate = listOf("npm ci"), requiredVariables = listOf("NPM_TOKEN"), requireGitHub = true)))
+            setupCreate = listOf("npm ci"), requiredVariables = listOf("NPM_TOKEN"), requireGitHub = true)), "press-2")
         val withRecipe = (requests.last().body as OutgoingContent.ByteArrayContent).bytes().decodeToString()
         assertTrue(""""repositories":[{"url":"https://github.com/acme/api","path":"api"""" in withRecipe, withRecipe)
         assertTrue(""""create":["npm ci"]""" in withRecipe && """"requiredVariables":["NPM_TOKEN"]""" in withRecipe && """"requireGitHub":true""" in withRecipe, withRecipe)
@@ -148,7 +149,7 @@ class RemoteCloudSessionRepositoryTest {
         assertEquals(400, assertFailsWith<AppException.Server> { repository.resume("a1", "c1") }.statusCode)
         answers["POST /api/v1/cloud/sessions"] = HttpStatusCode.BadRequest to """{"error":{"type":"invalid_request","message":"m"}}"""
         assertEquals(CloudSessionRefusal.INVALID,
-            assertFailsWith<AppException.CloudSessionRefused> { repository.create("a1", NewCloudSession(CloudAgent.CLAUDE)) }.reason)
+            assertFailsWith<AppException.CloudSessionRefused> { repository.create("a1", NewCloudSession(CloudAgent.CLAUDE), "press-3") }.reason)
         answers["POST /api/v1/cloud/sessions/c1/resume"] = HttpStatusCode.ServiceUnavailable to """{"error":{"type":"unavailable","message":"m"}}"""
         assertEquals(503, assertFailsWith<AppException.Server> { repository.resume("a1", "c1") }.statusCode)
     }

@@ -15,6 +15,7 @@ import run.ostrom.app.domain.models.CloudRecipe
 import run.ostrom.app.domain.models.CloudRepository
 import run.ostrom.app.domain.models.CloudSession
 import run.ostrom.app.domain.models.NewCloudSession
+import run.ostrom.app.domain.services.IdGenerator
 import run.ostrom.app.domain.usecases.sessions.CloudSessionRules
 import run.ostrom.app.domain.usecases.sessions.CreateCloudSessionUseCase
 import run.ostrom.app.domain.usecases.sessions.LoadCloudSessionOptionsUseCase
@@ -74,9 +75,17 @@ class NewCloudSessionViewModel(
     private val route: NewCloudSessionRoute,
     private val loadOptions: LoadCloudSessionOptionsUseCase,
     private val createSession: CreateCloudSessionUseCase,
+    private val ids: IdGenerator,
 ) : ViewModel() {
     private val state = MutableStateFlow(NewCloudSessionUiState())
     val uiState: StateFlow<NewCloudSessionUiState> = state.asStateFlow()
+
+    /**
+     * One key per form as it was pressed: Start pressed again on the same form, after a lost answer, returns the
+     * session the first press started (TeamCode's and the console's key per press); any change starts a new key.
+     */
+    private var key = ids.newId()
+    private var keyedForm: NewCloudSession? = null
 
     init { load() }
 
@@ -136,10 +145,14 @@ class NewCloudSessionViewModel(
     fun create() {
         val current = state.value
         if (!current.canCreate) return
+        val form = current.form()
+        if (keyedForm != null && form != keyedForm) key = ids.newId()
+        keyedForm = form
+        val pressKey = key
         state.update { it.copy(creating = true, createError = null) }
         viewModelScope.launch {
             try {
-                val session = createSession(route.accountId, current.form())
+                val session = createSession(route.accountId, form, pressKey)
                 state.update { it.copy(creating = false, created = session) }
             } catch (error: CancellationException) {
                 throw error

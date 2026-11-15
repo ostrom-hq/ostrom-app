@@ -31,5 +31,5 @@ val cloudSessionsModule = module {
     single { SetCloudSessionGitHubAccessUseCase(get()) }
     viewModel { CloudSessionsViewModel(get(), get()) }
     viewModel { (route: CloudSessionRoute) -> CloudSessionViewModel(route, get(), get(), get(), get()) }
-    viewModel { (route: NewCloudSessionRoute) -> NewCloudSessionViewModel(route, get(), get()) }
+    viewModel { (route: NewCloudSessionRoute) -> NewCloudSessionViewModel(route, get(), get(), get()) }
 }
