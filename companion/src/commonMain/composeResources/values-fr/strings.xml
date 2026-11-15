@@ -1067,4 +1067,37 @@
     <string name="error_cloud_message">Écrivez un message de 32 000 caractères au maximum.</string>
     <string name="error_cloud_model">Utilisez un modèle valide : lettres, chiffres et . _ : / - (120 caractères au maximum).</string>
     <string name="error_cloud_effort">Utilisez un effort valide : lettres, chiffres et . _ : / - (120 caractères au maximum).</string>
+    <!-- Files sent with messages (runners.cloud.files.v1), TeamCode companion strings. -->
+    <string name="files_attach">Joindre des fichiers</string>
+    <string name="files_source_photos">Photothèque</string>
+    <string name="files_source_camera">Prendre une photo</string>
+    <string name="files_source_documents">Fichiers</string>
+    <string name="files_drop">Dépose des fichiers pour les joindre à ton prochain message</string>
+    <string name="files_remove">Retirer %1$s</string>
+    <string name="files_retry">Réessayer</string>
+    <string name="files_uploaded">Envoyé</string>
+    <string name="files_dismiss">Fermer</string>
+    <string name="files_not_ready">Attends que tous les fichiers soient envoyés, ou retire ceux qui ont échoué.</string>
+    <string name="file_problem_too_many">Un message contient %1$d fichiers au maximum : envoie d'abord celui-ci, ou retire un fichier.</string>
+    <string name="file_problem_empty">Ce fichier est vide.</string>
+    <string name="file_problem_too_large">L'organisation autorise %1$s par fichier.</string>
+    <string name="file_problem_message_too_large">L'organisation autorise %1$s de fichiers par message : envoie d'abord les fichiers déjà joints.</string>
+    <string name="file_problem_type">L'organisation accepte %1$s ; c'est le contenu qui compte, pas le nom.</string>
+    <string name="file_problem_unreadable">Le fichier n'a pas pu être lu, ou il a changé pendant l'envoi. Sélectionne-le à nouveau.</string>
+    <string name="file_problem_quota_daily">Ton quota d'envoi quotidien est atteint ; réessaie dans %1$s.</string>
+    <string name="file_problem_quota_session">Cette session contient trop de fichiers pas encore envoyés : envoie d'abord un message avec ceux-ci.</string>
+    <string name="file_problem_storage_off">Les fichiers sont désactivés pour cette organisation : un administrateur doit d'abord configurer et tester son stockage d'artefacts.</string>
+    <string name="file_problem_storage_unavailable">Le stockage de fichiers de l'organisation n'a pas répondu. Réessaie dans un instant.</string>
+    <string name="file_problem_integrity">Le serveur a enregistré d'autres octets que ceux envoyés. Réessaie.</string>
+    <string name="file_problem_denied">Tu n'as pas le droit d'envoyer des fichiers à cette session.</string>
+    <string name="file_problem_unreachable">Le serveur est injoignable.</string>
+    <string name="file_problem_unsupported">Ce serveur n'accepte pas les fichiers ; il doit d'abord être mis à jour.</string>
+    <string name="file_problem_gone">Cette session n'existe plus, ou tu ne peux plus la voir.</string>
+    <string name="file_problem_other">L'envoi a été refusé (%1$s).</string>
+    <string name="message_files_unavailable">un fichier joint n'est plus disponible (déjà envoyé, ou expiré au bout de 24 heures). Joins-le à nouveau.</string>
+    <string name="message_files_too_large">ses fichiers dépassent ensemble la limite de l'organisation par message. Joins-en moins.</string>
+    <string name="message_files_unsupported">l'hôte de cette session n'accepte pas encore les fichiers.</string>
+    <string name="message_files_invalid">les fichiers joints ne sont pas valides pour cette session. Joins-les à nouveau.</string>
+    <string name="error_file_refused">Le fichier a été refusé.</string>
+    <string name="error_file_refused_code">Le fichier a été refusé (%1$s).</string>
 </resources>

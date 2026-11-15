@@ -119,6 +119,12 @@ sealed class AppException(message: String) : Exception(message) {
             LinkRefusal.SIGNED_OUT -> "Your account on this artifact's server is signed out. Sign in again, then open the link again."
         },
     )
+    /**
+     * The server refused a file sent to a session ([code]: `file_too_large`, `upload_quota`, ...; [statusCode] 0 for a
+     * check made here, such as `file_integrity_failed`), or the file could not be read (`file_unreadable`).
+     */
+    class FileRefused(val code: String?, val statusCode: Int, val retryAfterSeconds: Long? = null) :
+        AppException("The file was refused" + (visibleCode(code)?.let { " ($it)" } ?: "") + ".")
     /** The server refused with [code] (its stable error key, shown only when it is one) and [statusCode]. */
     class Server(val statusCode: Int, val code: String?) :
         AppException("The server returned HTTP $statusCode" + (visibleCode(code)?.let { " ($it)" } ?: "") + ".")

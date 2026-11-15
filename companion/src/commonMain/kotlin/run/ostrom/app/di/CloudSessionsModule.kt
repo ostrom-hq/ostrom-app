@@ -4,6 +4,7 @@ package run.ostrom.app.di
 
 import org.koin.core.module.dsl.viewModel
 import org.koin.dsl.module
+import run.ostrom.app.domain.usecases.files.SessionFilesUseCase
 import run.ostrom.app.domain.usecases.sessions.AnswerPermissionUseCase
 import run.ostrom.app.domain.usecases.sessions.CloudSessionAccess
 import run.ostrom.app.domain.usecases.sessions.ControlConversationUseCase
@@ -18,6 +19,7 @@ import run.ostrom.app.domain.usecases.sessions.LoadCloudSessionOptionsUseCase
 import run.ostrom.app.domain.usecases.sessions.LoadCloudSessionsUseCase
 import run.ostrom.app.domain.usecases.sessions.SetCloudSessionGitHubAccessUseCase
 import run.ostrom.app.infrastructure.repositories.RemoteCloudSessionRepository
+import run.ostrom.app.infrastructure.repositories.RemoteSessionFileRepository
 import run.ostrom.app.infrastructure.repositories.RemoteTranscriptRepository
 import run.ostrom.app.presentation.navigation.CloudSessionRoute
 import run.ostrom.app.presentation.navigation.NewCloudSessionRoute
@@ -46,7 +48,10 @@ val cloudSessionsModule = module {
     single { SendMessageUseCase(get(), get(), get(), get()) }
     single { ControlConversationUseCase(get(), get(), get()) }
     single { AnswerPermissionUseCase(get(), get(), get(), get()) }
-    single { CloudConversationUseCases(get(), get(), get(), get(), get(), get(), get()) }
+    // Files sent with messages (`runners.cloud.files.v1`): the composer's paperclip.
+    single { RemoteSessionFileRepository(get()) }
+    single { SessionFilesUseCase(get(), get(), get(), get()) }
+    single { CloudConversationUseCases(get(), get(), get(), get(), get(), get(), get(), get()) }
     viewModel { (route: CloudSessionRoute) -> CloudSessionViewModel(route, get(), get(), get(), get(), get()) }
     viewModel { (route: NewCloudSessionRoute) -> NewCloudSessionViewModel(route, get(), get(), get()) }
 }

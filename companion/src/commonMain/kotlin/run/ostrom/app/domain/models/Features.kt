@@ -86,6 +86,9 @@ object Features {
 
     /** The agent's effort, changed while it runs: the effort chip's picker. */
     const val RUNNERS_CLOUD_EFFORT = "runners.cloud.effort.v1"
+
+    /** Files sent with messages (`POST …/files`, then their ids in the message's `fileIds`): the composer's paperclip. */
+    const val RUNNERS_CLOUD_FILES = "runners.cloud.files.v1"
 }
 
 /** Throws [AppException.UnsupportedApi] for a server that speaks another API version than this app. */

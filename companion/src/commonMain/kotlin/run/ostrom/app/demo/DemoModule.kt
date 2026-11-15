@@ -8,6 +8,7 @@ import run.ostrom.app.domain.repositories.ActivityRepository
 import run.ostrom.app.domain.repositories.ArtifactRepository
 import run.ostrom.app.domain.repositories.AuthRepository
 import run.ostrom.app.domain.repositories.CloudSessionRepository
+import run.ostrom.app.domain.repositories.SessionFileRepository
 import run.ostrom.app.domain.repositories.TranscriptRepository
 import run.ostrom.app.domain.repositories.TransferRepository
 import run.ostrom.app.domain.repositories.FeaturesRepository
@@ -30,6 +31,7 @@ import run.ostrom.app.infrastructure.repositories.RemoteActivityRepository
 import run.ostrom.app.infrastructure.repositories.RemoteArtifactRepository
 import run.ostrom.app.infrastructure.repositories.RemoteAuthRepository
 import run.ostrom.app.infrastructure.repositories.RemoteCloudSessionRepository
+import run.ostrom.app.infrastructure.repositories.RemoteSessionFileRepository
 import run.ostrom.app.infrastructure.repositories.RemoteTranscriptRepository
 import run.ostrom.app.infrastructure.repositories.RemoteTransferRepository
 import run.ostrom.app.infrastructure.repositories.RemoteGitHubLinkRepository
@@ -76,6 +78,7 @@ val demoModule = module {
     single<MemberSetupRepository> { DemoAwareMemberSetupRepository(get<RemoteMemberSetupRepository>(), DemoMemberSetupRepository(get())) }
     single<GitHubLinkRepository> { DemoAwareGitHubLinkRepository(get<RemoteGitHubLinkRepository>(), DemoGitHubLinkRepository(get())) }
     single<CloudSessionRepository> { DemoAwareCloudSessionRepository(get<RemoteCloudSessionRepository>(), DemoCloudSessionRepository(get(), get())) }
+    single<SessionFileRepository> { get<RemoteSessionFileRepository>().let { DemoAwareSessionFileRepository(it, DemoSessionFileRepository(it)) } }
     single<TranscriptRepository> { DemoAwareTranscriptRepository(get<RemoteTranscriptRepository>(), DemoTranscriptRepository(get())) }
     single<TransferRepository> { DemoAwareTransferRepository(get<RemoteTransferRepository>(), DemoTransferRepository) }
     single<ReceiptKeyPinRepository> { DemoAwareReceiptKeyPinRepository(get<SecureReceiptKeyPinRepository>(), get()) }

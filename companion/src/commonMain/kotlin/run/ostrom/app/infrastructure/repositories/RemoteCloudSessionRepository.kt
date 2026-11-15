@@ -57,8 +57,8 @@ class RemoteCloudSessionRepository(private val calls: AccountCalls) : CloudSessi
     override suspend fun setGitHubAccess(accountId: String, sessionId: String, access: GitHubAccess): CloudSession =
         calls.withAccount(accountId, resource = true) { client -> refusals(githubAccess = true) { client.cloudSessions.setGitHubAccess(sessionId, access.wire).domain() } }
 
-    override suspend fun send(accountId: String, sessionId: String, text: String, clientMessageId: String): InputReceipt =
-        calls.withAccount(accountId, resource = true) { it.cloudMessages.send(sessionId, SendCloudMessageRequest(text, wake = true), idempotencyKey = clientMessageId).receipt() }
+    override suspend fun send(accountId: String, sessionId: String, text: String, clientMessageId: String, fileIds: List<String>): InputReceipt =
+        calls.withAccount(accountId, resource = true) { it.cloudMessages.send(sessionId, SendCloudMessageRequest(text, wake = true, fileIds = fileIds), idempotencyKey = clientMessageId).receipt() }
 
     override suspend fun interrupt(accountId: String, sessionId: String): InputReceipt =
         calls.withAccount(accountId, resource = true) { it.cloudMessages.interrupt(sessionId).receipt() }

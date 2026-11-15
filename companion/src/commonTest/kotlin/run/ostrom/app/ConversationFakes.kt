@@ -2,6 +2,7 @@
 // Ported from TeamCode (Apache-2.0), companion/src/commonTest/.../Fakes.kt (FakeSessionRepository); see NOTICE.
 package run.ostrom.app
 
+import run.ostrom.app.domain.usecases.files.SessionFilesUseCase
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import run.ostrom.app.domain.models.CloudSession
@@ -56,8 +57,8 @@ abstract class ConversationCalls : CloudSessionRepository {
     /** Keeps a changed session, for the fakes that read it again. */
     open fun changed(session: CloudSession): CloudSession = session
 
-    override suspend fun send(accountId: String, sessionId: String, text: String, clientMessageId: String): InputReceipt {
-        calls += "send $sessionId $text $clientMessageId"
+    override suspend fun send(accountId: String, sessionId: String, text: String, clientMessageId: String, fileIds: List<String>): InputReceipt {
+        calls += "send $sessionId $text $clientMessageId" + if (fileIds.isEmpty()) "" else " files=" + fileIds.joinToString(",")
         return sendResult(text)
     }
 
@@ -148,6 +149,7 @@ fun conversationViewModel(
     transcripts: TranscriptRepository,
     features: FakeFeatures,
     memberId: String? = "m1",
+    files: SessionFilesUseCase? = null,
 ): CloudSessionViewModel {
     val accounts = accounts().also { it.save(account("a1", memberId = memberId)) }
     val guard = AccountGuard(RefreshAccountUseCase(FakeAuthRepository(), accounts, MemoryCredentialStore(), FixedClock()))
@@ -158,7 +160,7 @@ fun conversationViewModel(
         CloudConversationUseCases(
             LoadTranscriptUseCase(transcripts, features, guard), FollowTranscriptUseCase(transcripts, guard), ListAgentsUseCase(transcripts, features, guard),
             SendMessageUseCase(sessions, features, guard, SequenceIds()), ControlConversationUseCase(sessions, guard, features),
-            AnswerPermissionUseCase(sessions, features, guard, SequenceIds()), accounts,
+            AnswerPermissionUseCase(sessions, features, guard, SequenceIds()), accounts, files,
         ),
     )
 }

@@ -6,9 +6,11 @@ import run.ostrom.app.domain.models.AppException
 import run.ostrom.app.domain.models.CloudSession
 import run.ostrom.app.domain.models.CloudSessionProblem
 import run.ostrom.app.domain.models.Features
+import run.ostrom.app.domain.models.FilePolicy
 import run.ostrom.app.domain.models.InputReceipt
 import run.ostrom.app.domain.models.PendingMessage
 import run.ostrom.app.domain.models.TranscriptEvent
+import run.ostrom.app.domain.models.UploadedFile
 import run.ostrom.app.domain.repositories.CloudSessionRepository
 import run.ostrom.app.domain.repositories.FeaturesRepository
 import run.ostrom.app.domain.repositories.announced
@@ -21,6 +23,9 @@ object MessageRules {
 
     fun valid(text: String): Boolean =
         text.isNotBlank() && text.length <= MAX_CHARS && text.none { it.isISOControl() && it != '\n' && it != '\t' && it != '\r' }
+
+    /** A message carrying files may have no text at all. */
+    fun valid(text: String, withFiles: Boolean): Boolean = (withFiles && text.isEmpty()) || valid(text)
 }
 
 /**
@@ -34,17 +39,24 @@ class SendMessageUseCase(
     private val guard: AccountGuard,
     private val ids: IdGenerator,
 ) {
-    /** A new message to send; an empty or overlong [text] is refused before any request. */
-    fun draft(text: String): PendingMessage {
-        if (!MessageRules.valid(text)) throw AppException.CloudSessionInvalid(CloudSessionProblem.MESSAGE)
-        return PendingMessage(ids.newId(), text, PendingMessage.State.SENDING)
+    /**
+     * A new message to send; an empty or overlong [text] is refused before any request. [files]: uploaded files the
+     * message carries; with files, [text] may be empty.
+     */
+    fun draft(text: String, files: List<UploadedFile> = emptyList()): PendingMessage {
+        require(files.size <= FilePolicy.MAX_FILES) { "A message carries ${FilePolicy.MAX_FILES} files at most." }
+        val sent = if (files.isNotEmpty() && text.isBlank()) "" else text
+        if (!MessageRules.valid(sent, withFiles = files.isNotEmpty())) throw AppException.CloudSessionInvalid(CloudSessionProblem.MESSAGE)
+        return PendingMessage(ids.newId(), sent, PendingMessage.State.SENDING, files = files)
     }
 
     /** Sends [message] (a new draft or a failed one being retried); never throws except for cancellation. */
     suspend operator fun invoke(accountId: String, sessionId: String, message: PendingMessage): PendingMessage = try {
         val receipt = guard(accountId) {
-            if (Features.RUNNERS_CLOUD_CONVERSATION !in features.announced(accountId)) throw AppException.Unsupported(Features.RUNNERS_CLOUD_CONVERSATION)
-            sessions.send(accountId, sessionId, message.text, message.clientMessageId)
+            val announced = features.announced(accountId)
+            if (Features.RUNNERS_CLOUD_CONVERSATION !in announced) throw AppException.Unsupported(Features.RUNNERS_CLOUD_CONVERSATION)
+            if (message.files.isNotEmpty() && Features.RUNNERS_CLOUD_FILES !in announced) throw AppException.Unsupported(Features.RUNNERS_CLOUD_FILES)
+            sessions.send(accountId, sessionId, message.text, message.clientMessageId, message.files.map { it.id })
         }
         message.received(receipt)
     } catch (error: kotlinx.coroutines.CancellationException) {
