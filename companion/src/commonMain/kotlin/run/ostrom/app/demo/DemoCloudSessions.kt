@@ -14,6 +14,14 @@ import run.ostrom.app.domain.models.InputReceipt
 import run.ostrom.app.domain.models.PermissionAnswer
 import run.ostrom.app.domain.models.CloudSessionRefusal
 import run.ostrom.app.domain.models.CloudSessionStatus
+import run.ostrom.app.domain.models.DeviceFolder
+import run.ostrom.app.domain.models.DeviceFolders
+import run.ostrom.app.domain.models.HostDevice
+import run.ostrom.app.domain.models.NewDeviceSession
+import run.ostrom.app.domain.models.ResumableSession
+import run.ostrom.app.domain.models.ResumableSessions
+import run.ostrom.app.domain.models.SessionHost
+import run.ostrom.app.domain.models.SessionKind
 import run.ostrom.app.domain.models.Features
 import run.ostrom.app.domain.models.FilePolicy
 import run.ostrom.app.domain.models.PickedFile
@@ -27,6 +35,7 @@ import run.ostrom.app.domain.models.TransferPage
 import run.ostrom.app.domain.models.TransferRequest
 import run.ostrom.app.domain.repositories.CloudSessionRepository
 import run.ostrom.app.domain.repositories.SessionFileRepository
+import run.ostrom.app.domain.repositories.DeviceRepository
 import run.ostrom.app.domain.repositories.TransferRepository
 import run.ostrom.app.domain.services.Clock
 
@@ -40,6 +49,19 @@ internal object DemoCloudSessionIds {
     const val RETRYABLE = "demo-cloud-docs"
     const val BROKEN = "demo-cloud-cards"
     const val CONVERSATION = "demo-cloud-talk"
+    const val REMOTE = "demo-remote-loom"
+    const val LOCAL = "demo-local-tables"
+}
+
+/** The demo member's devices: the laptop, online with two folders it offers, and its conversations to continue. */
+internal object DemoDevices {
+    const val LAPTOP = "demo-device-laptop"
+    val laptop = HostDevice(LAPTOP, "Ada's MacBook", "macos", "15.1", current = false)
+    val folders = listOf(DeviceFolder("engine", "engine", "~/git/engine"), DeviceFolder("notes", "notes", "~/git/notes"))
+    fun resumable(startedAt: Long) = listOf(
+        ResumableSession("0000000a-aaaa-4bbb-8ccc-00000000000a", "Carry the tens in the mill", startedAt - 2 * 60 * MINUTE, 6),
+        ResumableSession("0000000b-aaaa-4bbb-8ccc-00000000000b", "Read the punched cards", startedAt - 26 * 60 * MINUTE, 3),
+    )
 }
 
 private val demoLimits = CloudLimits(idleTimeoutMinutes = 30, maxRunMinutes = 240, restrictedEgress = true)
@@ -83,13 +105,24 @@ internal fun demoCloudSessions(startedAt: Long): List<CloudSession> {
         demoCloudSession(DemoCloudSessionIds.BROKEN, "Difference tables", CloudSessionStatus.FAILED, "running", startedAt - 26 * 60 * MINUTE,
             failure = CloudFailure(CloudFailure.PREPARATION_FAILED, "Setup command 1 (create) failed (exit code 1).", retryable = false),
             recipe = recipe.copy(setupCreate = listOf("make tables")), endedAt = startedAt - 26 * 60 * MINUTE + 4 * MINUTE),
+        // On Ada's laptop (`runners.cloud.remote.v1`), in the engine folder; and her `ostrom claude` in a terminal (`runners.cloud.local.v1`).
+        demoCloudSession(DemoCloudSessionIds.REMOTE, "Weave the loom cards", CloudSessionStatus.RUNNING, "running", startedAt - 35 * MINUTE,
+            readyAt = startedAt - 34 * MINUTE)
+            .copy(mode = CloudSessionMode.CONVERSATION, ownerId = DemoContent.MEMBER_ID, limits = null, githubAccess = null, kind = SessionKind.REMOTE,
+                host = SessionHost("Ada's MacBook", "macos", "15.1", "engine", online = true, removed = false, permissionMode = SessionHost.ASK)),
+        demoCloudSession(DemoCloudSessionIds.LOCAL, "Difference engine notes", CloudSessionStatus.RUNNING, "running", startedAt - 12 * MINUTE,
+            readyAt = startedAt - 12 * MINUTE)
+            .copy(mode = CloudSessionMode.CONVERSATION, ownerId = DemoContent.MEMBER_ID, limits = null, githubAccess = null, kind = SessionKind.LOCAL),
     )
 }
 
 /** The demo's cloud sessions from memory: started, paused, resumed and stopped at once, in one page. */
 class DemoCloudSessionRepository(private val demo: DemoMode, private val clock: Clock) : CloudSessionRepository {
-    override suspend fun sessions(accountId: String, before: String?): CloudSessionPage =
-        CloudSessionPage(if (before == null) demo.store().cloudSessions.value else emptyList(), null)
+    // As the server: without kinds, its cloud sessions only.
+    override suspend fun sessions(accountId: String, before: String?, kinds: Set<SessionKind>): CloudSessionPage {
+        val shown = kinds.ifEmpty { setOf(SessionKind.CLOUD) }
+        return CloudSessionPage(if (before == null) demo.store().cloudSessions.value.filter { it.kind in shown } else emptyList(), null)
+    }
 
     override suspend fun session(accountId: String, sessionId: String): CloudSession =
         demo.store().cloudSessions.value.firstOrNull { it.id == sessionId } ?: throw AppException.NotFound()
@@ -102,6 +135,22 @@ class DemoCloudSessionRepository(private val demo: DemoMode, private val clock: 
             "demo-cloud-new-${store.cloudSessions.value.size + 1}", name, session.agent.wire, session.model, session.repo, session.ref, CloudSessionStatus.RUNNING,
             "running", null, null, demoLimits, now, now, now, now, null, null, session.recipe,
             GitHubAccess.OWNER, ownerId = DemoContent.MEMBER_ID, mode = session.mode,
+        )
+        store.cloudSessions.value = listOf(created) + store.cloudSessions.value
+        return created
+    }
+
+    /** On the demo laptop: it starts at once, as a conversation in the chosen folder. */
+    override suspend fun createOnDevice(accountId: String, session: NewDeviceSession, idempotencyKey: String): CloudSession {
+        val store = demo.store()
+        val now = clock.nowMillis()
+        val folder = DemoDevices.folders.firstOrNull { it.id == session.folderId } ?: throw AppException.DeviceRefused("folder_not_published")
+        val created = CloudSession(
+            "demo-remote-new-${store.cloudSessions.value.size + 1}", session.name, session.agent, session.model, null, null, CloudSessionStatus.RUNNING,
+            "running", null, null, null, now, now, now, now, null, null, null,
+            ownerId = DemoContent.MEMBER_ID, mode = CloudSessionMode.CONVERSATION, effort = session.effort, kind = SessionKind.REMOTE,
+            host = SessionHost(DemoDevices.laptop.name, DemoDevices.laptop.platform, DemoDevices.laptop.osVersion, folder.name, online = true, removed = false,
+                permissionMode = session.permissionMode.wire),
         )
         store.cloudSessions.value = listOf(created) + store.cloudSessions.value
         return created
@@ -164,7 +213,9 @@ class DemoCloudSessionRepository(private val demo: DemoMode, private val clock: 
 /** The demo account's cloud sessions from memory, every other account's from its server. */
 class DemoAwareCloudSessionRepository(private val real: CloudSessionRepository, private val demo: CloudSessionRepository) : CloudSessionRepository {
     private fun of(accountId: String) = if (isDemo(accountId)) demo else real
-    override suspend fun sessions(accountId: String, before: String?) = of(accountId).sessions(accountId, before)
+    override suspend fun sessions(accountId: String, before: String?, kinds: Set<SessionKind>) = of(accountId).sessions(accountId, before, kinds)
+    override suspend fun createOnDevice(accountId: String, session: NewDeviceSession, idempotencyKey: String) =
+        of(accountId).createOnDevice(accountId, session, idempotencyKey)
     override suspend fun session(accountId: String, sessionId: String) = of(accountId).session(accountId, sessionId)
     override suspend fun create(accountId: String, session: NewCloudSession, idempotencyKey: String) =
         of(accountId).create(accountId, session, idempotencyKey)
@@ -181,6 +232,28 @@ class DemoAwareCloudSessionRepository(private val real: CloudSessionRepository, 
     override suspend fun setPermissionBypass(accountId: String, sessionId: String, enabled: Boolean) = of(accountId).setPermissionBypass(accountId, sessionId, enabled)
     override suspend fun setModel(accountId: String, sessionId: String, model: String) = of(accountId).setModel(accountId, sessionId, model)
     override suspend fun setEffort(accountId: String, sessionId: String, effort: String) = of(accountId).setEffort(accountId, sessionId, effort)
+}
+
+/** The demo member's laptop, online, from memory. */
+class DemoDeviceRepository(private val demo: DemoMode) : DeviceRepository {
+    override suspend fun onlineDevices(accountId: String): List<HostDevice> = listOf(DemoDevices.laptop)
+
+    override suspend fun folders(accountId: String, deviceId: String): DeviceFolders {
+        if (deviceId != DemoDevices.LAPTOP) throw AppException.DeviceRefused("device_not_found")
+        return DeviceFolders(online = true, DemoDevices.folders, resumes = true)
+    }
+
+    override suspend fun resumable(accountId: String, deviceId: String, folderId: String, limit: Int, before: String?): ResumableSessions =
+        ResumableSessions(if (before == null && folderId == "engine") DemoDevices.resumable(demo.store().startedAt) else emptyList())
+}
+
+/** The demo account's devices from memory, every other account's from its server. */
+class DemoAwareDeviceRepository(private val real: DeviceRepository, private val demo: DeviceRepository) : DeviceRepository {
+    private fun of(accountId: String) = if (isDemo(accountId)) demo else real
+    override suspend fun onlineDevices(accountId: String) = of(accountId).onlineDevices(accountId)
+    override suspend fun folders(accountId: String, deviceId: String) = of(accountId).folders(accountId, deviceId)
+    override suspend fun resumable(accountId: String, deviceId: String, folderId: String, limit: Int, before: String?) =
+        of(accountId).resumable(accountId, deviceId, folderId, limit, before)
 }
 
 /** The demo has no team to transfer sessions to (it announces no transfers), so its screens stay quiet. */

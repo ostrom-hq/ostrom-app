@@ -6,6 +6,8 @@ import run.ostrom.app.domain.usecases.files.SessionFilesUseCase
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import run.ostrom.app.domain.models.CloudSession
+import run.ostrom.app.domain.models.NewDeviceSession
+import run.ostrom.app.domain.models.SessionKind
 import run.ostrom.app.domain.models.CloudSessionPage
 import run.ostrom.app.domain.models.CloudSessionStatus
 import run.ostrom.app.domain.models.GitHubAccess
@@ -50,6 +52,16 @@ abstract class ConversationCalls : CloudSessionRepository {
     var answerResult: suspend (PermissionAnswer) -> InputReceipt = { InputReceipt("ans-${it.requestId}", "queued", woke = false, reason = null) }
     var stopTaskResult: suspend (String) -> InputReceipt = { InputReceipt("stop-$it", "queued", woke = false, reason = null) }
     var changeResult: suspend (CloudSession) -> CloudSession = { it }
+
+    /** Every session started on a device, with its idempotency key. */
+    val deviceCreations = mutableListOf<Pair<NewDeviceSession, String>>()
+    var createOnDeviceResult: suspend (NewDeviceSession) -> CloudSession = { current("remote-new").copy(kind = SessionKind.REMOTE) }
+
+    override suspend fun createOnDevice(accountId: String, session: NewDeviceSession, idempotencyKey: String): CloudSession {
+        calls += "createOnDevice $idempotencyKey"
+        deviceCreations += session to idempotencyKey
+        return createOnDeviceResult(session)
+    }
 
     /** The session the model, effort and Bypass changes start from. */
     abstract fun current(sessionId: String): CloudSession
@@ -101,7 +113,7 @@ class FakeCloudSessionRepository(var session: CloudSession) : ConversationCalls(
 
     override fun current(sessionId: String) = session
     override fun changed(session: CloudSession): CloudSession { this.session = session; return session }
-    override suspend fun sessions(accountId: String, before: String?) = CloudSessionPage(listOf(session), null)
+    override suspend fun sessions(accountId: String, before: String?, kinds: Set<SessionKind>) = CloudSessionPage(listOf(session), null)
     override suspend fun session(accountId: String, sessionId: String): CloudSession {
         calls += "get $sessionId"
         sessionFailure?.let { throw it }

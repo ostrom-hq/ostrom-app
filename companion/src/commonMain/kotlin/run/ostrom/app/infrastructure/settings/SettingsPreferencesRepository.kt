@@ -6,6 +6,7 @@ import com.russhwolf.settings.Settings
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import run.ostrom.app.domain.models.PermissionMode
 import run.ostrom.app.domain.models.ThemePreference
 import run.ostrom.app.domain.repositories.PreferencesRepository
 
@@ -20,7 +21,13 @@ class SettingsPreferencesRepository(private val settings: Settings) : Preference
         settings.putString(THEME_KEY, theme.name)
     }
 
+    override val permissionMode: PermissionMode
+        get() = PermissionMode.of(settings.getStringOrNull(PERMISSION_MODE_KEY)) ?: PermissionMode.ASK
+
+    override fun setPermissionMode(mode: PermissionMode) = settings.putString(PERMISSION_MODE_KEY, mode.wire)
+
     private companion object {
         const val THEME_KEY = "preferences.theme"
+        const val PERMISSION_MODE_KEY = "preferences.permissionMode"
     }
 }

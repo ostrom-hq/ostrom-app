@@ -3,6 +3,29 @@
 package run.ostrom.app.presentation.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.Icon
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.style.TextOverflow
+import com.adamglin.phosphoricons.regular.CaretDown
+import com.adamglin.phosphoricons.regular.CaretUp
+import org.jetbrains.compose.resources.pluralStringResource
+import run.ostrom.app.domain.models.PermissionMode
+import run.ostrom.app.domain.models.ResumableSession
+import run.ostrom.app.presentation.components.ErrorText
+import run.ostrom.app.presentation.components.Group
+import run.ostrom.app.presentation.components.GroupDivider
+import run.ostrom.app.presentation.components.relativeTime
+import run.ostrom.app.presentation.components.rememberNow
+import run.ostrom.app.presentation.components.systemOf
+import run.ostrom.app.presentation.viewmodels.NewCloudSessionUiState
+import run.ostrom.app.presentation.viewmodels.SessionTarget
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -89,12 +112,42 @@ import run.ostrom.app.resources.cloud_new_variables_hint
 import run.ostrom.app.resources.cloud_new_working_directory
 import run.ostrom.app.resources.cloud_recipe
 import run.ostrom.app.resources.sessions_title
+import run.ostrom.app.resources.local_session_agent
+import run.ostrom.app.resources.local_session_agent_claude
+import run.ostrom.app.resources.local_session_agent_codex
+import run.ostrom.app.resources.local_session_agent_default
+import run.ostrom.app.resources.new_session_device
+import run.ostrom.app.resources.new_session_device_this
+import run.ostrom.app.resources.new_session_effort
+import run.ostrom.app.resources.new_session_folder
+import run.ostrom.app.resources.new_session_folder_hint
+import run.ostrom.app.resources.new_session_no_device
+import run.ostrom.app.resources.new_session_no_folder
+import run.ostrom.app.resources.new_session_permissions
+import run.ostrom.app.resources.new_session_permissions_ask
+import run.ostrom.app.resources.new_session_permissions_ask_hint
+import run.ostrom.app.resources.new_session_permissions_bypass
+import run.ostrom.app.resources.new_session_permissions_bypass_warning
+import run.ostrom.app.resources.new_session_refresh_devices
+import run.ostrom.app.resources.new_session_resume
+import run.ostrom.app.resources.new_session_resume_empty
+import run.ostrom.app.resources.new_session_resume_hint
+import run.ostrom.app.resources.new_session_resume_loading
+import run.ostrom.app.resources.new_session_resume_more
+import run.ostrom.app.resources.new_session_resume_none
+import run.ostrom.app.resources.new_session_resume_none_hint
+import run.ostrom.app.resources.new_session_resume_old_daemon
+import run.ostrom.app.resources.new_session_resume_turns
+import run.ostrom.app.resources.new_session_start_on_device
+import run.ostrom.app.resources.new_session_target_cloud
+import run.ostrom.app.resources.new_session_target_device
 
 /**
  * The new cloud session form: the agent, a name, a model and a first message; then, on a server that takes a
  * preparation recipe (`runners.cloud.environment.v1`), its repositories (address, directory, ref, local branch), working
  * directory, setup commands, required variables, GitHub requirement and Git e-mail domain; otherwise the single
- * repository and ref. Start lands on the new session.
+ * repository and ref. On a server that starts sessions on the member's online devices (`runners.cloud.remote.daemon.v1`),
+ * a switch offers that target instead ([DeviceForm]). Start lands on the new session.
  */
 @Composable
 fun NewCloudSessionScreen(
@@ -119,7 +172,14 @@ fun NewCloudSessionScreen(
                 })
             }
             BusyRow(state.loading)
-            if (!state.loading && state.error == null) {
+            if (!state.loading && state.error == null && state.onDevices) {
+                Segmented(
+                    listOf(SessionTarget.CLOUD to stringResource(Res.string.new_session_target_cloud), SessionTarget.DEVICE to stringResource(Res.string.new_session_target_device)),
+                    state.target, viewModel::onTarget, Modifier.fillMaxWidth(), tag = { "target-${it.name.lowercase()}" },
+                )
+            }
+            if (!state.loading && state.error == null && state.target == SessionTarget.DEVICE) DeviceForm(state, viewModel)
+            if (!state.loading && state.error == null && state.target == SessionTarget.CLOUD) {
                 Text(stringResource(Res.string.cloud_new_agent), color = colors.text, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                 Segmented(
                     CloudAgent.entries.map { it to agentWords(it) }, state.agent, viewModel::onAgent, Modifier.fillMaxWidth(),
@@ -174,6 +234,193 @@ fun NewCloudSessionScreen(
                 AppButton(stringResource(Res.string.cloud_new_start), onClick = viewModel::create, enabled = state.canCreate, busy = state.creating,
                     modifier = Modifier.testTag("cloud-new-submit"))
             }
+        }
+    }
+}
+
+/**
+ * The form on one of the member's online devices (`runners.cloud.remote.daemon.v1`), TeamCode's DeviceFields: the online
+ * devices only, then the folders the chosen one offers (never a path typed here), the conversation to continue, the
+ * agent; then a name (the folder's by default), a first message, the model and effort, and the permission mode.
+ */
+@Composable
+private fun DeviceForm(state: NewCloudSessionUiState, viewModel: NewCloudSessionViewModel) {
+    val colors = Ostrom.colors
+    val device = state.devices?.firstOrNull { it.id == state.deviceId }
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(stringResource(Res.string.new_session_device), color = colors.text, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+            AppButton(stringResource(Res.string.new_session_refresh_devices), onClick = viewModel::reloadDevices, kind = ButtonKind.GHOST, small = true, fill = false,
+                enabled = !state.loadingDevices && !state.creating, modifier = Modifier.testTag("refresh-devices"))
+        }
+        BusyRow(state.loadingDevices)
+        val devices = state.devices
+        if (!state.loadingDevices && devices != null && devices.isEmpty()) {
+            Text(stringResource(Res.string.new_session_no_device), color = colors.muted, fontSize = 14.sp, modifier = Modifier.testTag("no-device"))
+        }
+        if (!devices.isNullOrEmpty()) Group(Modifier.selectableGroup()) {
+            devices.forEachIndexed { index, item ->
+                if (index > 0) GroupDivider()
+                val system = systemOf(item.platform, item.osVersion)
+                val subtitle = if (item.current) listOfNotNull(stringResource(Res.string.new_session_device_this), system).joinToString(" · ") else system
+                Option(item.name, subtitle, selected = state.deviceId == item.id, tag = "device-${item.id}") { viewModel.onDevice(item.id) }
+            }
+        }
+    }
+    if (state.deviceId != null) Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(stringResource(Res.string.new_session_folder), color = colors.text, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+        BusyRow(state.loadingFolders)
+        val folders = state.folders
+        if (!state.loadingFolders && folders != null && folders.isEmpty() && state.createError == null) {
+            Text(stringResource(Res.string.new_session_no_folder), color = colors.muted, fontSize = 14.sp, modifier = Modifier.testTag("no-folder"))
+        }
+        if (!folders.isNullOrEmpty()) {
+            Group(Modifier.selectableGroup()) {
+                folders.forEachIndexed { index, folder ->
+                    if (index > 0) GroupDivider()
+                    Option(folder.name, folder.label?.takeIf { it != folder.name }, selected = state.folderId == folder.id, tag = "folder-${folder.id}") { viewModel.onFolder(folder.id) }
+                }
+            }
+            Text(stringResource(Res.string.new_session_folder_hint), style = MetaStyle, color = colors.muted)
+        }
+    }
+    ResumeFields(state, viewModel, device?.name)
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(stringResource(Res.string.local_session_agent), color = colors.text, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+        Segmented(listOf("claude" to stringResource(Res.string.local_session_agent_claude), "codex" to stringResource(Res.string.local_session_agent_codex)),
+            state.deviceAgent, viewModel::onDeviceAgent, Modifier.fillMaxWidth(), tag = { "agent-$it" })
+    }
+    AppTextField(state.name, { viewModel.onField(CloudField.NAME, it) }, Modifier.fillMaxWidth(), label = stringResource(Res.string.cloud_new_name), tag = "cloud-new-name")
+    AppTextField(state.prompt, { viewModel.onField(CloudField.PROMPT, it) }, Modifier.fillMaxWidth(), label = stringResource(Res.string.cloud_new_prompt),
+        hint = stringResource(Res.string.cloud_new_prompt_hint), singleLine = false, minLines = 3, tag = "cloud-new-prompt")
+    val default = stringResource(Res.string.local_session_agent_default)
+    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        AppTextField(state.model, { viewModel.onField(CloudField.MODEL, it) }, Modifier.weight(1f), label = stringResource(Res.string.cloud_new_model), placeholder = default,
+            mono = true, tag = "cloud-new-model")
+        AppTextField(state.effort, { viewModel.onField(CloudField.EFFORT, it) }, Modifier.weight(1f), label = stringResource(Res.string.new_session_effort), placeholder = default,
+            mono = true, tag = "cloud-new-effort")
+    }
+    PermissionFields(state, viewModel, device?.name)
+    state.createError?.let { Banner(it.words(), Tone.DANGER, Modifier.testTag("cloud-new-error")) }
+    val label = if (device != null) stringResource(Res.string.new_session_start_on_device, device.name) else stringResource(Res.string.cloud_new_start)
+    AppButton(label, onClick = viewModel::create, enabled = state.canCreate, busy = state.creating, modifier = Modifier.testTag("cloud-new-submit"))
+}
+
+/**
+ * "Resume a session", under the folder: closed and set to None by default; opened, it lists the folder's Claude Code
+ * conversations the device read now (title, how long ago, how many messages). Another folder or device clears it.
+ */
+@Composable
+private fun ResumeFields(state: NewCloudSessionUiState, viewModel: NewCloudSessionViewModel, deviceName: String?) {
+    if (!state.showsResume) return
+    val colors = Ostrom.colors
+    val device = deviceName ?: stringResource(Res.string.new_session_device).lowercase()
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.testTag("resume")) {
+        Text(stringResource(Res.string.new_session_resume), color = colors.text, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+        if (!state.deviceResumes) {
+            Text(stringResource(Res.string.new_session_resume_old_daemon, device), style = MetaStyle, color = colors.muted, modifier = Modifier.testTag("resume-old-daemon"))
+            return@Column
+        }
+        ResumePicker(state, viewModel)
+        Text(stringResource(Res.string.new_session_resume_hint, device), style = MetaStyle, color = colors.muted)
+    }
+}
+
+/**
+ * The picker itself: closed, it shows the choice (None by default); opened, the conversations (title, how long ago, how
+ * many messages), what is loading or failed with Retry, an empty folder, and the older ones.
+ */
+@Composable
+private fun ResumePicker(state: NewCloudSessionUiState, viewModel: NewCloudSessionViewModel) {
+    val colors = Ostrom.colors
+    val now = rememberNow()
+    val resumable = state.resumable
+    val chosen = resumable?.firstOrNull { it.id == state.resumeId }
+    Group {
+        Row(
+            Modifier.fillMaxWidth().heightIn(min = 56.dp).clickable(enabled = !state.creating, role = Role.Button, onClick = viewModel::onResumeOpen)
+                .padding(horizontal = 14.dp, vertical = 8.dp).testTag("resume-picker"),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(chosen?.title ?: stringResource(Res.string.new_session_resume_none), color = colors.text, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, maxLines = 1,
+                    overflow = TextOverflow.Ellipsis)
+                Text(chosen?.let { meta(it, now) } ?: stringResource(Res.string.new_session_resume_none_hint), style = MetaStyle, color = colors.muted)
+            }
+            Icon(if (state.resumeOpen) PhosphorIcons.Regular.CaretUp else PhosphorIcons.Regular.CaretDown, null, tint = colors.muted, modifier = Modifier.size(16.dp))
+        }
+        if (state.resumeOpen) {
+            GroupDivider()
+            if (state.loadingResumable && resumable == null) {
+                BusyRow(true)
+                Text(stringResource(Res.string.new_session_resume_loading), color = colors.muted, fontSize = 13.sp, modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp))
+            }
+            state.resumableError?.let { error ->
+                Column(Modifier.padding(horizontal = 14.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ErrorText(error, Modifier.testTag("resume-error"))
+                    AppButton(stringResource(Res.string.action_retry), onClick = viewModel::onResumeRetry, kind = ButtonKind.SECONDARY, small = true, fill = false,
+                        modifier = Modifier.testTag("resume-retry"))
+                }
+            }
+            if (resumable != null) Column(Modifier.selectableGroup()) {
+                Option(stringResource(Res.string.new_session_resume_none), stringResource(Res.string.new_session_resume_none_hint), selected = state.resumeId == null,
+                    tag = "resume-none") { viewModel.onResume(null) }
+                resumable.forEach { session ->
+                    GroupDivider()
+                    Option(session.title, meta(session, now), selected = state.resumeId == session.id, tag = "resume-${session.id}") { viewModel.onResume(session.id) }
+                }
+                if (resumable.isEmpty() && state.resumableError == null) {
+                    GroupDivider()
+                    Text(stringResource(Res.string.new_session_resume_empty), color = colors.muted, fontSize = 14.sp,
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp).testTag("resume-empty"))
+                }
+                if (state.resumableNext != null) {
+                    GroupDivider()
+                    Box(Modifier.padding(horizontal = 8.dp, vertical = 4.dp)) {
+                        AppButton(stringResource(Res.string.new_session_resume_more), onClick = viewModel::onResumeMore, kind = ButtonKind.GHOST, small = true, fill = false,
+                            busy = state.loadingResumable, modifier = Modifier.testTag("resume-more"))
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** "2 h ago · 5 messages". */
+@Composable
+private fun meta(session: ResumableSession, now: Long): String =
+    relativeTime(session.lastActiveAt, now) + " · " + pluralStringResource(Res.plurals.new_session_resume_turns, session.turns, session.turns)
+
+/** Ask or bypass, chosen at each launch; the last choice comes back the next time. */
+@Composable
+private fun PermissionFields(state: NewCloudSessionUiState, viewModel: NewCloudSessionViewModel, deviceName: String?) {
+    val colors = Ostrom.colors
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(stringResource(Res.string.new_session_permissions), color = colors.text, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+        Segmented(listOf(PermissionMode.ASK to stringResource(Res.string.new_session_permissions_ask), PermissionMode.BYPASS to stringResource(Res.string.new_session_permissions_bypass)),
+            state.permissionMode, viewModel::onPermissionMode, Modifier.fillMaxWidth(), tag = { "permissions-${it.wire}" })
+        if (state.permissionMode == PermissionMode.BYPASS) {
+            Banner(stringResource(Res.string.new_session_permissions_bypass_warning, deviceName ?: stringResource(Res.string.new_session_device).lowercase()), Tone.WARN,
+                Modifier.testTag("bypass-warning"))
+        } else Text(stringResource(Res.string.new_session_permissions_ask_hint), style = MetaStyle, color = colors.muted)
+    }
+}
+
+/** A radio row of the device form: a device, a folder, a conversation. */
+@Composable
+private fun Option(title: String, subtitle: String?, selected: Boolean, tag: String, onClick: () -> Unit) {
+    val colors = Ostrom.colors
+    Row(
+        Modifier.fillMaxWidth().heightIn(min = 56.dp).selectable(selected, role = Role.RadioButton, onClick = onClick).padding(horizontal = 14.dp, vertical = 8.dp).testTag(tag),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Box(Modifier.size(20.dp).border(1.5.dp, if (selected) colors.accent else colors.line, CircleShape), contentAlignment = Alignment.Center) {
+            if (selected) Box(Modifier.size(10.dp).background(colors.accent, CircleShape))
+        }
+        Column(Modifier.weight(1f)) {
+            Text(title, color = colors.text, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+            subtitle?.let { Text(it, style = MetaStyle, color = colors.muted) }
         }
     }
 }

@@ -14,18 +14,24 @@ import run.ostrom.app.domain.usecases.transcript.ListAgentsUseCase
 import run.ostrom.app.domain.usecases.transcript.LoadTranscriptUseCase
 import run.ostrom.app.domain.usecases.sessions.ControlCloudSessionUseCase
 import run.ostrom.app.domain.usecases.sessions.CreateCloudSessionUseCase
+import run.ostrom.app.domain.usecases.sessions.CreateDeviceSessionUseCase
+import run.ostrom.app.domain.usecases.sessions.LoadDeviceFoldersUseCase
+import run.ostrom.app.domain.usecases.sessions.LoadHostDevicesUseCase
+import run.ostrom.app.domain.usecases.sessions.LoadResumableSessionsUseCase
 import run.ostrom.app.domain.usecases.sessions.GetCloudSessionUseCase
 import run.ostrom.app.domain.usecases.sessions.LoadCloudSessionOptionsUseCase
 import run.ostrom.app.domain.usecases.sessions.LoadCloudSessionsUseCase
 import run.ostrom.app.domain.usecases.sessions.SetCloudSessionGitHubAccessUseCase
 import run.ostrom.app.infrastructure.repositories.RemoteCloudSessionRepository
 import run.ostrom.app.infrastructure.repositories.RemoteSessionFileRepository
+import run.ostrom.app.infrastructure.repositories.RemoteDeviceRepository
 import run.ostrom.app.infrastructure.repositories.RemoteTranscriptRepository
 import run.ostrom.app.presentation.navigation.CloudSessionRoute
 import run.ostrom.app.presentation.navigation.NewCloudSessionRoute
 import run.ostrom.app.presentation.viewmodels.CloudConversationUseCases
 import run.ostrom.app.presentation.viewmodels.CloudSessionViewModel
 import run.ostrom.app.presentation.viewmodels.CloudSessionsViewModel
+import run.ostrom.app.presentation.viewmodels.DeviceSessionUseCases
 import run.ostrom.app.presentation.viewmodels.NewCloudSessionViewModel
 
 /** The person's cloud sessions (`runners.cloud.v1`): their list in the Sessions tab, a session's record, the new session form. */
@@ -40,6 +46,13 @@ val cloudSessionsModule = module {
     single { CreateCloudSessionUseCase(get()) }
     single { SetCloudSessionGitHubAccessUseCase(get()) }
     viewModel { CloudSessionsViewModel(get(), get()) }
+    // Sessions started on one of the member's online devices (`runners.cloud.remote.daemon.v1`).
+    single { RemoteDeviceRepository(get()) }
+    single { LoadHostDevicesUseCase(get(), get()) }
+    single { LoadDeviceFoldersUseCase(get(), get()) }
+    single { LoadResumableSessionsUseCase(get(), get()) }
+    single { CreateDeviceSessionUseCase(get(), get()) }
+    single { DeviceSessionUseCases(get(), get(), get(), get()) }
     // A conversation session (`runners.cloud.conversation.v1`): its transcript, messages, permissions and controls.
     single { RemoteTranscriptRepository(get()) }
     single { LoadTranscriptUseCase(get(), get(), get()) }
@@ -53,5 +66,5 @@ val cloudSessionsModule = module {
     single { SessionFilesUseCase(get(), get(), get(), get()) }
     single { CloudConversationUseCases(get(), get(), get(), get(), get(), get(), get(), get()) }
     viewModel { (route: CloudSessionRoute) -> CloudSessionViewModel(route, get(), get(), get(), get(), get()) }
-    viewModel { (route: NewCloudSessionRoute) -> NewCloudSessionViewModel(route, get(), get(), get()) }
+    viewModel { (route: NewCloudSessionRoute) -> NewCloudSessionViewModel(route, get(), get(), get(), get(), get()) }
 }

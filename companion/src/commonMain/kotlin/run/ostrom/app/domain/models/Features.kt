@@ -89,6 +89,18 @@ object Features {
 
     /** Files sent with messages (`POST …/files`, then their ids in the message's `fileIds`): the composer's paperclip. */
     const val RUNNERS_CLOUD_FILES = "runners.cloud.files.v1"
+
+    /** Remote sessions, on a member's own device (TeamCode's `cloud.sessions.remote.v1`): the list asks for every kind and says where each runs. */
+    const val RUNNERS_CLOUD_REMOTE = "runners.cloud.remote.v1"
+
+    /** Sessions started on one of the member's online devices, in a folder it offers (TeamCode's `cloud.sessions.remote.daemon.v1`). */
+    const val RUNNERS_CLOUD_REMOTE_DAEMON = "runners.cloud.remote.daemon.v1"
+
+    /** A session on a device that continues a Claude Code conversation of its folder (TeamCode's `cloud.sessions.remote.resume.v1`). */
+    const val RUNNERS_CLOUD_REMOTE_RESUME = "runners.cloud.remote.resume.v1"
+
+    /** The sessions of a member's `ostrom <agent>` in a terminal (TeamCode's `cloud.sessions.local.v1`): listed, never talked to from the app. */
+    const val RUNNERS_CLOUD_LOCAL = "runners.cloud.local.v1"
 }
 
 /** Throws [AppException.UnsupportedApi] for a server that speaks another API version than this app. */

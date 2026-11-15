@@ -39,7 +39,8 @@ object DemoContent {
         Features.WORKFLOWS, Features.ENVIRONMENT, Features.MCP_PERSONAL, Features.RUNNERS_CLOUD, Features.RUNNERS_CLOUD_ENVIRONMENT,
         Features.GITHUB_LINK, Features.RUNNERS_CLOUD_GITHUB, Features.RUNNERS_CLOUD_CONVERSATION, Features.RUNNERS_CLOUD_PERMISSIONS,
         Features.RUNNERS_CLOUD_PERMISSIONS_BYPASS, Features.RUNNERS_CLOUD_TASKS, Features.RUNNERS_CLOUD_TRANSCRIPT_FEEDS, Features.RUNNERS_CLOUD_MODEL,
-        Features.RUNNERS_CLOUD_EFFORT,
+        Features.RUNNERS_CLOUD_EFFORT, Features.RUNNERS_CLOUD_REMOTE, Features.RUNNERS_CLOUD_REMOTE_DAEMON, Features.RUNNERS_CLOUD_REMOTE_RESUME,
+        Features.RUNNERS_CLOUD_LOCAL,
     )
 
     /** The demo member's id: the owner of the demo's conversation session. */

@@ -29,11 +29,16 @@ import run.ostrom.app.domain.models.QuestionAnswer
 import run.ostrom.app.domain.models.SessionWaiting
 import run.ostrom.app.domain.models.GitHubAccess
 import run.ostrom.app.domain.models.NewCloudSession
+import run.ostrom.app.domain.models.NewDeviceSession
+import run.ostrom.app.domain.models.PermissionMode
+import run.ostrom.app.domain.models.SessionHost
+import run.ostrom.app.domain.models.SessionKind
 import run.ostrom.app.domain.services.PlatformInfo
 import run.ostrom.app.infrastructure.client.OstromClientProvider
 import run.ostrom.app.infrastructure.credentials.MemoryCredentialStore
 import run.ostrom.app.infrastructure.repositories.AccountCalls
 import run.ostrom.app.infrastructure.repositories.RemoteCloudSessionRepository
+import run.ostrom.app.infrastructure.repositories.refusalReason
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -113,6 +118,50 @@ class RemoteCloudSessionRepositoryTest {
         val withRecipe = (requests.last().body as OutgoingContent.ByteArrayContent).bytes().decodeToString()
         assertTrue(""""repositories":[{"url":"https://github.com/acme/api","path":"api"""" in withRecipe, withRecipe)
         assertTrue(""""create":["npm ci"]""" in withRecipe && """"requiredVariables":["NPM_TOKEN"]""" in withRecipe && """"requireGitHub":true""" in withRecipe, withRecipe)
+    }
+
+    @Test
+    fun theKindsAreAskedAndARemoteSessionCarriesItsHostAndTheDevicesRefusalReason() = runTest {
+        signedIn()
+        val host = ""","kind":"remote","mode":"conversation","host":{"deviceId":"d1","deviceName":"Ada's MacBook","platform":"macos","osVersion":"15.1",
+            "directoryName":"app","online":false,"permissionMode":"bypass","folderId":"f1"},"failure":{"code":"host_offline","message":"m"}"""
+        val removed = ""","kind":"remote","host":{"directoryName":"web"}"""
+        val refused = ""","kind":"remote","host":{"deviceId":"d1"},"failure":{"code":"host_refused","message":"The device refused to start this session (folder_missing)."}"""
+        val local = ""","kind":"local","host":{"deviceId":"d1","deviceName":"ignored"}"""
+        answers["GET /api/v1/cloud/sessions"] = HttpStatusCode.OK to
+            """{"items":[${session("r1", "paused", host)},${session("r2", "running", removed)},${session("r3", "failed", refused)},${session("l1", "running", local)},${session("c1", "running")}]}"""
+        val page = repository.sessions("a1", before = null, kinds = setOf(SessionKind.REMOTE, SessionKind.LOCAL, SessionKind.CLOUD))
+        assertEquals(listOf("cloud", "local", "remote"), requests.last().url.parameters.getAll("kind"))
+        val (r1, r2, r3, l1, c1) = page.sessions
+        assertEquals(SessionHost("Ada's MacBook", "macos", "15.1", "app", online = false, removed = false, permissionMode = "bypass"), r1.host)
+        assertTrue(r1.remote && r1.hostOffline)
+        assertTrue(r2.host!!.removed)
+        assertEquals("folder_missing", r3.refusalReason)
+        assertTrue(r3.hostRefused)
+        assertTrue(l1.local); assertEquals(null, l1.host, "only a remote session has a host")
+        assertEquals(SessionKind.CLOUD, c1.kind)
+        repository.sessions("a1", before = null)
+        assertEquals(null, requests.last().url.parameters["kind"], "an older server is asked as before")
+        // Only a short code is kept from the server's text.
+        assertEquals(null, refusalReason("The device refused to start this session."))
+        assertEquals("agent_unsupported", refusalReason("Refused (Some Text) (agent_unsupported)."))
+    }
+
+    @Test
+    fun aSessionStartsOnADeviceInOneOfItsFoldersAndItsRefusalKeepsItsKey() = runTest {
+        signedIn()
+        answers["POST /api/v1/cloud/sessions"] = HttpStatusCode.Created to session("r9", "creating", ""","kind":"remote","phase":"waiting_host","host":{"deviceId":"d1"}""")
+        val form = NewDeviceSession("app", "d1", "f1", "claude", "opus", "high", PermissionMode.BYPASS, "Fix the build", "0000000a-aaaa-4bbb-8ccc-00000000000a")
+        val created = repository.createOnDevice("a1", form, "press-1")
+        assertTrue(created.waitingForHost)
+        assertEquals("press-1", requests.last().headers["Idempotency-Key"])
+        val sent = body()
+        listOf(""""agent":"claude"""", """"kind":"remote"""", """"deviceId":"d1"""", """"folderId":"f1"""", """"permissionMode":"bypass"""", """"name":"app"""",
+            """"prompt":"Fix the build"""", """"model":"opus"""", """"effort":"high"""", """"resumeSessionId":"0000000a-aaaa-4bbb-8ccc-00000000000a"""")
+            .forEach { assertTrue(it in sent, "$it in $sent") }
+        assertFalse("directoryName" in sent || "\"mode\"" in sent, sent)
+        answers["POST /api/v1/cloud/sessions"] = HttpStatusCode.Conflict to """{"error":{"type":"device_offline","message":"m"}}"""
+        assertEquals("device_offline", assertFailsWith<AppException.Server> { repository.createOnDevice("a1", form, "press-2") }.code)
     }
 
     @Test

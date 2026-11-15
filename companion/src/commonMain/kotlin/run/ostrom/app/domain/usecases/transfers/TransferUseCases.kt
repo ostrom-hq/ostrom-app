@@ -33,7 +33,7 @@ object TransferRules {
      * owner's recipe), not ended, not already changing owner.
      */
     fun canTransfer(account: Account, session: CloudSession): Boolean =
-        session.ownerId != null && session.ownerId == account.memberId && !session.remote && session.status in TRANSFERABLE
+        session.ownerId != null && session.ownerId == account.memberId && !session.remote && !session.local && session.status in TRANSFERABLE
 
     private val TRANSFERABLE = setOf(CloudSessionStatus.RUNNING, CloudSessionStatus.PAUSING, CloudSessionStatus.PAUSED, CloudSessionStatus.RESUMING)
 

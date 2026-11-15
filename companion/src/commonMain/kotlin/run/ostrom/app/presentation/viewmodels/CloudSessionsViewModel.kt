@@ -33,6 +33,8 @@ data class CloudSessionsUiState(
     val error: Failure? = null,
     /** The [error] is an older page's: a retry reads that page again, not the first one. */
     val moreFailed: Boolean = false,
+    /** The server has remote sessions (`runners.cloud.remote.v1`): each row says where it runs. */
+    val remoteSessions: Boolean = false,
 ) {
     val empty: Boolean get() = loaded && !loading && sessions.isEmpty()
 }
@@ -104,7 +106,7 @@ class CloudSessionsViewModel(
                 val older = if (page.next == null || boundary == null) emptyList()
                 else current.sessions.filter { it.id !in fresh && (it.createdAt ?: Long.MIN_VALUE) < boundary }
                 current.copy(sessions = page.sessions + older, next = if (older.isEmpty()) page.next else current.next, loaded = true, loading = false,
-                    loadingMore = false, unavailable = false)
+                    loadingMore = false, unavailable = false, remoteSessions = page.remoteSessions)
             }
         } catch (error: CancellationException) {
             throw error

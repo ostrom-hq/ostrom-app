@@ -52,6 +52,7 @@ import run.ostrom.app.presentation.components.Banner
 import run.ostrom.app.presentation.components.ButtonKind
 import run.ostrom.app.presentation.components.BusyRow
 import run.ostrom.app.presentation.components.Chip
+import run.ostrom.app.presentation.components.KindChips
 import run.ostrom.app.presentation.components.ContentWidth
 import run.ostrom.app.presentation.components.EmptyState
 import run.ostrom.app.presentation.components.IconButtonKind
@@ -92,6 +93,7 @@ import run.ostrom.app.resources.cloud_status_unknown
 import run.ostrom.app.resources.sessions_kind_agent
 import run.ostrom.app.resources.sessions_kind_cloud
 import run.ostrom.app.resources.sessions_title
+import run.ostrom.app.resources.session_phase_waiting_host
 
 /** Which sessions the Sessions tab shows: the organization's agent sessions, or the person's cloud sessions. */
 enum class SessionsKind { AGENT, CLOUD }
@@ -183,7 +185,7 @@ fun CloudSessionsScreen(
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             items(state.sessions, key = { it.id }) { session ->
-                CloudSessionCard(session, now) { account?.let { onOpen(it.id, session.id) } }
+                CloudSessionCard(session, now, showKind = state.remoteSessions) { account?.let { onOpen(it.id, session.id) } }
             }
             item(key = "end") {
                 BusyRow(state.loading || state.loadingMore)
@@ -199,9 +201,12 @@ fun CloudSessionsScreen(
     }
 }
 
-/** A cloud session: its name and status, its agent and model, its repository, its age. */
+/**
+ * A session: its name and status, its agent and model, where it runs ([showKind], once the server has remote
+ * sessions), its repository or, on a device, its folder, its age.
+ */
 @Composable
-private fun CloudSessionCard(session: CloudSession, now: Long, onClick: () -> Unit) {
+private fun CloudSessionCard(session: CloudSession, now: Long, showKind: Boolean, onClick: () -> Unit) {
     val colors = Ostrom.colors
     AppCard(Modifier.testTag("cloud-session-${session.id}"), onClick = onClick) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -210,10 +215,14 @@ private fun CloudSessionCard(session: CloudSession, now: Long, onClick: () -> Un
             CloudStatusChip(session, Modifier.testTag("cloud-session-status-${session.id}"))
         }
         if (session.preparing) {
-            Text(phaseWords(session.preparationPhase), color = colors.accentText, fontSize = 13.sp, modifier = Modifier.testTag("cloud-session-phase-${session.id}"))
+            // A remote session waiting for its device is not preparing a workspace: the server's phase is worded.
+            Text(if (session.waitingForHost) stringResource(Res.string.session_phase_waiting_host) else phaseWords(session.preparationPhase), color = colors.accentText,
+                fontSize = 13.sp, modifier = Modifier.testTag("cloud-session-phase-${session.id}"))
         }
         Text(listOfNotNull(session.agent, session.model).joinToString(" · "), color = colors.text, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        val where = session.recipe?.repositories?.firstOrNull()?.url ?: session.repo
+        if (showKind || session.remote) KindChips(session)
+        // A remote session has no repository to clone: the folder it runs in tells it apart instead.
+        val where = if (session.remote) session.host?.directoryName else session.recipe?.repositories?.firstOrNull()?.url ?: session.repo
         val age = session.createdAt?.let { stringResource(Res.string.cloud_sessions_created_ago, relativeTime(it, now)) }
         val meta = listOfNotNull(where?.removePrefix("https://github.com/"), age)
         if (meta.isNotEmpty()) Text(meta.joinToString(" · "), style = MetaStyle, color = colors.muted, maxLines = 1, overflow = TextOverflow.Ellipsis)

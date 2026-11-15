@@ -68,6 +68,10 @@ class AccountUseCasesTest {
         assertEquals(ServerFeatures.RUNNERS_CLOUD_TRANSCRIPT_FEEDS, Features.RUNNERS_CLOUD_TRANSCRIPT_FEEDS)
         assertEquals(ServerFeatures.RUNNERS_CLOUD_MODEL, Features.RUNNERS_CLOUD_MODEL)
         assertEquals(ServerFeatures.RUNNERS_CLOUD_EFFORT, Features.RUNNERS_CLOUD_EFFORT)
+        assertEquals(ServerFeatures.RUNNERS_CLOUD_REMOTE, Features.RUNNERS_CLOUD_REMOTE)
+        assertEquals(ServerFeatures.RUNNERS_CLOUD_REMOTE_DAEMON, Features.RUNNERS_CLOUD_REMOTE_DAEMON)
+        assertEquals(ServerFeatures.RUNNERS_CLOUD_REMOTE_RESUME, Features.RUNNERS_CLOUD_REMOTE_RESUME)
+        assertEquals(ServerFeatures.RUNNERS_CLOUD_LOCAL, Features.RUNNERS_CLOUD_LOCAL)
         requireSupportedApi(Features.SUPPORTED_API_VERSION)
         assertFailsWith<AppException.UnsupportedApi> { requireSupportedApi(Features.SUPPORTED_API_VERSION + 1) }
     }

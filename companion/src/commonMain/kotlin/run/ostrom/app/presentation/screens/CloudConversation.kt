@@ -80,6 +80,8 @@ import run.ostrom.app.presentation.components.Banner
 import run.ostrom.app.presentation.components.BusyRow
 import run.ostrom.app.presentation.components.ButtonKind
 import run.ostrom.app.presentation.components.Chip
+import run.ostrom.app.presentation.components.KindChips
+import run.ostrom.app.presentation.components.hostName
 import run.ostrom.app.presentation.components.ConfirmingLinks
 import run.ostrom.app.presentation.components.Dot
 import run.ostrom.app.presentation.components.IconButtonKind
@@ -169,6 +171,8 @@ import run.ostrom.app.resources.session_reconnecting
 import run.ostrom.app.resources.session_working
 import run.ostrom.app.resources.subagents_back_to_main
 import run.ostrom.app.resources.subagents_thread_empty
+import run.ostrom.app.resources.composer_local
+import run.ostrom.app.resources.session_paused_remote_dock
 
 /**
  * A conversation session (`mode: conversation`): a compact summary (status, model, effort, live stream; the record on
@@ -413,6 +417,7 @@ private fun Summary(session: CloudSession, state: CloudSessionUiState, onModel: 
                     val changeLabel = stringResource(Res.string.session_effort_change)
                     Chip(label, Modifier.testTag("effort-chip").let { if (onEffort != null) it.clickable(role = Role.Button, onClickLabel = changeLabel, onClick = onEffort) else it }, tone = Tone.MUTED)
                 }
+                if (session.remote) KindChips(session)
                 if (session.permissionBypass && state.options.bypass) Chip(stringResource(Res.string.session_bypass_on), modifier = Modifier.testTag("bypass-chip"))
                 LiveLabel(state)
             }
@@ -422,7 +427,7 @@ private fun Summary(session: CloudSession, state: CloudSessionUiState, onModel: 
             )
         }
         if (!expanded) {
-            val line = listOfNotNull(session.agent, session.effort, session.repo?.substringAfter("://")?.removeSuffix(".git"))
+            val line = listOfNotNull(session.agent, session.effort, session.host?.directoryName, session.repo?.substringAfter("://")?.removeSuffix(".git"))
             Text(line.joinToString(" · "), style = MetaStyle, color = colors.muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
         } else {
             Column(Modifier.heightIn(max = 360.dp).verticalScroll(rememberScrollState()).testTag("summary-record"), verticalArrangement = Arrangement.spacedBy(12.dp)) { record() }
@@ -547,7 +552,7 @@ private fun Dock(session: CloudSession, state: CloudSessionUiState, viewModel: C
         ) {
             Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (!ControlConversationUseCase.canMessage(session)) {
-                    Text(stringResource(Res.string.composer_ended), color = colors.muted, fontSize = 13.5.sp, textAlign = TextAlign.Center,
+                    Text(stringResource(if (session.local && !session.status.ended) Res.string.composer_local else Res.string.composer_ended), color = colors.muted, fontSize = 13.5.sp, textAlign = TextAlign.Center,
                         modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp).testTag("composer-ended"))
                     return@Column
                 }
@@ -561,7 +566,10 @@ private fun Dock(session: CloudSession, state: CloudSessionUiState, viewModel: C
                         AppButton(stringResource(Res.string.conversation_interrupt), onClick = viewModel::interrupt, enabled = !state.busy, busy = state.busy, kind = ButtonKind.SECONDARY,
                             small = true, fill = false, icon = PhosphorIcons.Regular.Stop, modifier = Modifier.testTag("interrupt"))
                     }
-                    paused -> DockStatus(stringResource(Res.string.session_paused_dock), colors.warn, dot = false, tag = "paused") {
+                    paused -> DockStatus(
+                        if (session.remote) stringResource(Res.string.session_paused_remote_dock, hostName(session.host)) else stringResource(Res.string.session_paused_dock),
+                        colors.warn, dot = false, tag = "paused",
+                    ) {
                         if (session.canResume) {
                             AppButton(stringResource(Res.string.cloud_resume), onClick = viewModel::resume, enabled = state.acting == null, busy = state.acting != null,
                                 kind = ButtonKind.SECONDARY, small = true, fill = false, icon = PhosphorIcons.Regular.Play, modifier = Modifier.testTag("dock-resume"))

@@ -15,6 +15,9 @@ import run.ostrom.app.domain.models.CloudSessionStatus
 import run.ostrom.app.domain.models.GitHubAccess
 import run.ostrom.app.domain.models.InputReceipt
 import run.ostrom.app.domain.models.NewCloudSession
+import run.ostrom.app.domain.models.NewDeviceSession
+import run.ostrom.app.domain.models.SessionHost
+import run.ostrom.app.domain.models.SessionKind
 import run.ostrom.app.domain.models.PermissionAnswer
 import run.ostrom.app.domain.models.SessionWaiting
 import run.ostrom.app.domain.repositories.CloudSessionRepository
@@ -23,6 +26,7 @@ import run.ostrom.core.api.models.CloudAgentKind
 import run.ostrom.core.api.models.CloudInput
 import run.ostrom.core.api.models.CloudQuestionAnswer
 import run.ostrom.core.api.models.CloudEnvironment
+import run.ostrom.core.api.models.CloudSessionKinds
 import run.ostrom.core.api.models.CloudSetup
 import run.ostrom.core.api.models.CreateCloudSessionRequest
 import run.ostrom.core.api.models.SendCloudMessageRequest
@@ -32,8 +36,8 @@ import run.ostrom.core.api.models.CloudSession as ApiCloudSession
 
 /** The person's cloud sessions over the typed client (`/api/v1/cloud/sessions`): read, started, paused, resumed, stopped. */
 class RemoteCloudSessionRepository(private val calls: AccountCalls) : CloudSessionRepository {
-    override suspend fun sessions(accountId: String, before: String?): CloudSessionPage = calls.withAccount(accountId) { client ->
-        val page = client.cloudSessions.list(before = before, limit = PAGE)
+    override suspend fun sessions(accountId: String, before: String?, kinds: Set<SessionKind>): CloudSessionPage = calls.withAccount(accountId) { client ->
+        val page = client.cloudSessions.list(before = before, limit = PAGE, kinds = kinds.map { it.wire }.sorted())
         CloudSessionPage(page.items.map { it.domain() }, page.next)
     }
 
@@ -43,6 +47,13 @@ class RemoteCloudSessionRepository(private val calls: AccountCalls) : CloudSessi
     override suspend fun create(accountId: String, session: NewCloudSession, idempotencyKey: String): CloudSession =
         calls.withAccount(accountId) { client ->
             refusals(creating = true) { client.cloudSessions.create(session.request(), idempotencyKey).domain() }
+        }
+
+    override suspend fun createOnDevice(accountId: String, session: NewDeviceSession, idempotencyKey: String): CloudSession =
+        calls.withAccount(accountId) { client ->
+            // No directoryName: the session's directory is the folder's name, which the server takes from the device. Its
+            // refusals about the device keep their key ([AppException.Server]); the plan's and the role's are worded.
+            refusals { client.cloudSessions.create(session.request(), idempotencyKey).domain() }
         }
 
     override suspend fun pause(accountId: String, sessionId: String): CloudSession =
@@ -145,7 +156,11 @@ internal fun ApiCloudSession.domain() = CloudSession(
     githubAccess = GitHubAccess.of(githubAccess),
     ownerId = owner,
     transferId = transferId,
-    remote = kind == "remote",
+    kind = SessionKind.of(kind),
+    host = host?.takeIf { kind == CloudSessionKinds.REMOTE }?.let {
+        SessionHost(it.deviceName, it.platform, it.osVersion, it.directoryName, it.online, removed = it.deviceId == null, permissionMode = it.permissionMode)
+    },
+    refusalReason = failure?.takeIf { it.code == CloudSession.HOST_REFUSED }?.message?.let(::refusalReason),
     mode = if (mode == CONVERSATION_MODE) CloudSessionMode.CONVERSATION else CloudSessionMode.TERMINAL,
     effort = effort,
     permissionBypass = permissionBypass == true,
@@ -153,6 +168,28 @@ internal fun ApiCloudSession.domain() = CloudSession(
 )
 
 private const val CONVERSATION_MODE = "conversation"
+
+/**
+ * The daemon's reason code in a `host_refused` failure, which the server words "The device refused to start this session
+ * (folder_missing).": only a short snake_case code is kept, never the rest of a server text.
+ */
+internal fun refusalReason(message: String): String? = REFUSAL_REASON.findAll(message).lastOrNull()?.groupValues?.get(1)
+
+private val REFUSAL_REASON = Regex("""\(([a-z][a-z0-9_]{0,63})\)""")
+
+/** A session on one of the member's devices: always a conversation, in a folder the device published. */
+internal fun NewDeviceSession.request() = CreateCloudSessionRequest(
+    agent = CloudAgentKind.entries.first { it.value == agent },
+    model = model,
+    effort = effort,
+    prompt = initialMessage,
+    name = name,
+    kind = CloudSessionKinds.REMOTE,
+    permissionMode = permissionMode.wire,
+    deviceId = deviceId,
+    folderId = folderId,
+    resumeSessionId = resumeSessionId,
+)
 
 internal fun CloudInput.receipt() = InputReceipt(id, status, woke, reason)
 
