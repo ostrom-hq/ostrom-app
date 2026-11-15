@@ -75,7 +75,7 @@ class DemoCloudSessionRepository(private val demo: DemoMode, private val clock: 
     override suspend fun session(accountId: String, sessionId: String): CloudSession =
         demo.store().cloudSessions.value.firstOrNull { it.id == sessionId } ?: throw AppException.NotFound()
 
-    override suspend fun create(accountId: String, session: NewCloudSession): CloudSession {
+    override suspend fun create(accountId: String, session: NewCloudSession, idempotencyKey: String): CloudSession {
         val store = demo.store()
         val now = clock.nowMillis()
         val name = session.name ?: (session.recipe?.repositories?.firstOrNull()?.url ?: session.repo)?.substringAfterLast('/')?.removeSuffix(".git") ?: session.agent.wire
@@ -122,7 +122,8 @@ class DemoAwareCloudSessionRepository(private val real: CloudSessionRepository, 
     private fun of(accountId: String) = if (isDemo(accountId)) demo else real
     override suspend fun sessions(accountId: String, before: String?) = of(accountId).sessions(accountId, before)
     override suspend fun session(accountId: String, sessionId: String) = of(accountId).session(accountId, sessionId)
-    override suspend fun create(accountId: String, session: NewCloudSession) = of(accountId).create(accountId, session)
+    override suspend fun create(accountId: String, session: NewCloudSession, idempotencyKey: String) =
+        of(accountId).create(accountId, session, idempotencyKey)
     override suspend fun pause(accountId: String, sessionId: String) = of(accountId).pause(accountId, sessionId)
     override suspend fun resume(accountId: String, sessionId: String) = of(accountId).resume(accountId, sessionId)
     override suspend fun stop(accountId: String, sessionId: String) = of(accountId).stop(accountId, sessionId)

@@ -32,8 +32,10 @@ class RemoteCloudSessionRepository(private val calls: AccountCalls) : CloudSessi
     override suspend fun session(accountId: String, sessionId: String): CloudSession =
         calls.withAccount(accountId, resource = true) { it.cloudSessions.get(sessionId).domain() }
 
-    override suspend fun create(accountId: String, session: NewCloudSession): CloudSession =
-        calls.withAccount(accountId) { client -> refusals(creating = true) { client.cloudSessions.create(session.request()).domain() } }
+    override suspend fun create(accountId: String, session: NewCloudSession, idempotencyKey: String): CloudSession =
+        calls.withAccount(accountId) { client ->
+            refusals(creating = true) { client.cloudSessions.create(session.request(), idempotencyKey).domain() }
+        }
 
     override suspend fun pause(accountId: String, sessionId: String): CloudSession =
         calls.withAccount(accountId, resource = true) { client -> refusals { client.cloudSessions.pause(sessionId).domain() } }

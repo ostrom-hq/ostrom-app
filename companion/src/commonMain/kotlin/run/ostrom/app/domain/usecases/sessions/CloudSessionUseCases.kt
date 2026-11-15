@@ -88,13 +88,15 @@ class SetCloudSessionGitHubAccessUseCase(private val access: CloudSessionAccess)
 
 /**
  * Starts a cloud session with what the form holds, checked first ([checkNewCloudSession]). A server without
- * `runners.cloud.environment.v1` would ignore a recipe: there, only the single repository goes.
+ * `runners.cloud.environment.v1` would ignore a recipe: there, only the single repository goes. The caller keeps
+ * [idempotencyKey] while the form is unchanged, so pressing Start again after a lost answer returns the first session.
  */
 class CreateCloudSessionUseCase(private val access: CloudSessionAccess) {
-    suspend operator fun invoke(accountId: String, form: NewCloudSession): CloudSession = access.call(accountId) { announced ->
-        val sent = checkNewCloudSession(form, recipeServed = Features.RUNNERS_CLOUD_ENVIRONMENT in announced)
-        access.repository.create(accountId, sent)
-    }
+    suspend operator fun invoke(accountId: String, form: NewCloudSession, idempotencyKey: String): CloudSession =
+        access.call(accountId) { announced ->
+            val sent = checkNewCloudSession(form, recipeServed = Features.RUNNERS_CLOUD_ENVIRONMENT in announced)
+            access.repository.create(accountId, sent, idempotencyKey)
+        }
 }
 
 /** The server's rules a form is checked against (TeamCode's and the server's `CloudEnvironmentRules`). */

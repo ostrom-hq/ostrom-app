@@ -50,7 +50,7 @@ class CloudSessionGitHubAccessTest {
         var refusal: CloudSessionRefusal? = null
         override suspend fun sessions(accountId: String, before: String?) = CloudSessionPage(listOf(session), null)
         override suspend fun session(accountId: String, sessionId: String) = session
-        override suspend fun create(accountId: String, session: NewCloudSession) = session.let { this.session }
+        override suspend fun create(accountId: String, session: NewCloudSession, idempotencyKey: String) = session.let { this.session }
         override suspend fun pause(accountId: String, sessionId: String) = session
         override suspend fun resume(accountId: String, sessionId: String) = session
         override suspend fun stop(accountId: String, sessionId: String) = session

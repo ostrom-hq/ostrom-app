@@ -49,7 +49,9 @@ class CloudSessionUseCasesTest {
             return CloudSessionPage(listOf(cloudSession()), "c2")
         }
         override suspend fun session(accountId: String, sessionId: String): CloudSession { calls += "get $sessionId"; return cloudSession(sessionId) }
-        override suspend fun create(accountId: String, session: NewCloudSession): CloudSession { created = session; calls += "create"; return cloudSession("new") }
+        override suspend fun create(accountId: String, session: NewCloudSession, idempotencyKey: String): CloudSession {
+            created = session; calls += "create $idempotencyKey"; return cloudSession("new")
+        }
         override suspend fun pause(accountId: String, sessionId: String): CloudSession { calls += "pause $sessionId"; return cloudSession(sessionId, CloudSessionStatus.PAUSING, "paused") }
         override suspend fun resume(accountId: String, sessionId: String): CloudSession { calls += "resume $sessionId"; return cloudSession(sessionId, CloudSessionStatus.RESUMING) }
         override suspend fun stop(accountId: String, sessionId: String): CloudSession { calls += "stop $sessionId"; return cloudSession(sessionId, CloudSessionStatus.RUNNING, "terminated") }
@@ -68,7 +70,7 @@ class CloudSessionUseCasesTest {
         assertEquals(Features.RUNNERS_CLOUD, assertFailsWith<AppException.Unsupported> { LoadCloudSessionsUseCase(access)("a1") }.feature)
         assertFailsWith<AppException.Unsupported> { GetCloudSessionUseCase(access)("a1", "c1") }
         assertFailsWith<AppException.Unsupported> { LoadCloudSessionOptionsUseCase(access)("a1") }
-        assertFailsWith<AppException.Unsupported> { CreateCloudSessionUseCase(access)("a1", NewCloudSession(CloudAgent.CLAUDE)) }
+        assertFailsWith<AppException.Unsupported> { CreateCloudSessionUseCase(access)("a1", NewCloudSession(CloudAgent.CLAUDE), "k1") }
         assertTrue(sessions.calls.isEmpty())
     }
 
@@ -97,7 +99,7 @@ class CloudSessionUseCasesTest {
             CloudAgent.CODEX, name = "  ", model = " gpt-5 ", prompt = "  ", repo = " https://github.com/acme/api ", ref = " main ",
             recipe = CloudRecipe(repositories = listOf(CloudRepository("https://github.com/acme/web"))),
         )
-        CreateCloudSessionUseCase(access)("a1", form)
+        CreateCloudSessionUseCase(access)("a1", form, "k1")
         assertEquals(NewCloudSession(CloudAgent.CODEX, model = "gpt-5", repo = "https://github.com/acme/api", ref = "main"), sessions.created)
     }
 
@@ -112,7 +114,7 @@ class CloudSessionUseCasesTest {
                 requiredVariables = listOf("NPM_TOKEN", "", "API_KEY"), requireGitHub = true, gitEmailDomain = " acme.dev ",
             ),
         )
-        CreateCloudSessionUseCase(access)("a1", form)
+        CreateCloudSessionUseCase(access)("a1", form, "k1")
         val sent = sessions.created!!
         assertNull(sent.repo, "A recipe replaces the single repository")
         assertEquals(
@@ -121,7 +123,7 @@ class CloudSessionUseCasesTest {
             sent.recipe,
         )
         // An empty recipe falls back to the single repository.
-        CreateCloudSessionUseCase(access)("a1", NewCloudSession(CloudAgent.SHELL, repo = "https://github.com/acme/api", recipe = CloudRecipe(listOf(CloudRepository("")))))
+        CreateCloudSessionUseCase(access)("a1", NewCloudSession(CloudAgent.SHELL, repo = "https://github.com/acme/api", recipe = CloudRecipe(listOf(CloudRepository("")))), "k1")
         assertEquals("https://github.com/acme/api", sessions.created?.repo)
         assertNull(sessions.created?.recipe)
     }

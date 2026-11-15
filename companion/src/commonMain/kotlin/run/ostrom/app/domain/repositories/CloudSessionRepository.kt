@@ -19,7 +19,11 @@ interface CloudSessionRepository {
 
     suspend fun session(accountId: String, sessionId: String): CloudSession
 
-    suspend fun create(accountId: String, session: NewCloudSession): CloudSession
+    /**
+     * Starts [session] under [idempotencyKey] (`Idempotency-Key`): the same key with the same form returns the session
+     * the first call started instead of a second one.
+     */
+    suspend fun create(accountId: String, session: NewCloudSession, idempotencyKey: String): CloudSession
 
     suspend fun pause(accountId: String, sessionId: String): CloudSession
 
