@@ -72,25 +72,29 @@ def check_layout(path, target):
         with zipfile.ZipFile(path) as archive:
             names = archive.namelist()
         top = {name.split('/', 1)[0] for name in names}
-        if top != {'Ostrom.app'} or 'Ostrom.app/Contents/MacOS/Ostrom' not in names:
+        needed = ('Ostrom.app/Contents/MacOS/Ostrom', 'Ostrom.app/Contents/app/resources/ostrom-desktop-version')
+        if top != {'Ostrom.app'} or any(name not in names for name in needed):
             raise ValueError('The macOS package must hold Ostrom.app only.')
         return
     if head[:2] != b'\x1f\x8b':
         raise ValueError('The Linux package is not a gzip archive.')
     with tarfile.open(path, 'r:gz') as archive:
         members = archive.getmembers()
-    top = {member.name.lstrip('./').split('/', 1)[0] for member in members if member.name.lstrip('./')}
-    executable = [member for member in members if member.name.lstrip('./') == 'Ostrom/bin/Ostrom' and member.isfile()]
-    if top != {'Ostrom'} or not executable or any(member.issym() and member.linkname.startswith('/') for member in members):
+    top = {member.name.removeprefix('./').split('/', 1)[0] for member in members if member.name.removeprefix('./')}
+    files = {member.name.removeprefix('./') for member in members if member.isfile()}
+    needed = {'Ostrom/bin/Ostrom', 'Ostrom/lib/app/resources/ostrom-desktop-version'}
+    if top != {'Ostrom'} or not needed <= files or any(member.issym() and member.linkname.startswith('/') for member in members):
         raise ValueError('The Linux package must hold the Ostrom folder only, with bin/Ostrom.')
 
 
 def stage(package, target, revision, source_commit, output):
     version(revision)
     commit(source_commit)
+    if package.is_symlink():
+        raise ValueError('The desktop package is a link.')
     package = package.resolve(strict=True)
     size = package.stat().st_size
-    if package.is_symlink() or not 1 <= size <= MAX_PACKAGE:
+    if not 1 <= size <= MAX_PACKAGE:
         raise ValueError('The desktop package is missing or exceeds its size bound.')
     check_layout(package, target)
     output.mkdir(parents=True, exist_ok=True)

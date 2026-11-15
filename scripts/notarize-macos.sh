@@ -13,7 +13,7 @@ dmg="$(ls "$BINARIES"/dmg/*.dmg)"
 # NOT in that list for notarytool: a timed-out submission may still be running at Apple, so it is never sent
 # again; its status is read instead (notarize() below). Stapler's calls are idempotent, so a timeout there is
 # retried ($apple_failure_stapler). Output is left in $apple_out (stdout) and $apple_err (stderr).
-apple_failure='network connection was lost|NSURLErrorDomain|could not connect|CloudKit|Error 68|offline|temporarily unavailable|Service Unavailable|HTTP[^0-9]*5[0-9][0-9]|internal error|connection (reset|refused)'
+apple_failure='network connection was lost|NSURLErrorDomain|could not connect|CloudKit|Error 68|offline|temporarily unavailable|Service Unavailable|(HTTP|status code)[^0-9]*5[0-9][0-9]|internal error|connection (reset|refused)'
 apple_failure_stapler="$apple_failure|timed out|timeout"
 apple_retry="$apple_failure"
 apple_out="$RUNNER_TEMP/apple.out"
@@ -42,7 +42,7 @@ json_field() {
   python3 -c 'import json,sys; print(json.load(sys.stdin).get(sys.argv[1], ""))' "$1" < "$apple_out" 2>/dev/null || true
 }
 # Submits once (--no-wait), waits for the verdict, then reads the status of that submission. The submission is only
-# sent again when the call failed before Apple gave it an id and the failure is a network one; a wait that times out
+# sent again when the call failed with a network error before an id was read (a duplicate submission is harmless); a wait that times out
 # never resubmits: the status is read and, still In Progress, the release fails with the id to look at.
 notarize() {
   local id status

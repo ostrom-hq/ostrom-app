@@ -94,6 +94,11 @@ class ReleaseDesktopTest(unittest.TestCase):
                 archive.writestr('other.txt', b'x')
             with self.assertRaisesRegex(ValueError, 'Ostrom.app only'):
                 desktop.stage(loose, 'macos-arm64', self.revision, self.source_commit, root / 'out')
+            no_version = root / 'noversion.zip'
+            with zipfile.ZipFile(no_version, 'w') as archive:
+                archive.writestr('Ostrom.app/Contents/MacOS/Ostrom', b'x')
+            with self.assertRaisesRegex(ValueError, 'Ostrom.app only'):
+                desktop.stage(no_version, 'macos-arm64', self.revision, self.source_commit, root / 'out')
             not_msi = root / 'x.msi'
             not_msi.write_bytes(b'MZ' + b'\0' * 100)
             with self.assertRaisesRegex(ValueError, 'installer database'):

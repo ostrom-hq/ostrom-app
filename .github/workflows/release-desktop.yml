@@ -234,6 +234,7 @@ jobs:
   # from the OSTROM_RELEASE_SIGNING_KEY secret, and checked against the pinned root before anything is attached.
   manifest:
     name: desktop manifest
+    if: inputs.release_tag != ''
     needs: [desktop]
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -241,8 +242,6 @@ jobs:
       contents: read
     env:
       VERSION: ${{ inputs.version }}
-      TAG: ${{ inputs.release_tag }}
-      RELEASE_SIGNING_KEY: ${{ secrets.OSTROM_RELEASE_SIGNING_KEY }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -255,7 +254,8 @@ jobs:
       - name: Verify and assemble the four packages
         run: python3 scripts/release-desktop.py assemble --inputs desktop-staged --version "$VERSION" --commit "$GITHUB_SHA" --output desktop-dist
       - name: Sign the manifest with the release key and check it against the pinned root
-        if: inputs.release_tag != ''
+        env:
+          RELEASE_SIGNING_KEY: ${{ secrets.OSTROM_RELEASE_SIGNING_KEY }}
         run: |
           set -eu
           if [ -z "$RELEASE_SIGNING_KEY" ]; then
