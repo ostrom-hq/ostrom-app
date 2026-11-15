@@ -65,7 +65,7 @@ class WorkflowEditingTest {
         override suspend fun workflow(accountId: String, workflowId: String): Workflow = throw AppException.NotFound()
         override suspend fun runs(accountId: String, workflowId: String?, status: String?, before: String?) = WorkflowRunPage(emptyList(), null)
         override suspend fun run(accountId: String, runId: String): WorkflowRun = throw AppException.NotFound()
-        override suspend fun start(accountId: String, workflowId: String, inputs: Map<String, String>): WorkflowRun = throw AppException.NotFound()
+        override suspend fun start(accountId: String, workflowId: String, inputs: Map<String, String>, idempotencyKey: String): WorkflowRun = throw AppException.NotFound()
         override suspend fun cancel(accountId: String, runId: String): WorkflowRun = throw AppException.NotFound()
     }
 

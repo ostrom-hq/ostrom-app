@@ -38,8 +38,10 @@ class RemoteWorkflowRepository(private val calls: AccountCalls) : WorkflowReposi
     override suspend fun run(accountId: String, runId: String): WorkflowRun =
         calls.withAccount(accountId, resource = true) { it.workflows.run(runId).domain() }
 
-    override suspend fun start(accountId: String, workflowId: String, inputs: Map<String, String>): WorkflowRun =
-        calls.withAccount(accountId, resource = true) { client -> refusals { client.workflows.start(workflowId, inputs).domain() } }
+    override suspend fun start(accountId: String, workflowId: String, inputs: Map<String, String>, idempotencyKey: String): WorkflowRun =
+        calls.withAccount(accountId, resource = true) { client ->
+            refusals { client.workflows.start(workflowId, inputs, idempotencyKey).domain() }
+        }
 
     override suspend fun cancel(accountId: String, runId: String): WorkflowRun =
         calls.withAccount(accountId, resource = true) { client -> refusals { client.workflows.cancel(runId).domain() } }
