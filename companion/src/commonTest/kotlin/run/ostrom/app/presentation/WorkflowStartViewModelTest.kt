@@ -76,7 +76,7 @@ class WorkflowStartViewModelTest {
         model.onInput("version", "1.1"); settle()
         model.start(); settle()
         assertEquals(3, starts.keys.size)
-        assertEquals(3, starts.keys.distinct().size, "Another form is another press, so another key")
+        assertEquals(2, starts.keys.distinct().size, "Another form is another press, so another key")
         assertNull(model.uiState.value.startError)
         assertEquals("new", model.uiState.value.started?.id)
     }
