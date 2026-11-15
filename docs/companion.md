@@ -210,8 +210,9 @@ at each return and on refresh, as does a record: the server publishes no cloud s
   JPEG), a file dialog on the desktop, plus drag-and-drop on the window and a pasted file or screenshot in the message
   field; each file is checked against the policy, then streamed at once through ostrom-client (progress, retries under
   one idempotency key, a new key after the stored SHA-256 differed); the message names the uploaded files and may then
-  have no text. The demo announces no files. Not ported: attachments, live text deltas (`runners.cloud.transcript.live.v1`: TeamCode's companion shows final messages
-  only), TeamCode's todo tab in the subagents panel (a cloud session has no todo), dictation.
+  have no text. The demo announces no files. Not ported: attachment leases (TeamCode's `cloud attach`), live text
+  deltas (`runners.cloud.transcript.live.v1`: TeamCode's companion shows final messages only), TeamCode's todo tab in
+  the subagents panel (a cloud session has no todo), dictation.
 - **Not in the app.** A terminal session's terminal (a WebSocket the app does not open).
 
 ## GitHub link
