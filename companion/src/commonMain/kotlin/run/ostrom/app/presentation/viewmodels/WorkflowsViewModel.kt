@@ -254,18 +254,20 @@ class WorkflowStartViewModel(
 
     fun onInput(id: String, value: String) {
         val max = state.value.workflow?.inputs?.firstOrNull { it.id == id }?.maxLength ?: return
-        key = ids.newId()
-        state.update { it.copy(inputs = it.inputs + (id to value.take(max)), startError = null) }
+        val entered = value.take(max)
+        if (state.value.inputs[id] != entered) key = ids.newId()
+        state.update { it.copy(inputs = it.inputs + (id to entered), startError = null) }
     }
 
     fun start() {
         val current = state.value
         val workflow = current.workflow ?: return
         if (!current.canStart) return
+        val pressKey = key
         state.update { it.copy(starting = true, startError = null) }
         viewModelScope.launch {
             try {
-                val run = startRun(route.accountId, workflow, current.inputs, key)
+                val run = startRun(route.accountId, workflow, current.inputs, pressKey)
                 state.update { it.copy(starting = false, started = run) }
             } catch (error: CancellationException) {
                 throw error
