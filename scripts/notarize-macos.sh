@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: Apache-2.0
 # Notarizes, staples and checks the signed macOS app and disk image of the desktop release (release-desktop.yml).
 # Ported from TeamCode's build.yml. Expects BINARIES (companion-desktop/build/compose/binaries/main), RUNNER_TEMP,
 # NOTARY_KEY_ID, NOTARY_ISSUER_ID, TEAM_ID, OSTROM_MACOS_SIGNING_IDENTITY, OSTROM_MACOS_SIGNING_KEYCHAIN, and the
