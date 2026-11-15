@@ -5,6 +5,9 @@ package run.ostrom.app.domain
 import kotlinx.coroutines.test.runTest
 import run.ostrom.app.FakeFeatures
 import run.ostrom.app.domain.models.AppException
+import run.ostrom.app.domain.models.SessionHost
+import run.ostrom.app.domain.models.SessionKind
+import run.ostrom.app.domain.models.SessionKinds
 import run.ostrom.app.domain.models.CloudAgent
 import run.ostrom.app.domain.models.CloudFailure
 import run.ostrom.app.domain.models.CloudPhase
@@ -20,6 +23,7 @@ import run.ostrom.app.domain.models.Features
 import run.ostrom.app.domain.models.GitHubAccess
 import run.ostrom.app.domain.models.NewCloudSession
 import run.ostrom.app.domain.usecases.sessions.CloudSessionAccess
+import run.ostrom.app.domain.usecases.sessions.ControlConversationUseCase
 import run.ostrom.app.domain.usecases.sessions.ControlCloudSessionUseCase
 import run.ostrom.app.domain.usecases.sessions.CreateCloudSessionUseCase
 import run.ostrom.app.domain.usecases.sessions.GetCloudSessionUseCase
@@ -38,15 +42,17 @@ import kotlin.test.assertTrue
 
 internal fun cloudSession(
     id: String = "c1", status: CloudSessionStatus = CloudSessionStatus.RUNNING, desired: String? = "running", phase: String? = null,
-    failure: CloudFailure? = null, ownerId: String? = null, remote: Boolean = false,
-) = CloudSession(id, "Mill", "claude", null, null, null, status, desired, phase, failure, null, 1_000L, 1_000L, null, null, null, null, null, ownerId = ownerId, remote = remote)
+    failure: CloudFailure? = null, ownerId: String? = null, remote: Boolean = false, kind: SessionKind = if (remote) SessionKind.REMOTE else SessionKind.CLOUD,
+    host: SessionHost? = null,
+) = CloudSession(id, "Mill", "claude", null, null, null, status, desired, phase, failure, null, 1_000L, 1_000L, null, null, null, null, null, ownerId = ownerId, kind = kind,
+    host = host)
 
 class CloudSessionUseCasesTest {
     private class FakeCloudSessions : ConversationCalls() {
         override fun current(sessionId: String) = cloudSession(sessionId)
         var created: NewCloudSession? = null
-        override suspend fun sessions(accountId: String, before: String?): CloudSessionPage {
-            calls += "list ${before.orEmpty()}".trim()
+        override suspend fun sessions(accountId: String, before: String?, kinds: Set<SessionKind>): CloudSessionPage {
+            calls += ("list ${before.orEmpty()}".trim() + kinds.joinToString(",", prefix = " ") { it.wire }).trim()
             return CloudSessionPage(listOf(cloudSession()), "c2")
         }
         override suspend fun session(accountId: String, sessionId: String): CloudSession { calls += "get $sessionId"; return cloudSession(sessionId) }
@@ -83,6 +89,60 @@ class CloudSessionUseCasesTest {
         assertEquals("c9", GetCloudSessionUseCase(access)("a1", "c9").id)
         assertFailsWith<AppException.NotFound> { GetCloudSessionUseCase(access)("a1", " ") }
         assertEquals(listOf("list", "list c2", "get c9"), sessions.calls)
+    }
+
+    @Test
+    fun aServerWithRemoteSessionsIsAskedForEveryKindItKnowsAndAnOlderOneAsBefore() = runTest {
+        features.features = setOf(Features.RUNNERS_CLOUD)
+        assertFalse(LoadCloudSessionsUseCase(access)("a1").remoteSessions)
+        features.features = setOf(Features.RUNNERS_CLOUD, Features.RUNNERS_CLOUD_REMOTE)
+        assertTrue(LoadCloudSessionsUseCase(access)("a1").remoteSessions)
+        features.features = setOf(Features.RUNNERS_CLOUD, Features.RUNNERS_CLOUD_REMOTE, Features.RUNNERS_CLOUD_LOCAL)
+        LoadCloudSessionsUseCase(access)("a1")
+        assertEquals(listOf("list", "list cloud,remote", "list cloud,remote,local"), sessions.calls)
+        assertEquals(setOf(SessionKind.CLOUD, SessionKind.REMOTE), SessionKinds.announced(setOf(Features.RUNNERS_CLOUD_REMOTE)))
+        assertEquals(SessionKind.CLOUD, SessionKind.of(null))
+        assertEquals(SessionKind.CLOUD, SessionKind.of("newer"))
+        assertEquals(SessionKind.LOCAL, SessionKind.of("local"))
+    }
+
+    @Test
+    fun aRemoteSessionSaysWhatItsDeviceDoesAndResumesOnlyFromIt() {
+        val laptop = SessionHost("Ada's MacBook", "macos", "15.1", "app", online = false, removed = false, permissionMode = SessionHost.ASK)
+        val offline = cloudSession(status = CloudSessionStatus.PAUSED, desired = "paused", remote = true, host = laptop,
+            failure = CloudFailure(CloudSession.HOST_OFFLINE, "m", null))
+        assertTrue(offline.remote && offline.hostOffline && !offline.hostRefused && !offline.waitingForHost)
+        assertFalse(offline.canResume, "a remote session resumes from its device, which a message asks")
+        assertTrue(cloudSession(remote = true).canPause)
+        val waiting = cloudSession(status = CloudSessionStatus.CREATING, phase = CloudSession.WAITING_HOST, remote = true, host = laptop)
+        assertTrue(waiting.waitingForHost)
+        assertFalse(waiting.copy(status = CloudSessionStatus.PAUSED).waitingForHost)
+        assertFalse(cloudSession(status = CloudSessionStatus.CREATING, phase = CloudSession.WAITING_HOST).waitingForHost, "a cloud session waits for no device")
+        val refused = cloudSession(status = CloudSessionStatus.FAILED, remote = true, failure = CloudFailure(CloudSession.HOST_REFUSED, "m", null))
+        assertTrue(refused.hostRefused)
+        assertFalse(cloudSession(failure = CloudFailure(CloudSession.HOST_REFUSED, "m", null)).hostRefused)
+    }
+
+    @Test
+    fun aLocalSessionIsNeverPausedResumedMessagedNorItsModelChangedButItStops() {
+        val local = cloudSession(kind = SessionKind.LOCAL)
+        assertTrue(local.local && !local.remote)
+        assertFalse(local.canPause)
+        assertFalse(local.copy(status = CloudSessionStatus.PAUSED, desiredStatus = "paused").canResume)
+        assertTrue(local.canStop)
+        assertFalse(ControlConversationUseCase.canMessage(local))
+        assertFalse(ControlConversationUseCase.canChangeModel(local))
+        assertTrue(ControlConversationUseCase.canMessage(cloudSession(remote = true)))
+    }
+
+    @Test
+    fun theFormStartsOnDevicesAndContinuesConversationsOnlyWhereTheServerSaysSo() = runTest {
+        features.features = setOf(Features.RUNNERS_CLOUD, Features.RUNNERS_CLOUD_REMOTE_RESUME)
+        val older = LoadCloudSessionOptionsUseCase(access)("a1")
+        assertFalse(older.onDevices); assertFalse(older.resumes)
+        features.features = setOf(Features.RUNNERS_CLOUD, Features.RUNNERS_CLOUD_REMOTE_DAEMON, Features.RUNNERS_CLOUD_REMOTE_RESUME)
+        val options = LoadCloudSessionOptionsUseCase(access)("a1")
+        assertTrue(options.onDevices); assertTrue(options.resumes)
     }
 
     @Test

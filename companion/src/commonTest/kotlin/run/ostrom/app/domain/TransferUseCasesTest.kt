@@ -44,6 +44,7 @@ class TransferUseCasesTest {
         assertFalse(TransferRules.canTransfer(account(), cloudSession("s1", ownerId = null)))
         // A session on a member's device stays theirs: the action is not offered at all.
         assertFalse(TransferRules.canTransfer(owner, cloudSession("s1", ownerId = "m1", remote = true)))
+        assertFalse(TransferRules.canTransfer(owner, cloudSession("s1", ownerId = "m1", kind = run.ostrom.app.domain.models.SessionKind.LOCAL)))
         for (status in listOf(CloudSessionStatus.CREATING, CloudSessionStatus.TRANSFERRING, CloudSessionStatus.TERMINATED, CloudSessionStatus.FAILED, CloudSessionStatus.UNKNOWN)) {
             assertFalse(TransferRules.canTransfer(owner, cloudSession("s1", status, ownerId = "m1")), status.name)
         }

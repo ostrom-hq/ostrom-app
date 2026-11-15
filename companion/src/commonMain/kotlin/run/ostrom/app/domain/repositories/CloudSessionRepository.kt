@@ -7,6 +7,8 @@ import run.ostrom.app.domain.models.CloudSessionPage
 import run.ostrom.app.domain.models.GitHubAccess
 import run.ostrom.app.domain.models.InputReceipt
 import run.ostrom.app.domain.models.NewCloudSession
+import run.ostrom.app.domain.models.NewDeviceSession
+import run.ostrom.app.domain.models.SessionKind
 import run.ostrom.app.domain.models.PermissionAnswer
 
 /**
@@ -16,8 +18,11 @@ import run.ostrom.app.domain.models.PermissionAnswer
  * accepted at once and carried out by the server: the answer is the session after the request.
  */
 interface CloudSessionRepository {
-    /** Newest first; [before] is the previous page's cursor. */
-    suspend fun sessions(accountId: String, before: String?): CloudSessionPage
+    /**
+     * Newest first; [before] is the previous page's cursor. [kinds] are asked of a server with remote sessions
+     * (`runners.cloud.remote.v1`); empty, the server's default (its cloud sessions).
+     */
+    suspend fun sessions(accountId: String, before: String?, kinds: Set<SessionKind> = emptySet()): CloudSessionPage
 
     suspend fun session(accountId: String, sessionId: String): CloudSession
 
@@ -26,6 +31,12 @@ interface CloudSessionRepository {
      * the first call started instead of a second one.
      */
     suspend fun create(accountId: String, session: NewCloudSession, idempotencyKey: String): CloudSession
+
+    /**
+     * Starts [session] on one of the member's devices (`kind: remote`, `runners.cloud.remote.daemon.v1`) under
+     * [idempotencyKey], as [create] does.
+     */
+    suspend fun createOnDevice(accountId: String, session: NewDeviceSession, idempotencyKey: String): CloudSession
 
     suspend fun pause(accountId: String, sessionId: String): CloudSession
 

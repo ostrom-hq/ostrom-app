@@ -85,6 +85,22 @@ import run.ostrom.app.resources.wfe_error_limit
 import run.ostrom.app.resources.wfe_error_name_taken
 import run.ostrom.app.resources.wfe_error_problems
 import run.ostrom.app.resources.wfe_error_stale
+import run.ostrom.app.resources.error_device_folder_not_published
+import run.ostrom.app.resources.error_device_invalid_folder
+import run.ostrom.app.resources.error_device_invalid_resume
+import run.ostrom.app.resources.error_device_no_answer
+import run.ostrom.app.resources.error_device_not_found
+import run.ostrom.app.resources.error_device_offline
+import run.ostrom.app.resources.error_device_refused
+import run.ostrom.app.resources.error_device_refused_code
+import run.ostrom.app.resources.error_device_requires_login
+import run.ostrom.app.resources.error_device_resume_agent
+import run.ostrom.app.resources.error_device_resume_folder
+import run.ostrom.app.resources.error_device_resume_unsupported
+import run.ostrom.app.resources.error_device_target_unsupported
+import run.ostrom.app.resources.input_choose_agent
+import run.ostrom.app.resources.input_choose_device
+import run.ostrom.app.resources.input_choose_folder
 
 /**
  * A failure shown to the person. [text] is the English sentence (logs, tests); [resource] and [args] word the same
@@ -179,7 +195,24 @@ private fun AppException.sentence(): Pair<StringResource, List<Any>> = when (thi
         CloudSessionProblem.MESSAGE -> Res.string.error_cloud_message
         CloudSessionProblem.MODEL -> Res.string.error_cloud_model
         CloudSessionProblem.EFFORT -> Res.string.error_cloud_effort
+        CloudSessionProblem.CHOOSE_DEVICE -> Res.string.input_choose_device
+        CloudSessionProblem.CHOOSE_FOLDER -> Res.string.input_choose_folder
+        CloudSessionProblem.CHOOSE_AGENT -> Res.string.input_choose_agent
     } to emptyList()
+    is AppException.DeviceRefused -> when (code) {
+        AppException.DeviceRefused.DEVICE_OFFLINE -> Res.string.error_device_offline to emptyList()
+        "folder_not_published" -> Res.string.error_device_folder_not_published to emptyList()
+        "device_not_found" -> Res.string.error_device_not_found to emptyList()
+        "remote_requires_login" -> Res.string.error_device_requires_login to emptyList()
+        "device_target_unsupported" -> Res.string.error_device_target_unsupported to emptyList()
+        "invalid_folder" -> Res.string.error_device_invalid_folder to emptyList()
+        AppException.DeviceRefused.DAEMON_RESUME_UNSUPPORTED -> Res.string.error_device_resume_unsupported to emptyList()
+        "device_no_answer" -> Res.string.error_device_no_answer to emptyList()
+        "resume_unsupported" -> Res.string.error_device_resume_agent to emptyList()
+        "invalid_resume" -> Res.string.error_device_invalid_resume to emptyList()
+        "folder_not_configured", "folder_missing", "folder_moved", "folder_refused" -> Res.string.error_device_resume_folder to listOf<Any>(code)
+        else -> visibleCode(code)?.let { Res.string.error_device_refused_code to listOf<Any>(it) } ?: (Res.string.error_device_refused to emptyList())
+    }
     is AppException.LinkRefused -> when (reason) {
         LinkRefusal.NOT_AN_ARTIFACT -> Res.string.error_link_not_artifact
         LinkRefusal.UNKNOWN_SERVER -> Res.string.error_link_unknown_server

@@ -14,6 +14,7 @@ import run.ostrom.app.FakeFeatures
 import run.ostrom.app.SequenceIds
 import run.ostrom.app.domain.cloudSession
 import run.ostrom.app.domain.models.AppException
+import run.ostrom.app.domain.models.SessionKind
 import run.ostrom.app.domain.models.CloudSession
 import run.ostrom.app.domain.models.CloudSessionPage
 import run.ostrom.app.domain.models.Features
@@ -51,7 +52,7 @@ class NewCloudSessionViewModelTest {
         override fun current(sessionId: String) = cloudSession(sessionId)
         val keys = mutableListOf<String>()
         var created: NewCloudSession? = null
-        override suspend fun sessions(accountId: String, before: String?) = CloudSessionPage(emptyList(), null)
+        override suspend fun sessions(accountId: String, before: String?, kinds: Set<SessionKind>) = CloudSessionPage(emptyList(), null)
         override suspend fun session(accountId: String, sessionId: String): CloudSession = cloudSession(sessionId)
         override suspend fun create(accountId: String, session: NewCloudSession, idempotencyKey: String): CloudSession {
             keys += idempotencyKey

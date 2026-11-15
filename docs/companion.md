@@ -180,6 +180,19 @@ at each return and on refresh, as does a record: the server publishes no cloud s
   `runners.cloud.environment.v1` the form takes the recipe (the fields of `CreateCloudSessionRequest.environment`);
   without it, the single repository and ref. No profile or image is chosen: the server picks the person's only profile,
   and asks for one (`profile_required`, worded) when there are several.
+- **Remote and local sessions** (`runners.cloud.remote.v1`, `runners.cloud.local.v1`), ported from TeamCode's
+  `SessionKind`, `SessionHost`, `SessionComponents` (`KindChips`) and the host banners. With the remote key the list
+  asks for the announced kinds (`kinds=cloud,remote[,local]`) and each card says where it runs ("Cloud",
+  "Remote · <device>", the local run), with its device offline, waiting or refusing. A remote session's record shows its
+  device, system, folder and permission mode; a local one is talked to in its terminal (`ostrom <agent>`), so it cannot
+  be paused, resumed, transferred, messaged or have its model changed; a remote one is never resumed (a message asks).
+- **Start on an online device** (`runners.cloud.remote.daemon.v1`, `runners.cloud.remote.resume.v1`), ported from
+  TeamCode's `NewSessionSheet` device form, `DeviceSessionUseCases` and `RemoteDeviceRepository`: Cloud | Online device,
+  the member's devices whose daemon is online, a folder the daemon published (its name names the session), Claude Code
+  or Codex, the permission mode (kept for the next launch), and with the resume key a Claude Code conversation of the
+  folder to continue. The server's refusals about the device (`device_offline`, `folder_not_published`, ...) are worded by
+  key and drop what went stale. Not ported: TeamCode's "On this device" (`LocalHost`) and its auto-device start of a
+  profile.
 - **Transfers** (`runners.cloud.transfer.v1`), ported from TeamCode's `TransferSheet`, `TransfersScreen`,
   `TransferViewModels`, `TransferUseCases` and `RemoteTransferRepository` over ostrom-core's `client.cloudTransfers`.
   A button in the Sessions tab's cloud list opens the transfers (to me, from me): accept or decline an offer made to the
@@ -317,6 +330,7 @@ What the React Native app did, what TeamCode's companion does that an Ostrom ser
 | The member's environment: the variable names their agents receive and those withheld (`GET /environment`, values dropped by ostrom-core's client), their personal variants (`GET /me/environment/variants`) | `environment.v1` | Settings, Environment variables, read only. A value is written in the console ("Open in the console", `/me/environment`): the server takes environment writes from a browser session only. TeamCode's companion has no such screen |
 | The member's personal MCP servers: a remote server's address, a hosted command's launcher and package, the secret names, the process state | `mcp.personal.v1` | Settings, MCP servers, read only like TeamCode's `McpServersScreen`; added, edited and deleted in the console (`/me/mcp`), whose writes need a browser session |
 | Cloud sessions: list, record (status, repository or recipe, times, limits, the preparation step, why it failed), pause, resume, stop, new cloud session with its recipe; a conversation session's transcript, messages, interrupt, permission cards, Bypass, model, effort, background tasks and subagent feeds | `runners.cloud.v1`, `runners.cloud.environment.v1`, `runners.cloud.transfer.v1`, `runners.cloud.conversation.v1`, `runners.cloud.permissions.v1`, `runners.cloud.permissions.bypass.v1`, `runners.cloud.model.v1`, `runners.cloud.effort.v1`, `runners.cloud.tasks.v1`, `runners.cloud.transcript.feeds.v1`, `runners.cloud.files.v1` | Ported from TeamCode's `SessionsScreen`, `SessionScreen`, `NewSessionSheet`, `PermissionCard`, the transcript views and their view models (see [Cloud sessions](#cloud-sessions)). Files (`runners.cloud.files.v1`): TeamCode's paperclip, its chips and pickers; no terminal (a WebSocket the app does not open) |
+| Remote and local sessions: where each runs, its device's state (offline, waiting, refused), its device, folder and permissions; start a session on an online device in a published folder, continuing a Claude Code conversation | `runners.cloud.remote.v1`, `runners.cloud.remote.daemon.v1`, `runners.cloud.remote.resume.v1`, `runners.cloud.local.v1` | Ported from TeamCode (see [Cloud sessions](#cloud-sessions)). Not yet: "On this device" and the live event feed |
 | GitHub link: the member's link (not linked, linked, reconnect), linking with the device flow, unlinking; a cloud session's GitHub access (mine, shared, none) | `github.link.v1`, `runners.cloud.github.v1` | Ported from TeamCode's `GitHubLinkScreen` and view model (see [GitHub link](#github-link)); the access switch on a cloud session's record is Ostrom's own (TeamCode has none). Not in the app: other members' links (owners and admins) |
 | Automations, team MCP servers, sharing | `automations.v1`, `mcp.v1`, `sharing.v1` | Later, each with its client routes in ostrom-core |
 | Desktop: menu bar icon, the CLI's account, update banner | none | Ported (see [Desktop](#desktop)). Left: tray notifications of new waits and approvals while the window is hidden (no use case emits them across accounts yet), making an app sign-in the CLI's (it would write the CLI's secret store), the CLI's account on Windows, an install button when no CLI is found, the app's own update (no desktop release) |

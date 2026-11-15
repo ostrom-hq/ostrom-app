@@ -41,6 +41,12 @@ import org.jetbrains.compose.resources.stringResource
 import run.ostrom.app.domain.models.CloudFailure
 import run.ostrom.app.domain.models.CloudRecipe
 import run.ostrom.app.domain.models.CloudSession
+import run.ostrom.app.domain.models.SessionHost
+import run.ostrom.app.domain.models.SessionKind
+import run.ostrom.app.presentation.components.KindChips
+import run.ostrom.app.presentation.components.hostName
+import run.ostrom.app.presentation.components.refusalText
+import run.ostrom.app.presentation.components.systemOf
 import run.ostrom.app.domain.models.CloudSessionStatus
 import run.ostrom.app.domain.models.GitHubAccess
 import run.ostrom.app.domain.models.visibleCode
@@ -115,6 +121,16 @@ import run.ostrom.app.resources.cloud_stop_body
 import run.ostrom.app.resources.cloud_stop_keep
 import run.ostrom.app.resources.cloud_stop_title
 import run.ostrom.app.resources.sessions_title
+import run.ostrom.app.resources.session_detail_folder
+import run.ostrom.app.resources.session_detail_permissions
+import run.ostrom.app.resources.session_detail_runs_on
+import run.ostrom.app.resources.session_detail_system
+import run.ostrom.app.resources.session_host_offline
+import run.ostrom.app.resources.session_kind_cloud
+import run.ostrom.app.resources.session_kind_local
+import run.ostrom.app.resources.session_permissions_ask
+import run.ostrom.app.resources.session_permissions_bypass
+import run.ostrom.app.resources.session_waiting_host
 
 /**
  * One cloud session's record: its status, agent and model, repository or recipe, times and limits; while it is
@@ -152,7 +168,7 @@ fun CloudSessionScreen(
             state.error?.let { error -> Banner(error.words(), Tone.DANGER, Modifier.testTag("cloud-session-error")) }
             state.actionError?.let { Banner(it.words(), Tone.DANGER, Modifier.testTag("cloud-session-action-error")) }
             Overview(session, today)
-            session.failure?.let { FailureBanner(it, session.canResume) }
+            if (!HostBanner(session)) session.failure?.let { FailureBanner(it, session.canResume) }
             if (session.status == CloudSessionStatus.TRANSFERRING) Banner(stringResource(Res.string.cloud_session_transferring), Tone.NEUTRAL, Modifier.testTag("cloud-session-transferring"))
             Actions(session, state.acting, onPause = viewModel::pause, onResume = viewModel::resume, onStop = { confirmStop = true }, extra = {
                 RevokeBypassButton(state, viewModel)
@@ -183,10 +199,10 @@ fun CloudSessionScreen(
             BusyRow(state.loading && session == null)
             if (session != null) {
                 Overview(session, today)
-                if (session.preparing) {
+                if (session.preparing && !session.waitingForHost) {
                     Banner(stringResource(Res.string.cloud_session_preparing, phaseWords(session.preparationPhase)), Tone.NEUTRAL, Modifier.testTag("cloud-session-phase"))
                 }
-                session.failure?.let { FailureBanner(it, session.canResume) }
+                if (!HostBanner(session)) session.failure?.let { FailureBanner(it, session.canResume) }
                 if (session.status == CloudSessionStatus.TRANSFERRING) Banner(stringResource(Res.string.cloud_session_transferring), Tone.NEUTRAL, Modifier.testTag("cloud-session-transferring"))
                 Actions(session, state.acting, onPause = viewModel::pause, onResume = viewModel::resume, onStop = { confirmStop = true }, extra = { extraActions(session) })
                 if (state.canChooseAccess) GitHubAccessChoice(session.githubAccess, state.settingAccess, onChoose = viewModel::chooseGitHubAccess)
@@ -208,6 +224,20 @@ private fun Overview(session: CloudSession, today: Long) {
             CloudStatusChip(session, Modifier.testTag("cloud-session-status"))
         }
         Text(listOfNotNull(session.agent, session.model).joinToString(" · "), color = colors.text, fontSize = 14.sp)
+        if (session.kind != SessionKind.CLOUD) KindChips(session)
+        Detail(stringResource(Res.string.session_detail_runs_on), when {
+            session.remote -> hostName(session.host)
+            session.local -> stringResource(Res.string.session_kind_local)
+            else -> stringResource(Res.string.session_kind_cloud)
+        })
+        session.host?.let { host ->
+            systemOf(host)?.let { Detail(stringResource(Res.string.session_detail_system), it) }
+            host.directoryName?.let { Detail(stringResource(Res.string.session_detail_folder), it) }
+            when (host.permissionMode) {
+                SessionHost.ASK -> Detail(stringResource(Res.string.session_detail_permissions), stringResource(Res.string.session_permissions_ask))
+                SessionHost.BYPASS -> Detail(stringResource(Res.string.session_detail_permissions), stringResource(Res.string.session_permissions_bypass))
+            }
+        }
         session.repo?.let { repo ->
             Text(session.ref?.let { stringResource(Res.string.cloud_session_repo_ref, repo, it) } ?: repo, style = MonospaceStyle, color = colors.text,
                 modifier = Modifier.testTag("cloud-session-repo"))
@@ -227,6 +257,32 @@ private fun Overview(session: CloudSession, today: Long) {
         }
         SelectionContainer { Text(session.id, style = MonospaceStyle, color = colors.muted, maxLines = 1, overflow = TextOverflow.Ellipsis) }
     }
+}
+
+@Composable
+private fun Detail(label: String, value: String) {
+    val colors = Ostrom.colors
+    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text(label, color = colors.muted, fontSize = 12.5.sp, modifier = Modifier.widthIn(min = 96.dp))
+        Text(value, color = colors.text, fontSize = 13.sp, modifier = Modifier.weight(1f))
+    }
+}
+
+/**
+ * A remote session's device, when it says more than a failure code: it went quiet (the session goes on once it is
+ * back), it did not start the session yet, or it refused it, worded by its reason. False when there is nothing to say.
+ */
+@Composable
+private fun HostBanner(session: CloudSession): Boolean {
+    when {
+        // Not a failure of the session: its device went quiet, and it goes on once the device is back.
+        session.hostOffline -> Banner(stringResource(Res.string.session_host_offline, hostName(session.host)), Tone.WARN, Modifier.testTag("host-offline"))
+        // The order is the session: it waits until the device's daemon picks it up, and says so.
+        session.waitingForHost -> Banner(stringResource(Res.string.session_waiting_host, hostName(session.host)), Tone.ACCENT, Modifier.testTag("waiting-host"))
+        session.hostRefused -> Banner(refusalText(session), Tone.DANGER, Modifier.testTag("host-refused"))
+        else -> return false
+    }
+    return true
 }
 
 /**

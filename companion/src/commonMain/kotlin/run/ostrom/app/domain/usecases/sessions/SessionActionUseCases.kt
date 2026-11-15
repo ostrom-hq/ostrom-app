@@ -207,10 +207,11 @@ class ControlConversationUseCase(private val sessions: CloudSessionRepository, p
         /** Bypass, the model and the effort are the owner's: a role opens nobody else's session. */
         fun canControl(memberId: String?, session: CloudSession): Boolean = memberId != null && session.ownerId == memberId
 
-        /** The model and the effort change while the session is not over. */
-        fun canChangeModel(session: CloudSession): Boolean = !session.status.ended
+        /** The model and the effort change while the session is not over; a local session's agent is the terminal's, not the server's. */
+        fun canChangeModel(session: CloudSession): Boolean = !session.local && !session.status.ended
 
-        /** Messages go to a session that is not over nor changing owner; a paused one wakes for them. */
-        fun canMessage(session: CloudSession): Boolean = !session.status.ended && session.status != run.ostrom.app.domain.models.CloudSessionStatus.TRANSFERRING
+        /** Messages go to a session that is not over nor changing owner, and not a local one; a paused one wakes for them. */
+        fun canMessage(session: CloudSession): Boolean =
+            !session.local && !session.status.ended && session.status != run.ostrom.app.domain.models.CloudSessionStatus.TRANSFERRING
     }
 }

@@ -12,6 +12,7 @@ import run.ostrom.app.ConversationCalls
 import run.ostrom.app.FakeFeatures
 import run.ostrom.app.domain.cloudSession
 import run.ostrom.app.domain.models.AppException
+import run.ostrom.app.domain.models.SessionKind
 import run.ostrom.app.domain.models.CloudSession
 import run.ostrom.app.domain.models.CloudSessionPage
 import run.ostrom.app.domain.models.CloudSessionRefusal
@@ -48,7 +49,7 @@ class CloudSessionGitHubAccessTest {
     private class Fake(var session: CloudSession) : ConversationCalls() {
         override fun current(sessionId: String) = session
         var refusal: CloudSessionRefusal? = null
-        override suspend fun sessions(accountId: String, before: String?) = CloudSessionPage(listOf(session), null)
+        override suspend fun sessions(accountId: String, before: String?, kinds: Set<SessionKind>) = CloudSessionPage(listOf(session), null)
         override suspend fun session(accountId: String, sessionId: String) = session
         override suspend fun create(accountId: String, session: NewCloudSession, idempotencyKey: String) = session.let { this.session }
         override suspend fun pause(accountId: String, sessionId: String) = session

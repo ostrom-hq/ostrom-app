@@ -93,6 +93,48 @@ data class CloudRecipe(
 }
 
 /**
+ * Where a session runs: a pod the server started, a member's device (`runners.cloud.remote.v1`), or the terminal of a
+ * member's `ostrom <agent>` ([LOCAL], `runners.cloud.local.v1`): it takes no message and lives as long as the run.
+ */
+enum class SessionKind(val wire: String) {
+    CLOUD("cloud"), REMOTE("remote"), LOCAL("local");
+
+    companion object {
+        /** A server without remote sessions sends no kind: its sessions are cloud sessions. */
+        fun of(wire: String?): SessionKind = entries.firstOrNull { it.wire == wire } ?: CLOUD
+    }
+}
+
+/** The kinds a server knows: a server that announces remote sessions knows cloud and remote ones, local ones only when it says so. */
+object SessionKinds {
+    fun announced(features: Set<String>): Set<SessionKind> = buildSet {
+        add(SessionKind.CLOUD); add(SessionKind.REMOTE)
+        if (Features.RUNNERS_CLOUD_LOCAL in features) add(SessionKind.LOCAL)
+    }
+}
+
+/**
+ * The device a remote session runs on, as the server describes it now. [removed]: the device was removed, so the
+ * session has no host any more. [online]: the host runs the session now. [directoryName] is the folder's name only.
+ */
+data class SessionHost(
+    val deviceName: String?,
+    val platform: String?,
+    val osVersion: String?,
+    val directoryName: String?,
+    val online: Boolean,
+    val removed: Boolean,
+    /** [ASK] or [BYPASS]. */
+    val permissionMode: String?,
+) {
+    companion object {
+        /** Claude Code's permission requests come to the organization's clients; Codex stays in its sandbox. */
+        const val ASK = "ask"
+        const val BYPASS = "bypass"
+    }
+}
+
+/**
  * One of the person's cloud sessions, as the server describes it (times in epoch milliseconds, null when unreadable).
  * [desiredStatus] is what the owner asked for (`running`, `paused`, `terminated`); [phase] the open label of the current
  * step.
@@ -122,8 +164,15 @@ data class CloudSession(
     val ownerId: String? = null,
     /** The accepted transfer the session is moving toward; null when none. */
     val transferId: String? = null,
-    /** A session on a member's device (`runners.cloud.remote.v1`): it is never transferred, its files stay there. */
-    val remote: Boolean = false,
+    /** Where it runs (`runners.cloud.remote.v1`, `runners.cloud.local.v1`); a server without them sends cloud sessions only. */
+    val kind: SessionKind = SessionKind.CLOUD,
+    /** Where a remote session runs; null for a cloud or a local session. */
+    val host: SessionHost? = null,
+    /**
+     * Why the device's daemon refused to start the session ([failure] `host_refused`): its stable reason code
+     * (`folder_missing`, `agent_unsupported`, ...), null when it did not give a readable one.
+     */
+    val refusalReason: String? = null,
     /** A [CloudSessionMode.CONVERSATION] session is talked to through its transcript and messages; a terminal one is not. */
     val mode: CloudSessionMode = CloudSessionMode.TERMINAL,
     /** The agent's effort (`runners.cloud.effort.v1`), if chosen. */
@@ -133,6 +182,24 @@ data class CloudSession(
     /** Why the agent waits for a person (`runners.cloud.permissions.v1`); null when it does not. */
     val waiting: SessionWaiting? = null,
 ) {
+    /** A session on a member's device: it is never transferred, its files stay there. */
+    val remote: Boolean get() = kind == SessionKind.REMOTE
+
+    /** The session of an `ostrom <agent>` in a terminal: no pause, resume, transfer or message from the app. */
+    val local: Boolean get() = kind == SessionKind.LOCAL
+
+    /** A remote session paused because its device stopped answering (the server's `host_offline`). */
+    val hostOffline: Boolean get() = remote && failure?.code == HOST_OFFLINE
+
+    /**
+     * A remote session that waits for its device to start it (`phase = waiting_host`): a new one the device's daemon has
+     * not picked up yet, or one woken by a message. It starts by itself once the device answers.
+     */
+    val waitingForHost: Boolean get() = remote && phase == WAITING_HOST && !status.ended && status != CloudSessionStatus.PAUSED
+
+    /** The device's daemon refused to start the session (`host_refused`): it ended without running. */
+    val hostRefused: Boolean get() = remote && failure?.code == HOST_REFUSED
+
     /** A conversation session: its screen shows the transcript and the composer. */
     val conversation: Boolean get() = mode == CloudSessionMode.CONVERSATION
 
@@ -142,14 +209,20 @@ data class CloudSession(
     /** The step being prepared, when the app words it; null otherwise or once prepared. */
     val preparationPhase: CloudPhase? get() = if (preparing) CloudPhase.of(phase) else null
 
-    /** Pause keeps the workspace: offered while it runs or is about to, unless a pause or a stop is asked already. */
-    val canPause: Boolean get() = status in PAUSABLE && desiredStatus != PAUSED && desiredStatus != TERMINATED
+    /**
+     * Pause keeps the workspace: offered while it runs or is about to, unless a pause or a stop is asked already. A local
+     * session is never paused from the app: it lives as long as its terminal.
+     */
+    val canPause: Boolean get() = !local && status in PAUSABLE && desiredStatus != PAUSED && desiredStatus != TERMINATED
 
     /**
      * Resume starts a new execution on the kept workspace: offered on a paused session (or one pausing), unless a resume
-     * is asked already (the server then resumes it by itself) or a stop.
+     * is asked already (the server then resumes it by itself) or a stop. A remote session resumes only from its own
+     * device, which this app never is: a message asks the device to resume it instead (the server refuses an explicit
+     * resume from elsewhere); a local session never.
      */
-    val canResume: Boolean get() = (status == CloudSessionStatus.PAUSED || status == CloudSessionStatus.PAUSING) && desiredStatus != RUNNING && desiredStatus != TERMINATED
+    val canResume: Boolean get() = !remote && !local && (status == CloudSessionStatus.PAUSED || status == CloudSessionStatus.PAUSING) &&
+        desiredStatus != RUNNING && desiredStatus != TERMINATED
 
     /** Stop ends it for good and deletes its workspace: offered until it ended or a stop is asked already. */
     val canStop: Boolean get() = !status.ended && desiredStatus != TERMINATED
@@ -158,6 +231,9 @@ data class CloudSession(
         const val RUNNING = "running"
         const val PAUSED = "paused"
         const val TERMINATED = "terminated"
+        const val HOST_OFFLINE = "host_offline"
+        const val WAITING_HOST = "waiting_host"
+        const val HOST_REFUSED = "host_refused"
         private val PAUSABLE = setOf(CloudSessionStatus.CREATING, CloudSessionStatus.RUNNING, CloudSessionStatus.RESUMING)
     }
 }
@@ -178,8 +254,11 @@ enum class GitHubAccess(val wire: String) {
     }
 }
 
-/** A page of cloud sessions, newest first; [next] is the cursor of the older page, null on the last one. */
-data class CloudSessionPage(val sessions: List<CloudSession>, val next: String?)
+/**
+ * A page of cloud sessions, newest first; [next] is the cursor of the older page, null on the last one.
+ * [remoteSessions]: the server announces remote sessions (`runners.cloud.remote.v1`), so each row says where it runs.
+ */
+data class CloudSessionPage(val sessions: List<CloudSession>, val next: String?, val remoteSessions: Boolean = false)
 
 /** The agents a cloud session starts; `shell` is a plain shell, to prepare a workspace or debug an image. */
 enum class CloudAgent(val wire: String) { CLAUDE("claude"), CODEX("codex"), OPENCODE("opencode"), GEMINI("gemini"), SHELL("shell") }
@@ -258,4 +337,13 @@ enum class CloudSessionProblem {
 
     /** An effort is not 1 to 120 letters, digits and `. _ : / -`. */
     EFFORT,
+
+    /** No online device is chosen for a session on a device. */
+    CHOOSE_DEVICE,
+
+    /** No folder the device offers is chosen. */
+    CHOOSE_FOLDER,
+
+    /** The agent on a device is neither Claude Code nor Codex. */
+    CHOOSE_AGENT,
 }

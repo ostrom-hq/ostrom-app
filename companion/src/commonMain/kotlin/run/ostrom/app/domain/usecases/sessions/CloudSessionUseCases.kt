@@ -14,6 +14,7 @@ import run.ostrom.app.domain.models.CloudSessionRefusal
 import run.ostrom.app.domain.models.Features
 import run.ostrom.app.domain.models.GitHubAccess
 import run.ostrom.app.domain.models.NewCloudSession
+import run.ostrom.app.domain.models.SessionKinds
 import run.ostrom.app.domain.repositories.CloudSessionRepository
 import run.ostrom.app.domain.repositories.FeaturesRepository
 import run.ostrom.app.domain.usecases.auth.AccountGuard
@@ -27,10 +28,19 @@ class CloudSessionAccess(val repository: CloudSessionRepository, private val fea
     }
 }
 
-/** One page of the person's cloud sessions, newest first. */
+/**
+ * One page of the person's sessions, newest first, of every kind: a server that announces remote sessions is asked for
+ * the kinds it knows ([SessionKinds.announced]), an older one is asked as before and answers its cloud sessions.
+ */
 class LoadCloudSessionsUseCase(private val access: CloudSessionAccess) {
     suspend operator fun invoke(accountId: String, before: String? = null): CloudSessionPage =
-        access.call(accountId) { access.repository.sessions(accountId, before) }
+        access.call(accountId) { announced ->
+            when {
+                Features.RUNNERS_CLOUD_REMOTE in announced ->
+                    access.repository.sessions(accountId, before, SessionKinds.announced(announced)).copy(remoteSessions = true)
+                else -> access.repository.sessions(accountId, before)
+            }
+        }
 }
 
 /** One cloud session's record. */
@@ -63,10 +73,19 @@ class ControlCloudSessionUseCase(private val access: CloudSessionAccess) {
 }
 
 /**
- * What the screens of a cloud session offer: the preparation recipe when the server takes one ([recipe]), and the choice
- * of the session's GitHub access when it announces `runners.cloud.github.v1` ([githubAccess]).
+ * What the screens of a cloud session offer: the preparation recipe when the server takes one ([recipe]), the choice
+ * of the session's GitHub access when it announces `runners.cloud.github.v1` ([githubAccess]), and sessions started on
+ * the member's online devices ([onDevices], [resumes]).
  */
-data class CloudSessionOptions(val recipe: Boolean, val githubAccess: Boolean = false, val conversation: Boolean = false)
+data class CloudSessionOptions(
+    val recipe: Boolean,
+    val githubAccess: Boolean = false,
+    val conversation: Boolean = false,
+    /** The server starts sessions on the member's online devices (`runners.cloud.remote.daemon.v1`). */
+    val onDevices: Boolean = false,
+    /** ... and lets such a session continue a conversation of the folder (`runners.cloud.remote.resume.v1`). */
+    val resumes: Boolean = false,
+)
 
 class LoadCloudSessionOptionsUseCase(private val access: CloudSessionAccess) {
     suspend operator fun invoke(accountId: String): CloudSessionOptions =
@@ -75,6 +94,8 @@ class LoadCloudSessionOptionsUseCase(private val access: CloudSessionAccess) {
                 recipe = Features.RUNNERS_CLOUD_ENVIRONMENT in announced,
                 githubAccess = Features.RUNNERS_CLOUD_GITHUB in announced,
                 conversation = Features.RUNNERS_CLOUD_CONVERSATION in announced,
+                onDevices = Features.RUNNERS_CLOUD_REMOTE_DAEMON in announced,
+                resumes = Features.RUNNERS_CLOUD_REMOTE_DAEMON in announced && Features.RUNNERS_CLOUD_REMOTE_RESUME in announced,
             )
         }
 }

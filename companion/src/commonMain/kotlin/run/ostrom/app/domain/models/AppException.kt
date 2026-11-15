@@ -109,8 +109,41 @@ sealed class AppException(message: String) : Exception(message) {
             CloudSessionProblem.MESSAGE -> "Write a message of up to 32,000 characters."
             CloudSessionProblem.MODEL -> "Use a valid model: letters, digits and . _ : / - (up to 120 characters)."
             CloudSessionProblem.EFFORT -> "Use a valid effort: letters, digits and . _ : / - (up to 120 characters)."
+            CloudSessionProblem.CHOOSE_DEVICE -> "Choose one of your online devices."
+            CloudSessionProblem.CHOOSE_FOLDER -> "Choose one of the folders the device offers."
+            CloudSessionProblem.CHOOSE_AGENT -> "Choose Claude Code or Codex."
         },
     )
+    /**
+     * The server refused to start a session on one of the member's devices, or to read its folders or conversations,
+     * with [code] (`device_offline`, `folder_not_published`...), worded by the app (TeamCode's `DeviceRefused`).
+     */
+    class DeviceRefused(val code: String) : AppException(
+        when (code) {
+            DEVICE_OFFLINE -> "This device is offline: its Ostrom service is not connected. Start it on the device (ostrom service install), or choose another device."
+            "folder_not_published" -> "This device no longer offers this folder. Add it on the device with ostrom folders add, or choose another folder."
+            "device_not_found" -> "This device is not one of yours any more, or it was removed."
+            "remote_requires_login" -> "Only the device's owner, signed in with a password, starts a session on it."
+            "device_target_unsupported" -> "This server does not start sessions on your devices. Update it to use them."
+            "invalid_folder" -> "Choose one of the folders the device offers."
+            DAEMON_RESUME_UNSUPPORTED -> "Ostrom on this device is too old to continue a conversation. Update it on the device (ostrom update)."
+            "device_no_answer" -> "The device did not answer in time. Try again."
+            "resume_unsupported" -> "Only a Claude Code session continues a conversation of the device."
+            "invalid_resume" -> "Choose one of the conversations the device listed."
+            else -> "The server refused to start the session on this device" + (visibleCode(code)?.let { " ($it)" } ?: "") + "."
+        },
+    ) {
+        companion object {
+            const val DEVICE_OFFLINE = "device_offline"
+            const val DAEMON_RESUME_UNSUPPORTED = "daemon_resume_unsupported"
+
+            /** The codes the server answers about a device or its folders; any other failure keeps its own type. */
+            val CODES = setOf(DEVICE_OFFLINE, "folder_not_published", "device_not_found", "remote_requires_login", "device_target_unsupported", "invalid_folder",
+                DAEMON_RESUME_UNSUPPORTED, "device_no_answer", "resume_unsupported", "invalid_resume",
+                // The daemon's own reasons for not reading a folder's conversations.
+                "folder_not_configured", "folder_missing", "folder_moved", "folder_refused")
+        }
+    }
     /** An `ostrom://open?url=` link this app does not open, for [reason]: nothing was opened or asked of a server. */
     class LinkRefused(val reason: LinkRefusal) : AppException(
         when (reason) {

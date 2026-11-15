@@ -131,3 +131,20 @@ class FakeEventRepository(var changes: Flow<LiveUpdate<OrgChange>> = emptyFlow()
 
 /** An [AccountGuard] over fakes: a `401` checks the account once and goes on. */
 fun fakeGuard() = AccountGuard(RefreshAccountUseCase(FakeAuthRepository(), accounts(), MemoryCredentialStore(), FixedClock()))
+
+/** The member's devices of a test: what each call answers, and the calls asked, in order. */
+class FakeDeviceRepository : run.ostrom.app.domain.repositories.DeviceRepository {
+    val calls = mutableListOf<String>()
+    var devicesResult: suspend () -> List<run.ostrom.app.domain.models.HostDevice> = { emptyList() }
+    var foldersResult: suspend (String) -> run.ostrom.app.domain.models.DeviceFolders = { run.ostrom.app.domain.models.DeviceFolders(true, emptyList()) }
+    var resumableResult: suspend (String, String, String?) -> run.ostrom.app.domain.models.ResumableSessions = { _, _, _ -> run.ostrom.app.domain.models.ResumableSessions(emptyList()) }
+
+    override suspend fun onlineDevices(accountId: String): List<run.ostrom.app.domain.models.HostDevice> { calls += "devices"; return devicesResult() }
+    override suspend fun folders(accountId: String, deviceId: String): run.ostrom.app.domain.models.DeviceFolders { calls += "folders $deviceId"; return foldersResult(deviceId) }
+    override suspend fun resumable(accountId: String, deviceId: String, folderId: String, limit: Int, before: String?): run.ostrom.app.domain.models.ResumableSessions {
+        calls += "resumable $deviceId $folderId $limit before=$before"
+        return resumableResult(deviceId, folderId, before)
+    }
+}
+
+fun hostDevice(id: String, name: String = "Ada's MacBook", current: Boolean = false) = run.ostrom.app.domain.models.HostDevice(id, name, "macos", "15.1", current)
