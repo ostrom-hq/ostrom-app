@@ -148,6 +148,8 @@ class GitHubLinkViewModel(
                 // A few failures in a row that may pass by themselves are waited out; any other one ends the flow.
                 if (!error.isTransient() || ++failures >= MAX_FAILURES) {
                     state.update { it.copy(step = null, error = error.userMessage()) }
+                    // A refusal of the server (App removed, device flow turned off) is read again.
+                    if (error is AppException.GitHubRefused) reload(clearError = false)
                     return
                 }
                 continue

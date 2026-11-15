@@ -45,13 +45,13 @@ class RemoteCloudSessionRepository(private val calls: AccountCalls) : CloudSessi
         calls.withAccount(accountId, resource = true) { client -> refusals { client.cloudSessions.stop(sessionId).domain() } }
 
     override suspend fun setGitHubAccess(accountId: String, sessionId: String, access: GitHubAccess): CloudSession =
-        calls.withAccount(accountId, resource = true) { client -> refusals { client.cloudSessions.setGitHubAccess(sessionId, access.wire).domain() } }
+        calls.withAccount(accountId, resource = true) { client -> refusals(githubAccess = true) { client.cloudSessions.setGitHubAccess(sessionId, access.wire).domain() } }
 
     /** The refusals of an action, by their error key; the server's message is never read nor shown. */
-    private suspend fun <T> refusals(creating: Boolean = false, call: suspend () -> T): T = try {
+    private suspend fun <T> refusals(creating: Boolean = false, githubAccess: Boolean = false, call: suspend () -> T): T = try {
         call()
     } catch (error: OstromException) {
-        throw cloudRefusalOf(error.status, error.type, creating)?.let { AppException.CloudSessionRefused(it) } ?: error
+        throw cloudRefusalOf(error.status, error.type, creating, githubAccess)?.let { AppException.CloudSessionRefused(it) } ?: error
     }
 
     private companion object { const val PAGE = 50 }
@@ -61,7 +61,7 @@ class RemoteCloudSessionRepository(private val calls: AccountCalls) : CloudSessi
  * The refusal a status and error key stand for; null for any other failure (translated as usual). Only a start
  * ([creating]) has values to check: an action's `invalid_request` stays a plain server error.
  */
-internal fun cloudRefusalOf(status: Int, type: String?, creating: Boolean): CloudSessionRefusal? = when (type) {
+internal fun cloudRefusalOf(status: Int, type: String?, creating: Boolean, githubAccess: Boolean = false): CloudSessionRefusal? = when (type) {
     "invalid_request" -> CloudSessionRefusal.INVALID.takeIf { creating }
     "payment_required" -> CloudSessionRefusal.PLAN_LIMIT
     "conflict" -> CloudSessionRefusal.STATE
@@ -69,8 +69,8 @@ internal fun cloudRefusalOf(status: Int, type: String?, creating: Boolean): Clou
     "profile_required" -> CloudSessionRefusal.PROFILE_REQUIRED
     "cloud_profile_not_found", "profile_unassigned", "image_not_allowed" -> CloudSessionRefusal.PROFILE_UNAVAILABLE
     "cluster_unavailable", "namespace_not_allowed" -> CloudSessionRefusal.CLUSTER_UNAVAILABLE
-    "github_owner_only" -> CloudSessionRefusal.GITHUB_OWNER_ONLY
-    "session_not_paused" -> CloudSessionRefusal.GITHUB_NOT_PAUSED
+    "github_owner_only" -> CloudSessionRefusal.GITHUB_OWNER_ONLY.takeIf { githubAccess }
+    "session_not_paused" -> CloudSessionRefusal.GITHUB_NOT_PAUSED.takeIf { githubAccess }
     else -> null
 }.takeIf { status in 400..499 }
 

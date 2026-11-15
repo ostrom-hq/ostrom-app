@@ -62,7 +62,14 @@ class CloudSessionViewModel(
         loading = viewModelScope.launch {
             try {
                 val session = getSession(route.accountId, route.sessionId)
-                val offered = options(route.accountId).githubAccess
+                // A secondary probe: its failure leaves the choice hidden, never the record unread.
+                val offered = try {
+                    options(route.accountId).githubAccess
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (error: Exception) {
+                    false
+                }
                 state.update { it.copy(session = session, loading = false, gone = false, githubAccessOffered = offered) }
             } catch (error: CancellationException) {
                 throw error
@@ -90,6 +97,7 @@ class CloudSessionViewModel(
                 val changed = setGitHubAccess(route.accountId, session, choice)
                 state.update { it.copy(settingAccess = null, session = changed) }
             } catch (error: CancellationException) {
+                state.update { it.copy(settingAccess = null) }
                 throw error
             } catch (error: Exception) {
                 state.update { it.copy(settingAccess = null, actionError = error.userMessage()) }
@@ -100,7 +108,7 @@ class CloudSessionViewModel(
 
     private fun act(action: CloudAction) {
         val session = state.value.session ?: return
-        if (state.value.acting != null) return
+        if (state.value.acting != null || state.value.settingAccess != null) return
         state.update { it.copy(acting = action, actionError = null) }
         viewModelScope.launch {
             try {

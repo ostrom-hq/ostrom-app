@@ -194,11 +194,9 @@ class CloudSessionUseCasesTest {
     }
 
     @Test
-    fun theSameAccessOrAnEndedSessionSendsNothing() = runTest {
+    fun anEndedSessionSendsNothing() = runTest {
         features.features = setOf(Features.RUNNERS_CLOUD, Features.RUNNERS_CLOUD_GITHUB)
         val set = SetCloudSessionGitHubAccessUseCase(access)
-        val current = cloudSession().copy(githubAccess = GitHubAccess.OWNER)
-        assertEquals(current, set("a1", current, GitHubAccess.OWNER))
         val refusal = assertFailsWith<AppException.CloudSessionRefused> { set("a1", cloudSession(status = CloudSessionStatus.TERMINATED), GitHubAccess.NONE) }
         assertEquals(CloudSessionRefusal.STATE, refusal.reason)
         assertTrue(sessions.calls.isEmpty())

@@ -82,7 +82,7 @@ class SetCloudSessionGitHubAccessUseCase(private val access: CloudSessionAccess)
     suspend operator fun invoke(accountId: String, session: CloudSession, choice: GitHubAccess): CloudSession = access.call(accountId) { announced ->
         if (Features.RUNNERS_CLOUD_GITHUB !in announced) throw AppException.Unsupported(Features.RUNNERS_CLOUD_GITHUB)
         if (session.status.ended) throw AppException.CloudSessionRefused(CloudSessionRefusal.STATE)
-        if (session.githubAccess == choice) session else access.repository.setGitHubAccess(accountId, session.id, choice)
+        access.repository.setGitHubAccess(accountId, session.id, choice)
     }
 }
 

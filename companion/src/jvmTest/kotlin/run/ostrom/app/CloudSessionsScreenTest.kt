@@ -274,7 +274,7 @@ class CloudSessionsScreenTest {
             server.routes["GET /api/v1/cloud/sessions/c1"] = session("c1", "Mill", "running", extra = ""","githubAccess":"shared"""")
             click("cloud-session-github-shared")
             waitForText("whoever shares the session's terminal")
-            assertTrue("PUT /api/v1/cloud/sessions/c1/github" in server.asked)
+            waitUntil(timeoutMillis = 10_000) { synchronized(server) { "PUT /api/v1/cloud/sessions/c1/github" in server.asked } }
             server.failures["PUT /api/v1/cloud/sessions/c1/github"] = 409 to "session_not_paused"
             click("cloud-session-github-none")
             waitFor("cloud-session-action-error")
