@@ -10,14 +10,22 @@ import run.ostrom.app.domain.models.CloudRepository
 import run.ostrom.app.domain.models.CloudSession
 import run.ostrom.app.domain.models.CloudSessionPage
 import run.ostrom.app.domain.models.CloudSessionRefusal
+import run.ostrom.app.domain.models.CloudSessionMode
 import run.ostrom.app.domain.models.CloudSessionStatus
 import run.ostrom.app.domain.models.GitHubAccess
+import run.ostrom.app.domain.models.InputReceipt
 import run.ostrom.app.domain.models.NewCloudSession
+import run.ostrom.app.domain.models.PermissionAnswer
+import run.ostrom.app.domain.models.SessionWaiting
 import run.ostrom.app.domain.repositories.CloudSessionRepository
+import run.ostrom.core.api.models.AnswerCloudPermissionRequest
 import run.ostrom.core.api.models.CloudAgentKind
+import run.ostrom.core.api.models.CloudInput
+import run.ostrom.core.api.models.CloudQuestionAnswer
 import run.ostrom.core.api.models.CloudEnvironment
 import run.ostrom.core.api.models.CloudSetup
 import run.ostrom.core.api.models.CreateCloudSessionRequest
+import run.ostrom.core.api.models.SendCloudMessageRequest
 import run.ostrom.core.client.OstromException
 import run.ostrom.core.api.models.CloudRepository as ApiCloudRepository
 import run.ostrom.core.api.models.CloudSession as ApiCloudSession
@@ -48,6 +56,35 @@ class RemoteCloudSessionRepository(private val calls: AccountCalls) : CloudSessi
 
     override suspend fun setGitHubAccess(accountId: String, sessionId: String, access: GitHubAccess): CloudSession =
         calls.withAccount(accountId, resource = true) { client -> refusals(githubAccess = true) { client.cloudSessions.setGitHubAccess(sessionId, access.wire).domain() } }
+
+    override suspend fun send(accountId: String, sessionId: String, text: String, clientMessageId: String): InputReceipt =
+        calls.withAccount(accountId, resource = true) { it.cloudMessages.send(sessionId, SendCloudMessageRequest(text, wake = true), idempotencyKey = clientMessageId).receipt() }
+
+    override suspend fun interrupt(accountId: String, sessionId: String): InputReceipt =
+        calls.withAccount(accountId, resource = true) { it.cloudMessages.interrupt(sessionId).receipt() }
+
+    override suspend fun answer(accountId: String, sessionId: String, answer: PermissionAnswer, idempotencyKey: String): InputReceipt =
+        calls.withAccount(accountId, resource = true) { client ->
+            val request = AnswerCloudPermissionRequest(
+                requestId = answer.requestId,
+                behavior = if (answer.allow) "allow" else "deny",
+                message = answer.message,
+                answers = answer.answers.takeIf { it.isNotEmpty() }?.map { CloudQuestionAnswer(it.question, it.options, it.text) },
+            )
+            client.cloudMessages.answerPermission(sessionId, request, idempotencyKey).receipt()
+        }
+
+    override suspend fun stopTask(accountId: String, sessionId: String, taskId: String): InputReceipt =
+        calls.withAccount(accountId, resource = true) { it.cloudMessages.stopTask(sessionId, taskId).receipt() }
+
+    override suspend fun setPermissionBypass(accountId: String, sessionId: String, enabled: Boolean): CloudSession =
+        calls.withAccount(accountId, resource = true) { it.cloudSessions.setPermissionBypass(sessionId, enabled).domain() }
+
+    override suspend fun setModel(accountId: String, sessionId: String, model: String): CloudSession =
+        calls.withAccount(accountId, resource = true) { it.cloudSessions.setModel(sessionId, model).domain() }
+
+    override suspend fun setEffort(accountId: String, sessionId: String, effort: String): CloudSession =
+        calls.withAccount(accountId, resource = true) { it.cloudSessions.setEffort(sessionId, effort).domain() }
 
     /** The refusals of an action, by their error key; the server's message is never read nor shown. */
     private suspend fun <T> refusals(creating: Boolean = false, githubAccess: Boolean = false, call: suspend () -> T): T = try {
@@ -109,7 +146,15 @@ internal fun ApiCloudSession.domain() = CloudSession(
     ownerId = owner,
     transferId = transferId,
     remote = kind == "remote",
+    mode = if (mode == CONVERSATION_MODE) CloudSessionMode.CONVERSATION else CloudSessionMode.TERMINAL,
+    effort = effort,
+    permissionBypass = permissionBypass == true,
+    waiting = waiting?.let { SessionWaiting(it.reason, it.requestId, millisOf(it.since)) },
 )
+
+private const val CONVERSATION_MODE = "conversation"
+
+internal fun CloudInput.receipt() = InputReceipt(id, status, woke, reason)
 
 internal fun NewCloudSession.request() = CreateCloudSessionRequest(
     agent = CloudAgentKind.entries.first { it.value == agent.wire },
@@ -118,6 +163,7 @@ internal fun NewCloudSession.request() = CreateCloudSessionRequest(
     ref = ref,
     prompt = prompt,
     name = name,
+    mode = if (mode == CloudSessionMode.CONVERSATION) CONVERSATION_MODE else null,
     environment = recipe?.let { recipe ->
         CloudEnvironment(
             repositories = recipe.repositories.map { ApiCloudRepository(it.url, it.path, it.ref, it.branch) },

@@ -65,6 +65,27 @@ object Features {
 
     /** Ownership transfers of cloud sessions: an owner's offer or an administrator's transfer, accept, decline and cancel. */
     const val RUNNERS_CLOUD_TRANSFER = "runners.cloud.transfer.v1"
+
+    /** A conversation session's transcript, messages and interrupt, and the `conversation` choice of a new cloud session. */
+    const val RUNNERS_CLOUD_CONVERSATION = "runners.cloud.conversation.v1"
+
+    /** A conversation session's permission requests: the permission cards. */
+    const val RUNNERS_CLOUD_PERMISSIONS = "runners.cloud.permissions.v1"
+
+    /** The owner's standing approval of tool uses: the cards' Bypass. */
+    const val RUNNERS_CLOUD_PERMISSIONS_BYPASS = "runners.cloud.permissions.bypass.v1"
+
+    /** The agent's background tasks and their stop: the subagents panel's commands and Stop. */
+    const val RUNNERS_CLOUD_TASKS = "runners.cloud.tasks.v1"
+
+    /** Each subagent's own feed and the subagent list: a subagent's thread and its real state. */
+    const val RUNNERS_CLOUD_TRANSCRIPT_FEEDS = "runners.cloud.transcript.feeds.v1"
+
+    /** The agent's model, changed while it runs: the model chip's picker. */
+    const val RUNNERS_CLOUD_MODEL = "runners.cloud.model.v1"
+
+    /** The agent's effort, changed while it runs: the effort chip's picker. */
+    const val RUNNERS_CLOUD_EFFORT = "runners.cloud.effort.v1"
 }
 
 /** Throws [AppException.UnsupportedApi] for a server that speaks another API version than this app. */

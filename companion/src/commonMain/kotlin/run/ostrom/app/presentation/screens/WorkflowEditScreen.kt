@@ -539,7 +539,7 @@ private fun Chips(content: @Composable () -> Unit) {
 
 /** One choice among several: the chosen one is outlined with the accent. */
 @Composable
-private fun ChoiceChip(text: String, selected: Boolean, onClick: () -> Unit, tag: String) {
+internal fun ChoiceChip(text: String, selected: Boolean, onClick: () -> Unit, tag: String) {
     val colors = Ostrom.colors
     Row(
         Modifier.heightIn(min = 36.dp).clip(Radii.control).background(if (selected) colors.panel else colors.panelAlt)

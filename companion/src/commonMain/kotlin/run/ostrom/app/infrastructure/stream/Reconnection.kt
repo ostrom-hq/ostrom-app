@@ -58,10 +58,13 @@ private fun monotonicMillis(): () -> Long {
  * reconnect after the policy's delay ([LiveUpdate.Reconnecting] says when); `DENIED` and every other refusal end the flow with an
  * [AppException] (a `401` or `DENIED` is [AppException.Unauthorized]); an unreadable event ends it too, since a
  * reconnection would replay it. [connect] keeps its own cursor so that each attempt resumes after the last item it
- * sent, and calls [StreamProgress.opened] once accepted and [StreamProgress.itemSent] after each item.
+ * sent, and calls [StreamProgress.opened] once accepted and [StreamProgress.itemSent] after each item. [resource] says
+ * whether the stream belongs to one resource (a session), whose `404` means it is gone, or to the caller (the feed); a
+ * resource's stream that ends ([StreamEnd.ENDED], TeamCode's transcript) emits [LiveUpdate.Ended] and completes.
  */
 internal fun <T> reconnecting(
     policy: ReconnectPolicy,
+    resource: Boolean = false,
     connect: suspend (send: suspend (LiveUpdate<T>) -> Unit, progress: StreamProgress) -> StreamEnd,
 ): Flow<LiveUpdate<T>> = channelFlow<Any> {
     var failures = 0
@@ -74,13 +77,16 @@ internal fun <T> reconnecting(
         openedAt = null
         var retryAfterSeconds: Long? = null
         try {
-            if (connect({ send(it) }, progress) == StreamEnd.DENIED) { send(Stop(AppException.Unauthorized())); return@channelFlow }
-            // ENDED: the organization's feed never ends by itself; were it to, it is resumed like a dropped connection,
-            // after the same delay, so a server that closes at once is not called in a loop.
+            when (connect({ send(it) }, progress)) {
+                StreamEnd.DENIED -> { send(Stop(AppException.Unauthorized())); return@channelFlow }
+                // The organization's feed never ends by itself; were it to, it is resumed like a dropped connection,
+                // after the same delay, so a server that closes at once is not called in a loop.
+                StreamEnd.ENDED -> if (resource) { send(LiveUpdate.Ended); return@channelFlow }
+            }
         } catch (error: CancellationException) {
             throw error
         } catch (error: Exception) {
-            if (!error.isTransient()) { send(Stop(error.translated())); return@channelFlow }
+            if (!error.isTransient()) { send(Stop(error.translated(resource))); return@channelFlow }
             retryAfterSeconds = (error as? OstromException)?.retryAfterSeconds
         }
         if (openedAt?.let { policy.now() - it >= policy.stableMillis } == true) failures = 0

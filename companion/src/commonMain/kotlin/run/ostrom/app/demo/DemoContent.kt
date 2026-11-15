@@ -37,8 +37,13 @@ object DemoContent {
     val features: Set<String> = setOf(
         Features.GATES, Features.WAITS, Features.RECEIPTS, Features.BUDGETS, Features.NOTIFICATIONS, Features.ARTIFACTS, Features.SESSIONS, Features.TODOS,
         Features.WORKFLOWS, Features.ENVIRONMENT, Features.MCP_PERSONAL, Features.RUNNERS_CLOUD, Features.RUNNERS_CLOUD_ENVIRONMENT,
-        Features.GITHUB_LINK, Features.RUNNERS_CLOUD_GITHUB,
+        Features.GITHUB_LINK, Features.RUNNERS_CLOUD_GITHUB, Features.RUNNERS_CLOUD_CONVERSATION, Features.RUNNERS_CLOUD_PERMISSIONS,
+        Features.RUNNERS_CLOUD_PERMISSIONS_BYPASS, Features.RUNNERS_CLOUD_TASKS, Features.RUNNERS_CLOUD_TRANSCRIPT_FEEDS, Features.RUNNERS_CLOUD_MODEL,
+        Features.RUNNERS_CLOUD_EFFORT,
     )
+
+    /** The demo member's id: the owner of the demo's conversation session. */
+    const val MEMBER_ID = "demo-member-ada"
 
     /**
      * The approvals inbox: a high-risk push and a low-risk tool waiting for Ada's yes, and a merge she approved. The
@@ -112,6 +117,7 @@ object DemoContent {
         organizationName = "Analytical Engines",
         serverVersion = SERVER_VERSION,
         method = SignInMethod.BROWSER,
+        memberId = MEMBER_ID,
     )
 }
 

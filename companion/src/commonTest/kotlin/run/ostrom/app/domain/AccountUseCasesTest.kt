@@ -61,6 +61,13 @@ class AccountUseCasesTest {
         assertEquals(ServerFeatures.RUNNERS_CLOUD, Features.RUNNERS_CLOUD)
         assertEquals(ServerFeatures.RUNNERS_CLOUD_ENVIRONMENT, Features.RUNNERS_CLOUD_ENVIRONMENT)
         assertEquals(ServerFeatures.RUNNERS_CLOUD_TRANSFER, Features.RUNNERS_CLOUD_TRANSFER)
+        assertEquals(ServerFeatures.RUNNERS_CLOUD_CONVERSATION, Features.RUNNERS_CLOUD_CONVERSATION)
+        assertEquals(ServerFeatures.RUNNERS_CLOUD_PERMISSIONS, Features.RUNNERS_CLOUD_PERMISSIONS)
+        assertEquals(ServerFeatures.RUNNERS_CLOUD_PERMISSIONS_BYPASS, Features.RUNNERS_CLOUD_PERMISSIONS_BYPASS)
+        assertEquals(ServerFeatures.RUNNERS_CLOUD_TASKS, Features.RUNNERS_CLOUD_TASKS)
+        assertEquals(ServerFeatures.RUNNERS_CLOUD_TRANSCRIPT_FEEDS, Features.RUNNERS_CLOUD_TRANSCRIPT_FEEDS)
+        assertEquals(ServerFeatures.RUNNERS_CLOUD_MODEL, Features.RUNNERS_CLOUD_MODEL)
+        assertEquals(ServerFeatures.RUNNERS_CLOUD_EFFORT, Features.RUNNERS_CLOUD_EFFORT)
         requireSupportedApi(Features.SUPPORTED_API_VERSION)
         assertFailsWith<AppException.UnsupportedApi> { requireSupportedApi(Features.SUPPORTED_API_VERSION + 1) }
     }

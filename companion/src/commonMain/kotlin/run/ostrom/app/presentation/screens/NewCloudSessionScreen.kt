@@ -60,6 +60,8 @@ import run.ostrom.app.resources.cloud_agent_gemini
 import run.ostrom.app.resources.cloud_agent_opencode
 import run.ostrom.app.resources.cloud_agent_shell
 import run.ostrom.app.resources.cloud_new_agent
+import run.ostrom.app.resources.cloud_new_conversation
+import run.ostrom.app.resources.cloud_new_conversation_hint
 import run.ostrom.app.resources.cloud_new_email_domain
 import run.ostrom.app.resources.cloud_new_email_domain_hint
 import run.ostrom.app.resources.cloud_new_model
@@ -123,6 +125,15 @@ fun NewCloudSessionScreen(
                     CloudAgent.entries.map { it to agentWords(it) }, state.agent, viewModel::onAgent, Modifier.fillMaxWidth(),
                     tag = { "cloud-new-agent-${it.wire}" }, scrollable = true,
                 )
+                if (state.conversationOffered) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Column(Modifier.weight(1f)) {
+                            Text(stringResource(Res.string.cloud_new_conversation), color = colors.text, fontSize = 14.sp)
+                            Text(stringResource(Res.string.cloud_new_conversation_hint), style = MetaStyle, color = colors.muted)
+                        }
+                        Switch(state.conversation, viewModel::onConversation, modifier = Modifier.testTag("cloud-new-conversation"))
+                    }
+                }
                 AppTextField(state.name, { viewModel.onField(CloudField.NAME, it) }, Modifier.fillMaxWidth(), label = stringResource(Res.string.cloud_new_name), tag = "cloud-new-name")
                 AppTextField(state.model, { viewModel.onField(CloudField.MODEL, it) }, Modifier.fillMaxWidth(), label = stringResource(Res.string.cloud_new_model), mono = true,
                     tag = "cloud-new-model")

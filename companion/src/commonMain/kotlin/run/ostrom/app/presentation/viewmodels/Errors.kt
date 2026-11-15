@@ -18,6 +18,9 @@ import run.ostrom.app.resources.Res
 import run.ostrom.app.resources.error_check_input
 import run.ostrom.app.resources.error_cloud_cluster_unavailable
 import run.ostrom.app.resources.error_cloud_email_domain
+import run.ostrom.app.resources.error_cloud_effort
+import run.ostrom.app.resources.error_cloud_message
+import run.ostrom.app.resources.error_cloud_model
 import run.ostrom.app.resources.error_cloud_forbidden
 import run.ostrom.app.resources.error_cloud_invalid
 import run.ostrom.app.resources.error_cloud_name
@@ -170,6 +173,9 @@ private fun AppException.sentence(): Pair<StringResource, List<Any>> = when (thi
         CloudSessionProblem.TOO_MANY -> Res.string.error_cloud_too_many
         CloudSessionProblem.VARIABLES -> Res.string.error_cloud_variables
         CloudSessionProblem.EMAIL_DOMAIN -> Res.string.error_cloud_email_domain
+        CloudSessionProblem.MESSAGE -> Res.string.error_cloud_message
+        CloudSessionProblem.MODEL -> Res.string.error_cloud_model
+        CloudSessionProblem.EFFORT -> Res.string.error_cloud_effort
     } to emptyList()
     is AppException.LinkRefused -> when (reason) {
         LinkRefusal.NOT_AN_ARTIFACT -> Res.string.error_link_not_artifact

@@ -121,6 +121,8 @@ class FollowWaitsUseCase(private val feed: OrgFeed, private val features: Featur
                 // The feed carries every type the app reads: the waits keep theirs.
                 is LiveUpdate.Item -> if (update.value.type in OrgChange.WAIT_TYPES) emit(WaitsSignal.Reload)
                 is LiveUpdate.Reconnecting -> emit(WaitsSignal.Connection(reconnecting = true))
+                // The org feed never ends.
+                LiveUpdate.Ended -> Unit
             }
         }
     })

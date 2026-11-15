@@ -8,6 +8,7 @@ import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import run.ostrom.app.ConversationCalls
 import run.ostrom.app.FakeFeatures
 import run.ostrom.app.domain.cloudSession
 import run.ostrom.app.domain.models.AppException
@@ -18,7 +19,6 @@ import run.ostrom.app.domain.models.CloudSessionStatus
 import run.ostrom.app.domain.models.Features
 import run.ostrom.app.domain.models.GitHubAccess
 import run.ostrom.app.domain.models.NewCloudSession
-import run.ostrom.app.domain.repositories.CloudSessionRepository
 import run.ostrom.app.domain.usecases.sessions.CloudSessionAccess
 import run.ostrom.app.domain.usecases.sessions.ControlCloudSessionUseCase
 import run.ostrom.app.domain.usecases.sessions.GetCloudSessionUseCase
@@ -45,8 +45,8 @@ class CloudSessionGitHubAccessTest {
 
     @AfterTest fun tearDown() = Dispatchers.resetMain()
 
-    private class Fake(var session: CloudSession) : CloudSessionRepository {
-        val calls = mutableListOf<String>()
+    private class Fake(var session: CloudSession) : ConversationCalls() {
+        override fun current(sessionId: String) = session
         var refusal: CloudSessionRefusal? = null
         override suspend fun sessions(accountId: String, before: String?) = CloudSessionPage(listOf(session), null)
         override suspend fun session(accountId: String, sessionId: String) = session
