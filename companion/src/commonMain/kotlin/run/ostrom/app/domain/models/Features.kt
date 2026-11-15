@@ -62,6 +62,9 @@ object Features {
 
     /** A cloud session's GitHub access (`owner`, `shared`, `none`): the choice on its record. */
     const val RUNNERS_CLOUD_GITHUB = "runners.cloud.github.v1"
+
+    /** Ownership transfers of cloud sessions: an owner's offer or an administrator's transfer, accept, decline and cancel. */
+    const val RUNNERS_CLOUD_TRANSFER = "runners.cloud.transfer.v1"
 }
 
 /** Throws [AppException.UnsupportedApi] for a server that speaks another API version than this app. */

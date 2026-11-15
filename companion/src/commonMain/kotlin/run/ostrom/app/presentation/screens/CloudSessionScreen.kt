@@ -41,6 +41,7 @@ import org.jetbrains.compose.resources.stringResource
 import run.ostrom.app.domain.models.CloudFailure
 import run.ostrom.app.domain.models.CloudRecipe
 import run.ostrom.app.domain.models.CloudSession
+import run.ostrom.app.domain.models.CloudSessionStatus
 import run.ostrom.app.domain.models.GitHubAccess
 import run.ostrom.app.domain.models.visibleCode
 import run.ostrom.app.presentation.components.AppButton
@@ -108,6 +109,7 @@ import run.ostrom.app.resources.cloud_session_refresh
 import run.ostrom.app.resources.cloud_session_repo_ref
 import run.ostrom.app.resources.cloud_session_restricted
 import run.ostrom.app.resources.cloud_session_title
+import run.ostrom.app.resources.cloud_session_transferring
 import run.ostrom.app.resources.cloud_stop
 import run.ostrom.app.resources.cloud_stop_body
 import run.ostrom.app.resources.cloud_stop_keep
@@ -120,7 +122,13 @@ import run.ostrom.app.resources.sessions_title
  * (confirmed first), each followed by a fresh read. Its transcript and terminal are not served to the app.
  */
 @Composable
-fun CloudSessionScreen(viewModel: CloudSessionViewModel, onBack: (() -> Unit)?, backLabel: String = stringResource(Res.string.sessions_title)) {
+fun CloudSessionScreen(
+    viewModel: CloudSessionViewModel,
+    onBack: (() -> Unit)?,
+    backLabel: String = stringResource(Res.string.sessions_title),
+    /** More actions of the loaded session (the transfer one, shown when the member may give it away). */
+    extraActions: @Composable (CloudSession) -> Unit = {},
+) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     // Read at each return: the server publishes no cloud session event.
     LifecycleStartEffect(viewModel) {
@@ -155,7 +163,8 @@ fun CloudSessionScreen(viewModel: CloudSessionViewModel, onBack: (() -> Unit)?, 
                     Banner(stringResource(Res.string.cloud_session_preparing, phaseWords(session.preparationPhase)), Tone.NEUTRAL, Modifier.testTag("cloud-session-phase"))
                 }
                 session.failure?.let { FailureBanner(it, session.canResume) }
-                Actions(session, state.acting, onPause = viewModel::pause, onResume = viewModel::resume, onStop = { confirmStop = true })
+                if (session.status == CloudSessionStatus.TRANSFERRING) Banner(stringResource(Res.string.cloud_session_transferring), Tone.NEUTRAL, Modifier.testTag("cloud-session-transferring"))
+                Actions(session, state.acting, onPause = viewModel::pause, onResume = viewModel::resume, onStop = { confirmStop = true }, extra = { extraActions(session) })
                 if (state.canChooseAccess) GitHubAccessChoice(session.githubAccess, state.settingAccess, onChoose = viewModel::chooseGitHubAccess)
                 session.recipe?.takeIf { !it.empty }?.let { Recipe(it) }
                 Text(stringResource(Res.string.cloud_session_not_served), style = MetaStyle, color = colors.muted)
@@ -233,8 +242,7 @@ private fun FailureBanner(failure: CloudFailure, resumable: Boolean) {
 private val PAUSES = setOf("idle_timeout", "max_duration", "hours_exhausted")
 
 @Composable
-private fun Actions(session: CloudSession, acting: CloudAction?, onPause: () -> Unit, onResume: () -> Unit, onStop: () -> Unit) {
-    if (!session.canPause && !session.canResume && !session.canStop) return
+private fun Actions(session: CloudSession, acting: CloudAction?, onPause: () -> Unit, onResume: () -> Unit, onStop: () -> Unit, extra: @Composable () -> Unit) {
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         if (session.canResume) {
             AppButton(stringResource(Res.string.cloud_resume), onClick = onResume, small = true, fill = false, icon = PhosphorIcons.Regular.Play, enabled = acting == null,
@@ -248,6 +256,7 @@ private fun Actions(session: CloudSession, acting: CloudAction?, onPause: () -> 
             AppButton(stringResource(Res.string.cloud_stop), onClick = onStop, kind = ButtonKind.DANGER, small = true, fill = false, enabled = acting == null,
                 busy = acting == CloudAction.STOP, modifier = Modifier.testTag("cloud-session-stop"))
         }
+        extra()
     }
 }
 

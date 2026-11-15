@@ -106,6 +106,9 @@ internal fun ApiCloudSession.domain() = CloudSession(
         )
     },
     githubAccess = GitHubAccess.of(githubAccess),
+    ownerId = owner,
+    transferId = transferId,
+    remote = kind == "remote",
 )
 
 internal fun NewCloudSession.request() = CreateCloudSessionRequest(

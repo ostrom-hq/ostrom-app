@@ -11,9 +11,16 @@ import run.ostrom.app.domain.models.CloudSession
 import run.ostrom.app.domain.models.CloudSessionPage
 import run.ostrom.app.domain.models.CloudSessionRefusal
 import run.ostrom.app.domain.models.CloudSessionStatus
+import run.ostrom.app.domain.models.Features
 import run.ostrom.app.domain.models.GitHubAccess
 import run.ostrom.app.domain.models.NewCloudSession
+import run.ostrom.app.domain.models.SessionTransfer
+import run.ostrom.app.domain.models.TeamMember
+import run.ostrom.app.domain.models.TransferDirection
+import run.ostrom.app.domain.models.TransferPage
+import run.ostrom.app.domain.models.TransferRequest
 import run.ostrom.app.domain.repositories.CloudSessionRepository
+import run.ostrom.app.domain.repositories.TransferRepository
 import run.ostrom.app.domain.services.Clock
 
 private const val MINUTE = 60_000L
@@ -128,4 +135,27 @@ class DemoAwareCloudSessionRepository(private val real: CloudSessionRepository, 
     override suspend fun resume(accountId: String, sessionId: String) = of(accountId).resume(accountId, sessionId)
     override suspend fun stop(accountId: String, sessionId: String) = of(accountId).stop(accountId, sessionId)
     override suspend fun setGitHubAccess(accountId: String, sessionId: String, access: GitHubAccess) = of(accountId).setGitHubAccess(accountId, sessionId, access)
+}
+
+/** The demo has no team to transfer sessions to (it announces no transfers), so its screens stay quiet. */
+object DemoTransferRepository : TransferRepository {
+    override suspend fun transfer(accountId: String, sessionId: String, request: TransferRequest, idempotencyKey: String): SessionTransfer =
+        throw AppException.Unsupported(Features.RUNNERS_CLOUD_TRANSFER)
+    override suspend fun transfers(accountId: String, direction: TransferDirection, before: String?) = TransferPage(emptyList(), null)
+    override suspend fun accept(accountId: String, transferId: String, resume: Boolean?): SessionTransfer = throw AppException.NotFound()
+    override suspend fun decline(accountId: String, transferId: String): SessionTransfer = throw AppException.NotFound()
+    override suspend fun cancel(accountId: String, transferId: String): SessionTransfer = throw AppException.NotFound()
+    override suspend fun recipients(accountId: String): List<TeamMember> = emptyList()
+}
+
+/** The demo account's transfers (none) from memory, every other account's from its server. */
+class DemoAwareTransferRepository(private val real: TransferRepository, private val demo: TransferRepository) : TransferRepository {
+    private fun of(accountId: String) = if (isDemo(accountId)) demo else real
+    override suspend fun transfer(accountId: String, sessionId: String, request: TransferRequest, idempotencyKey: String) =
+        of(accountId).transfer(accountId, sessionId, request, idempotencyKey)
+    override suspend fun transfers(accountId: String, direction: TransferDirection, before: String?) = of(accountId).transfers(accountId, direction, before)
+    override suspend fun accept(accountId: String, transferId: String, resume: Boolean?) = of(accountId).accept(accountId, transferId, resume)
+    override suspend fun decline(accountId: String, transferId: String) = of(accountId).decline(accountId, transferId)
+    override suspend fun cancel(accountId: String, transferId: String) = of(accountId).cancel(accountId, transferId)
+    override suspend fun recipients(accountId: String) = of(accountId).recipients(accountId)
 }

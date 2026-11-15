@@ -39,10 +39,14 @@ import run.ostrom.app.presentation.components.Banner
 import run.ostrom.app.presentation.components.ButtonKind
 import run.ostrom.app.presentation.components.LocalWideLayout
 import run.ostrom.app.presentation.components.SheetHeader
+import run.ostrom.app.presentation.components.SheetViewModels
+import run.ostrom.app.presentation.components.TransferButton
 import run.ostrom.app.presentation.components.Tone
 import run.ostrom.app.presentation.screens.AddServerScreen
 import run.ostrom.app.presentation.screens.ArtifactScreen
 import run.ostrom.app.presentation.screens.CloudSessionScreen
+import run.ostrom.app.presentation.screens.TransferSheet
+import run.ostrom.app.presentation.screens.TransfersScreen
 import run.ostrom.app.presentation.screens.LoginScreen
 import run.ostrom.app.presentation.screens.MainScreen
 import run.ostrom.app.presentation.screens.MainTab
@@ -62,6 +66,8 @@ import run.ostrom.app.presentation.screens.WorkflowStartScreen
 import run.ostrom.app.presentation.viewmodels.ArtifactLinkOutcome
 import run.ostrom.app.presentation.viewmodels.ArtifactViewModel
 import run.ostrom.app.presentation.viewmodels.CloudSessionViewModel
+import run.ostrom.app.presentation.viewmodels.TransferViewModel
+import run.ostrom.app.presentation.viewmodels.TransfersViewModel
 import run.ostrom.app.presentation.viewmodels.Failure
 import run.ostrom.app.presentation.viewmodels.GitHubLinkViewModel
 import run.ostrom.app.presentation.viewmodels.MemberEnvironmentViewModel
@@ -198,6 +204,7 @@ fun OstromNavHost(rootViewModel: RootViewModel = koinViewModel(), unlock: PhoneU
                 onOpenSession = { accountId, sessionId -> navController.navigate(SessionRoute(accountId, sessionId)) },
                 onOpenCloudSession = { accountId, sessionId -> navController.navigate(CloudSessionRoute(accountId, sessionId)) },
                 onNewCloudSession = { accountId -> navController.navigate(NewCloudSessionRoute(accountId)) },
+                onOpenTransfers = { accountId -> navController.navigate(TransfersRoute(accountId)) },
                 onOpenWorkflow = { accountId, workflowId -> navController.navigate(WorkflowRoute(accountId, workflowId)) },
                 onNewWorkflow = { accountId -> navController.navigate(WorkflowEditRoute(accountId)) },
                 onOpenRun = { accountId, runId -> navController.navigate(WorkflowRunRoute(accountId, runId)) },
@@ -284,8 +291,23 @@ fun OstromNavHost(rootViewModel: RootViewModel = koinViewModel(), unlock: PhoneU
             )
         }
         composable<CloudSessionRoute> { entry ->
-            val viewModel: CloudSessionViewModel = koinViewModel { parametersOf(entry.toRoute<CloudSessionRoute>()) }
-            CloudSessionScreen(viewModel, onBack = { navController.popBackStack() })
+            val route = entry.toRoute<CloudSessionRoute>()
+            val viewModel: CloudSessionViewModel = koinViewModel { parametersOf(route) }
+            var transferring by remember { mutableStateOf<TransferRoute?>(null) }
+            CloudSessionScreen(viewModel, onBack = { navController.popBackStack() }, extraActions = { session ->
+                TransferButton(route.accountId, session) { session.ownerId?.let { transferring = TransferRoute(route.accountId, session.id, it) } }
+            })
+            transferring?.let { transfer ->
+                SheetViewModels {
+                    val sheet: TransferViewModel = koinViewModel { parametersOf(transfer) }
+                    TransferSheet(sheet, onDismiss = { transferring = null })
+                }
+            }
+        }
+        composable<TransfersRoute> { entry ->
+            val route = entry.toRoute<TransfersRoute>()
+            val viewModel: TransfersViewModel = koinViewModel { parametersOf(route) }
+            TransfersScreen(viewModel, onBack = { navController.popBackStack() }, onOpenSession = { navController.navigate(CloudSessionRoute(route.accountId, it)) })
         }
         composable<NewCloudSessionRoute> { entry ->
             val route = entry.toRoute<NewCloudSessionRoute>()

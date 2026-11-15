@@ -9,6 +9,9 @@ enum class CloudSessionStatus(val wire: String) {
     PAUSING("pausing"),
     PAUSED("paused"),
     RESUMING("resuming"),
+
+    /** An accepted transfer is changing the owner at a paused boundary (`runners.cloud.transfer.v1`). */
+    TRANSFERRING("transferring"),
     TERMINATED("terminated"),
     FAILED("failed"),
     UNKNOWN("unknown"),
@@ -98,6 +101,12 @@ data class CloudSession(
     val recipe: CloudRecipe?,
     /** Whose GitHub access it uses (`runners.cloud.github.v1`); null when the server does not say or says something new. */
     val githubAccess: GitHubAccess? = null,
+    /** The member who owns it (`runners.cloud.transfer.v1`); null when the server does not say. */
+    val ownerId: String? = null,
+    /** The accepted transfer the session is moving toward; null when none. */
+    val transferId: String? = null,
+    /** A session on a member's device (`runners.cloud.remote.v1`): it is never transferred, its files stay there. */
+    val remote: Boolean = false,
 ) {
     /** Creating or resuming: the runner prepares the workspace, and [phase] says which step. */
     val preparing: Boolean get() = status == CloudSessionStatus.CREATING || status == CloudSessionStatus.RESUMING

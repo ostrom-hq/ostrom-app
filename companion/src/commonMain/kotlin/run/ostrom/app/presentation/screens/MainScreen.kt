@@ -144,6 +144,7 @@ fun MainScreen(
     onOpenSession: (accountId: String, sessionId: String) -> Unit = { _, _ -> },
     onOpenCloudSession: (accountId: String, sessionId: String) -> Unit = { _, _ -> },
     onNewCloudSession: (accountId: String) -> Unit = {},
+    onOpenTransfers: (accountId: String) -> Unit = {},
     onOpenWorkflow: (accountId: String, workflowId: String) -> Unit = { _, _ -> },
     onNewWorkflow: (accountId: String) -> Unit = {},
     onOpenRun: (accountId: String, runId: String) -> Unit = { _, _ -> },
@@ -222,7 +223,7 @@ fun MainScreen(
                         MainTab.INBOX -> InboxScreen(onOpen = onOpenRequest, onOpenSettings = { selected = MainTab.SETTINGS })
                         MainTab.WAITING -> WaitsScreen(waits)
                         MainTab.SESSIONS -> SessionsTab(state.serves(Features.SESSIONS), state.serves(Features.RUNNERS_CLOUD), onOpenSession = onOpenSession,
-                            onOpenCloudSession = onOpenCloudSession, onNewCloudSession = onNewCloudSession)
+                            onOpenCloudSession = onOpenCloudSession, onNewCloudSession = onNewCloudSession, onOpenTransfers = onOpenTransfers)
                         MainTab.HISTORY -> HistoryScreen()
                         MainTab.SPENDING -> SpendingScreen()
                         MainTab.ACTIVITY -> ActivityScreen(onOpen = if (state.serves(Features.GATES)) onOpenRequest else null)
