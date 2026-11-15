@@ -17,7 +17,7 @@ on:
         default: ''
         type: string
       require_signing:
-        description: 'Fail when the macOS Developer ID secrets are missing (set it for a real release)'
+        description: 'Fail when the macOS Developer ID secrets are missing (always on with release_tag)'
         required: false
         default: false
         type: boolean
@@ -30,8 +30,34 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Fails before the long builds when the version is wrong or the release to attach to is not there.
+  check:
+    name: check the inputs
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      VERSION: ${{ inputs.version }}
+      TAG: ${{ inputs.release_tag }}
+    steps:
+      - name: Check the version and the release
+        run: |
+          if ! [[ "$VERSION" =~ ^[1-9][0-9]*\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::version must be MAJOR.MINOR.PATCH with a major of 1 or later, got '$VERSION'."
+            exit 1
+          fi
+          [ -z "$TAG" ] && exit 0
+          if [ "$TAG" != "$VERSION" ]; then
+            echo "::error::release_tag '$TAG' must be the version '$VERSION' (tags carry no v)."
+            exit 1
+          fi
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" > /dev/null || { echo "::error::No release '$TAG' to attach to: create it first."; exit 1; }
+
   desktop:
     name: desktop (${{ matrix.target }})
+    needs: [check]
     timeout-minutes: 60
     strategy:
       fail-fast: false
@@ -54,12 +80,6 @@ jobs:
       run:
         shell: bash
     steps:
-      - name: Check the version
-        run: |
-          if ! [[ "$VERSION" =~ ^[1-9][0-9]*\.[0-9]+\.[0-9]+$ ]]; then
-            echo "::error::version must be MAJOR.MINOR.PATCH with a major of 1 or later, got '$VERSION'."
-            exit 1
-          fi
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -92,7 +112,8 @@ jobs:
           NOTARY_KEY_ID: ${{ secrets.OSTROM_NOTARY_KEY_ID }}
           NOTARY_ISSUER_ID: ${{ secrets.OSTROM_NOTARY_ISSUER_ID }}
           TEAM_ID: ${{ vars.OSTROM_MACOS_TEAM_ID }}
-          REQUIRE_SIGNING: ${{ inputs.require_signing }}
+          # Attaching to a release always requires signing.
+          REQUIRE_SIGNING: ${{ inputs.require_signing || inputs.release_tag != '' }}
         run: |
           present=0
           for value in "$CERTIFICATE_P12" "$CERTIFICATE_PASSWORD" "$NOTARY_KEY" "$NOTARY_KEY_ID" "$NOTARY_ISSUER_ID" "$TEAM_ID"; do
