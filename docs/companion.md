@@ -240,7 +240,7 @@ ostrom-core's `client.githubLink`. The capability is read again from the server 
   failure says why with the CLI's last lines and offers to try again. A version closed with "Not now" does not show
   again; a newer one does. The CLI is found where its installers put it (`$OSTROM_INSTALL_DIR`, else `~/.ostrom/bin`;
   Homebrew's and Scoop's folders), then on the `PATH`, the login shell's included. The app only runs the CLI: it
-  never downloads or verifies a release itself, and it does not update itself (no desktop release is published yet).
+  never downloads or verifies a release itself, and it does not update itself (no desktop release is published yet; the installers are built by hand, see [distribution](distribution.md)).
 
 ## Tests
 
@@ -287,6 +287,6 @@ What the React Native app did, what TeamCode's companion does that an Ostrom ser
 | Cloud sessions: list, record (status, repository or recipe, times, limits, the preparation step, why it failed), pause, resume, stop, new cloud session with its recipe | `runners.cloud.v1`, `runners.cloud.environment.v1` | Ported from TeamCode's `SessionsScreen`, `SessionScreen`, `NewSessionSheet` and their view models (see [Cloud sessions](#cloud-sessions)). No transcript, no messages, no terminal: the server serves none of them to the app |
 | GitHub link: the member's link (not linked, linked, reconnect), linking with the device flow, unlinking; a cloud session's GitHub access (mine, shared, none) | `github.link.v1`, `runners.cloud.github.v1` | Ported from TeamCode's `GitHubLinkScreen` and view model (see [GitHub link](#github-link)); the access switch on a cloud session's record is Ostrom's own (TeamCode has none). Not in the app: other members' links (owners and admins) |
 | Automations, team MCP servers, sharing | `automations.v1`, `mcp.v1`, `sharing.v1` | Later, each with its client routes in ostrom-core |
-| Desktop: menu bar icon, the CLI's account, update banner | none | Ported (see [Desktop](#desktop)). Left: tray notifications of new waits and approvals while the window is hidden (no use case emits them across accounts yet), making an app sign-in the CLI's (it would write the CLI's secret store), the CLI's account on Windows, an install button when no CLI is found, the app's own update (no desktop release), installer icons for macOS and Windows |
+| Desktop: menu bar icon, the CLI's account, update banner | none | Ported (see [Desktop](#desktop)). Left: tray notifications of new waits and approvals while the window is hidden (no use case emits them across accounts yet), making an app sign-in the CLI's (it would write the CLI's secret store), the CLI's account on Windows, an install button when no CLI is found, the app's own update (no desktop release) |
 | Store builds (TestFlight, Play internal track) | none | Ported: TeamCode's fastlane lanes as is ([distribution.md](distribution.md)) |
-| Desktop distribution (signed installers) | none | With 1.0.0 and a Developer ID ([distribution.md](distribution.md)) |
+| Desktop distribution (signed installers) | none | Ported: the `release-desktop.yml` workflow builds DMG, MSI, DEB and RPM (1.0.0 or later), signed and notarized with a Developer ID once the secrets exist ([distribution.md](distribution.md)); unsigned without them |

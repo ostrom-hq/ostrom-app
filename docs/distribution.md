@@ -57,10 +57,39 @@ lane refuses to run. CI builds the debug APK only.
 | iOS | Simulator build, `CODE_SIGNING_ALLOWED=NO` | `ios` job on `main` |
 | macOS, Linux, Windows | Runnable jar of each system (`packageUberJarForCurrentOS`) | `desktop` jobs on `main`, artifacts `ostrom-desktop-<system>` |
 
-## Desktop, later
+## Desktop installers
 
-The desktop app's bundle identifier is `run.ostrom.app.desktop`, and Windows uses a fixed upgrade code. Installers (DMG,
-MSI, DEB, RPM) refuse a 0.x version, so they come with 1.0.0. Signing and notarizing the macOS app will follow
-TeamCode's `build.yml`. It will need `OSTROM_MACOS_CERTIFICATE_P12`, `OSTROM_MACOS_CERTIFICATE_PASSWORD`,
-`OSTROM_NOTARY_KEY`, `OSTROM_NOTARY_KEY_ID`, `OSTROM_NOTARY_ISSUER_ID` and the variable `OSTROM_MACOS_TEAM_ID`. Windows
-installers stay unsigned, as TeamCode's.
+Ported from the `desktop` job of TeamCode's `build.yml` and its `companion-desktop/build.gradle.kts`. The workflow
+`release-desktop.yml` is started by hand (`workflow_dispatch`) with a `version` (MAJOR.MINOR.PATCH, 1.0.0 or later:
+DMG, MSI, DEB and RPM installers refuse a 0.x). It builds on four runners and uploads one workflow artifact per target
+(`ostrom-desktop-<target>`, kept 14 days), and nothing more unless asked:
+
+| Target | Runner | Files (`ostrom-desktop-<version>-<target>.*`) |
+| --- | --- | --- |
+| `macos-arm64` | `macos-latest` | `.zip` (the `.app`), `.dmg` |
+| `windows-x64` | `windows-latest` | `.msi` (per user, no administrator rights) |
+| `linux-x64`, `linux-arm64` | `ubuntu-24.04`, `ubuntu-24.04-arm` | `.tar.gz` (the app folder), `.deb`, `.rpm` |
+
+Each target also has a `SHA256SUMS-<target>` file. With `release_tag` set to an **existing** release, the `attach` job
+uploads the files and one `SHA256SUMS-desktop` to it; it never creates or publishes a release. Not ported, because
+Ostrom's release has no CLI manifest yet: TeamCode's signed `desktop-manifest.json` and the CLI's `ui` install command.
+
+**Signing and notarization (macOS).** Without the secrets below the macOS build is unsigned (Gatekeeper warns), which is
+what a validation run wants. Set `require_signing` for a real release: the job then fails unless every secret exists.
+With them, the job imports the Developer ID into a temporary keychain, `companion-desktop` signs the app (and the native
+library inside the keyring's jar, as TeamCode does), `scripts/notarize-macos.sh` notarizes the app and the DMG with
+`notarytool` and staples them, with retries on Apple's service failures, then the temporary keychain is deleted.
+Windows installers are not signed (no paid signing service): SmartScreen warns on first launch.
+
+| Name | Kind | Content |
+| --- | --- | --- |
+| `OSTROM_MACOS_CERTIFICATE_P12` | secret | the "Developer ID Application" certificate with its private key, a `.p12` encoded in base64 |
+| `OSTROM_MACOS_CERTIFICATE_PASSWORD` | secret | the `.p12` password |
+| `OSTROM_NOTARY_KEY` | secret | the App Store Connect API key (`.p8`) used by `notarytool`, as text |
+| `OSTROM_NOTARY_KEY_ID` | secret | that key's ID |
+| `OSTROM_NOTARY_ISSUER_ID` | secret | the issuer ID of the App Store Connect team |
+| `OSTROM_MACOS_TEAM_ID` | variable | the Apple Team ID (`Z8T3MHFW48`), public |
+
+The build reads `OSTROM_MACOS_SIGNING_IDENTITY` and `OSTROM_MACOS_SIGNING_KEYCHAIN` (set by the job) to sign, and
+`OSTROM_NOTARIZATION_APPLE_ID` / `_PASSWORD` / `_TEAM_ID` to let Gradle notarize on a Mac without the job (not used by
+the workflow). Icons are in `companion-desktop/icons/`, made from the phones' icon (the macOS shape for the `.icns`).
