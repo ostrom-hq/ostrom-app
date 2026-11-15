@@ -75,6 +75,7 @@ import run.ostrom.app.domain.usecases.sessions.ControlConversationUseCase
 import run.ostrom.app.presentation.components.AppButton
 import run.ostrom.app.presentation.components.AppIconButton
 import run.ostrom.app.presentation.components.AppTextField
+import run.ostrom.app.presentation.components.AttachButton
 import run.ostrom.app.presentation.components.Banner
 import run.ostrom.app.presentation.components.BusyRow
 import run.ostrom.app.presentation.components.ButtonKind
@@ -83,9 +84,14 @@ import run.ostrom.app.presentation.components.ConfirmingLinks
 import run.ostrom.app.presentation.components.Dot
 import run.ostrom.app.presentation.components.IconButtonKind
 import run.ostrom.app.presentation.components.LinkButton
+import run.ostrom.app.presentation.components.MessageFiles
 import run.ostrom.app.presentation.components.NavBar
+import run.ostrom.app.presentation.components.PendingFileChips
 import run.ostrom.app.presentation.components.Tone
 import run.ostrom.app.presentation.components.dismissKeyboardOnTap
+import run.ostrom.app.presentation.components.fileProblemText
+import run.ostrom.app.presentation.files.FileDropArea
+import run.ostrom.app.presentation.files.rememberFilePicker
 import run.ostrom.app.presentation.theme.MetaStyle
 import run.ostrom.app.presentation.theme.Ostrom
 import run.ostrom.app.presentation.theme.Radii
@@ -113,9 +119,17 @@ import run.ostrom.app.resources.composer_ended
 import run.ostrom.app.resources.composer_hint
 import run.ostrom.app.resources.composer_send
 import run.ostrom.app.resources.conversation_bypass_off
+import run.ostrom.app.resources.conversation_ended
 import run.ostrom.app.resources.conversation_interrupt
 import run.ostrom.app.resources.error_cloud_effort
 import run.ostrom.app.resources.error_cloud_model
+import run.ostrom.app.resources.files_dismiss
+import run.ostrom.app.resources.files_drop
+import run.ostrom.app.resources.files_not_ready
+import run.ostrom.app.resources.message_files_invalid
+import run.ostrom.app.resources.message_files_too_large
+import run.ostrom.app.resources.message_files_unavailable
+import run.ostrom.app.resources.message_files_unsupported
 import run.ostrom.app.resources.notice_nothing_running
 import run.ostrom.app.resources.notice_permission_answered
 import run.ostrom.app.resources.notice_permission_denied
@@ -140,7 +154,6 @@ import run.ostrom.app.resources.session_effort_default
 import run.ostrom.app.resources.session_effort_hint
 import run.ostrom.app.resources.session_effort_title
 import run.ostrom.app.resources.session_empty
-import run.ostrom.app.resources.conversation_ended
 import run.ostrom.app.resources.session_live
 import run.ostrom.app.resources.session_load_older
 import run.ostrom.app.resources.session_model_apply
@@ -202,6 +215,8 @@ internal fun ConversationScreen(
     }
     val today = localEpochDay(now)
     val backToMain = stringResource(Res.string.subagents_back_to_main)
+    // Files dragged onto the screen (the desktop) go the way of the paperclip's, while it takes them.
+    FileDropArea(enabled = messaging && state.files.canAttach, onDropped = viewModel::attach, modifier = Modifier.fillMaxSize()) { dropping ->
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize().background(colors.background).dismissKeyboardOnTap().testTag("conversation")) {
             NavBar(backLabel, onBack, title) {
@@ -261,6 +276,18 @@ internal fun ConversationScreen(
                 ?: work.subagents.firstOrNull { it.taskId == taskId }?.let { "${it.type}: ${it.description}" } ?: taskId
             StopTaskDialog(name, onConfirm = viewModel::confirmStop, onDismiss = viewModel::cancelStop)
         }
+        if (dropping) DropHint()
+    }
+    }
+}
+
+/** Over the conversation while files are dragged onto it. */
+@Composable
+private fun DropHint() {
+    val colors = Ostrom.colors
+    Box(Modifier.fillMaxSize().background(colors.shade).padding(24.dp).testTag("drop-files"), contentAlignment = Alignment.Center) {
+        Text(stringResource(Res.string.files_drop), color = colors.text, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center,
+            modifier = Modifier.clip(RoundedCornerShape(12.dp)).background(colors.panel).border(1.dp, colors.accent, RoundedCornerShape(12.dp)).padding(20.dp))
     }
 }
 
@@ -279,6 +306,7 @@ private fun noticeText(notice: SessionNotice): String = when (notice) {
         else stringResource(Res.string.notice_permission_invalid, notice.code ?: "400")
     SessionNotice.PermissionDenied -> stringResource(Res.string.notice_permission_denied)
     is SessionNotice.PermissionRejected -> stringResource(Res.string.notice_permission_rejected, notice.reason ?: "rejected")
+    SessionNotice.FilesNotReady -> stringResource(Res.string.files_not_ready)
 }
 
 /** The bypass chip's "turn off", for the owner where the server takes it. */
@@ -540,12 +568,24 @@ private fun Dock(session: CloudSession, state: CloudSessionUiState, viewModel: C
                         }
                     }
                 }
+                state.files.notice?.let { problem ->
+                    Banner(fileProblemText(problem), Tone.WARN, Modifier.testTag("file-notice"), action = {
+                        AppButton(stringResource(Res.string.files_dismiss), onClick = viewModel::dismissFileNotice, kind = ButtonKind.GHOST, small = true, fill = false)
+                    })
+                }
+                PendingFileChips(state.files.files, onRetry = viewModel::retryFile, onRemove = viewModel::removeFile)
                 Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    // No paperclip: files (`runners.cloud.files.v1`) come with their own slice.
+                    // Only once the server announced `runners.cloud.files.v1`: an older server shows the composer as before.
+                    if (state.files.supported) {
+                        val picker = rememberFilePicker(onPicked = viewModel::attach, onFailed = viewModel::pickFailed)
+                        AttachButton(state.files, picker, onUnavailable = viewModel::explainFiles)
+                    }
                     AppTextField(
                         state.draft, viewModel::onDraftChange, singleLine = false, maxLines = 6, placeholder = stringResource(Res.string.composer_hint),
                         modifier = Modifier.weight(1f), tag = "composer", shape = RoundedCornerShape(22.dp), minHeight = 44.dp,
                         onSubmit = { if (state.canSend) viewModel.send() },
+                        // A file or a screenshot pasted into the field goes the way of the paperclip's, when files are on.
+                        onPasteFiles = if (state.files.supported && state.files.canAttach) viewModel::attach else null, onPasteFailed = viewModel::pickFailed,
                     )
                     AppIconButton(PhosphorIcons.Regular.ArrowUp, stringResource(Res.string.composer_send), onClick = viewModel::send, kind = IconButtonKind.FILLED,
                         enabled = state.canSend, modifier = Modifier.testTag("send"))
@@ -568,18 +608,19 @@ private fun DockStatus(text: String, color: Color, dot: Boolean, tag: String, ac
 private fun PendingBubble(message: PendingMessage, viewModel: CloudSessionViewModel) {
     val colors = Ostrom.colors
     Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp).testTag("pending-${message.clientMessageId}"), horizontalAlignment = Alignment.End) {
-        Text(
+        if (message.text.isNotEmpty()) Text(
             message.text,
             modifier = Modifier.atMostBubbleWidth().alpha(0.7f).clip(RoundedCornerShape(16.dp, 16.dp, 4.dp, 16.dp)).background(colors.bubble).padding(horizontal = 12.dp, vertical = 9.dp),
             color = colors.onBubble,
             fontSize = 14.5.sp,
         )
+        MessageFiles(message.files, Modifier.padding(top = 4.dp))
         val failed = message.state == PendingMessage.State.FAILED || message.state == PendingMessage.State.REFUSED
         val status = when (message.state) {
             PendingMessage.State.SENDING -> stringResource(Res.string.pending_sending)
             PendingMessage.State.SENT -> stringResource(if (message.woke) Res.string.pending_woke else Res.string.pending_sent)
             PendingMessage.State.FAILED -> stringResource(Res.string.pending_failed, message.reason ?: "")
-            PendingMessage.State.REFUSED -> stringResource(Res.string.pending_refused, message.reason.orEmpty())
+            PendingMessage.State.REFUSED -> stringResource(Res.string.pending_refused, messageRefusal(message.reason))
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(status, fontSize = 12.sp, color = if (failed) colors.danger else colors.muted, modifier = Modifier.testTag("pending-status-${message.clientMessageId}"))
@@ -591,4 +632,14 @@ private fun PendingBubble(message: PendingMessage, viewModel: CloudSessionViewMo
             }
         }
     }
+}
+
+/** A message's refusal: the files' codes in words, any other reason as the server's code. */
+@Composable
+private fun messageRefusal(reason: String?): String = when (reason) {
+    "file_unavailable" -> stringResource(Res.string.message_files_unavailable)
+    "files_too_large" -> stringResource(Res.string.message_files_too_large)
+    "files_unsupported" -> stringResource(Res.string.message_files_unsupported)
+    "invalid_files" -> stringResource(Res.string.message_files_invalid)
+    else -> reason.orEmpty()
 }

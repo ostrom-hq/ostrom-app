@@ -25,6 +25,8 @@ data class PendingMessage(
     val woke: Boolean = false,
     /** Why it failed or was refused: a stable code, or the domain's sentence for a network failure. */
     val reason: String? = null,
+    /** The files it carries (`runners.cloud.files.v1`), already uploaded; sent again as they are on a retry. */
+    val files: List<UploadedFile> = emptyList(),
 ) {
     enum class State { SENDING, SENT, FAILED, REFUSED }
 }

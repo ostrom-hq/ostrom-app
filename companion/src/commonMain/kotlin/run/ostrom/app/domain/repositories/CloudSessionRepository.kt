@@ -40,7 +40,7 @@ interface CloudSessionRepository {
     // SessionRepository: its inputs are acknowledged at once and carried out by the agent.
 
     /** Sends a message to the agent under [clientMessageId] (`Idempotency-Key`): a retry returns the first acknowledgement. */
-    suspend fun send(accountId: String, sessionId: String, text: String, clientMessageId: String): InputReceipt
+    suspend fun send(accountId: String, sessionId: String, text: String, clientMessageId: String, fileIds: List<String> = emptyList()): InputReceipt
 
     /** Stops the agent's current turn; `409 nothing_to_interrupt` when no agent runs. */
     suspend fun interrupt(accountId: String, sessionId: String): InputReceipt

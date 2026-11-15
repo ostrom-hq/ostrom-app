@@ -22,13 +22,16 @@ import run.ostrom.app.domain.models.CloudSessionStatus
 import run.ostrom.app.domain.models.GitHubAccess
 import run.ostrom.app.domain.models.KnownAgent
 import run.ostrom.app.domain.models.LiveUpdate
+import run.ostrom.app.domain.models.FileProblem
 import run.ostrom.app.domain.models.PendingMessage
+import run.ostrom.app.domain.models.PickedFile
 import run.ostrom.app.domain.models.PermissionAnswer
 import run.ostrom.app.domain.models.QuestionChoice
 import run.ostrom.app.domain.models.TranscriptEvent
 import run.ostrom.app.domain.models.TurnPhase
 import run.ostrom.app.domain.repositories.AccountRepository
 import run.ostrom.app.domain.repositories.find
+import run.ostrom.app.domain.usecases.files.SessionFilesUseCase
 import run.ostrom.app.domain.usecases.sessions.AnswerPermissionUseCase
 import run.ostrom.app.domain.usecases.sessions.ControlCloudSessionUseCase
 import run.ostrom.app.domain.usecases.sessions.ControlConversationUseCase
@@ -64,6 +67,8 @@ sealed interface SessionNotice {
     data object PermissionDenied : SessionNotice
     /** An accepted answer the agent did not take (an `input` event rejected it): the request is still open. */
     data class PermissionRejected(val reason: String?) : SessionNotice
+    /** Send was asked while a file still uploads or failed: nothing was sent. */
+    data object FilesNotReady : SessionNotice
 }
 
 /** Where an answer to a permission request stands. */
@@ -122,6 +127,8 @@ data class CloudSessionUiState(
     /** Messages sent from here that the transcript does not show yet, or that failed. */
     val pending: List<PendingMessage> = emptyList(),
     val draft: String = "",
+    /** The files of the next message (`runners.cloud.files.v1`). */
+    val files: FilesUiState = FilesUiState(),
     /** The member owns the session: Bypass, the model and the effort are theirs. */
     val canControl: Boolean = false,
     /** The member signed in on this account: their own messages read as theirs. */
@@ -170,8 +177,8 @@ data class CloudSessionUiState(
     /** The session's agent runs: only then has it background tasks and takes answers. */
     val agentRuns: Boolean get() = session?.status == CloudSessionStatus.RUNNING
 
-    /** Send is offered: some text. */
-    val canSend: Boolean get() = draft.isNotBlank()
+    /** Send is offered: some text or a file, once every file is uploaded. */
+    val canSend: Boolean get() = files.ready && (draft.isNotBlank() || files.files.isNotEmpty())
 
     /** The requests still waiting, oldest first; none while the session takes no answer (paused, pausing, ended). */
     val openRequests: List<TranscriptEvent.PermissionRequest> by lazy {
@@ -204,6 +211,8 @@ class CloudConversationUseCases(
     val control: ControlConversationUseCase,
     val answerPermission: AnswerPermissionUseCase,
     val accounts: AccountRepository,
+    /** Null when the app does not send files: no paperclip, messages without files as before. */
+    val files: SessionFilesUseCase? = null,
 )
 
 /**
@@ -228,6 +237,9 @@ class CloudSessionViewModel(
     val uiState: StateFlow<CloudSessionUiState> = state.asStateFlow()
     private var loading: Job? = null
     private var started = false
+    private val files = conversation?.files?.let { useCase ->
+        SessionFiles(viewModelScope, route.accountId, route.sessionId, useCase, read = { state.value.files }, write = { change -> state.update { it.copy(files = change(it.files)) } })
+    }
 
     /** The screen is visible: the record is read, and a conversation session is followed. */
     fun visible() {
@@ -345,6 +357,7 @@ class CloudSessionViewModel(
 
     private fun startConversation() {
         val uses = conversation ?: return
+        files?.load()
         // The transcript does not carry pauses, resumes or a failed pod: the header is read again while visible.
         if (header?.isActive != true) header = viewModelScope.launch {
             while (true) {
@@ -504,19 +517,37 @@ class CloudSessionViewModel(
 
     fun onDraftChange(text: String) = state.update { it.copy(draft = text) }
 
-    /** Shows the message at once, then sends it; the draft is cleared once it is queued for sending. */
+    /**
+     * Shows the message at once, then sends it with the uploaded files; the draft and the files are cleared only once it
+     * is queued for sending. While a file still uploads or failed, nothing is sent.
+     */
     fun send() {
         val uses = conversation ?: return
+        val attached = files?.uploaded() ?: if (state.value.files.files.isEmpty()) emptyList() else null
+        if (attached == null) { state.update { it.copy(notice = SessionNotice.FilesNotReady) }; return }
         val message = try {
-            uses.sendMessage.draft(state.value.draft.trim())
+            uses.sendMessage.draft(state.value.draft.trim(), attached)
         } catch (error: AppException) {
             state.update { it.copy(notice = SessionNotice.Text(error.userMessage())) }
             return
         }
         // A new message replaces what the last action said (a refused draft, nothing to interrupt).
         state.update { it.copy(draft = "", pending = it.pending + message, notice = null) }
+        if (attached.isNotEmpty()) files?.clear()
         deliver(message)
     }
+
+    // ---- Files of the next message ------------------------------------------------------------------------------------
+
+    /** Files picked, dropped, pasted or photographed: each is checked, then uploaded at once. */
+    fun attach(picked: List<PickedFile>) { if (picked.isNotEmpty()) files?.attach(picked) }
+    /** The paperclip while files cannot be added (off for the organization, or already the most a message carries). */
+    fun explainFiles() { files?.explainUnavailable() }
+    fun retryFile(localId: String) { files?.retry(localId) }
+    fun removeFile(localId: String) { files?.remove(localId) }
+    fun dismissFileNotice() { files?.dismissNotice() }
+    /** A picker failed to hand over a file (it could not be read): said like an unreadable file. */
+    fun pickFailed() = state.update { it.copy(files = it.files.copy(notice = FileProblem.Unreadable)) }
 
     /** Sends a failed message again with the same id: the server never queues it twice. */
     fun retry(clientMessageId: String) {

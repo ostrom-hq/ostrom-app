@@ -16,6 +16,8 @@ import run.ostrom.app.domain.models.WorkflowRefusal
 import run.ostrom.app.domain.models.visibleCode
 import run.ostrom.app.resources.Res
 import run.ostrom.app.resources.error_check_input
+import run.ostrom.app.resources.error_file_refused
+import run.ostrom.app.resources.error_file_refused_code
 import run.ostrom.app.resources.error_cloud_cluster_unavailable
 import run.ostrom.app.resources.error_cloud_email_domain
 import run.ostrom.app.resources.error_cloud_effort
@@ -154,6 +156,7 @@ private fun AppException.sentence(): Pair<StringResource, List<Any>> = when (thi
         CloudSessionRefusal.GITHUB_OWNER_ONLY -> Res.string.error_cloud_github_owner_only
         CloudSessionRefusal.GITHUB_NOT_PAUSED -> Res.string.error_cloud_github_not_paused
     } to emptyList()
+    is AppException.FileRefused -> visibleCode(code)?.let { Res.string.error_file_refused_code to listOf<Any>(it) } ?: (Res.string.error_file_refused to emptyList())
     is AppException.TransferRefused -> visibleCode(code)?.let { Res.string.transfer_refused_other to listOf<Any>(it) } ?: (Res.string.error_transfer_refused to emptyList())
     is AppException.TransferInvalid -> when (problem) {
         TransferProblem.RECIPIENT -> Res.string.error_transfer_recipient

@@ -22,6 +22,10 @@ class AccountCalls(private val clients: OstromClientProvider, private val accoun
     suspend fun <T> withAccount(accountId: String, resource: Boolean = false, call: suspend (OstromClient) -> T): T =
         translateFailures(resource) { call(client(accountId)) }
 
+    /** Like [withAccount] for a resource, bounded by [timeoutMillis] instead of a short call's 30 s (a file upload). */
+    suspend fun <T> withAccountLong(accountId: String, timeoutMillis: Long, call: suspend (OstromClient) -> T): T =
+        translateFailures(resource = true, timeoutMillis = timeoutMillis) { call(client(accountId)) }
+
     /** The organization the account's calls act in now (`Ostrom-Org`); an unknown account is signed out. */
     fun organizationOf(accountId: String): String? =
         (accounts.find(accountId) ?: throw AppException.Unauthorized()).organizationId

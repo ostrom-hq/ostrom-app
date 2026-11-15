@@ -15,6 +15,9 @@ import run.ostrom.app.domain.models.PermissionAnswer
 import run.ostrom.app.domain.models.CloudSessionRefusal
 import run.ostrom.app.domain.models.CloudSessionStatus
 import run.ostrom.app.domain.models.Features
+import run.ostrom.app.domain.models.FilePolicy
+import run.ostrom.app.domain.models.PickedFile
+import run.ostrom.app.domain.models.UploadedFile
 import run.ostrom.app.domain.models.GitHubAccess
 import run.ostrom.app.domain.models.NewCloudSession
 import run.ostrom.app.domain.models.SessionTransfer
@@ -23,6 +26,7 @@ import run.ostrom.app.domain.models.TransferDirection
 import run.ostrom.app.domain.models.TransferPage
 import run.ostrom.app.domain.models.TransferRequest
 import run.ostrom.app.domain.repositories.CloudSessionRepository
+import run.ostrom.app.domain.repositories.SessionFileRepository
 import run.ostrom.app.domain.repositories.TransferRepository
 import run.ostrom.app.domain.services.Clock
 
@@ -122,7 +126,7 @@ class DemoCloudSessionRepository(private val demo: DemoMode, private val clock: 
         return change(sessionId) { it.copy(githubAccess = access) }
     }
 
-    override suspend fun send(accountId: String, sessionId: String, text: String, clientMessageId: String): InputReceipt {
+    override suspend fun send(accountId: String, sessionId: String, text: String, clientMessageId: String, fileIds: List<String>): InputReceipt {
         val session = session(accountId, sessionId)
         if (session.status.ended) throw AppException.Server(HTTP_CONFLICT, "session_not_running")
         // A message wakes a paused session, as on a server.
@@ -168,7 +172,8 @@ class DemoAwareCloudSessionRepository(private val real: CloudSessionRepository, 
     override suspend fun resume(accountId: String, sessionId: String) = of(accountId).resume(accountId, sessionId)
     override suspend fun stop(accountId: String, sessionId: String) = of(accountId).stop(accountId, sessionId)
     override suspend fun setGitHubAccess(accountId: String, sessionId: String, access: GitHubAccess) = of(accountId).setGitHubAccess(accountId, sessionId, access)
-    override suspend fun send(accountId: String, sessionId: String, text: String, clientMessageId: String) = of(accountId).send(accountId, sessionId, text, clientMessageId)
+    override suspend fun send(accountId: String, sessionId: String, text: String, clientMessageId: String, fileIds: List<String>) =
+        of(accountId).send(accountId, sessionId, text, clientMessageId, fileIds)
     override suspend fun interrupt(accountId: String, sessionId: String) = of(accountId).interrupt(accountId, sessionId)
     override suspend fun answer(accountId: String, sessionId: String, answer: PermissionAnswer, idempotencyKey: String) =
         of(accountId).answer(accountId, sessionId, answer, idempotencyKey)
@@ -199,4 +204,21 @@ class DemoAwareTransferRepository(private val real: TransferRepository, private 
     override suspend fun decline(accountId: String, transferId: String) = of(accountId).decline(accountId, transferId)
     override suspend fun cancel(accountId: String, transferId: String) = of(accountId).cancel(accountId, transferId)
     override suspend fun recipients(accountId: String) = of(accountId).recipients(accountId)
+}
+
+/** The demo takes no files (it announces no `runners.cloud.files.v1`); [typeFor] needs no server and stays the app's. */
+class DemoSessionFileRepository(private val types: SessionFileRepository) : SessionFileRepository {
+    override suspend fun policy(accountId: String) = FilePolicy(false, "demo", 0, 0, 1, emptyList())
+    override suspend fun upload(accountId: String, sessionId: String, file: PickedFile, idempotencyKey: String, onProgress: (Long, Long) -> Unit): UploadedFile =
+        throw AppException.Unsupported(Features.RUNNERS_CLOUD_FILES)
+    override fun typeFor(name: String): String? = types.typeFor(name)
+}
+
+/** The demo account's files from memory (none), every other account's through its server. */
+class DemoAwareSessionFileRepository(private val real: SessionFileRepository, private val demo: SessionFileRepository) : SessionFileRepository {
+    private fun of(accountId: String) = if (isDemo(accountId)) demo else real
+    override suspend fun policy(accountId: String) = of(accountId).policy(accountId)
+    override suspend fun upload(accountId: String, sessionId: String, file: PickedFile, idempotencyKey: String, onProgress: (sent: Long, total: Long) -> Unit) =
+        of(accountId).upload(accountId, sessionId, file, idempotencyKey, onProgress)
+    override fun typeFor(name: String) = real.typeFor(name)
 }

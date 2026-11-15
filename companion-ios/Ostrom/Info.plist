@@ -24,6 +24,8 @@
 			</array>
 		</dict>
 	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>Take a photo to send it to a session's agent.</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>Ostrom uses Face ID to confirm that you are the one saying yes or no.</string>
 	<!-- The Keychain group of the push key, shared with the notification service extension (Push/PushCrypto.swift). -->
