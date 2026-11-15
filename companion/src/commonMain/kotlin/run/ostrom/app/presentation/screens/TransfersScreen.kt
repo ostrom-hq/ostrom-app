@@ -1,0 +1,179 @@
+// SPDX-License-Identifier: Apache-2.0
+// Ported from TeamCode (Apache-2.0), companion/.../presentation/screens/TransfersScreen.kt; see NOTICE.
+package run.ostrom.app.presentation.screens
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.adamglin.PhosphorIcons
+import com.adamglin.phosphoricons.Regular
+import com.adamglin.phosphoricons.regular.ArrowsClockwise
+import com.adamglin.phosphoricons.regular.ArrowsLeftRight
+import org.jetbrains.compose.resources.stringResource
+import run.ostrom.app.domain.models.SessionTransfer
+import run.ostrom.app.domain.models.TransferDirection
+import run.ostrom.app.domain.models.TransferState
+import run.ostrom.app.domain.usecases.transfers.TransferAction
+import run.ostrom.app.presentation.components.AppButton
+import run.ostrom.app.presentation.components.AppCard
+import run.ostrom.app.presentation.components.AppIconButton
+import run.ostrom.app.presentation.components.Banner
+import run.ostrom.app.presentation.components.ButtonKind
+import run.ostrom.app.presentation.components.BusyRow
+import run.ostrom.app.presentation.components.ContentWidth
+import run.ostrom.app.presentation.components.EmptyState
+import run.ostrom.app.presentation.components.KeepAtTopOnNewFirstRow
+import run.ostrom.app.presentation.components.NavBar
+import run.ostrom.app.presentation.components.Segmented
+import run.ostrom.app.presentation.components.Tone
+import run.ostrom.app.presentation.components.TransferStateChip
+import run.ostrom.app.presentation.components.rememberNow
+import run.ostrom.app.presentation.components.transferErrorText
+import run.ostrom.app.presentation.components.transferProblem
+import run.ostrom.app.presentation.theme.MetaStyle
+import run.ostrom.app.presentation.theme.Ostrom
+import run.ostrom.app.presentation.viewmodels.TransfersUiState
+import run.ostrom.app.presentation.viewmodels.TransfersViewModel
+import run.ostrom.app.resources.Res
+import run.ostrom.app.resources.sessions_title
+import run.ostrom.app.resources.transfer_accept
+import run.ostrom.app.resources.transfer_cancel
+import run.ostrom.app.resources.transfer_decline
+import run.ostrom.app.resources.transfer_expires_days
+import run.ostrom.app.resources.transfer_expires_hours
+import run.ostrom.app.resources.transfer_expires_soon
+import run.ostrom.app.resources.transfer_failed_because
+import run.ostrom.app.resources.transfer_from_to
+import run.ostrom.app.resources.transfer_resumes
+import run.ostrom.app.resources.transfer_session
+import run.ostrom.app.resources.transfer_withdraw
+import run.ostrom.app.resources.transfer_you
+import run.ostrom.app.resources.transfers_empty_incoming
+import run.ostrom.app.resources.transfers_empty_outgoing
+import run.ostrom.app.resources.transfers_empty_title
+import run.ostrom.app.resources.transfers_incoming
+import run.ostrom.app.resources.transfers_outgoing
+import run.ostrom.app.resources.transfers_refresh
+import run.ostrom.app.resources.transfers_title
+
+/**
+ * Session transfers of an account: offers made to the member (accept or decline) and transfers of their sessions
+ * (withdraw an offer). [onOpenSession] opens a session the member can see: theirs before it went, or once it is theirs.
+ */
+@Composable
+fun TransfersScreen(viewModel: TransfersViewModel, onBack: (() -> Unit)?, onOpenSession: (String) -> Unit, backLabel: String = stringResource(Res.string.sessions_title)) {
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val colors = Ostrom.colors
+    val now = rememberNow()
+    Column(Modifier.fillMaxSize().background(colors.background), horizontalAlignment = Alignment.CenterHorizontally) {
+        NavBar(backLabel, onBack, stringResource(Res.string.transfers_title)) {
+            AppIconButton(PhosphorIcons.Regular.ArrowsClockwise, stringResource(Res.string.transfers_refresh), onClick = viewModel::refresh, enabled = !state.loading, modifier = Modifier.testTag("transfers-refresh"))
+        }
+        Column(Modifier.widthIn(max = ContentWidth).fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+            Segmented(
+                listOf(TransferDirection.INCOMING to stringResource(Res.string.transfers_incoming), TransferDirection.OUTGOING to stringResource(Res.string.transfers_outgoing)),
+                selected = state.direction, onSelect = viewModel::setDirection, tag = { "direction-${it.wire}" },
+            )
+        }
+        val listState = rememberLazyListState()
+        val nearEnd by remember { derivedStateOf { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index?.let { it >= listState.layoutInfo.totalItemsCount - 3 } == true } }
+        LaunchedEffect(nearEnd, state.list.nextBefore) { if (nearEnd) viewModel.loadMore() }
+        KeepAtTopOnNewFirstRow(listState, if (state.error != null) "error" else state.list.transfers.firstOrNull()?.id ?: "end")
+        LazyColumn(
+            Modifier.widthIn(max = ContentWidth).fillMaxWidth().weight(1f).testTag("transfers"),
+            state = listState,
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            state.error?.let { error -> item(key = "error") { Banner(transferErrorText(error), Tone.DANGER, Modifier.testTag("transfers-error")) } }
+            items(state.list.transfers, key = { it.id }) { transfer -> TransferCard(transfer, state, viewModel, now, onOpenSession) }
+            item(key = "end") {
+                BusyRow(state.loading || state.loadingMore)
+                if (state.list.loaded && state.list.transfers.isEmpty() && !state.loading) {
+                    EmptyState(
+                        PhosphorIcons.Regular.ArrowsLeftRight, stringResource(Res.string.transfers_empty_title),
+                        stringResource(if (state.direction == TransferDirection.INCOMING) Res.string.transfers_empty_incoming else Res.string.transfers_empty_outgoing),
+                        modifier = Modifier.testTag("transfers-empty"),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TransferCard(transfer: SessionTransfer, state: TransfersUiState, viewModel: TransfersViewModel, now: Long, onOpenSession: (String) -> Unit) {
+    val colors = Ostrom.colors
+    val incoming = state.direction == TransferDirection.INCOMING
+    // The former owner sees the session until it changed owner; the recipient once it did.
+    val visible = if (incoming) transfer.state == TransferState.COMPLETED else transfer.state != TransferState.COMPLETED
+    AppCard(Modifier.testTag("transfer-${transfer.id}"), onClick = if (visible) ({ onOpenSession(transfer.sessionId) }) else null) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            TransferStateChip(transfer.state)
+            Text(stringResource(Res.string.transfer_session, transfer.sessionId.take(8)), style = MetaStyle, color = colors.muted, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+            if (transfer.state == TransferState.OFFERED) transfer.expiresAt?.let { Text(expiry(it, now), style = MetaStyle.copy(fontSize = 11.5.sp), color = colors.warn) }
+        }
+        Text(
+            stringResource(Res.string.transfer_from_to, memberName(transfer.fromMemberId, state), memberName(transfer.toMemberId, state)),
+            color = colors.text, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
+        )
+        if (transfer.resume && transfer.state.open) Text(stringResource(Res.string.transfer_resumes), color = colors.muted, fontSize = 13.sp)
+        transfer.problemCode?.takeIf { transfer.state == TransferState.FAILED || transfer.state == TransferState.CANCELLED }?.let {
+            Text(stringResource(Res.string.transfer_failed_because, transferProblem(it)), color = if (transfer.state == TransferState.FAILED) colors.danger else colors.muted, fontSize = 13.sp)
+        }
+        val actions = viewModel.actions(transfer)
+        if (actions.isNotEmpty()) {
+            val acting = transfer.id in state.acting
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (TransferAction.ACCEPT in actions) AppButton(stringResource(Res.string.transfer_accept), onClick = { viewModel.accept(transfer) }, small = true, enabled = !acting, busy = acting,
+                    modifier = Modifier.weight(1f).testTag("accept-${transfer.id}"))
+                if (TransferAction.DECLINE in actions) AppButton(stringResource(Res.string.transfer_decline), onClick = { viewModel.decline(transfer) }, small = true, kind = ButtonKind.SECONDARY, enabled = !acting,
+                    modifier = Modifier.weight(1f).testTag("decline-${transfer.id}"))
+                if (TransferAction.CANCEL in actions) {
+                    val label = if (transfer.state == TransferState.OFFERED && transfer.fromMemberId == state.memberId) Res.string.transfer_withdraw else Res.string.transfer_cancel
+                    AppButton(stringResource(label), onClick = { viewModel.cancel(transfer) }, small = true, kind = ButtonKind.DANGER, enabled = !acting,
+                        modifier = Modifier.weight(1f).testTag("cancel-${transfer.id}"))
+                }
+                if (actions.size == 1) Spacer(Modifier.weight(1f))
+            }
+        }
+    }
+}
+
+@Composable
+private fun memberName(id: String, state: TransfersUiState): String =
+    if (id == state.memberId) stringResource(Res.string.transfer_you) else state.names[id] ?: id.take(8)
+
+@Composable
+private fun expiry(at: Long, now: Long): String {
+    val hours = (at - now) / 3_600_000
+    return when {
+        hours < 1 -> stringResource(Res.string.transfer_expires_soon)
+        hours < 48 -> stringResource(Res.string.transfer_expires_hours, hours.toInt())
+        else -> stringResource(Res.string.transfer_expires_days, (hours / 24).toInt())
+    }
+}

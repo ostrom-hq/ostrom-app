@@ -78,6 +78,14 @@ data class WorkflowEditRoute(val accountId: String, val workflowId: String? = nu
 @Serializable
 data class CloudSessionRoute(val accountId: String, val sessionId: String)
 
+/** The transfer sheet's session (a sheet over the cloud session, not a destination of its own). */
+@Serializable
+data class TransferRoute(val accountId: String, val sessionId: String, val ownerId: String)
+
+/** An account's incoming and outgoing session transfers (`runners.cloud.transfer.v1`), opened from the cloud sessions list. */
+@Serializable
+data class TransfersRoute(val accountId: String)
+
 /** The form that starts a cloud session, opened from the cloud sessions list. */
 @Serializable
 data class NewCloudSessionRoute(val accountId: String)

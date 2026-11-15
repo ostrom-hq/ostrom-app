@@ -77,6 +77,16 @@ sealed class AppException(message: String) : Exception(message) {
             CloudSessionRefusal.GITHUB_NOT_PAUSED -> "Pause the session before removing its GitHub access."
         },
     )
+    /** The server refused a transfer of a cloud session or a decision on one, with its error key [code] (`transfer_pending`, `recipient_ineligible`...). */
+    class TransferRefused(val code: String) :
+        AppException("The server refused the transfer" + (visibleCode(code)?.let { " ($it)" } ?: "") + ".")
+    /** The transfer form breaks [problem]: nothing was sent. */
+    class TransferInvalid(val problem: TransferProblem) : AppException(
+        when (problem) {
+            TransferProblem.RECIPIENT -> "Choose the member to give the session to."
+            TransferProblem.OWNER -> "This member already owns the session."
+        },
+    )
     /** The server refused to start or follow the GitHub link, for [reason]. */
     class GitHubRefused(val reason: GitHubRefusal) : AppException(
         when (reason) {

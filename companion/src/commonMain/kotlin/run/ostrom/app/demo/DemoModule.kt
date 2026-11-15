@@ -8,6 +8,7 @@ import run.ostrom.app.domain.repositories.ActivityRepository
 import run.ostrom.app.domain.repositories.ArtifactRepository
 import run.ostrom.app.domain.repositories.AuthRepository
 import run.ostrom.app.domain.repositories.CloudSessionRepository
+import run.ostrom.app.domain.repositories.TransferRepository
 import run.ostrom.app.domain.repositories.FeaturesRepository
 import run.ostrom.app.domain.repositories.GitHubLinkRepository
 import run.ostrom.app.domain.repositories.MemberSetupRepository
@@ -28,6 +29,7 @@ import run.ostrom.app.infrastructure.repositories.RemoteActivityRepository
 import run.ostrom.app.infrastructure.repositories.RemoteArtifactRepository
 import run.ostrom.app.infrastructure.repositories.RemoteAuthRepository
 import run.ostrom.app.infrastructure.repositories.RemoteCloudSessionRepository
+import run.ostrom.app.infrastructure.repositories.RemoteTransferRepository
 import run.ostrom.app.infrastructure.repositories.RemoteGitHubLinkRepository
 import run.ostrom.app.infrastructure.repositories.RemoteMemberSetupRepository
 import run.ostrom.app.infrastructure.repositories.RemoteNotificationPreferencesRepository
@@ -72,5 +74,6 @@ val demoModule = module {
     single<MemberSetupRepository> { DemoAwareMemberSetupRepository(get<RemoteMemberSetupRepository>(), DemoMemberSetupRepository(get())) }
     single<GitHubLinkRepository> { DemoAwareGitHubLinkRepository(get<RemoteGitHubLinkRepository>(), DemoGitHubLinkRepository(get())) }
     single<CloudSessionRepository> { DemoAwareCloudSessionRepository(get<RemoteCloudSessionRepository>(), DemoCloudSessionRepository(get(), get())) }
+    single<TransferRepository> { DemoAwareTransferRepository(get<RemoteTransferRepository>(), DemoTransferRepository) }
     single<ReceiptKeyPinRepository> { DemoAwareReceiptKeyPinRepository(get<SecureReceiptKeyPinRepository>(), get()) }
 }

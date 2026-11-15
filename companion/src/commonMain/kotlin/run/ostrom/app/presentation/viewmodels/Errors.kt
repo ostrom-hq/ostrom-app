@@ -10,6 +10,7 @@ import run.ostrom.app.domain.models.CloudSessionProblem
 import run.ostrom.app.domain.models.CloudSessionRefusal
 import run.ostrom.app.domain.models.GitHubRefusal
 import run.ostrom.app.domain.models.LinkRefusal
+import run.ostrom.app.domain.models.TransferProblem
 import run.ostrom.app.domain.models.WorkflowEditRefusal
 import run.ostrom.app.domain.models.WorkflowRefusal
 import run.ostrom.app.domain.models.visibleCode
@@ -53,6 +54,10 @@ import run.ostrom.app.resources.error_sign_in_denied
 import run.ostrom.app.resources.error_sign_in_expired
 import run.ostrom.app.resources.error_sign_in_mismatch
 import run.ostrom.app.resources.error_sign_up_closed
+import run.ostrom.app.resources.error_transfer_owner
+import run.ostrom.app.resources.error_transfer_recipient
+import run.ostrom.app.resources.error_transfer_refused
+import run.ostrom.app.resources.transfer_refused_other
 import run.ostrom.app.resources.error_step_up
 import run.ostrom.app.resources.error_unauthorized
 import run.ostrom.app.resources.error_unreachable
@@ -145,6 +150,11 @@ private fun AppException.sentence(): Pair<StringResource, List<Any>> = when (thi
         CloudSessionRefusal.CLUSTER_UNAVAILABLE -> Res.string.error_cloud_cluster_unavailable
         CloudSessionRefusal.GITHUB_OWNER_ONLY -> Res.string.error_cloud_github_owner_only
         CloudSessionRefusal.GITHUB_NOT_PAUSED -> Res.string.error_cloud_github_not_paused
+    } to emptyList()
+    is AppException.TransferRefused -> visibleCode(code)?.let { Res.string.transfer_refused_other to listOf<Any>(it) } ?: (Res.string.error_transfer_refused to emptyList())
+    is AppException.TransferInvalid -> when (problem) {
+        TransferProblem.RECIPIENT -> Res.string.error_transfer_recipient
+        TransferProblem.OWNER -> Res.string.error_transfer_owner
     } to emptyList()
     is AppException.GitHubRefused -> when (reason) {
         GitHubRefusal.APP_NOT_CONFIGURED -> Res.string.error_github_app_not_configured

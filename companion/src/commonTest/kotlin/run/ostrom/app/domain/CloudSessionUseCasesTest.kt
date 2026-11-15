@@ -37,8 +37,8 @@ import kotlin.test.assertTrue
 
 internal fun cloudSession(
     id: String = "c1", status: CloudSessionStatus = CloudSessionStatus.RUNNING, desired: String? = "running", phase: String? = null,
-    failure: CloudFailure? = null,
-) = CloudSession(id, "Mill", "claude", null, null, null, status, desired, phase, failure, null, 1_000L, 1_000L, null, null, null, null, null)
+    failure: CloudFailure? = null, ownerId: String? = null, remote: Boolean = false,
+) = CloudSession(id, "Mill", "claude", null, null, null, status, desired, phase, failure, null, 1_000L, 1_000L, null, null, null, null, null, ownerId = ownerId, remote = remote)
 
 class CloudSessionUseCasesTest {
     private class FakeCloudSessions : CloudSessionRepository {

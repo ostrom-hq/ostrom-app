@@ -58,6 +58,7 @@ import run.ostrom.app.presentation.components.IconButtonKind
 import run.ostrom.app.presentation.components.LargeTitle
 import run.ostrom.app.presentation.components.Segmented
 import run.ostrom.app.presentation.components.Tone
+import run.ostrom.app.presentation.components.TransfersButton
 import run.ostrom.app.presentation.components.relativeTime
 import run.ostrom.app.presentation.components.rememberNow
 import run.ostrom.app.presentation.theme.MetaStyle
@@ -86,6 +87,7 @@ import run.ostrom.app.resources.cloud_status_pausing
 import run.ostrom.app.resources.cloud_status_resuming
 import run.ostrom.app.resources.cloud_status_running
 import run.ostrom.app.resources.cloud_status_terminated
+import run.ostrom.app.resources.cloud_status_transferring
 import run.ostrom.app.resources.cloud_status_unknown
 import run.ostrom.app.resources.sessions_kind_agent
 import run.ostrom.app.resources.sessions_kind_cloud
@@ -105,6 +107,7 @@ fun SessionsTab(
     onOpenSession: (accountId: String, sessionId: String) -> Unit,
     onOpenCloudSession: (accountId: String, sessionId: String) -> Unit,
     onNewCloudSession: (accountId: String) -> Unit,
+    onOpenTransfers: (accountId: String) -> Unit = {},
 ) {
     var chosen by rememberSaveable { mutableStateOf(SessionsKind.AGENT) }
     val kind = when {
@@ -122,7 +125,7 @@ fun SessionsTab(
     } else null
     when (kind) {
         SessionsKind.AGENT -> SessionsScreen(onOpen = onOpenSession, kindSwitch = switch)
-        SessionsKind.CLOUD -> CloudSessionsScreen(onOpen = onOpenCloudSession, onNew = onNewCloudSession, kindSwitch = switch)
+        SessionsKind.CLOUD -> CloudSessionsScreen(onOpen = onOpenCloudSession, onNew = onNewCloudSession, onOpenTransfers = onOpenTransfers, kindSwitch = switch)
     }
 }
 
@@ -135,6 +138,7 @@ fun SessionsTab(
 fun CloudSessionsScreen(
     onOpen: (accountId: String, sessionId: String) -> Unit,
     onNew: (accountId: String) -> Unit,
+    onOpenTransfers: (accountId: String) -> Unit = {},
     kindSwitch: (@Composable () -> Unit)? = null,
     viewModel: CloudSessionsViewModel = koinViewModel(),
 ) {
@@ -152,6 +156,7 @@ fun CloudSessionsScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             LargeTitle(stringResource(if (kindSwitch != null) Res.string.sessions_title else Res.string.cloud_sessions_title)) {
+                if (account != null && account.signedIn && !state.unavailable) TransfersButton(account.id) { onOpenTransfers(account.id) }
                 AppIconButton(PhosphorIcons.Regular.ArrowsClockwise, stringResource(Res.string.cloud_sessions_refresh), onClick = viewModel::reload,
                     modifier = Modifier.testTag("cloud-sessions-refresh"))
                 if (account != null && account.signedIn && !state.unavailable) {
@@ -228,6 +233,7 @@ internal fun CloudStatusChip(session: CloudSession, modifier: Modifier = Modifie
         CloudSessionStatus.PAUSING -> Res.string.cloud_status_pausing to Tone.NEUTRAL
         CloudSessionStatus.PAUSED -> Res.string.cloud_status_paused to Tone.NEUTRAL
         CloudSessionStatus.RESUMING -> Res.string.cloud_status_resuming to Tone.ACCENT
+        CloudSessionStatus.TRANSFERRING -> Res.string.cloud_status_transferring to Tone.ACCENT
         CloudSessionStatus.TERMINATED -> Res.string.cloud_status_terminated to Tone.MUTED
         CloudSessionStatus.FAILED -> Res.string.cloud_status_failed to Tone.DANGER
         CloudSessionStatus.UNKNOWN -> Res.string.cloud_status_unknown to Tone.MUTED
