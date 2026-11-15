@@ -276,8 +276,11 @@ class CloudSessionsScreenTest {
             waitForText("whoever shares the session's terminal")
             waitUntil(timeoutMillis = 10_000) { synchronized(server) { "PUT /api/v1/cloud/sessions/c1/github" in server.asked } }
             server.failures["PUT /api/v1/cloud/sessions/c1/github"] = 409 to "session_not_paused"
-            click("cloud-session-github-none")
-            waitFor("cloud-session-action-error")
+            // The switch ignores a press while the first change is still in flight, so press until one lands.
+            waitUntil(timeoutMillis = 10_000) {
+                onNodeWithTag("cloud-session-github-none").performSemanticsAction(SemanticsActions.OnClick)
+                onAllNodes(hasTestTag("cloud-session-action-error"), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
+            }
             waitForText("Pause the session before removing its GitHub access")
             assertFalse(onAllNodes(hasText("\"m\"", substring = true)).fetchSemanticsNodes().isNotEmpty(), "the server's text is never shown")
         }
