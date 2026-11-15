@@ -209,10 +209,18 @@ jobs:
             if command -v sha256sum > /dev/null; then sha256sum "$file"; else shasum -a 256 "$file"; fi
           done > "SHA256SUMS-$DESKTOP_TARGET"
           cat "SHA256SUMS-$DESKTOP_TARGET"
+          cd ..
+          # The package `ostrom ui` installs (not the DMG), checked for its layout and recorded for the manifest.
+          python3 scripts/release-desktop.py stage --package "staged/ostrom-desktop-$VERSION-$DESKTOP_TARGET.$(case "$DESKTOP_TARGET" in macos-*) echo zip ;; windows-*) echo msi ;; *) echo tar.gz ;; esac)" --target "$DESKTOP_TARGET" --version "$VERSION" --commit "$GITHUB_SHA" --output manifest-staged
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ostrom-desktop-${{ matrix.target }}
           path: staged/*
+          retention-days: 14
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: desktop-package-${{ matrix.target }}
+          path: manifest-staged/*
           retention-days: 14
       - name: Remove the temporary keychain and notarization key
         if: always() && runner.os == 'macOS'
@@ -220,11 +228,59 @@ jobs:
           if [ -n "${OSTROM_MACOS_SIGNING_KEYCHAIN:-}" ]; then security delete-keychain "$OSTROM_MACOS_SIGNING_KEYCHAIN" || true; fi
           rm -f "$RUNNER_TEMP/notary-key.p8" "$RUNNER_TEMP/developer-id.p12"
 
+  # The signed manifest `ostrom ui` authenticates: desktop-manifest.json (product desktop, the four packages with their
+  # SHA-256 and size), signed with the CLI's release key exactly as its latest.json is (Ed25519 over the raw bytes,
+  # base64 in desktop-manifest.json.sig; scripts/release/sign-manifest.sh of ostrom-cli). Signed only with release_tag,
+  # from the OSTROM_RELEASE_SIGNING_KEY secret, and checked against the pinned root before anything is attached.
+  manifest:
+    name: desktop manifest
+    if: inputs.release_tag != ''
+    needs: [desktop]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    env:
+      VERSION: ${{ inputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: desktop-package-*
+          merge-multiple: true
+          path: desktop-staged
+      - name: Verify and assemble the four packages
+        run: python3 scripts/release-desktop.py assemble --inputs desktop-staged --version "$VERSION" --commit "$GITHUB_SHA" --output desktop-dist
+      - name: Sign the manifest with the release key and check it against the pinned root
+        env:
+          RELEASE_SIGNING_KEY: ${{ secrets.OSTROM_RELEASE_SIGNING_KEY }}
+        run: |
+          set -eu
+          if [ -z "$RELEASE_SIGNING_KEY" ]; then
+            echo "::error::Attaching a release needs the OSTROM_RELEASE_SIGNING_KEY secret (the key of ostrom-cli's RELEASE_SIGNING_KEY)."
+            exit 1
+          fi
+          tmp="$(mktemp -d)"; chmod 700 "$tmp"; trap 'rm -rf "$tmp"' EXIT
+          ( umask 077; printf '%s\n' "$RELEASE_SIGNING_KEY" > "$tmp/key.pem" )
+          manifest=desktop-dist/desktop-manifest.json
+          openssl pkeyutl -sign -inkey "$tmp/key.pem" -rawin -in "$manifest" -out "$tmp/sig"
+          base64 < "$tmp/sig" | tr -d '\n' > "$manifest.sig"
+          printf '\n' >> "$manifest.sig"
+          tr -d ' \r\n' < "$manifest.sig" | base64 -d > "$tmp/raw.sig"
+          openssl pkeyutl -verify -pubin -inkey release/trust/ostrom-release-2026.pem -rawin -in "$manifest" -sigfile "$tmp/raw.sig"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: desktop-manifest
+          path: desktop-dist/*
+          retention-days: 14
+
   # Attaches the packages to an existing release, only when asked for. It never creates or publishes a release.
   attach:
     name: attach to the release
     if: inputs.release_tag != ''
-    needs: [desktop]
+    needs: [desktop, manifest]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -234,6 +290,10 @@ jobs:
         with:
           pattern: ostrom-desktop-*
           merge-multiple: true
+          path: staged
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: desktop-manifest
           path: staged
       - name: Attach to the release
         env:

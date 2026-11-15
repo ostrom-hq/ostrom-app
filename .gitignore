@@ -24,6 +24,7 @@ DerivedData/
 *.p12
 *.key
 *.pem
+!release/trust/*.pem
 *.mobileprovision
 **/fastlane/*.json
 # Store listings are kept in the stores, never here; build outputs and fastlane reports stay local

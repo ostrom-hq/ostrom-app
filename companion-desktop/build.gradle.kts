@@ -68,6 +68,22 @@ tasks.test { useJUnitPlatform() }
 // Installers take MAJOR.MINOR.PATCH only, and macOS refuses a major version of 0: packaging a 0.x fails instead of
 // publishing another number than the app's.
 val desktopPackageVersion = project.version.toString().substringBefore('-')
+
+// The app's own version, readable without starting it: `ostrom ui` reads this file inside an installed app
+// (Contents/app/resources on macOS, app/resources on Windows, lib/app/resources on Linux) to know whether it is
+// older than the CLI. Ported from TeamCode's `teamcode-desktop-version`.
+val generatedAppResources = layout.buildDirectory.dir("generated/desktop-app-resources")
+val generateAppResources by tasks.registering {
+    val version = project.version.toString()
+    inputs.property("version", version)
+    outputs.dir(generatedAppResources)
+    doLast {
+        val output = generatedAppResources.get().file("common/ostrom-desktop-version").asFile
+        output.parentFile.mkdirs()
+        output.writeText("$version\n")
+    }
+}
+tasks.matching { it.name == "prepareAppResources" }.configureEach { dependsOn(generateAppResources) }
 // The runnable jar (packageUberJarForCurrentOS, what CI builds on main) has no such limit and is not guarded.
 val installerTasks = Regex("""(package|packageRelease)(Dmg|Msi|Exe|Deb|Rpm|Pkg|DistributionForCurrentOS)|create(Release)?Distributable""")
 tasks.matching { installerTasks.matches(it.name) }.configureEach {
@@ -83,6 +99,7 @@ compose.desktop {
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb, TargetFormat.Rpm)
             packageName = "Ostrom"
+            appResourcesRootDir.set(generatedAppResources)
             packageVersion = desktopPackageVersion
             // Signed with a Developer ID only on a Mac that provides one (docs/distribution.md): the release workflow
             // imports it into a temporary keychain and notarizes with notarytool. Windows installers are not signed (no
@@ -110,6 +127,9 @@ compose.desktop {
             windows {
                 iconFile.set(project.file("icons/Ostrom.ico"))
                 perUserInstall = true
+                // One folder level, no separator, on purpose (as TeamCode's: a path with a separator breaks jpackage's
+                // quoting and WiX's ICE64). %LOCALAPPDATA%\Ostrom App is where `ostrom ui` looks for the app.
+                installationPath = "Ostrom App"
                 // Never changes, so a new version replaces the previous one.
                 upgradeUuid = "6f1d8a52-3b7e-4c1a-9d2e-5a0b7c4e8f13"
                 menu = true

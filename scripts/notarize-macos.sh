@@ -8,10 +8,14 @@ set -euo pipefail
 app="$BINARIES/app/Ostrom.app"
 dmg="$(ls "$BINARIES"/dmg/*.dmg)"
 # Every call to Apple's services (notarytool, stapler's CloudKit lookups) goes through apple(): up to 6 tries
-# with 15, 30, 60, 120 and 240 s between them, and only when the failure is a network or service one (a lost
-# connection, a timeout, CloudKit, stapler's error 68, an HTTP 5xx). Anything else fails at once. Its output
-# is left in $apple_out (stdout) and $apple_err (stderr).
-apple_failure='network connection was lost|NSURLErrorDomain|could not connect|timed out|timeout|CloudKit|Error 68|offline|temporarily unavailable|Service Unavailable|(HTTP|status( code)?)[^0-9]*5[0-9][0-9]|internal error|connection (reset|refused)'
+# with 15, 30, 60, 120 and 240 s between them, and only when the failure is a transient network or service one
+# (a lost connection, CloudKit, stapler's error 68, an HTTP 5xx). Anything else fails at once. A timeout is
+# NOT in that list for notarytool: a timed-out submission may still be running at Apple, so it is never sent
+# again; its status is read instead (notarize() below). Stapler's calls are idempotent, so a timeout there is
+# retried ($apple_failure_stapler). Output is left in $apple_out (stdout) and $apple_err (stderr).
+apple_failure='network connection was lost|NSURLErrorDomain|could not connect|CloudKit|Error 68|offline|temporarily unavailable|Service Unavailable|(HTTP|status code)[^0-9]*5[0-9][0-9]|internal error|connection (reset|refused)'
+apple_failure_stapler="$apple_failure|timed out|timeout"
+apple_retry="$apple_failure"
 apple_out="$RUNNER_TEMP/apple.out"
 apple_err="$RUNNER_TEMP/apple.err"
 apple() {
@@ -22,7 +26,7 @@ apple() {
     cat "$apple_out"
     cat "$apple_err" >&2
     if [ "$status" -eq 0 ]; then return 0; fi
-    if ! cat "$apple_out" "$apple_err" | grep -qiE "$apple_failure"; then
+    if ! cat "$apple_out" "$apple_err" | grep -qiE "$apple_retry"; then
       return "$status"
     fi
     if [ "$attempt" -eq 6 ]; then break; fi
@@ -34,15 +38,32 @@ apple() {
   return "$status"
 }
 notary=(--key "$RUNNER_TEMP/notary-key.p8" --key-id "$NOTARY_KEY_ID" --issuer "$NOTARY_ISSUER_ID")
+json_field() {
+  python3 -c 'import json,sys; print(json.load(sys.stdin).get(sys.argv[1], ""))' "$1" < "$apple_out" 2>/dev/null || true
+}
+# Submits once (--no-wait), waits for the verdict, then reads the status of that submission. The submission is only
+# sent again when the call failed with a network error before an id was read (a duplicate submission is harmless); a wait that times out
+# never resubmits: the status is read and, still In Progress, the release fails with the id to look at.
 notarize() {
   local id status
-  # A real rejection (Invalid) is a finished submission, not a failure of the call: it is not retried.
-  apple xcrun notarytool submit "$1" "${notary[@]}" --wait --timeout 30m --output-format json || true
-  id="$(python3 -c 'import json,sys; print(json.load(sys.stdin).get("id", ""))' < "$apple_out" 2>/dev/null || true)"
-  status="$(python3 -c 'import json,sys; print(json.load(sys.stdin).get("status", ""))' < "$apple_out" 2>/dev/null || true)"
-  echo "Notarization ${id:-unknown} ${status:-no status}"
+  apple xcrun notarytool submit "$1" "${notary[@]}" --no-wait --output-format json || true
+  id="$(json_field id)"
+  if [ -z "$id" ]; then
+    echo "::error::Notarization of $1 was not accepted for submission."
+    return 1
+  fi
+  echo "Notarization submission $id"
+  # A rejection (Invalid) is a finished submission, not a failure of the call: it is not retried either.
+  apple xcrun notarytool wait "$id" "${notary[@]}" --timeout 30m --output-format json || true
+  apple xcrun notarytool info "$id" "${notary[@]}" --output-format json || true
+  status="$(json_field status)"
+  echo "Notarization $id ${status:-no status}"
   if [ "$status" != Accepted ]; then
-    if [ -n "$id" ]; then apple xcrun notarytool log "$id" "${notary[@]}" || true; fi
+    if [ "$status" = "In Progress" ]; then
+      echo "::error::Notarization $id is still in progress after the wait: not submitted again. Check it with notarytool info, then run the release again."
+    elif [ -n "$status" ]; then
+      apple xcrun notarytool log "$id" "${notary[@]}" || true
+    fi
     return 1
   fi
 }
@@ -72,10 +93,11 @@ offline_gate() {
   fi
 }
 staple() {
+  local apple_retry="$apple_failure_stapler"
   apple xcrun stapler staple "$1" || return $?
   local status=0
   apple xcrun stapler validate "$1" && return 0 || status=$?
-  if ! cat "$apple_out" "$apple_err" | grep -qiE "$apple_failure"; then return "$status"; fi
+  if ! cat "$apple_out" "$apple_err" | grep -qiE "$apple_failure_stapler"; then return "$status"; fi
   echo "::warning::stapler validate could not reach Apple's CloudKit after 6 tries; checked $1 with the offline gate instead (signature, Developer ID, stapled ticket, spctl)."
   offline_gate "$1" "$2"
 }
