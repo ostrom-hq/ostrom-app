@@ -11,6 +11,7 @@ import run.ostrom.app.domain.models.CloudSession
 import run.ostrom.app.domain.models.CloudSessionPage
 import run.ostrom.app.domain.models.CloudSessionRefusal
 import run.ostrom.app.domain.models.CloudSessionStatus
+import run.ostrom.app.domain.models.GitHubAccess
 import run.ostrom.app.domain.models.NewCloudSession
 import run.ostrom.app.domain.repositories.CloudSessionRepository
 import run.ostrom.app.domain.services.Clock
@@ -32,6 +33,7 @@ private fun demoCloudSession(
     recipe: CloudRecipe? = null, repo: String? = null, ref: String? = null, readyAt: Long? = null, pausedAt: Long? = null, endedAt: Long? = null,
 ) = CloudSession(
     id, name, "claude", "claude-opus", repo, ref, status, desired, phase, failure, demoLimits, created, created, readyAt, readyAt, pausedAt, endedAt, recipe,
+    GitHubAccess.OWNER,
 )
 
 /**
@@ -80,6 +82,7 @@ class DemoCloudSessionRepository(private val demo: DemoMode, private val clock: 
         val created = CloudSession(
             "demo-cloud-new-${store.cloudSessions.value.size + 1}", name, session.agent.wire, session.model, session.repo, session.ref, CloudSessionStatus.RUNNING,
             "running", null, null, demoLimits, now, now, now, now, null, null, session.recipe,
+            GitHubAccess.OWNER,
         )
         store.cloudSessions.value = listOf(created) + store.cloudSessions.value
         return created
@@ -95,6 +98,14 @@ class DemoCloudSessionRepository(private val demo: DemoMode, private val clock: 
 
     override suspend fun stop(accountId: String, sessionId: String): CloudSession =
         change(sessionId) { it.copy(status = CloudSessionStatus.TERMINATED, desiredStatus = CloudSession.TERMINATED, phase = null, endedAt = clock.nowMillis()) }
+
+    override suspend fun setGitHubAccess(accountId: String, sessionId: String, access: GitHubAccess): CloudSession {
+        // As the server: taking the access away needs the session paused.
+        if (access == GitHubAccess.NONE && demo.store().cloudSessions.value.firstOrNull { it.id == sessionId }?.status != CloudSessionStatus.PAUSED) {
+            throw AppException.CloudSessionRefused(CloudSessionRefusal.GITHUB_NOT_PAUSED)
+        }
+        return change(sessionId) { it.copy(githubAccess = access) }
+    }
 
     private fun change(sessionId: String, update: (CloudSession) -> CloudSession): CloudSession {
         val store = demo.store()
@@ -115,4 +126,5 @@ class DemoAwareCloudSessionRepository(private val real: CloudSessionRepository, 
     override suspend fun pause(accountId: String, sessionId: String) = of(accountId).pause(accountId, sessionId)
     override suspend fun resume(accountId: String, sessionId: String) = of(accountId).resume(accountId, sessionId)
     override suspend fun stop(accountId: String, sessionId: String) = of(accountId).stop(accountId, sessionId)
+    override suspend fun setGitHubAccess(accountId: String, sessionId: String, access: GitHubAccess) = of(accountId).setGitHubAccess(accountId, sessionId, access)
 }

@@ -42,6 +42,10 @@ data class MemberEnvironmentRoute(val accountId: String)
 @Serializable
 data class PersonalMcpServersRoute(val accountId: String)
 
+/** The member's GitHub link on an account's server (`github.link.v1`): which account is linked, and linking one, opened from Settings. */
+@Serializable
+data class GitHubLinkRoute(val accountId: String)
+
 /** One artifact of an account, at [version] (the latest one when null), opened from the Artifacts tab. */
 @Serializable
 data class ArtifactRoute(val accountId: String, val artifactId: String, val version: Int? = null)

@@ -22,6 +22,7 @@ import run.ostrom.app.domain.models.CloudRecipe
 import run.ostrom.app.domain.models.CloudRepository
 import run.ostrom.app.domain.models.CloudSessionRefusal
 import run.ostrom.app.domain.models.CloudSessionStatus
+import run.ostrom.app.domain.models.GitHubAccess
 import run.ostrom.app.domain.models.NewCloudSession
 import run.ostrom.app.domain.services.PlatformInfo
 import run.ostrom.app.infrastructure.client.OstromClientProvider
@@ -150,5 +151,27 @@ class RemoteCloudSessionRepositoryTest {
             assertFailsWith<AppException.CloudSessionRefused> { repository.create("a1", NewCloudSession(CloudAgent.CLAUDE)) }.reason)
         answers["POST /api/v1/cloud/sessions/c1/resume"] = HttpStatusCode.ServiceUnavailable to """{"error":{"type":"unavailable","message":"m"}}"""
         assertEquals(503, assertFailsWith<AppException.Server> { repository.resume("a1", "c1") }.statusCode)
+    }
+
+    @Test
+    fun theGitHubAccessIsPutAndItsRefusalsAreWordedByTheirKey() = runTest {
+        signedIn()
+        answers["PUT /api/v1/cloud/sessions/c1/github"] = HttpStatusCode.OK to session("c1", "paused").replace(""""githubAccess":"owner"""", """"githubAccess":"none"""")
+        val changed = repository.setGitHubAccess("a1", "c1", GitHubAccess.NONE)
+        assertEquals(GitHubAccess.NONE, changed.githubAccess)
+        assertEquals("""{"access":"none"}""", (requests.last().body as OutgoingContent.ByteArrayContent).bytes().decodeToString())
+        assertEquals(GitHubAccess.OWNER, GitHubAccess.of("owner"))
+        assertEquals(null, GitHubAccess.of("something_new"))
+        val refusals = mapOf(
+            "session_not_paused" to (HttpStatusCode.Conflict to CloudSessionRefusal.GITHUB_NOT_PAUSED),
+            "github_owner_only" to (HttpStatusCode.Forbidden to CloudSessionRefusal.GITHUB_OWNER_ONLY),
+            "conflict" to (HttpStatusCode.Conflict to CloudSessionRefusal.STATE),
+        )
+        for ((key, expected) in refusals) {
+            answers["PUT /api/v1/cloud/sessions/c1/github"] = expected.first to """{"error":{"type":"$key","message":"server text"}}"""
+            val refused = assertFailsWith<AppException.CloudSessionRefused> { repository.setGitHubAccess("a1", "c1", GitHubAccess.NONE) }
+            assertEquals(expected.second, refused.reason)
+            assertFalse("server text" in refused.message.orEmpty())
+        }
     }
 }

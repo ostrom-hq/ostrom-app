@@ -34,7 +34,9 @@ All repository content (code, comments, docs, commits, pull requests) is in Engl
    models (`XxxViewModel`, a `StateFlow` of an immutable `XxxUiState`); `di/` wires them with Koin; the platform
    modules (`androidMain`, `iosMain`, `jvmMain`) bind the platform services.
 3. Never swallow `CancellationException`: rethrow it first in every broad catch; no `runCatching` around suspend code.
-4. Failures reach the screen as `AppException`s worded by `userMessage()`: never a server-provided message.
+4. Failures reach the screen as `AppException`s worded by `userMessage()`: never a server-provided message. One accepted
+   exception: a failed cloud session preparation's structured message (which step, its index, the exit code; never a
+   command's output) is shown as the server words it.
 5. Secrets (tokens, unlock keys) only in the `CredentialStore` (Keychain, Android Keystore, the desktop keyring);
    never in settings, logs or crash reports. Never log tokens, prompts or response bodies.
 6. All user-facing text through `Res.string`, in English and French (`LocalizationTest`); the apostrophe stays bare.

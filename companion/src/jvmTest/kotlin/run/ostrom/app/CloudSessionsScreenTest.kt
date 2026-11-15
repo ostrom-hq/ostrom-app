@@ -259,4 +259,61 @@ class CloudSessionsScreenTest {
         }
         assertTrue(server.clients == 0, "the demo makes no request")
     }
+
+    @Test
+    fun aSessionsGitHubAccessIsChosenOnlyWithTheFeatureAndAFailedRemovalIsWordedByItsKey() {
+        val owned = session("c1", "Mill", "running", extra = ""","githubAccess":"owner"""")
+        val server = server("sessions.v1", "runners.cloud.v1", "runners.cloud.github.v1")
+        server.routes["GET /api/v1/cloud/sessions/c1"] = owned
+        server.routes["PUT /api/v1/cloud/sessions/c1/github"] = session("c1", "Mill", "running", extra = ""","githubAccess":"shared"""")
+        signedIn(server) {
+            openCloud()
+            click("cloud-session-c1")
+            waitFor("cloud-session-github")
+            waitForText("Git and gh in this session act as your linked GitHub account.")
+            server.routes["GET /api/v1/cloud/sessions/c1"] = session("c1", "Mill", "running", extra = ""","githubAccess":"shared"""")
+            click("cloud-session-github-shared")
+            waitForText("whoever shares the session's terminal")
+            waitUntil(timeoutMillis = 10_000) { synchronized(server) { "PUT /api/v1/cloud/sessions/c1/github" in server.asked } }
+            server.failures["PUT /api/v1/cloud/sessions/c1/github"] = 409 to "session_not_paused"
+            click("cloud-session-github-none")
+            waitFor("cloud-session-action-error")
+            waitForText("Pause the session before removing its GitHub access")
+            assertFalse(onAllNodes(hasText("\"m\"", substring = true)).fetchSemanticsNodes().isNotEmpty(), "the server's text is never shown")
+        }
+    }
+
+    @Test
+    fun noGitHubAccessChoiceWithoutTheFeature() {
+        val server = server("sessions.v1", "runners.cloud.v1")
+        server.routes["GET /api/v1/cloud/sessions/c1"] = session("c1", "Mill", "running", extra = ""","githubAccess":"owner"""")
+        signedIn(server) {
+            openCloud()
+            click("cloud-session-c1")
+            waitFor("cloud-session-overview")
+            onNodeWithTag("cloud-session-github").assertDoesNotExist()
+        }
+    }
+
+    @Test
+    fun theDemoChoosesAGitHubAccessAndRefusesRemovingItWhileRunning() {
+        val server = server("runners.cloud.v1")
+        testApp(server) {
+            onNodeWithTag("try-demo").performSemanticsAction(SemanticsActions.OnClick)
+            settle()
+            click("tab-sessions")
+            click("sessions-kind-cloud")
+            click("cloud-session-${DemoCloudSessionIds.RUNNING}")
+            waitFor("cloud-session-github")
+            click("cloud-session-github-shared")
+            waitForText("whoever shares the session's terminal")
+            click("cloud-session-github-none")
+            waitForText("Pause the session before removing its GitHub access")
+            click("cloud-session-pause")
+            gone("cloud-session-pause")
+            click("cloud-session-github-none")
+            waitForText("No GitHub credential")
+        }
+        assertFalse(server.clients > 0, "the demo makes no request")
+    }
 }

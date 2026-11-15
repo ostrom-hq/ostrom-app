@@ -8,6 +8,7 @@ import org.jetbrains.compose.resources.stringResource
 import run.ostrom.app.domain.models.AppException
 import run.ostrom.app.domain.models.CloudSessionProblem
 import run.ostrom.app.domain.models.CloudSessionRefusal
+import run.ostrom.app.domain.models.GitHubRefusal
 import run.ostrom.app.domain.models.LinkRefusal
 import run.ostrom.app.domain.models.WorkflowEditRefusal
 import run.ostrom.app.domain.models.WorkflowRefusal
@@ -27,7 +28,14 @@ import run.ostrom.app.resources.error_cloud_repository
 import run.ostrom.app.resources.error_cloud_state
 import run.ostrom.app.resources.error_cloud_too_many
 import run.ostrom.app.resources.error_cloud_variables
+import run.ostrom.app.resources.error_cloud_github_not_paused
+import run.ostrom.app.resources.error_cloud_github_owner_only
 import run.ostrom.app.resources.error_credential_storage
+import run.ostrom.app.resources.error_github_account_in_use
+import run.ostrom.app.resources.error_github_app_misconfigured
+import run.ostrom.app.resources.error_github_app_not_configured
+import run.ostrom.app.resources.error_github_device_flow_disabled
+import run.ostrom.app.resources.error_github_unreachable
 import run.ostrom.app.resources.error_generic
 import run.ostrom.app.resources.error_invalid_origin
 import run.ostrom.app.resources.error_link_not_artifact
@@ -135,6 +143,15 @@ private fun AppException.sentence(): Pair<StringResource, List<Any>> = when (thi
         CloudSessionRefusal.PROFILE_REQUIRED -> Res.string.error_cloud_profile_required
         CloudSessionRefusal.PROFILE_UNAVAILABLE -> Res.string.error_cloud_profile_unavailable
         CloudSessionRefusal.CLUSTER_UNAVAILABLE -> Res.string.error_cloud_cluster_unavailable
+        CloudSessionRefusal.GITHUB_OWNER_ONLY -> Res.string.error_cloud_github_owner_only
+        CloudSessionRefusal.GITHUB_NOT_PAUSED -> Res.string.error_cloud_github_not_paused
+    } to emptyList()
+    is AppException.GitHubRefused -> when (reason) {
+        GitHubRefusal.APP_NOT_CONFIGURED -> Res.string.error_github_app_not_configured
+        GitHubRefusal.DEVICE_FLOW_DISABLED -> Res.string.error_github_device_flow_disabled
+        GitHubRefusal.APP_MISCONFIGURED -> Res.string.error_github_app_misconfigured
+        GitHubRefusal.ACCOUNT_IN_USE -> Res.string.error_github_account_in_use
+        GitHubRefusal.UNREACHABLE -> Res.string.error_github_unreachable
     } to emptyList()
     is AppException.CloudSessionInvalid -> when (problem) {
         CloudSessionProblem.NAME -> Res.string.error_cloud_name

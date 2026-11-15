@@ -161,18 +161,48 @@ at each return and on refresh, as does a record: the server publishes no cloud s
   While it is creating or resuming, the step the runner reports (`configuring_git`, `cloning_repositories`,
   `fetching_repositories`, `running_setup`; any other reads as preparing the workspace). A failure is worded by its
   code; a `preparation_failed` shows the server's sentence (which step failed, never a command's output) and says to
-  resume when `retryable`, otherwise that the recipe or the variables must be fixed in the console.
+  resume when `retryable`, otherwise that the recipe or the variables must be fixed in the console. This is the one
+  accepted exception to "never the server's text" (AGENTS.md): the message is structured (step, index, exit code) and
+  never holds a command's output.
 - **Actions.** Pause (while it runs or is on its way), Resume (on a paused session not already resuming), Stop (asked first: the workspace
   is deleted). Each takes the server's answer, then reads the session again. A refusal is worded by its key
   (`invalid_request`, `payment_required`, `conflict`, `forbidden`, `profile_required`, `profile_unassigned`,
   `cloud_profile_not_found`, `image_not_allowed`, `cluster_unavailable`, `namespace_not_allowed`), never with the
   server's text.
+- **GitHub access.** With `runners.cloud.github.v1`, a record whose `githubAccess` the server states (and that has not
+  ended) shows a switch: Mine (`owner`, the default), Shared (`shared`, the owner's account with the terminal shared)
+  or None (`none`, public repositories only), sent with `PUT .../github`. The sessions listed are the person's own,
+  so the person is the owner; `github_owner_only` (403, an agent or a service key) is worded anyway. Taking the access
+  away from a session that is not paused is refused by the server (`409 session_not_paused`): the app sends it and
+  words the refusal by its key ("Pause the session before removing its GitHub access"), never the server's text.
+  TeamCode's companion has no such control; it is Ostrom's own.
 - **New cloud session.** The agent, a name, a model and a first message, checked as the server checks them. With
   `runners.cloud.environment.v1` the form takes the recipe (the fields of `CreateCloudSessionRequest.environment`);
   without it, the single repository and ref. No profile or image is chosen: the server picks the person's only profile,
   and asks for one (`profile_required`, worded) when there are several.
 - **Not in the app.** A cloud session's transcript (no route serves it), sending it a message, and its terminal (a
   WebSocket the app does not open).
+
+## GitHub link
+
+With `github.link.v1`, Settings has a GitHub row (under the setup rows) that opens the member's link, ported from
+TeamCode's `GitHubLinkScreen`, `GitHubLinkViewModel`, `GitHubLinkUseCases` and `RemoteGitHubLinkRepository` over
+ostrom-core's `client.githubLink`. The capability is read again from the server when the screen opens.
+
+- **States.** Not linked (with a note when an administrator has not configured the instance's GitHub App, `appConfigured`
+  false: nothing can be linked), linked as `<login>`, reconnect required (link again), and a state of a newer server
+  (link again or unlink). A server without the capability shows a note instead.
+- **Device flow.** Link starts it (`POST /github/link/device`), copies the code, opens GitHub's page once ("Open GitHub
+  again" and "Copy the code" stay), and polls (`POST /github/link/device/{id}`) at the interval the server returns,
+  kept between 1 and 60 seconds. Linked ends the flow and reads the account; expired and denied say so and offer to
+  start again; a status or an attempt the server no longer knows (`github_link_not_found`) reads as expired. Three failures
+  in a row of the server, or of GitHub for the server (`github_unreachable`), are waited out; any other ends the flow.
+  Cancel stops the polling. Unlink (`DELETE /github/link`) removes the link and revokes its token at GitHub (the server does).
+- **Never a token.** No call returns a GitHub token and the app reads none; it shows the account name only.
+- **Refusals** by key, never the server's text: `github_app_not_configured`, `github_device_flow_disabled`,
+  `github_app_misconfigured`, `github_account_in_use`, `github_unreachable`.
+- **Demo.** The demo announces both GitHub capabilities: its device flow shows a code, then links "ada-lovelace" in memory.
+- Another member's link (`list`, `member`, `unlinkMember`, owners and admins) is not in the app.
 
 ## Desktop
 
@@ -222,6 +252,11 @@ at each return and on refresh, as does a record: the server publishes no cloud s
   waiting for the person, a budget passed, the phone's session and unlock key) and runs this test with that session in
   `OSTROM_E2E_*`; it says yes and no, sees their receipts verified in the history, reads the spending, the activity
   and the account, and the workflow checks the gates and their signed receipts. Without `OSTROM_E2E_SERVER` it is skipped.
+- GitHub link: `RemoteGitHubLinkRepositoryTest` (routes, states, each poll outcome, refusals by key), `GitHubLinkUseCasesTest`,
+  `GitHubLinkViewModelTest` (polling pending, linked, expired, denied, unreachable, the interval bounds, cancel, unlink),
+  `GitHubLinkScreenTest` (jvmTest: the row and its gate, the states, the code and the opened page, refusals, the demo),
+  and the GitHub access of a cloud session in `CloudSessionUseCasesTest`, `RemoteCloudSessionRepositoryTest`,
+  `CloudSessionGitHubAccessTest` and `CloudSessionsScreenTest`.
 - `companion-desktop/src/test`: the CLI's account against a temporary CLI folder and a fake secret store, finding and
   running the CLI with fake processes, the window placement.
 - `testAndroidHostTest` runs the common tests on Android's host JVM. Kover's gate covers the domain.
@@ -250,7 +285,8 @@ What the React Native app did, what TeamCode's companion does that an Ostrom ser
 | The member's environment: the variable names their agents receive and those withheld (`GET /environment`, values dropped by ostrom-core's client), their personal variants (`GET /me/environment/variants`) | `environment.v1` | Settings, Environment variables, read only. A value is written in the console ("Open in the console", `/me/environment`): the server takes environment writes from a browser session only. TeamCode's companion has no such screen |
 | The member's personal MCP servers: a remote server's address, a hosted command's launcher and package, the secret names, the process state | `mcp.personal.v1` | Settings, MCP servers, read only like TeamCode's `McpServersScreen`; added, edited and deleted in the console (`/me/mcp`), whose writes need a browser session |
 | Cloud sessions: list, record (status, repository or recipe, times, limits, the preparation step, why it failed), pause, resume, stop, new cloud session with its recipe | `runners.cloud.v1`, `runners.cloud.environment.v1` | Ported from TeamCode's `SessionsScreen`, `SessionScreen`, `NewSessionSheet` and their view models (see [Cloud sessions](#cloud-sessions)). No transcript, no messages, no terminal: the server serves none of them to the app |
-| Automations, team MCP servers, GitHub link, sharing | `automations.v1`, `mcp.v1`, `github.link.v1`, `sharing.v1` | Later, each with its client routes in ostrom-core |
+| GitHub link: the member's link (not linked, linked, reconnect), linking with the device flow, unlinking; a cloud session's GitHub access (mine, shared, none) | `github.link.v1`, `runners.cloud.github.v1` | Ported from TeamCode's `GitHubLinkScreen` and view model (see [GitHub link](#github-link)); the access switch on a cloud session's record is Ostrom's own (TeamCode has none). Not in the app: other members' links (owners and admins) |
+| Automations, team MCP servers, sharing | `automations.v1`, `mcp.v1`, `sharing.v1` | Later, each with its client routes in ostrom-core |
 | Desktop: menu bar icon, the CLI's account, update banner | none | Ported (see [Desktop](#desktop)). Left: tray notifications of new waits and approvals while the window is hidden (no use case emits them across accounts yet), making an app sign-in the CLI's (it would write the CLI's secret store), the CLI's account on Windows, an install button when no CLI is found, the app's own update (no desktop release), installer icons for macOS and Windows |
 | Store builds (TestFlight, Play internal track) | none | Ported: TeamCode's fastlane lanes as is ([distribution.md](distribution.md)) |
 | Desktop distribution (signed installers) | none | With 1.0.0 and a Developer ID ([distribution.md](distribution.md)) |

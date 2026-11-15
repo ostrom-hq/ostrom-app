@@ -46,6 +46,7 @@ import run.ostrom.app.presentation.screens.CloudSessionScreen
 import run.ostrom.app.presentation.screens.LoginScreen
 import run.ostrom.app.presentation.screens.MainScreen
 import run.ostrom.app.presentation.screens.MainTab
+import run.ostrom.app.presentation.screens.GitHubLinkScreen
 import run.ostrom.app.presentation.screens.MemberEnvironmentScreen
 import run.ostrom.app.presentation.screens.MoreTabScreen
 import run.ostrom.app.presentation.screens.NewCloudSessionScreen
@@ -62,6 +63,7 @@ import run.ostrom.app.presentation.viewmodels.ArtifactLinkOutcome
 import run.ostrom.app.presentation.viewmodels.ArtifactViewModel
 import run.ostrom.app.presentation.viewmodels.CloudSessionViewModel
 import run.ostrom.app.presentation.viewmodels.Failure
+import run.ostrom.app.presentation.viewmodels.GitHubLinkViewModel
 import run.ostrom.app.presentation.viewmodels.MemberEnvironmentViewModel
 import run.ostrom.app.presentation.viewmodels.NewCloudSessionViewModel
 import run.ostrom.app.presentation.viewmodels.NotificationPreferencesViewModel
@@ -191,6 +193,7 @@ fun OstromNavHost(rootViewModel: RootViewModel = koinViewModel(), unlock: PhoneU
                 onOpenNotifications = { accountId -> navController.navigate(NotificationPreferencesRoute(accountId)) },
                 onOpenEnvironment = { accountId -> navController.navigate(MemberEnvironmentRoute(accountId)) },
                 onOpenMcpServers = { accountId -> navController.navigate(PersonalMcpServersRoute(accountId)) },
+                onOpenGitHub = { accountId -> navController.navigate(GitHubLinkRoute(accountId)) },
                 onOpenArtifact = { accountId, artifactId -> navController.navigate(ArtifactRoute(accountId, artifactId)) },
                 onOpenSession = { accountId, sessionId -> navController.navigate(SessionRoute(accountId, sessionId)) },
                 onOpenCloudSession = { accountId, sessionId -> navController.navigate(CloudSessionRoute(accountId, sessionId)) },
@@ -301,6 +304,10 @@ fun OstromNavHost(rootViewModel: RootViewModel = koinViewModel(), unlock: PhoneU
         composable<MemberEnvironmentRoute> { entry ->
             val viewModel: MemberEnvironmentViewModel = koinViewModel { parametersOf(entry.toRoute<MemberEnvironmentRoute>()) }
             MemberEnvironmentScreen(viewModel, onBack = { navController.popBackStack() })
+        }
+        composable<GitHubLinkRoute> { entry ->
+            val viewModel: GitHubLinkViewModel = koinViewModel { parametersOf(entry.toRoute<GitHubLinkRoute>()) }
+            GitHubLinkScreen(viewModel, onBack = { navController.popBackStack() })
         }
         composable<PersonalMcpServersRoute> { entry ->
             val viewModel: PersonalMcpServersViewModel = koinViewModel { parametersOf(entry.toRoute<PersonalMcpServersRoute>()) }

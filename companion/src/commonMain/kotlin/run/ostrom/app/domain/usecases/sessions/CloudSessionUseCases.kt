@@ -10,6 +10,7 @@ import run.ostrom.app.domain.models.CloudSessionPage
 import run.ostrom.app.domain.models.CloudSessionProblem
 import run.ostrom.app.domain.models.CloudSessionRefusal
 import run.ostrom.app.domain.models.Features
+import run.ostrom.app.domain.models.GitHubAccess
 import run.ostrom.app.domain.models.NewCloudSession
 import run.ostrom.app.domain.repositories.CloudSessionRepository
 import run.ostrom.app.domain.repositories.FeaturesRepository
@@ -59,12 +60,30 @@ class ControlCloudSessionUseCase(private val access: CloudSessionAccess) {
     }
 }
 
-/** What the new cloud session form offers: the preparation recipe when the server takes one ([recipe]). */
-data class CloudSessionOptions(val recipe: Boolean)
+/**
+ * What the screens of a cloud session offer: the preparation recipe when the server takes one ([recipe]), and the choice
+ * of the session's GitHub access when it announces `runners.cloud.github.v1` ([githubAccess]).
+ */
+data class CloudSessionOptions(val recipe: Boolean, val githubAccess: Boolean = false)
 
 class LoadCloudSessionOptionsUseCase(private val access: CloudSessionAccess) {
     suspend operator fun invoke(accountId: String): CloudSessionOptions =
-        access.call(accountId) { announced -> CloudSessionOptions(recipe = Features.RUNNERS_CLOUD_ENVIRONMENT in announced) }
+        access.call(accountId) { announced ->
+            CloudSessionOptions(recipe = Features.RUNNERS_CLOUD_ENVIRONMENT in announced, githubAccess = Features.RUNNERS_CLOUD_GITHUB in announced)
+        }
+}
+
+/**
+ * Chooses whose GitHub access a cloud session uses, on a server with `runners.cloud.github.v1` (the sessions listed are
+ * the person's own: the owner's). A session that ended is refused before any request; taking the access away from a
+ * session that is not paused is the server's refusal (`session_not_paused`), worded by its key.
+ */
+class SetCloudSessionGitHubAccessUseCase(private val access: CloudSessionAccess) {
+    suspend operator fun invoke(accountId: String, session: CloudSession, choice: GitHubAccess): CloudSession = access.call(accountId) { announced ->
+        if (Features.RUNNERS_CLOUD_GITHUB !in announced) throw AppException.Unsupported(Features.RUNNERS_CLOUD_GITHUB)
+        if (session.status.ended) throw AppException.CloudSessionRefused(CloudSessionRefusal.STATE)
+        access.repository.setGitHubAccess(accountId, session.id, choice)
+    }
 }
 
 /**

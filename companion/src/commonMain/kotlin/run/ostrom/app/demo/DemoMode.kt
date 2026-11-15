@@ -70,6 +70,9 @@ internal class DemoStore(val startedAt: Long) {
 
     /** The person's cloud sessions, newest first; the demo's starts, pauses, resumes and stops change them. */
     val cloudSessions = MutableStateFlow(demoCloudSessions(startedAt))
+
+    /** The demo member's GitHub link: none at first; the demo's device flow links Ada's account, unlinking removes it. */
+    val githubLink = MutableStateFlow(demoGitHubLink(linked = false, startedAt))
 }
 
 /** "Try the demo" on the first screen: offered only on a device without any account, so a demo never mixes with a real one. */

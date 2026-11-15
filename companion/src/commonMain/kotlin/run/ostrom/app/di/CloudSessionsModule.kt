@@ -10,6 +10,7 @@ import run.ostrom.app.domain.usecases.sessions.CreateCloudSessionUseCase
 import run.ostrom.app.domain.usecases.sessions.GetCloudSessionUseCase
 import run.ostrom.app.domain.usecases.sessions.LoadCloudSessionOptionsUseCase
 import run.ostrom.app.domain.usecases.sessions.LoadCloudSessionsUseCase
+import run.ostrom.app.domain.usecases.sessions.SetCloudSessionGitHubAccessUseCase
 import run.ostrom.app.infrastructure.repositories.RemoteCloudSessionRepository
 import run.ostrom.app.presentation.navigation.CloudSessionRoute
 import run.ostrom.app.presentation.navigation.NewCloudSessionRoute
@@ -27,7 +28,8 @@ val cloudSessionsModule = module {
     single { ControlCloudSessionUseCase(get()) }
     single { LoadCloudSessionOptionsUseCase(get()) }
     single { CreateCloudSessionUseCase(get()) }
+    single { SetCloudSessionGitHubAccessUseCase(get()) }
     viewModel { CloudSessionsViewModel(get(), get()) }
-    viewModel { (route: CloudSessionRoute) -> CloudSessionViewModel(route, get(), get()) }
+    viewModel { (route: CloudSessionRoute) -> CloudSessionViewModel(route, get(), get(), get(), get()) }
     viewModel { (route: NewCloudSessionRoute) -> NewCloudSessionViewModel(route, get(), get()) }
 }
