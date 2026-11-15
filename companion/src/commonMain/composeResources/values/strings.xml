@@ -1175,6 +1175,8 @@
     <string name="error_device_resume_unsupported">Ostrom on this device is too old to resume a session. Update it on the device (ostrom update).</string>
     <string name="error_device_no_answer">The device did not answer in time. Try again.</string>
     <string name="error_device_resume_folder">The device could not read this folder's sessions (%1$s).</string>
+    <string name="error_device_resume_agent">Only a Claude Code session continues a conversation of the device.</string>
+    <string name="error_device_invalid_resume">Choose one of the conversations the device listed.</string>
     <string name="input_choose_device">Choose one of your online devices.</string>
     <string name="input_choose_folder">Choose one of the folders the device offers.</string>
     <string name="input_choose_agent">Choose Claude Code or Codex.</string>

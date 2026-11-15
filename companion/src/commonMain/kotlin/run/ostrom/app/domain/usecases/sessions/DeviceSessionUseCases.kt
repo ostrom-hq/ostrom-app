@@ -72,6 +72,9 @@ class CreateDeviceSessionUseCase(private val access: CloudSessionAccess, private
         if (sent.name.isEmpty() || sent.name.length > CloudSessionRules.MAX_NAME || sent.name.any(Char::isISOControl)) {
             throw AppException.CloudSessionInvalid(CloudSessionProblem.NAME)
         }
+        // The server's rules for a model and an effort, as when a session's are changed.
+        if (sent.model != null && !ControlConversationUseCase.validModel(sent.model)) throw AppException.CloudSessionInvalid(CloudSessionProblem.MODEL)
+        if (sent.effort != null && !ControlConversationUseCase.validEffort(sent.effort)) throw AppException.CloudSessionInvalid(CloudSessionProblem.EFFORT)
         val message = sent.initialMessage
         if (message != null && message.length > CloudSessionRules.MAX_PROMPT) throw AppException.CloudSessionInvalid(CloudSessionProblem.PROMPT)
         return access.call(accountId) { announced ->

@@ -201,10 +201,21 @@ class NewDeviceSessionViewModelTest {
         model.create(); settle()
         val keys = sessions.deviceCreations.map { it.second }
         assertEquals(2, keys.size); assertEquals(keys[0], keys[1])
+        // Nothing is edited while a creation is in flight, so a retry sends what was sent, under its key.
+        val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+        sessions.createOnDeviceResult = { gate.await(); throw AppException.Unreachable() }
+        model.create(); runCurrent()
+        assertTrue(model.uiState.value.creating)
+        model.onField(CloudField.PROMPT, "Changed meanwhile"); model.onField(CloudField.NAME, "Other")
+        assertEquals("app", model.uiState.value.name); assertEquals("", model.uiState.value.prompt)
+        gate.complete(Unit); settle()
+        assertEquals(3, sessions.deviceCreations.size); assertEquals(sessions.deviceCreations[0], sessions.deviceCreations.last())
+        model.create(); settle()
+        assertEquals(sessions.deviceCreations[0], sessions.deviceCreations.last())
         // What is sent changes: another key.
         model.onField(CloudField.EFFORT, "high")
         model.create(); settle()
-        assertEquals(3, sessions.deviceCreations.size); assertEquals(2, sessions.deviceCreations.map { it.second }.distinct().size)
+        assertEquals(5, sessions.deviceCreations.size); assertEquals(2, sessions.deviceCreations.map { it.second }.distinct().size)
         // The device went offline meanwhile: refused, said in words, and no longer offered.
         online = emptyList()
         sessions.createOnDeviceResult = { throw AppException.Server(409, "device_offline") }

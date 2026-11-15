@@ -87,12 +87,14 @@ import run.ostrom.app.resources.wfe_error_problems
 import run.ostrom.app.resources.wfe_error_stale
 import run.ostrom.app.resources.error_device_folder_not_published
 import run.ostrom.app.resources.error_device_invalid_folder
+import run.ostrom.app.resources.error_device_invalid_resume
 import run.ostrom.app.resources.error_device_no_answer
 import run.ostrom.app.resources.error_device_not_found
 import run.ostrom.app.resources.error_device_offline
 import run.ostrom.app.resources.error_device_refused
 import run.ostrom.app.resources.error_device_refused_code
 import run.ostrom.app.resources.error_device_requires_login
+import run.ostrom.app.resources.error_device_resume_agent
 import run.ostrom.app.resources.error_device_resume_folder
 import run.ostrom.app.resources.error_device_resume_unsupported
 import run.ostrom.app.resources.error_device_target_unsupported
@@ -206,6 +208,8 @@ private fun AppException.sentence(): Pair<StringResource, List<Any>> = when (thi
         "invalid_folder" -> Res.string.error_device_invalid_folder to emptyList()
         AppException.DeviceRefused.DAEMON_RESUME_UNSUPPORTED -> Res.string.error_device_resume_unsupported to emptyList()
         "device_no_answer" -> Res.string.error_device_no_answer to emptyList()
+        "resume_unsupported" -> Res.string.error_device_resume_agent to emptyList()
+        "invalid_resume" -> Res.string.error_device_invalid_resume to emptyList()
         "folder_not_configured", "folder_missing", "folder_moved", "folder_refused" -> Res.string.error_device_resume_folder to listOf<Any>(code)
         else -> visibleCode(code)?.let { Res.string.error_device_refused_code to listOf<Any>(it) } ?: (Res.string.error_device_refused to emptyList())
     }

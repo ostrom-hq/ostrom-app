@@ -1175,6 +1175,8 @@
     <string name="error_device_resume_unsupported">Ostrom sur cet appareil est trop ancien pour reprendre une session. Mets-le à jour sur l'appareil (ostrom update).</string>
     <string name="error_device_no_answer">L'appareil n'a pas répondu à temps. Réessaie.</string>
     <string name="error_device_resume_folder">L'appareil n'a pas pu lire les sessions de ce dossier (%1$s).</string>
+    <string name="error_device_resume_agent">Seule une session Claude Code reprend une conversation de l'appareil.</string>
+    <string name="error_device_invalid_resume">Choisis l'une des conversations listées par l'appareil.</string>
     <string name="input_choose_device">Choisis l'un de tes appareils en ligne.</string>
     <string name="input_choose_folder">Choisis l'un des dossiers proposés par l'appareil.</string>
     <string name="input_choose_agent">Choisis Claude Code ou Codex.</string>

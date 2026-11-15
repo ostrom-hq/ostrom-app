@@ -351,9 +351,11 @@ class NewCloudSessionViewModel(
     private fun Exception.isDeviceGone() =
         this is AppException.DeviceRefused && (code == AppException.DeviceRefused.DEVICE_OFFLINE || code == DEVICE_NOT_FOUND)
 
-    fun onAgent(agent: CloudAgent) = state.update { it.copy(agent = agent, createError = null) }
+    // Nothing is edited while a creation is in flight: what was sent keeps its key for a retry.
+    fun onAgent(agent: CloudAgent) = state.update { if (it.creating) it else it.copy(agent = agent, createError = null) }
 
     fun onField(field: CloudField, value: String) = state.update {
+        if (it.creating) return@update it
         when (field) {
             // A name cleared lets the folder name the session again.
             CloudField.NAME -> it.copy(name = value.take(CloudSessionRules.MAX_NAME), nameEdited = value.isNotBlank())

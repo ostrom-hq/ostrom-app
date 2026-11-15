@@ -10,6 +10,7 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.test.performTextInput
 import com.russhwolf.settings.MapSettings
 import kotlinx.coroutines.runBlocking
 import run.ostrom.app.demo.DemoCloudSessionIds
@@ -51,6 +52,7 @@ class SessionKindsScreenTest {
             "GET /api/v1/cloud/sessions/l1" to local,
             "GET /api/v1/cloud/sessions/r1/events" to """{"events":[],"lastSeq":0}""",
             "GET /api/v1/cloud/sessions/r1/events/stream" to "event: end\ndata: {}\n\n",
+            "POST /api/v1/cloud/sessions/r1/messages" to """{"id":"in-1","kind":"message","status":"queued","authorId":"m1","createdAt":"2026-11-14T10:00:00Z"}""",
             "GET /api/v1/cloud/sessions/l1/events" to """{"events":[],"lastSeq":0}""",
             "GET /api/v1/cloud/sessions/l1/events/stream" to "event: end\ndata: {}\n\n",
         ),
@@ -102,6 +104,11 @@ class SessionKindsScreenTest {
             click("cloud-session-r1")
             waitForText("Paused on Ada's MacBook. A message asks it to resume.")
             onNodeWithTag("dock-resume").assertDoesNotExist()
+            // No Resume: a message wakes it, so the composer stays under the dock.
+            waitFor("composer")
+            onNodeWithTag("composer").performTextInput("Go on")
+            click("send")
+            waitUntil(timeoutMillis = 10_000) { "POST /api/v1/cloud/sessions/r1/messages" in server.asked }
             // The record, with the device's banner, is in the conversation's summary.
             click("summary-toggle")
             waitFor("host-offline")
@@ -124,6 +131,8 @@ class SessionKindsScreenTest {
             openList()
             click("cloud-session-l1")
             waitForText("This session runs in a terminal (ostrom <agent>): talk to it there.")
+            waitForText("Local run (ostrom <agent>)")
+            onNodeWithTag("composer").assertDoesNotExist()
         }
     }
 

@@ -71,6 +71,7 @@ import org.jetbrains.compose.resources.stringResource
 import run.ostrom.app.domain.models.CloudSession
 import run.ostrom.app.domain.models.CloudSessionStatus
 import run.ostrom.app.domain.models.PendingMessage
+import run.ostrom.app.domain.models.SessionKind
 import run.ostrom.app.domain.usecases.sessions.ControlConversationUseCase
 import run.ostrom.app.presentation.components.AppButton
 import run.ostrom.app.presentation.components.AppIconButton
@@ -417,7 +418,7 @@ private fun Summary(session: CloudSession, state: CloudSessionUiState, onModel: 
                     val changeLabel = stringResource(Res.string.session_effort_change)
                     Chip(label, Modifier.testTag("effort-chip").let { if (onEffort != null) it.clickable(role = Role.Button, onClickLabel = changeLabel, onClick = onEffort) else it }, tone = Tone.MUTED)
                 }
-                if (session.remote) KindChips(session)
+                if (session.kind != SessionKind.CLOUD) KindChips(session)
                 if (session.permissionBypass && state.options.bypass) Chip(stringResource(Res.string.session_bypass_on), modifier = Modifier.testTag("bypass-chip"))
                 LiveLabel(state)
             }

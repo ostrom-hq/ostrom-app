@@ -126,6 +126,9 @@ class DeviceSessionUseCasesTest {
         assertEquals(CloudSessionProblem.CHOOSE_AGENT, assertFailsWith<AppException.CloudSessionInvalid> { create("a1", form.copy(agent = "gemini"), "k") }.problem)
         assertEquals(CloudSessionProblem.NAME, assertFailsWith<AppException.CloudSessionInvalid> { create("a1", form.copy(name = "  "), "k") }.problem)
         assertEquals(CloudSessionProblem.PROMPT, assertFailsWith<AppException.CloudSessionInvalid> { create("a1", form.copy(initialMessage = "x".repeat(20_001)), "k") }.problem)
+        assertEquals(CloudSessionProblem.MODEL, assertFailsWith<AppException.CloudSessionInvalid> { create("a1", form.copy(model = "opus 4"), "k") }.problem)
+        assertEquals(CloudSessionProblem.MODEL, assertFailsWith<AppException.CloudSessionInvalid> { create("a1", form.copy(model = "m".repeat(121)), "k") }.problem)
+        assertEquals(CloudSessionProblem.EFFORT, assertFailsWith<AppException.CloudSessionInvalid> { create("a1", form.copy(effort = "very high"), "k") }.problem)
         assertTrue(sessions.deviceCreations.isEmpty())
         // A refused form keeps the last launch's mode.
         assertEquals(PermissionMode.ASK, preferences.permissionMode)
