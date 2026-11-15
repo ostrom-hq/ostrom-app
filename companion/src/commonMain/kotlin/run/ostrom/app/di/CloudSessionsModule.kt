@@ -4,7 +4,13 @@ package run.ostrom.app.di
 
 import org.koin.core.module.dsl.viewModel
 import org.koin.dsl.module
+import run.ostrom.app.domain.usecases.sessions.AnswerPermissionUseCase
 import run.ostrom.app.domain.usecases.sessions.CloudSessionAccess
+import run.ostrom.app.domain.usecases.sessions.ControlConversationUseCase
+import run.ostrom.app.domain.usecases.sessions.SendMessageUseCase
+import run.ostrom.app.domain.usecases.transcript.FollowTranscriptUseCase
+import run.ostrom.app.domain.usecases.transcript.ListAgentsUseCase
+import run.ostrom.app.domain.usecases.transcript.LoadTranscriptUseCase
 import run.ostrom.app.domain.usecases.sessions.ControlCloudSessionUseCase
 import run.ostrom.app.domain.usecases.sessions.CreateCloudSessionUseCase
 import run.ostrom.app.domain.usecases.sessions.GetCloudSessionUseCase
@@ -12,8 +18,10 @@ import run.ostrom.app.domain.usecases.sessions.LoadCloudSessionOptionsUseCase
 import run.ostrom.app.domain.usecases.sessions.LoadCloudSessionsUseCase
 import run.ostrom.app.domain.usecases.sessions.SetCloudSessionGitHubAccessUseCase
 import run.ostrom.app.infrastructure.repositories.RemoteCloudSessionRepository
+import run.ostrom.app.infrastructure.repositories.RemoteTranscriptRepository
 import run.ostrom.app.presentation.navigation.CloudSessionRoute
 import run.ostrom.app.presentation.navigation.NewCloudSessionRoute
+import run.ostrom.app.presentation.viewmodels.CloudConversationUseCases
 import run.ostrom.app.presentation.viewmodels.CloudSessionViewModel
 import run.ostrom.app.presentation.viewmodels.CloudSessionsViewModel
 import run.ostrom.app.presentation.viewmodels.NewCloudSessionViewModel
@@ -30,6 +38,15 @@ val cloudSessionsModule = module {
     single { CreateCloudSessionUseCase(get()) }
     single { SetCloudSessionGitHubAccessUseCase(get()) }
     viewModel { CloudSessionsViewModel(get(), get()) }
-    viewModel { (route: CloudSessionRoute) -> CloudSessionViewModel(route, get(), get(), get(), get()) }
+    // A conversation session (`runners.cloud.conversation.v1`): its transcript, messages, permissions and controls.
+    single { RemoteTranscriptRepository(get()) }
+    single { LoadTranscriptUseCase(get(), get(), get()) }
+    single { FollowTranscriptUseCase(get(), get()) }
+    single { ListAgentsUseCase(get(), get(), get()) }
+    single { SendMessageUseCase(get(), get(), get(), get()) }
+    single { ControlConversationUseCase(get(), get(), get()) }
+    single { AnswerPermissionUseCase(get(), get(), get(), get()) }
+    single { CloudConversationUseCases(get(), get(), get(), get(), get(), get(), get()) }
+    viewModel { (route: CloudSessionRoute) -> CloudSessionViewModel(route, get(), get(), get(), get(), get()) }
     viewModel { (route: NewCloudSessionRoute) -> NewCloudSessionViewModel(route, get(), get(), get()) }
 }

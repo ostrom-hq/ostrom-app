@@ -14,6 +14,7 @@ import run.ostrom.app.domain.models.CloudAgent
 import run.ostrom.app.domain.models.CloudRecipe
 import run.ostrom.app.domain.models.CloudRepository
 import run.ostrom.app.domain.models.CloudSession
+import run.ostrom.app.domain.models.CloudSessionMode
 import run.ostrom.app.domain.models.NewCloudSession
 import run.ostrom.app.domain.services.IdGenerator
 import run.ostrom.app.domain.usecases.sessions.CloudSessionRules
@@ -32,6 +33,10 @@ data class NewCloudSessionUiState(
     val error: Failure? = null,
     /** The server takes a preparation recipe (`runners.cloud.environment.v1`); otherwise the single repository and ref. */
     val recipeServed: Boolean = false,
+    /** The server runs conversation sessions (`runners.cloud.conversation.v1`): claude and codex may start as one. */
+    val conversationServed: Boolean = false,
+    /** Start the agent headless, talked to from this app, instead of in a terminal. */
+    val conversation: Boolean = false,
     val agent: CloudAgent = CloudAgent.CLAUDE,
     val name: String = "",
     val model: String = "",
@@ -54,9 +59,13 @@ data class NewCloudSessionUiState(
     val canCreate: Boolean get() = !loading && error == null && !creating && created == null
     val canAddRepository: Boolean get() = repositories.size < CloudSessionRules.MAX_REPOSITORIES
 
+    /** The conversation choice shows for an agent the server runs headless. */
+    val conversationOffered: Boolean get() = conversationServed && agent in CloudSessionRules.CONVERSATION_AGENTS
+
     /** What is sent: the recipe on a server that takes one, the single repository otherwise. */
     fun form(): NewCloudSession = NewCloudSession(
         agent, name = name, model = model, prompt = prompt,
+        mode = if (conversation && conversationOffered) CloudSessionMode.CONVERSATION else CloudSessionMode.TERMINAL,
         repo = repo.takeIf { !recipeServed }, ref = ref.takeIf { !recipeServed },
         recipe = if (!recipeServed) null else CloudRecipe(
             repositories = repositories,
@@ -94,7 +103,7 @@ class NewCloudSessionViewModel(
         viewModelScope.launch {
             try {
                 val options = loadOptions(route.accountId)
-                state.update { it.copy(loading = false, recipeServed = options.recipe) }
+                state.update { it.copy(loading = false, recipeServed = options.recipe, conversationServed = options.conversation) }
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Exception) {
@@ -119,6 +128,8 @@ class NewCloudSessionViewModel(
             CloudField.EMAIL_DOMAIN -> it.copy(emailDomain = value)
         }.copy(createError = null)
     }
+
+    fun onConversation(conversation: Boolean) = state.update { it.copy(conversation = conversation, createError = null) }
 
     fun onRequireGitHub(required: Boolean) = state.update { it.copy(requireGitHub = required, createError = null) }
 

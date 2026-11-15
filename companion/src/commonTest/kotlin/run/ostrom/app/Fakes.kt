@@ -31,8 +31,8 @@ val CAPABILITIES = ServerCapabilities(serverVersion = "1.4.0", apiVersion = 1, f
 
 fun accounts() = SettingsAccountRepository(MapSettings())
 
-fun account(id: String = "a1", login: String = "ada", origin: String = ORIGIN, signedIn: Boolean = true, expiresAt: Long? = null) =
-    Account(id = id, origin = origin, login = login, signedIn = signedIn, expiresAt = expiresAt)
+fun account(id: String = "a1", login: String = "ada", origin: String = ORIGIN, signedIn: Boolean = true, expiresAt: Long? = null, memberId: String? = null) =
+    Account(id = id, origin = origin, login = login, signedIn = signedIn, expiresAt = expiresAt, memberId = memberId)
 
 class FixedClock(var now: Long = 1_000_000L) : Clock {
     override fun nowMillis(): Long = now

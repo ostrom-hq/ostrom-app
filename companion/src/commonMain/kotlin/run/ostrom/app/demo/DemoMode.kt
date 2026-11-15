@@ -71,6 +71,9 @@ internal class DemoStore(val startedAt: Long) {
     /** The person's cloud sessions, newest first; the demo's starts, pauses, resumes and stops change them. */
     val cloudSessions = MutableStateFlow(demoCloudSessions(startedAt))
 
+    /** The conversation sessions' transcripts, by session id: a message adds to it, with the agent's scripted reply. */
+    val transcripts = MutableStateFlow(mapOf(DemoCloudSessionIds.CONVERSATION to demoConversation(startedAt)))
+
     /** The demo member's GitHub link: none at first; the demo's device flow links Ada's account, unlinking removes it. */
     val githubLink = MutableStateFlow(demoGitHubLink(linked = false, startedAt))
 }

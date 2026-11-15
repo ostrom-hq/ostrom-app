@@ -17,12 +17,17 @@ import kotlin.test.assertTrue
 class LocalizationTest {
     private val resources = File("src/commonMain/composeResources")
 
-    private fun load(folder: String): Map<String, String> {
+    /** The texts of each resource: its name (`plurals:` in front for a plural) to its texts (one per quantity). */
+    private fun load(folder: String): Map<String, List<String>> {
         val document = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(File(resources, "$folder/strings.xml"))
         val entries = document.documentElement.childNodes
         return (0 until entries.length).mapNotNull { entries.item(it) as? Element }.associate { node ->
-            assertEquals("string", node.tagName, "Unexpected <${node.tagName}> in $folder/strings.xml")
-            node.getAttribute("name") to node.textContent
+            val name = node.getAttribute("name")
+            when (node.tagName) {
+                "string" -> name to listOf(node.textContent)
+                "plurals" -> node.getElementsByTagName("item").let { items -> "plurals:$name" to (0 until items.length).map { items.item(it).textContent } }
+                else -> error("Unexpected <${node.tagName}> in $folder/strings.xml")
+            }
         }
     }
 
@@ -38,7 +43,8 @@ class LocalizationTest {
         for (language in languages() - "en") {
             val translated = load("values-$language")
             assertEquals(default.keys.sorted(), translated.keys.sorted(), "values-$language and values differ in their keys")
-            for ((key, text) in default) assertEquals(placeholders(text), placeholders(translated.getValue(key)), "$key in values-$language")
+            // A plural has one text per quantity: each text of a language carries the placeholders of the default's last one.
+            for ((key, texts) in default) translated.getValue(key).forEach { assertEquals(placeholders(texts.last()), placeholders(it), "$key in values-$language") }
         }
     }
 
@@ -46,7 +52,7 @@ class LocalizationTest {
     fun noTextIsEmptyOrEscapesAnApostrophe() {
         for (language in languages()) {
             val folder = if (language == "en") "values" else "values-$language"
-            for ((key, text) in load(folder)) {
+            for ((key, text) in load(folder).flatMap { (key, texts) -> texts.map { key to it } }) {
                 assertTrue(text.isNotBlank(), "$key in $folder is empty")
                 // Compose does not unescape \', so the apostrophe stays bare.
                 assertFalse(text.contains("\\'"), "$key in $folder escapes an apostrophe")

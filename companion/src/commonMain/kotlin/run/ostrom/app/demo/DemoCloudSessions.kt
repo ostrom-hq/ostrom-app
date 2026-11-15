@@ -8,7 +8,10 @@ import run.ostrom.app.domain.models.CloudLimits
 import run.ostrom.app.domain.models.CloudRecipe
 import run.ostrom.app.domain.models.CloudRepository
 import run.ostrom.app.domain.models.CloudSession
+import run.ostrom.app.domain.models.CloudSessionMode
 import run.ostrom.app.domain.models.CloudSessionPage
+import run.ostrom.app.domain.models.InputReceipt
+import run.ostrom.app.domain.models.PermissionAnswer
 import run.ostrom.app.domain.models.CloudSessionRefusal
 import run.ostrom.app.domain.models.CloudSessionStatus
 import run.ostrom.app.domain.models.Features
@@ -24,6 +27,7 @@ import run.ostrom.app.domain.repositories.TransferRepository
 import run.ostrom.app.domain.services.Clock
 
 private const val MINUTE = 60_000L
+private const val HTTP_CONFLICT = 409
 
 /** The demo's cloud session ids. */
 internal object DemoCloudSessionIds {
@@ -31,6 +35,7 @@ internal object DemoCloudSessionIds {
     const val PREPARING = "demo-cloud-setup"
     const val RETRYABLE = "demo-cloud-docs"
     const val BROKEN = "demo-cloud-cards"
+    const val CONVERSATION = "demo-cloud-talk"
 }
 
 private val demoLimits = CloudLimits(idleTimeoutMinutes = 30, maxRunMinutes = 240, restrictedEgress = true)
@@ -61,6 +66,9 @@ internal fun demoCloudSessions(startedAt: Long): List<CloudSession> {
         gitEmailDomain = "analytical-engines.example",
     )
     return listOf(
+        demoCloudSession(DemoCloudSessionIds.CONVERSATION, "Bernoulli numbers", CloudSessionStatus.RUNNING, "running", startedAt - 20 * MINUTE,
+            repo = "https://github.com/analytical-engines/engine", ref = "main", readyAt = startedAt - 19 * MINUTE)
+            .copy(mode = CloudSessionMode.CONVERSATION, ownerId = DemoContent.MEMBER_ID, effort = "high"),
         demoCloudSession(DemoCloudSessionIds.RUNNING, "Carry the tens", CloudSessionStatus.RUNNING, "running", startedAt - 50 * MINUTE, recipe = recipe,
             readyAt = startedAt - 47 * MINUTE),
         demoCloudSession(DemoCloudSessionIds.PREPARING, "Punch the cards", CloudSessionStatus.CREATING, "running", startedAt - 2 * MINUTE, phase = "running_setup",
@@ -89,7 +97,7 @@ class DemoCloudSessionRepository(private val demo: DemoMode, private val clock: 
         val created = CloudSession(
             "demo-cloud-new-${store.cloudSessions.value.size + 1}", name, session.agent.wire, session.model, session.repo, session.ref, CloudSessionStatus.RUNNING,
             "running", null, null, demoLimits, now, now, now, now, null, null, session.recipe,
-            GitHubAccess.OWNER,
+            GitHubAccess.OWNER, ownerId = DemoContent.MEMBER_ID, mode = session.mode,
         )
         store.cloudSessions.value = listOf(created) + store.cloudSessions.value
         return created
@@ -114,6 +122,31 @@ class DemoCloudSessionRepository(private val demo: DemoMode, private val clock: 
         return change(sessionId) { it.copy(githubAccess = access) }
     }
 
+    override suspend fun send(accountId: String, sessionId: String, text: String, clientMessageId: String): InputReceipt {
+        val session = session(accountId, sessionId)
+        if (session.status.ended) throw AppException.Server(HTTP_CONFLICT, "session_not_running")
+        // A message wakes a paused session, as on a server.
+        val woke = session.status == CloudSessionStatus.PAUSED
+        if (woke) resume(accountId, sessionId)
+        return InputReceipt(demo.store().exchange(sessionId, text, clock.nowMillis()), "consumed", woke, null)
+    }
+
+    override suspend fun interrupt(accountId: String, sessionId: String): InputReceipt =
+        InputReceipt(demo.store().interrupted(sessionId, clock.nowMillis()), "consumed", false, null)
+
+    override suspend fun answer(accountId: String, sessionId: String, answer: PermissionAnswer, idempotencyKey: String): InputReceipt =
+        InputReceipt(demo.store().answered(sessionId, answer, clock.nowMillis()), "consumed", false, null)
+
+    override suspend fun stopTask(accountId: String, sessionId: String, taskId: String): InputReceipt =
+        InputReceipt(demo.store().stoppedTask(sessionId, taskId, clock.nowMillis()), "consumed", false, null)
+
+    override suspend fun setPermissionBypass(accountId: String, sessionId: String, enabled: Boolean): CloudSession =
+        change(sessionId) { it.copy(permissionBypass = enabled) }
+
+    override suspend fun setModel(accountId: String, sessionId: String, model: String): CloudSession = change(sessionId) { it.copy(model = model) }
+
+    override suspend fun setEffort(accountId: String, sessionId: String, effort: String): CloudSession = change(sessionId) { it.copy(effort = effort) }
+
     private fun change(sessionId: String, update: (CloudSession) -> CloudSession): CloudSession {
         val store = demo.store()
         val current = store.cloudSessions.value.firstOrNull { it.id == sessionId } ?: throw AppException.NotFound()
@@ -135,6 +168,14 @@ class DemoAwareCloudSessionRepository(private val real: CloudSessionRepository, 
     override suspend fun resume(accountId: String, sessionId: String) = of(accountId).resume(accountId, sessionId)
     override suspend fun stop(accountId: String, sessionId: String) = of(accountId).stop(accountId, sessionId)
     override suspend fun setGitHubAccess(accountId: String, sessionId: String, access: GitHubAccess) = of(accountId).setGitHubAccess(accountId, sessionId, access)
+    override suspend fun send(accountId: String, sessionId: String, text: String, clientMessageId: String) = of(accountId).send(accountId, sessionId, text, clientMessageId)
+    override suspend fun interrupt(accountId: String, sessionId: String) = of(accountId).interrupt(accountId, sessionId)
+    override suspend fun answer(accountId: String, sessionId: String, answer: PermissionAnswer, idempotencyKey: String) =
+        of(accountId).answer(accountId, sessionId, answer, idempotencyKey)
+    override suspend fun stopTask(accountId: String, sessionId: String, taskId: String) = of(accountId).stopTask(accountId, sessionId, taskId)
+    override suspend fun setPermissionBypass(accountId: String, sessionId: String, enabled: Boolean) = of(accountId).setPermissionBypass(accountId, sessionId, enabled)
+    override suspend fun setModel(accountId: String, sessionId: String, model: String) = of(accountId).setModel(accountId, sessionId, model)
+    override suspend fun setEffort(accountId: String, sessionId: String, effort: String) = of(accountId).setEffort(accountId, sessionId, effort)
 }
 
 /** The demo has no team to transfer sessions to (it announces no transfers), so its screens stay quiet. */

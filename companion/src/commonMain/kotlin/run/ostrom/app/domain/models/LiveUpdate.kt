@@ -4,7 +4,8 @@ package run.ostrom.app.domain.models
 
 /**
  * What a followed stream reports. The stream reconnects by itself after a network failure, resuming after the last
- * item it delivered, so items are never lost or repeated; it ends with an [AppException].
+ * item it delivered, so items are never lost or repeated; it ends with [Ended] (a session's transcript, once the session
+ * is over) or an [AppException].
  */
 sealed interface LiveUpdate<out T> {
     /** The server accepted the stream. [resumed] is false when it starts from "now" without a cursor (the first connection). */
@@ -14,4 +15,6 @@ sealed interface LiveUpdate<out T> {
     data object Gap : LiveUpdate<Nothing>
     /** The connection dropped; the next attempt comes after [delayMillis]. */
     data class Reconnecting(val delayMillis: Long) : LiveUpdate<Nothing>
+    /** The stream sent everything: what it follows is over (a terminated session's transcript). Nothing comes after it. */
+    data object Ended : LiveUpdate<Nothing>
 }

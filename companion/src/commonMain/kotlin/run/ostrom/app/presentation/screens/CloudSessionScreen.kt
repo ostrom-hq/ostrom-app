@@ -119,7 +119,8 @@ import run.ostrom.app.resources.sessions_title
 /**
  * One cloud session's record: its status, agent and model, repository or recipe, times and limits; while it is
  * prepared, which step; why it failed (a failed preparation says whether a resume may pass); and Pause, Resume and Stop
- * (confirmed first), each followed by a fresh read. Its transcript and terminal are not served to the app.
+ * (confirmed first), each followed by a fresh read. A conversation session ([ConversationScreen]) shows its transcript,
+ * the composer and its controls, with this record on demand; a terminal session's terminal is not served to the app.
  */
 @Composable
 fun CloudSessionScreen(
@@ -130,16 +131,39 @@ fun CloudSessionScreen(
     extraActions: @Composable (CloudSession) -> Unit = {},
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    // Read at each return: the server publishes no cloud session event.
+    // Read at each return: the server publishes no cloud session event. A conversation session is followed while visible.
     LifecycleStartEffect(viewModel) {
-        viewModel.load()
-        onStopOrDispose { }
+        viewModel.visible()
+        onStopOrDispose { viewModel.hidden() }
     }
     val now = rememberNow()
     val today = localEpochDay(now)
     val colors = Ostrom.colors
     val session = state.session
     var confirmStop by rememberSaveable { mutableStateOf(false) }
+    if (session != null && state.conversation) {
+        ConversationScreen(
+            state, session, viewModel, backLabel, onBack, session.title(), state.memberId,
+            navActions = {
+                AppIconButton(PhosphorIcons.Regular.ArrowsClockwise, stringResource(Res.string.cloud_session_refresh), onClick = viewModel::load, enabled = !state.loading,
+                    modifier = Modifier.testTag("cloud-session-refresh"))
+            },
+        ) {
+            state.error?.let { error -> Banner(error.words(), Tone.DANGER, Modifier.testTag("cloud-session-error")) }
+            state.actionError?.let { Banner(it.words(), Tone.DANGER, Modifier.testTag("cloud-session-action-error")) }
+            Overview(session, today)
+            session.failure?.let { FailureBanner(it, session.canResume) }
+            if (session.status == CloudSessionStatus.TRANSFERRING) Banner(stringResource(Res.string.cloud_session_transferring), Tone.NEUTRAL, Modifier.testTag("cloud-session-transferring"))
+            Actions(session, state.acting, onPause = viewModel::pause, onResume = viewModel::resume, onStop = { confirmStop = true }, extra = {
+                RevokeBypassButton(state, viewModel)
+                extraActions(session)
+            })
+            if (state.canChooseAccess) GitHubAccessChoice(session.githubAccess, state.settingAccess, onChoose = viewModel::chooseGitHubAccess)
+            session.recipe?.takeIf { !it.empty }?.let { Recipe(it) }
+        }
+        if (confirmStop) ConfirmStop(onConfirm = { confirmStop = false; viewModel.stop() }, onDismiss = { confirmStop = false })
+        return
+    }
     Column(Modifier.fillMaxSize().background(colors.background), horizontalAlignment = Alignment.CenterHorizontally) {
         NavBar(backLabel, onBack, session?.title() ?: stringResource(Res.string.cloud_session_title)) {
             AppIconButton(PhosphorIcons.Regular.ArrowsClockwise, stringResource(Res.string.cloud_session_refresh), onClick = viewModel::load, enabled = !state.loading,

@@ -106,6 +106,9 @@ sealed class AppException(message: String) : Exception(message) {
             CloudSessionProblem.TOO_MANY -> "Use at most 16 repositories, and 16 commands of up to 4,096 characters per setup list."
             CloudSessionProblem.VARIABLES -> "Name at most 64 required variables, each once, in UPPER_SNAKE_CASE."
             CloudSessionProblem.EMAIL_DOMAIN -> "Use a lowercase domain name, such as example.com, for the Git e-mail domain."
+            CloudSessionProblem.MESSAGE -> "Write a message of up to 32,000 characters."
+            CloudSessionProblem.MODEL -> "Use a valid model: letters, digits and . _ : / - (up to 120 characters)."
+            CloudSessionProblem.EFFORT -> "Use a valid effort: letters, digits and . _ : / - (up to 120 characters)."
         },
     )
     /** An `ostrom://open?url=` link this app does not open, for [reason]: nothing was opened or asked of a server. */

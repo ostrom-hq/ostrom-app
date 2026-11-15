@@ -21,7 +21,12 @@ import run.ostrom.app.domain.models.CloudPhase
 import run.ostrom.app.domain.models.CloudRecipe
 import run.ostrom.app.domain.models.CloudRepository
 import run.ostrom.app.domain.models.CloudSessionRefusal
+import run.ostrom.app.domain.models.CloudSessionMode
 import run.ostrom.app.domain.models.CloudSessionStatus
+import run.ostrom.app.domain.models.InputReceipt
+import run.ostrom.app.domain.models.PermissionAnswer
+import run.ostrom.app.domain.models.QuestionAnswer
+import run.ostrom.app.domain.models.SessionWaiting
 import run.ostrom.app.domain.models.GitHubAccess
 import run.ostrom.app.domain.models.NewCloudSession
 import run.ostrom.app.domain.services.PlatformInfo
@@ -174,5 +179,79 @@ class RemoteCloudSessionRepositoryTest {
             assertEquals(expected.second, refused.reason)
             assertFalse("server text" in refused.message.orEmpty())
         }
+    }
+
+    private fun input(id: String, kind: String, status: String = "queued", woke: Boolean = false, reason: String? = null) =
+        """{"id":"$id","kind":"$kind","status":"$status","authorId":"m1","woke":$woke,"createdAt":"2026-11-14T10:00:00Z"""" +
+            (reason?.let { ""","reason":"$it"""" } ?: "") + "}"
+
+    private fun body() = (requests.last().body as OutgoingContent.ByteArrayContent).bytes().decodeToString()
+
+    @Test
+    fun aConversationSessionCarriesItsModeEffortBypassAndWaiting() = runTest {
+        signedIn()
+        val extra = ""","mode":"conversation","effort":"high","permissionBypass":true,
+            "waiting":{"reason":"permission","requestId":"r1","since":"2026-11-14T09:00:00Z","eventSeq":12}"""
+        answers["GET /api/v1/cloud/sessions/c1"] = HttpStatusCode.OK to session("c1", "running", extra)
+        answers["GET /api/v1/cloud/sessions/c2"] = HttpStatusCode.OK to session("c2", "running")
+        val talk = repository.session("a1", "c1")
+        assertEquals(CloudSessionMode.CONVERSATION, talk.mode)
+        assertTrue(talk.conversation)
+        assertEquals("high", talk.effort)
+        assertTrue(talk.permissionBypass)
+        assertEquals(SessionWaiting("permission", "r1", 1_794_646_800_000L), talk.waiting)
+        val terminal = repository.session("a1", "c2")
+        assertEquals(CloudSessionMode.TERMINAL, terminal.mode)
+        assertFalse(terminal.conversation)
+        assertFalse(terminal.permissionBypass)
+        answers["POST /api/v1/cloud/sessions"] = HttpStatusCode.Created to session("c9", "creating")
+        repository.create("a1", NewCloudSession(CloudAgent.CLAUDE, mode = CloudSessionMode.CONVERSATION), "press-1")
+        assertTrue(""""mode":"conversation"""" in body(), body())
+        repository.create("a1", NewCloudSession(CloudAgent.CLAUDE), "press-2")
+        assertFalse("mode" in body(), body())
+    }
+
+    @Test
+    fun messagesAnswersInterruptsAndStopsGoToTheirRoutes() = runTest {
+        signedIn()
+        answers["POST /api/v1/cloud/sessions/c1/messages"] = HttpStatusCode.Accepted to input("in-1", "message", woke = true)
+        val receipt = repository.send("a1", "c1", "Run the tests", "client-1")
+        assertEquals(InputReceipt("in-1", "queued", woke = true, reason = null), receipt)
+        assertEquals("client-1", requests.last().headers["Idempotency-Key"])
+        assertTrue(""""text":"Run the tests"""" in body() && "clientMessageId" !in body(), body())
+
+        answers["POST /api/v1/cloud/sessions/c1/interrupt"] = HttpStatusCode.Accepted to input("int-1", "interrupt")
+        assertEquals("int-1", repository.interrupt("a1", "c1").inputId)
+        answers["POST /api/v1/cloud/sessions/c1/interrupt"] = HttpStatusCode.Conflict to """{"error":{"type":"nothing_to_interrupt","message":"m"}}"""
+        val nothing = assertFailsWith<AppException.Server> { repository.interrupt("a1", "c1") }
+        assertEquals(409, nothing.statusCode)
+        assertEquals("nothing_to_interrupt", nothing.code)
+
+        answers["POST /api/v1/cloud/sessions/c1/permissions"] = HttpStatusCode.Accepted to input("ans-1", "permission_answer", reason = null)
+        repository.answer("a1", "c1", PermissionAnswer("r1", allow = true, answers = listOf(QuestionAnswer(0, listOf(1)), QuestionAnswer(1, text = "Grace"))), "key-1")
+        assertEquals("key-1", requests.last().headers["Idempotency-Key"])
+        assertTrue(""""requestId":"r1"""" in body() && """"behavior":"allow"""" in body() && """"answers":[{"question":0,"options":[1]},""" in body(), body())
+        repository.answer("a1", "c1", PermissionAnswer("r2", allow = false), "key-2")
+        assertTrue(""""behavior":"deny"""" in body() && "answers" !in body(), body())
+
+        answers["POST /api/v1/cloud/sessions/c1/tasks/stop"] = HttpStatusCode.Accepted to input("stop-1", "task_stop", status = "rejected", reason = "task_stop_unsupported")
+        assertEquals(InputReceipt("stop-1", "rejected", woke = false, reason = "task_stop_unsupported"), repository.stopTask("a1", "c1", "b1"))
+        assertEquals("""{"taskId":"b1"}""", body())
+    }
+
+    @Test
+    fun bypassTheModelAndTheEffortArePutAndAnswerTheSession() = runTest {
+        signedIn()
+        answers["PUT /api/v1/cloud/sessions/c1/permission-bypass"] = HttpStatusCode.OK to session("c1", "running", ""","mode":"conversation","permissionBypass":true""")
+        assertTrue(repository.setPermissionBypass("a1", "c1", true).permissionBypass)
+        assertEquals("""{"enabled":true}""", body())
+        answers["PUT /api/v1/cloud/sessions/c1/model"] = HttpStatusCode.OK to session("c1", "running")
+        assertEquals("claude-opus", repository.setModel("a1", "c1", "claude-opus").model)
+        assertEquals("""{"model":"claude-opus"}""", body())
+        answers["PUT /api/v1/cloud/sessions/c1/effort"] = HttpStatusCode.OK to session("c1", "running", ""","effort":"max"""")
+        assertEquals("max", repository.setEffort("a1", "c1", "max").effort)
+        assertEquals("""{"effort":"max"}""", body())
+        answers["PUT /api/v1/cloud/sessions/c1/permission-bypass"] = HttpStatusCode.Forbidden to """{"error":{"type":"bypass_owner_only","message":"m"}}"""
+        assertEquals("bypass_owner_only", assertFailsWith<AppException.Server> { repository.setPermissionBypass("a1", "c1", true) }.code)
     }
 }

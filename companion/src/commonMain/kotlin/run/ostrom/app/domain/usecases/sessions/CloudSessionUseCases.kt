@@ -3,9 +3,11 @@
 package run.ostrom.app.domain.usecases.sessions
 
 import run.ostrom.app.domain.models.AppException
+import run.ostrom.app.domain.models.CloudAgent
 import run.ostrom.app.domain.models.CloudRecipe
 import run.ostrom.app.domain.models.CloudRepository
 import run.ostrom.app.domain.models.CloudSession
+import run.ostrom.app.domain.models.CloudSessionMode
 import run.ostrom.app.domain.models.CloudSessionPage
 import run.ostrom.app.domain.models.CloudSessionProblem
 import run.ostrom.app.domain.models.CloudSessionRefusal
@@ -64,12 +66,16 @@ class ControlCloudSessionUseCase(private val access: CloudSessionAccess) {
  * What the screens of a cloud session offer: the preparation recipe when the server takes one ([recipe]), and the choice
  * of the session's GitHub access when it announces `runners.cloud.github.v1` ([githubAccess]).
  */
-data class CloudSessionOptions(val recipe: Boolean, val githubAccess: Boolean = false)
+data class CloudSessionOptions(val recipe: Boolean, val githubAccess: Boolean = false, val conversation: Boolean = false)
 
 class LoadCloudSessionOptionsUseCase(private val access: CloudSessionAccess) {
     suspend operator fun invoke(accountId: String): CloudSessionOptions =
         access.call(accountId) { announced ->
-            CloudSessionOptions(recipe = Features.RUNNERS_CLOUD_ENVIRONMENT in announced, githubAccess = Features.RUNNERS_CLOUD_GITHUB in announced)
+            CloudSessionOptions(
+                recipe = Features.RUNNERS_CLOUD_ENVIRONMENT in announced,
+                githubAccess = Features.RUNNERS_CLOUD_GITHUB in announced,
+                conversation = Features.RUNNERS_CLOUD_CONVERSATION in announced,
+            )
         }
 }
 
@@ -94,7 +100,11 @@ class SetCloudSessionGitHubAccessUseCase(private val access: CloudSessionAccess)
 class CreateCloudSessionUseCase(private val access: CloudSessionAccess) {
     suspend operator fun invoke(accountId: String, form: NewCloudSession, idempotencyKey: String): CloudSession =
         access.call(accountId) { announced ->
-            val sent = checkNewCloudSession(form, recipeServed = Features.RUNNERS_CLOUD_ENVIRONMENT in announced)
+            val sent = checkNewCloudSession(
+                form,
+                recipeServed = Features.RUNNERS_CLOUD_ENVIRONMENT in announced,
+                conversationServed = Features.RUNNERS_CLOUD_CONVERSATION in announced,
+            )
             access.repository.create(accountId, sent, idempotencyKey)
         }
 }
@@ -107,6 +117,9 @@ object CloudSessionRules {
     const val MAX_COMMANDS = 16
     const val MAX_COMMAND_LENGTH = 4096
     const val MAX_VARIABLES = 64
+
+    /** The agents a conversation session runs headless (`400 invalid_mode` for the others). */
+    val CONVERSATION_AGENTS = setOf(CloudAgent.CLAUDE, CloudAgent.CODEX)
     private val GITHUB = Regex("https://github\\.com/[A-Za-z0-9][A-Za-z0-9-]{0,38}/[A-Za-z0-9._-]{1,100}")
     private val VARIABLE = Regex("[A-Z_][A-Z0-9_]{0,127}")
     private val DOMAIN = Regex("[a-z0-9]([-a-z0-9.]{0,251}[a-z0-9])?")
@@ -121,12 +134,14 @@ object CloudSessionRules {
  * trimmed, empty optional fields left out, empty rows dropped; the recipe when [recipeServed] and it holds anything,
  * otherwise the single repository and ref.
  */
-fun checkNewCloudSession(form: NewCloudSession, recipeServed: Boolean): NewCloudSession {
+fun checkNewCloudSession(form: NewCloudSession, recipeServed: Boolean, conversationServed: Boolean = false): NewCloudSession {
     val name = form.name.orNull()
     if (name != null && (name.length > CloudSessionRules.MAX_NAME || name.any(Char::isISOControl))) throw AppException.CloudSessionInvalid(CloudSessionProblem.NAME)
     val prompt = form.prompt?.takeIf { it.isNotBlank() }
     if (prompt != null && prompt.length > CloudSessionRules.MAX_PROMPT) throw AppException.CloudSessionInvalid(CloudSessionProblem.PROMPT)
-    val base = NewCloudSession(form.agent, name = name, model = form.model.orNull(), prompt = prompt)
+    // A conversation only where the server runs one, and only for an agent it runs headless; a terminal otherwise.
+    val mode = if (conversationServed && form.agent in CloudSessionRules.CONVERSATION_AGENTS) form.mode else CloudSessionMode.TERMINAL
+    val base = NewCloudSession(form.agent, name = name, model = form.model.orNull(), prompt = prompt, mode = mode)
     val recipe = form.recipe?.takeIf { recipeServed }?.tidy()?.takeIf { !it.empty }
     if (recipe != null) {
         val commands = recipe.setupCreate + recipe.setupStart

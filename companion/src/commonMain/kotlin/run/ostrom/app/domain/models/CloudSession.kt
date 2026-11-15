@@ -25,6 +25,23 @@ enum class CloudSessionStatus(val wire: String) {
     }
 }
 
+/**
+ * How a cloud session's agent runs, fixed at creation: in a terminal (a PTY the console attaches to) or headless, talked
+ * to through its transcript and messages (`runners.cloud.conversation.v1`, claude and codex only).
+ */
+enum class CloudSessionMode { TERMINAL, CONVERSATION }
+
+/**
+ * The agent waits for a person: [reason] is `permission` (a tool use to approve) or `question`; [requestId] the request
+ * to answer, [since] server time in milliseconds (null when unreadable).
+ */
+data class SessionWaiting(val reason: String, val requestId: String?, val since: Long?) {
+    companion object {
+        const val PERMISSION = "permission"
+        const val QUESTION = "question"
+    }
+}
+
 /** The preparation steps a runner reports while a session is creating or resuming (`runners.cloud.environment.v1`). */
 enum class CloudPhase(val wire: String) {
     CONFIGURING_GIT("configuring_git"),
@@ -107,7 +124,18 @@ data class CloudSession(
     val transferId: String? = null,
     /** A session on a member's device (`runners.cloud.remote.v1`): it is never transferred, its files stay there. */
     val remote: Boolean = false,
+    /** A [CloudSessionMode.CONVERSATION] session is talked to through its transcript and messages; a terminal one is not. */
+    val mode: CloudSessionMode = CloudSessionMode.TERMINAL,
+    /** The agent's effort (`runners.cloud.effort.v1`), if chosen. */
+    val effort: String? = null,
+    /** The owner's standing approval of tool uses is on (`runners.cloud.permissions.bypass.v1`). */
+    val permissionBypass: Boolean = false,
+    /** Why the agent waits for a person (`runners.cloud.permissions.v1`); null when it does not. */
+    val waiting: SessionWaiting? = null,
 ) {
+    /** A conversation session: its screen shows the transcript and the composer. */
+    val conversation: Boolean get() = mode == CloudSessionMode.CONVERSATION
+
     /** Creating or resuming: the runner prepares the workspace, and [phase] says which step. */
     val preparing: Boolean get() = status == CloudSessionStatus.CREATING || status == CloudSessionStatus.RESUMING
 
@@ -168,6 +196,8 @@ data class NewCloudSession(
     val repo: String? = null,
     val ref: String? = null,
     val recipe: CloudRecipe? = null,
+    /** [CloudSessionMode.CONVERSATION] on a server with `runners.cloud.conversation.v1`, for claude and codex only. */
+    val mode: CloudSessionMode = CloudSessionMode.TERMINAL,
 )
 
 /** Why the server refused to start, pause, resume or stop a cloud session, by its error key. */
@@ -219,4 +249,13 @@ enum class CloudSessionProblem {
 
     /** The Git e-mail domain is not a lowercase DNS name. */
     EMAIL_DOMAIN,
+
+    /** A message to the agent is empty, over 32,000 characters or holds a control character. */
+    MESSAGE,
+
+    /** A model is not 1 to 120 letters, digits and `. _ : / -`. */
+    MODEL,
+
+    /** An effort is not 1 to 120 letters, digits and `. _ : / -`. */
+    EFFORT,
 }

@@ -11,6 +11,7 @@ import run.ostrom.app.domain.models.CloudPhase
 import run.ostrom.app.domain.models.CloudRecipe
 import run.ostrom.app.domain.models.CloudRepository
 import run.ostrom.app.domain.models.CloudSession
+import run.ostrom.app.domain.models.CloudSessionMode
 import run.ostrom.app.domain.models.CloudSessionPage
 import run.ostrom.app.domain.models.CloudSessionProblem
 import run.ostrom.app.domain.models.CloudSessionRefusal
@@ -18,7 +19,6 @@ import run.ostrom.app.domain.models.CloudSessionStatus
 import run.ostrom.app.domain.models.Features
 import run.ostrom.app.domain.models.GitHubAccess
 import run.ostrom.app.domain.models.NewCloudSession
-import run.ostrom.app.domain.repositories.CloudSessionRepository
 import run.ostrom.app.domain.usecases.sessions.CloudSessionAccess
 import run.ostrom.app.domain.usecases.sessions.ControlCloudSessionUseCase
 import run.ostrom.app.domain.usecases.sessions.CreateCloudSessionUseCase
@@ -27,6 +27,7 @@ import run.ostrom.app.domain.usecases.sessions.LoadCloudSessionOptionsUseCase
 import run.ostrom.app.domain.usecases.sessions.LoadCloudSessionsUseCase
 import run.ostrom.app.domain.usecases.sessions.SetCloudSessionGitHubAccessUseCase
 import run.ostrom.app.domain.usecases.sessions.checkNewCloudSession
+import run.ostrom.app.ConversationCalls
 import run.ostrom.app.fakeGuard
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -41,8 +42,8 @@ internal fun cloudSession(
 ) = CloudSession(id, "Mill", "claude", null, null, null, status, desired, phase, failure, null, 1_000L, 1_000L, null, null, null, null, null, ownerId = ownerId, remote = remote)
 
 class CloudSessionUseCasesTest {
-    private class FakeCloudSessions : CloudSessionRepository {
-        val calls = mutableListOf<String>()
+    private class FakeCloudSessions : ConversationCalls() {
+        override fun current(sessionId: String) = cloudSession(sessionId)
         var created: NewCloudSession? = null
         override suspend fun sessions(accountId: String, before: String?): CloudSessionPage {
             calls += "list ${before.orEmpty()}".trim()
@@ -202,5 +203,17 @@ class CloudSessionUseCasesTest {
         val refusal = assertFailsWith<AppException.CloudSessionRefused> { set("a1", cloudSession(status = CloudSessionStatus.TERMINATED), GitHubAccess.NONE) }
         assertEquals(CloudSessionRefusal.STATE, refusal.reason)
         assertTrue(sessions.calls.isEmpty())
+    }
+
+    @Test
+    fun aConversationGoesOnlyToAServerThatRunsOneForAnAgentItRunsHeadless() = runTest {
+        val talk = NewCloudSession(CloudAgent.CLAUDE, mode = CloudSessionMode.CONVERSATION)
+        assertEquals(CloudSessionMode.TERMINAL, checkNewCloudSession(talk, recipeServed = false).mode)
+        assertEquals(CloudSessionMode.CONVERSATION, checkNewCloudSession(talk, recipeServed = false, conversationServed = true).mode)
+        assertEquals(CloudSessionMode.TERMINAL, checkNewCloudSession(talk.copy(agent = CloudAgent.SHELL), recipeServed = false, conversationServed = true).mode)
+        features.features = setOf(Features.RUNNERS_CLOUD, Features.RUNNERS_CLOUD_CONVERSATION)
+        assertTrue(LoadCloudSessionOptionsUseCase(access)("a1").conversation)
+        CreateCloudSessionUseCase(access)("a1", talk.copy(agent = CloudAgent.CODEX), "k1")
+        assertEquals(CloudSessionMode.CONVERSATION, sessions.created?.mode)
     }
 }

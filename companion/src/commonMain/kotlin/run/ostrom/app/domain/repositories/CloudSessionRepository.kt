@@ -5,7 +5,9 @@ package run.ostrom.app.domain.repositories
 import run.ostrom.app.domain.models.CloudSession
 import run.ostrom.app.domain.models.CloudSessionPage
 import run.ostrom.app.domain.models.GitHubAccess
+import run.ostrom.app.domain.models.InputReceipt
 import run.ostrom.app.domain.models.NewCloudSession
+import run.ostrom.app.domain.models.PermissionAnswer
 
 /**
  * The person's cloud sessions on an account's server (`runners.cloud.v1`). Failures are
@@ -33,4 +35,28 @@ interface CloudSessionRepository {
 
     /** Chooses whose GitHub access the session uses (`runners.cloud.github.v1`); the answer is the session after the change. */
     suspend fun setGitHubAccess(accountId: String, sessionId: String, access: GitHubAccess): CloudSession
+
+    // A conversation session (`runners.cloud.conversation.v1` and the keys after it), ported from TeamCode's
+    // SessionRepository: its inputs are acknowledged at once and carried out by the agent.
+
+    /** Sends a message to the agent under [clientMessageId] (`Idempotency-Key`): a retry returns the first acknowledgement. */
+    suspend fun send(accountId: String, sessionId: String, text: String, clientMessageId: String): InputReceipt
+
+    /** Stops the agent's current turn; `409 nothing_to_interrupt` when no agent runs. */
+    suspend fun interrupt(accountId: String, sessionId: String): InputReceipt
+
+    /** Answers a permission request under [idempotencyKey] (`runners.cloud.permissions.v1`). */
+    suspend fun answer(accountId: String, sessionId: String, answer: PermissionAnswer, idempotencyKey: String): InputReceipt
+
+    /** Stops the agent's background task [taskId] (`runners.cloud.tasks.v1`). */
+    suspend fun stopTask(accountId: String, sessionId: String, taskId: String): InputReceipt
+
+    /** Turns the owner's standing approval of tool uses on or off (`runners.cloud.permissions.bypass.v1`). */
+    suspend fun setPermissionBypass(accountId: String, sessionId: String, enabled: Boolean): CloudSession
+
+    /** Switches the agent's model (`runners.cloud.model.v1`). */
+    suspend fun setModel(accountId: String, sessionId: String, model: String): CloudSession
+
+    /** Switches the agent's effort (`runners.cloud.effort.v1`). */
+    suspend fun setEffort(accountId: String, sessionId: String, effort: String): CloudSession
 }

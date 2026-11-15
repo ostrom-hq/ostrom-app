@@ -17,3 +17,6 @@ interface FeaturesRepository {
 
 /** Whether the account's server announces [feature]. */
 suspend fun FeaturesRepository.has(accountId: String, feature: String): Boolean = feature in capabilities(accountId).features
+
+/** The feature keys the account's server announces. */
+suspend fun FeaturesRepository.announced(accountId: String): Set<String> = capabilities(accountId).features

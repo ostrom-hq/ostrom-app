@@ -32,6 +32,8 @@ internal fun OrgFeed.signals(accountId: String, features: FeaturesRepository, ty
             LiveUpdate.Gap -> emit(FeedSignal.Reload)
             is LiveUpdate.Item -> if (update.value.type in types) emit(FeedSignal.Changed(update.value))
             is LiveUpdate.Reconnecting -> emit(FeedSignal.Connection(reconnecting = true))
+            // The organization's feed never ends.
+            LiveUpdate.Ended -> Unit
         }
     }
 }
