@@ -118,12 +118,13 @@ class RemoteWorkflowRepositoryTest {
         signedIn()
         answers["/api/v1/workflows/wf1/runs"] = HttpStatusCode.Created to run("r9", "queued")
         answers["/api/v1/runs/r9/cancel"] = HttpStatusCode.OK to run("r9", "cancelled")
-        val started = repository.start("a1", "wf1", mapOf("version" to "1.4.0"))
+        val started = repository.start("a1", "wf1", mapOf("version" to "1.4.0"), "press-1")
         assertEquals("r9", started.id)
         assertEquals(RunStatus.QUEUED, started.status)
         assertEquals("POST", requests.last().method.value)
         val body = (requests.last().body as OutgoingContent.ByteArrayContent).bytes().decodeToString()
         assertTrue(""""inputs":{"version":"1.4.0"}""" in body, body)
+        assertEquals("press-1", requests.last().headers["Idempotency-Key"], "A repeated press carries the same key")
         assertEquals(RunStatus.CANCELLED, repository.cancel("a1", "r9").status)
         assertEquals("POST /api/v1/runs/r9/cancel", requests.last().let { "${it.method.value} ${it.url.encodedPath}" })
     }
@@ -133,7 +134,7 @@ class RemoteWorkflowRepositoryTest {
         signedIn()
         suspend fun refusalOfStart(status: HttpStatusCode, body: String): WorkflowRefusal {
             answers["/api/v1/workflows/wf1/runs"] = status to body
-            return assertFailsWith<AppException.WorkflowRefused> { repository.start("a1", "wf1", emptyMap()) }.reason
+            return assertFailsWith<AppException.WorkflowRefused> { repository.start("a1", "wf1", emptyMap(), "press-2") }.reason
         }
         suspend fun refusalOfCancel(status: HttpStatusCode, body: String): WorkflowRefusal {
             answers["/api/v1/runs/r1/cancel"] = status to body
@@ -148,10 +149,10 @@ class RemoteWorkflowRepositoryTest {
         assertEquals(WorkflowRefusal.RUN_BUSY, refusalOfCancel(HttpStatusCode.Conflict, error("conflict", "run_busy: the run changed meanwhile, try again.")))
 
         answers["/api/v1/workflows/wf1/runs"] = HttpStatusCode.Conflict to error("conflict", "something_else: new")
-        val other = assertFailsWith<AppException.Server> { repository.start("a1", "wf1", emptyMap()) }
+        val other = assertFailsWith<AppException.Server> { repository.start("a1", "wf1", emptyMap(), "press-2") }
         assertEquals(409, other.statusCode)
         answers.remove("/api/v1/workflows/wf1/runs")
-        assertFailsWith<AppException.NotFound> { repository.start("a1", "wf1", emptyMap()) }
+        assertFailsWith<AppException.NotFound> { repository.start("a1", "wf1", emptyMap(), "press-2") }
         answers.remove("/api/v1/runs/r1/cancel")
         assertFailsWith<AppException.NotFound> { repository.cancel("a1", "r1") }
         answers["/api/v1/runs/r1/cancel"] = HttpStatusCode.Unauthorized to error("unauthorized", "m")

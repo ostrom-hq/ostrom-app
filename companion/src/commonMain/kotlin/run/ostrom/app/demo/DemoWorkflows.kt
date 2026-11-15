@@ -125,7 +125,7 @@ class DemoWorkflowRepository(private val demo: DemoMode, private val clock: Cloc
     override suspend fun run(accountId: String, runId: String): WorkflowRun =
         all(demo.store()).firstOrNull { it.id == runId } ?: throw AppException.NotFound()
 
-    override suspend fun start(accountId: String, workflowId: String, inputs: Map<String, String>): WorkflowRun {
+    override suspend fun start(accountId: String, workflowId: String, inputs: Map<String, String>, idempotencyKey: String): WorkflowRun {
         val store = demo.store()
         val workflow = workflow(accountId, workflowId)
         if (!workflow.runnable) throw AppException.WorkflowRefused(WorkflowRefusal.NOT_RUNNABLE)
@@ -158,6 +158,7 @@ class DemoAwareWorkflowRepository(private val real: WorkflowRepository, private 
     override suspend fun workflow(accountId: String, workflowId: String) = of(accountId).workflow(accountId, workflowId)
     override suspend fun runs(accountId: String, workflowId: String?, status: String?, before: String?) = of(accountId).runs(accountId, workflowId, status, before)
     override suspend fun run(accountId: String, runId: String) = of(accountId).run(accountId, runId)
-    override suspend fun start(accountId: String, workflowId: String, inputs: Map<String, String>) = of(accountId).start(accountId, workflowId, inputs)
+    override suspend fun start(accountId: String, workflowId: String, inputs: Map<String, String>, idempotencyKey: String) =
+        of(accountId).start(accountId, workflowId, inputs, idempotencyKey)
     override suspend fun cancel(accountId: String, runId: String) = of(accountId).cancel(accountId, runId)
 }

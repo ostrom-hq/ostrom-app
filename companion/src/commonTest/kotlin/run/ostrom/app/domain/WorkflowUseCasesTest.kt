@@ -61,6 +61,7 @@ internal fun visit(seq: Int, status: String = "active", endedAt: Long? = null, c
 class WorkflowUseCasesTest {
     private class FakeWorkflows : WorkflowRepository {
         val calls = mutableListOf<String>()
+        val keys = mutableListOf<String>()
         override suspend fun workflows(accountId: String) = listOf(aWorkflow("w2", "release"), aWorkflow("w1", "Build"), aWorkflow("w3", "audit"))
         override suspend fun workflow(accountId: String, workflowId: String): Workflow { calls += "get $workflowId"; return aWorkflow(workflowId, "Build") }
         override suspend fun runs(accountId: String, workflowId: String?, status: String?, before: String?): WorkflowRunPage {
@@ -68,8 +69,8 @@ class WorkflowUseCasesTest {
             return WorkflowRunPage(listOf(workflowRun("r1")), null)
         }
         override suspend fun run(accountId: String, runId: String): WorkflowRun { calls += "run $runId"; return workflowRun(runId) }
-        override suspend fun start(accountId: String, workflowId: String, inputs: Map<String, String>): WorkflowRun {
-            calls += "start $workflowId $inputs"; return workflowRun("new", RunStatus.QUEUED)
+        override suspend fun start(accountId: String, workflowId: String, inputs: Map<String, String>, idempotencyKey: String): WorkflowRun {
+            calls += "start $workflowId $inputs"; keys += idempotencyKey; return workflowRun("new", RunStatus.QUEUED)
         }
         override suspend fun cancel(accountId: String, runId: String): WorkflowRun { calls += "cancel $runId"; return workflowRun(runId, RunStatus.CANCELLED) }
     }
@@ -81,7 +82,7 @@ class WorkflowUseCasesTest {
         assertFailsWith<AppException.Unsupported> { GetWorkflowUseCase(access)("a1", "w1") }
         assertFailsWith<AppException.Unsupported> { LoadWorkflowRunsUseCase(access)("a1", null, RunFilter.ALL) }
         assertFailsWith<AppException.Unsupported> { GetWorkflowRunUseCase(access)("a1", "r1") }
-        assertFailsWith<AppException.Unsupported> { StartWorkflowRunUseCase(access)("a1", aWorkflow("w1", "Build"), emptyMap()) }
+        assertFailsWith<AppException.Unsupported> { StartWorkflowRunUseCase(access)("a1", aWorkflow("w1", "Build"), emptyMap(), "k") }
         assertFailsWith<AppException.Unsupported> { CancelWorkflowRunUseCase(access)("a1", workflowRun("r1")) }
         assertEquals(emptyList(), repository.calls)
     }
@@ -147,24 +148,25 @@ class WorkflowUseCasesTest {
     @Test fun aRunStartsWithItsRequiredInputsTrimmedAndTheDefaultsFilledIn() = runTest {
         val repository = FakeWorkflows()
         val start = StartWorkflowRunUseCase(WorkflowAccess(repository, FakeFeatures(setOf(Features.WORKFLOWS)), fakeGuard()))
-        assertEquals(RunStatus.QUEUED, start("a1", release, mapOf("version" to " 1.4.0 ", "notes" to "  ")).status)
+        assertEquals(RunStatus.QUEUED, start("a1", release, mapOf("version" to " 1.4.0 ", "notes" to "  "), "k1").status)
         assertEquals(listOf("start w1 {version=1.4.0, channel=stable}"), repository.calls, "An empty optional input is not sent; a default counts")
-        val missing = assertFailsWith<AppException.WorkflowInputMissing> { start("a1", release, mapOf("version" to "  ")) }
+        val missing = assertFailsWith<AppException.WorkflowInputMissing> { start("a1", release, mapOf("version" to "  "), "k") }
         assertEquals("Version", missing.label)
-        assertFailsWith<AppException.WorkflowInputMissing> { start("a1", release, mapOf("version" to "1", "channel" to "")) }
-        val long = assertFailsWith<AppException.WorkflowRefused> { start("a1", release, mapOf("version" to "12345678901")) }
+        assertFailsWith<AppException.WorkflowInputMissing> { start("a1", release, mapOf("version" to "1", "channel" to ""), "k") }
+        val long = assertFailsWith<AppException.WorkflowRefused> { start("a1", release, mapOf("version" to "12345678901"), "k") }
         assertEquals(WorkflowRefusal.INVALID_INPUTS, long.reason)
         assertEquals(1, repository.calls.size, "Nothing is sent before the inputs are right")
+        assertEquals(listOf("k1"), repository.keys, "The caller's key goes with the start")
     }
 
     @Test fun onlyAnAcceptedWorkflowStarts() = runTest {
         val repository = FakeWorkflows()
         val start = StartWorkflowRunUseCase(WorkflowAccess(repository, FakeFeatures(setOf(Features.WORKFLOWS)), fakeGuard()))
         for (status in listOf("proposed", "rejected")) {
-            val refused = assertFailsWith<AppException.WorkflowRefused> { start("a1", aWorkflow("w1", "Build").copy(status = status), emptyMap()) }
+            val refused = assertFailsWith<AppException.WorkflowRefused> { start("a1", aWorkflow("w1", "Build").copy(status = status), emptyMap(), "k") }
             assertEquals(WorkflowRefusal.NOT_RUNNABLE, refused.reason)
         }
-        start("a1", aWorkflow("w2", "Build").copy(status = "edited"), emptyMap())
+        start("a1", aWorkflow("w2", "Build").copy(status = "edited"), emptyMap(), "k")
         assertEquals(listOf("start w2 {}"), repository.calls)
     }
 

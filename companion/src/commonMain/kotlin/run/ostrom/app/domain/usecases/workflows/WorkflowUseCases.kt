@@ -102,12 +102,20 @@ fun checkRunStart(workflow: Workflow, entered: Map<String, String>): Map<String,
     return sent
 }
 
-/** Starts a run of an accepted [workflow] as the person, with what they [entered] (by input id). */
+/**
+ * Starts a run of an accepted [workflow] as the person, with what they [entered] (by input id). The caller keeps
+ * [idempotencyKey] while the form is unchanged, so pressing Start again after a lost answer returns the first run.
+ */
 class StartWorkflowRunUseCase(private val access: WorkflowAccess) {
-    suspend operator fun invoke(accountId: String, workflow: Workflow, entered: Map<String, String>): WorkflowRun {
+    suspend operator fun invoke(
+        accountId: String,
+        workflow: Workflow,
+        entered: Map<String, String>,
+        idempotencyKey: String,
+    ): WorkflowRun {
         if (!workflow.runnable) throw AppException.WorkflowRefused(WorkflowRefusal.NOT_RUNNABLE)
         val inputs = checkRunStart(workflow, entered)
-        return access.call(accountId) { access.repository.start(accountId, workflow.id, inputs) }
+        return access.call(accountId) { access.repository.start(accountId, workflow.id, inputs, idempotencyKey) }
     }
 }
 

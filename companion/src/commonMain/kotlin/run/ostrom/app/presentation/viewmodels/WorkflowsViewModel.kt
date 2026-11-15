@@ -19,6 +19,7 @@ import run.ostrom.app.domain.models.Account
 import run.ostrom.app.domain.models.AppException
 import run.ostrom.app.domain.models.NodeKind
 import run.ostrom.app.domain.models.Workflow
+import run.ostrom.app.domain.services.IdGenerator
 import run.ostrom.app.domain.models.WorkflowEditRights
 import run.ostrom.app.domain.models.WorkflowWrite
 import run.ostrom.app.domain.models.WorkflowRun
@@ -223,10 +224,14 @@ class WorkflowStartViewModel(
     private val route: WorkflowStartRoute,
     private val getWorkflow: GetWorkflowUseCase,
     private val startRun: StartWorkflowRunUseCase,
+    private val ids: IdGenerator,
 ) : ViewModel() {
     private val state = MutableStateFlow(WorkflowStartUiState())
     val uiState: StateFlow<WorkflowStartUiState> = state.asStateFlow()
     private var loading: Job? = null
+
+    /** One key for the form as it is: a start repeated after a lost answer returns the run the first press started. */
+    private var key = ids.newId()
 
     init { load() }
 
@@ -249,6 +254,7 @@ class WorkflowStartViewModel(
 
     fun onInput(id: String, value: String) {
         val max = state.value.workflow?.inputs?.firstOrNull { it.id == id }?.maxLength ?: return
+        key = ids.newId()
         state.update { it.copy(inputs = it.inputs + (id to value.take(max)), startError = null) }
     }
 
@@ -259,7 +265,7 @@ class WorkflowStartViewModel(
         state.update { it.copy(starting = true, startError = null) }
         viewModelScope.launch {
             try {
-                val run = startRun(route.accountId, workflow, current.inputs)
+                val run = startRun(route.accountId, workflow, current.inputs, key)
                 state.update { it.copy(starting = false, started = run) }
             } catch (error: CancellationException) {
                 throw error
