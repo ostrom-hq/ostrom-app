@@ -73,6 +73,7 @@
 
     <string name="error_check_input">Vérifie ce que tu as saisi.</string>
     <string name="error_credential_storage">Le stockage sécurisé de cet appareil a refusé l'accès. Déverrouille-le et réessaie.</string>
+    <string name="error_installation_busy">Une autre commande Ostrom crée l'identité de cet ordinateur (installation-id.lock dans le dossier ostrom). Attends qu'elle se termine, ou arrête-la, puis reconnecte-toi.</string>
     <string name="error_installation_unreadable">L'identité Ostrom de cet ordinateur (installation-id dans le dossier ostrom) ne peut être ni lue ni créée. Si le fichier existe, supprime-le, puis reconnecte-toi.</string>
     <string name="error_generic">Quelque chose s'est mal passé.</string>
     <string name="error_invalid_origin">Saisis l'adresse de ton serveur Ostrom, en https://.</string>

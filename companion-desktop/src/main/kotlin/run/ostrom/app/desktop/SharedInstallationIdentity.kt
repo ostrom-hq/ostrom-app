@@ -34,7 +34,8 @@ import run.ostrom.app.infrastructure.settings.SettingsInstallationIdentity
  * app never overwrites one. An app that drew its own id before (in its preferences) publishes that one when the CLI has
  * none yet, so its device keeps its name and sessions. A read that fails while another first run publishes the file is
  * tried again, 20 times 25 ms apart (TeamCode #281). A file that holds anything but an id, or that cannot be read or
- * written, is [AppException.InstallationUnreadable] and stays as it is.
+ * written, is [AppException.InstallationUnreadable] and stays as it is. The lock is waited for 10 s at most (as
+ * TeamCode's configuration lock): a CLI stuck while it holds it is [AppException.InstallationBusy], never an endless wait.
  *
  * @param directory The CLI's folder ([DesktopEnvironment.cliDirectory]).
  * @param sleep Waits the given milliseconds between two reads (virtual in tests).
@@ -57,6 +58,8 @@ class SharedInstallationIdentity(
             locker.lock(lockFile).use {
                 if (exists()) null else (legacy() ?: ids.newId()).takeIf(::publish)
             }
+        } catch (_: CliLockBusyException) {
+            throw AppException.InstallationBusy()
         } catch (_: IOException) {
             // Neither the lock nor the file could be written: said as such, never retried over another's file.
             throw AppException.InstallationUnreadable()
