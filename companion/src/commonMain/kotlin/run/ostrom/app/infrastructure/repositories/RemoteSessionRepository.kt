@@ -40,5 +40,5 @@ internal fun ApiSession.domain() = AgentSession(
     // A session the server marks ended without an end time (a launcher declared lost) is not shown as open.
     lost = lost == true || (ended == true && endedAt == null),
     activity = activity,
-    gateAnswers = gateAnswers.map { SessionGateAnswer(it.gateId, it.actionClass, it.outcome, it.by, millisOf(it.at), it.receiptId) },
+    gateAnswers = gateAnswers.orEmpty().map { SessionGateAnswer(it.gateId, it.actionClass, it.outcome, it.by, millisOf(it.at), it.receiptId) },
 )

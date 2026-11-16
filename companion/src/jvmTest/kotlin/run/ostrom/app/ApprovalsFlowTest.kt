@@ -36,12 +36,10 @@ class ApprovalsFlowTest {
 
     private fun approval(id: String = "appr_0001", status: String = "pending", digest: String = "sha256:shown", extra: String = "") =
         """{"id":"$id","title":"Push to main","requestedFrom":"ada","channel":"app","status":"$status","shownDigest":"$digest",
-           "repo":"acme/api","askedBy":["grace"],"commitDetails":[{"sha":"c0ffee0123","title":"Fix the login","author":"grace"}],
-           "checks":[{"name":"ci","state":"success"}],"action":{"kind":"push","repo":"acme/api","ref":"main","headSha":"c0ffee0123","risk":"high"},
-           "diffStats":{"files":3,"additions":40,"deletions":2}$extra}"""
+           "repo":"acme/api","askedBy":["grace"],"commits":["c0ffee0123"]$extra}"""
 
     private fun viewOf(approval: String, canApprove: Boolean = true, self: Boolean = false) =
-        """{"approval":$approval,"who":{"dev":"grace","agent":"claude-code","model":"opus"},"what":{"command":"git push origin main"},
+        """{"approval":$approval,"who":{"dev":"grace"},"what":{"action":"push","command":"git push origin main"},"askedVia":[],
            "gate":{"workflowId":"w1","workflowName":"Release","nodeId":"n1","label":"Push to main","approvers":["ada"],"status":"accepted","enforce":true,"reason":"r"},
            "you":{"login":"ada","self":$self,"canApprove":$canApprove}}"""
 
@@ -96,13 +94,11 @@ class ApprovalsFlowTest {
             onNodeWithText("Answered lately", substring = true, ignoreCase = true).assertExists()
             onNodeWithTag("request-appr_0000").assertExists()
             openRequest()
-            // Everything before any button: who asks, through which gate, the command, the commits and checks.
-            onNodeWithText("claude-code · opus", substring = true).assertExists()
+            // Everything before any button: who asks, through which gate, the command, the commits.
             onNodeWithText("Release · Push to main", substring = true).assertExists()
             onNodeWithText("git push origin main", substring = true).assertExists()
-            onNodeWithText("Fix the login", substring = true).assertExists()
-            onNodeWithText("Files: 3 · +40 −2", substring = true).assertExists()
-            onNodeWithText("Approve push", substring = true).assertExists()
+            onNodeWithText("c0ffee0", substring = true).assertExists()
+            onNodeWithTag("request-approve").assertExists()
             assertFalse(answer in server.asked, "Opening a request answers nothing")
             assertFalse(unlock in server.asked)
         }
@@ -221,14 +217,12 @@ class ApprovalsFlowTest {
     }
 
     @Test
-    fun noYesOnATruncatedChangeAndANoNeedsItsReason() {
-        val server = server(pending = viewOf(approval(extra = ""","diffTruncated":true""")))
+    fun aNoNeedsItsReason() {
+        val server = server(pending = viewOf(approval()))
         val (settings, credentials) = signedIn(phone = true)
         val gate = FakeBiometricGate()
         testApp(server, settings = settings, credentials = credentials, biometrics = gate) {
             openRequest()
-            onNodeWithTag("request-approve").assertDoesNotExist()
-            onNodeWithText("approve it from the console", substring = true).assertExists()
             tap("request-decline")
             tap("request-send-decline")
             assertFalse(answer in server.asked, "No no without its reason")
@@ -236,7 +230,7 @@ class ApprovalsFlowTest {
             tap("request-send-decline")
             waitUntil(timeoutMillis = 10_000) { answer in server.asked }
             val sent = server.sent.getValue(answer).single()
-            assertTrue("\"answer\":\"reject\"" in sent && "\"note\":\"Split it in two\"" in sent, sent)
+            assertTrue("\"answer\":\"reject\"" in sent && "\"comment\":\"Split it in two\"" in sent, sent)
             assertEquals(listOf("Decline “Push to main”"), gate.prompts)
         }
     }

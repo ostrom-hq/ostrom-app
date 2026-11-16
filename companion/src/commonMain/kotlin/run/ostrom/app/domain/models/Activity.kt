@@ -3,7 +3,8 @@ package run.ostrom.app.domain.models
 
 /**
  * A line of the organization's activity: [summary] is the server's sentence for a person, [at] its time in epoch
- * milliseconds (null when unreadable). [approvalId] links the approval it is about.
+ * milliseconds (null when unreadable). [approvalId] links the request it is about: the gate's id, which the approval view
+ * takes for the reader's own request on that gate.
  */
 data class ActivityItem(
     val id: String,

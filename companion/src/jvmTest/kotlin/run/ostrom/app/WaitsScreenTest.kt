@@ -28,7 +28,7 @@ class WaitsScreenTest {
     private val origin = "https://ostrom.example.org"
 
     private fun wait(id: String, title: String, status: String = "open", extra: String = "", fields: String = "", actions: String = """{"id":"done","label":"Send","style":"primary"}""") = """
-        {"id":"$id","kind":"question","status":"$status","assignee":"ada","createdAt":"2026-11-13T10:00:00Z",
+        {"id":"$id","kind":"question","status":"$status","assignee":"ada","createdBy":"grace","createdAt":"2026-11-13T10:00:00Z",
          "question":{"title":"$title","fields":[$fields],"actions":[$actions]}$extra}
     """.trimIndent()
 

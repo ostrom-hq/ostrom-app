@@ -127,7 +127,7 @@ class RemoteTransferRepositoryTest {
     @Test fun aCloudSessionCarriesItsOwnerItsTransferAndItsKind() = runTest {
         signedIn()
         val session = """{"id":"c1","name":"Mill","owner":"m1","agent":"claude","status":"transferring","transferId":"t1","kind":"remote",
-            "createdAt":"2026-11-14T09:00:00Z"}"""
+            "desiredStatus":"running","epoch":1,"limits":{"idleTimeoutMinutes":30,"maxRunMinutes":240,"restrictedEgress":false},"createdAt":"2026-11-14T09:00:00Z","updatedAt":"2026-11-14T09:00:00Z"}"""
         json(session)
         val read = RemoteCloudSessionRepository(calls).session("a1", "c1")
         assertEquals(run.ostrom.app.domain.models.CloudSessionStatus.TRANSFERRING, read.status)

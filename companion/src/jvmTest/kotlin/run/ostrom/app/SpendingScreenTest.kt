@@ -133,7 +133,7 @@ class SpendingScreenTest {
 
     @Test
     fun aLineAboutAnApprovalOpensItsRequestOnlyOnAServerWithApprovals() {
-        val line = """{"items":[{"id":"i9","at":"2026-11-13T10:00:00Z","kind":"gate.requested","actor":{"kind":"agent","name":"Codex"},"summary":"Asked to push","approvalId":"apr1"}]}"""
+        val line = """{"items":[{"id":"i9","at":"2026-11-13T10:00:00Z","kind":"gate.requested","actor":{"kind":"agent","name":"Codex"},"summary":"Asked to push","gateId":"apr1"}]}"""
         val gates = server(features = "\"gates.v1\"").also { it.routes["GET /api/v1/activity"] = line }
         signedIn(gates) {
             waitFor("tab-activity")
