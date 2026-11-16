@@ -11,6 +11,7 @@ import run.ostrom.app.domain.repositories.PreferencesRepository
 import run.ostrom.app.domain.services.CliSession
 import run.ostrom.app.domain.services.Clock
 import run.ostrom.app.domain.services.IdGenerator
+import run.ostrom.app.domain.services.InstallationIdentity
 import run.ostrom.app.domain.usecases.auth.AccountGuard
 import run.ostrom.app.domain.usecases.auth.BrowserSignInUseCase
 import run.ostrom.app.domain.usecases.auth.CompleteSignInUseCase
@@ -25,6 +26,7 @@ import run.ostrom.app.infrastructure.repositories.AccountCalls
 import run.ostrom.app.infrastructure.repositories.CachedFeaturesRepository
 import run.ostrom.app.infrastructure.repositories.RemoteAuthRepository
 import run.ostrom.app.infrastructure.settings.SettingsAccountRepository
+import run.ostrom.app.infrastructure.settings.SettingsInstallationIdentity
 import run.ostrom.app.infrastructure.settings.SettingsPreferencesRepository
 import run.ostrom.app.infrastructure.system.RandomIdGenerator
 import run.ostrom.app.infrastructure.system.SystemClock
@@ -38,6 +40,8 @@ val infrastructureModule = module {
     single { CoroutineScope(SupervisorJob() + Dispatchers.Default) }
     single<Clock> { SystemClock }
     single<IdGenerator> { RandomIdGenerator }
+    // The desktop's platform module replaces it with the CLI's own id, so the app and the CLI are one device.
+    single<InstallationIdentity> { SettingsInstallationIdentity(get(), get()) }
     single { OstromClientProvider(get(), get<DemoCredentialStore>(), get(), get()) }
     single { SettingsAccountRepository(get()) }
     single<PreferencesRepository> { SettingsPreferencesRepository(get()) }
@@ -52,7 +56,7 @@ val domainModule = module {
     single { CompleteSignInUseCase(get(), get(), get<DemoCredentialStore>(), get()) }
     // Resolved only where a BrowserSignIn exists (the phones' platform modules).
     single { BrowserSignInUseCase(get(), get(), get(), get()) }
-    single { DeviceSignInUseCase(get(), get(), get()) }
+    single { DeviceSignInUseCase(get(), get(), get(), get(), get()) }
     // This phone stops taking the account's push first, while its session can still speak.
     single {
         val clearPush = get<ClearPushUseCase>()

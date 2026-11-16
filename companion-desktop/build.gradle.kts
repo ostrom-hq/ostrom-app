@@ -56,6 +56,7 @@ dependencies {
     implementation(libs.coroutines.swing)
     implementation(libs.multiplatform.settings)
     implementation(libs.serialization.json)
+    implementation(libs.jna)
     testImplementation(kotlin("test"))
     testImplementation(libs.coroutines.test)
     testImplementation(libs.multiplatform.settings.test)

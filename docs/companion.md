@@ -26,6 +26,15 @@ that embeds the framework `Companion`) and `companion-desktop/` (a window). It i
   `POST /api/v1/auth/device/token` every interval, slower on `slow_down`): the server only sends a browser back to
   the phones' `ostrom://auth/callback`. The page to enter the code on must be GitHub's or of the server's own origin
   (or its console's, `app.` for `api.`).
+- **One device per installation** (`devices.v1`, TeamCode's installation identity): the device flow sends this
+  installation's id, the name a new device takes (`Ostrom macOS · <host name>`; a device already registered keeps the
+  name its owner gave it) and the platform, so every later sign-in lands on the same device. On a computer the id is the
+  `ostrom` CLI's own `installation-id`, beside its `config.toml`: the app and the CLI are one device. The app reads it,
+  or creates it as the CLI does, under the CLI's lock (`installation-id.lock`: `flock` on macOS and Linux, `LockFileEx`
+  on Windows), published complete and never over an existing file; a read is tried again 20 times 25 ms apart while
+  another first run publishes it. An id the app kept in its own settings is published there when the CLI has none yet.
+  A file that holds anything else is refused, and its removal asked for. The phones keep their id in their settings;
+  their browser sign-in (`POST /auth/mobile/token`) does not carry it yet, so a phone registers no device.
 - Every new session's capabilities are read before it is kept: a server whose API version this app does not speak
   is refused, and the new session revoked. The organization the calls act in (`Ostrom-Org`) is the only membership,
   or the one `GET /auth/me` names; a member of several chooses it in Settings.
@@ -303,7 +312,9 @@ ostrom-core's `client.githubLink`. The capability is read again from the server 
   and the GitHub access of a cloud session in `CloudSessionUseCasesTest`, `RemoteCloudSessionRepositoryTest`,
   `CloudSessionGitHubAccessTest` and `CloudSessionsScreenTest`.
 - `companion-desktop/src/test`: the CLI's account against a temporary CLI folder and a fake secret store, finding and
-  running the CLI with fake processes, the window placement.
+  running the CLI with fake processes, the window placement, the shared installation id (`SharedInstallationIdentityTest`:
+  created once, the CLI's wins, never overwritten, the retried read, concurrent first runs) and the CLI's lock against a
+  `flock` holder (`CliFileLockTest`).
 - `testAndroidHostTest` runs the common tests on Android's host JVM. Kover's gate covers the domain.
 
 ## Parity

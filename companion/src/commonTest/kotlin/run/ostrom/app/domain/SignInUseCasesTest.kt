@@ -4,6 +4,8 @@ package run.ostrom.app.domain
 import kotlinx.coroutines.test.runTest
 import run.ostrom.app.CountingRandom
 import run.ostrom.app.FakeAuthRepository
+import run.ostrom.app.FakePlatform
+import run.ostrom.app.FixedInstallation
 import run.ostrom.app.FixedClock
 import run.ostrom.app.ORIGIN
 import run.ostrom.app.SERVER
@@ -13,10 +15,13 @@ import run.ostrom.app.domain.models.AppException
 import run.ostrom.app.domain.models.Organization
 import run.ostrom.app.domain.models.SignInMethod
 import run.ostrom.app.domain.repositories.DevicePoll
+import run.ostrom.app.domain.repositories.Installation
 import run.ostrom.app.domain.repositories.Member
 import run.ostrom.app.domain.repositories.NewSession
 import run.ostrom.app.domain.services.BrowserSignIn
 import run.ostrom.app.domain.services.CredentialStore
+import run.ostrom.app.domain.services.InstallationIdentity
+import run.ostrom.app.domain.services.PlatformInfo
 import run.ostrom.app.domain.services.unlockKeyEntry
 import run.ostrom.app.domain.usecases.auth.BrowserSignInUseCase
 import run.ostrom.app.domain.usecases.auth.CompleteSignInUseCase
@@ -98,7 +103,7 @@ class SignInUseCasesTest {
     fun aServerWithoutGitHubIsRefusedBeforeTheBrowserOpens() = runTest {
         val noGitHub = SERVER.copy(methods = setOf("email"))
         assertFailsWith<AppException.NoGitHubSignIn> { browser { error("opened") }(noGitHub) }
-        assertFailsWith<AppException.NoGitHubSignIn> { DeviceSignInUseCase(auth, complete, clock) {}.start(noGitHub) }
+        assertFailsWith<AppException.NoGitHubSignIn> { DeviceSignInUseCase(auth, complete, clock, FixedInstallation(), FakePlatform) {}.start(noGitHub) }
     }
 
     @Test
@@ -155,7 +160,7 @@ class SignInUseCasesTest {
             { throw AppException.Server(503, null) },
             { DevicePoll.Done(NewSession("osm_cli", "ada", null, null)) },
         )
-        val device = DeviceSignInUseCase(auth, complete, clock) { clock.now += it; pauses += it }
+        val device = DeviceSignInUseCase(auth, complete, clock, FixedInstallation(), FakePlatform) { clock.now += it; pauses += it }
         val account = device.await(device.start(SERVER))
         assertEquals(SignInMethod.DEVICE, account.method)
         assertEquals(listOf(5_000L, 5_000L, 10_000L, 10_000L, 10_000L), pauses)
@@ -163,9 +168,45 @@ class SignInUseCasesTest {
     }
 
     @Test
+    fun theDeviceFlowRegistersThisInstallationWithItsNameAndPlatform() = runTest {
+        val device = DeviceSignInUseCase(auth, complete, clock, FixedInstallation("0f3c9a1e-2b4d-4c6e-8a0b-1c2d3e4f5a6b"), FakePlatform) {}
+        device.start(SERVER)
+        assertEquals(listOf<Installation?>(Installation("0f3c9a1e-2b4d-4c6e-8a0b-1c2d3e4f5a6b", "Ostrom macOS · studio", "macos")), auth.installations)
+    }
+
+    @Test
+    fun anUnusableInstallationIdentityStartsNoSignIn() = runTest {
+        val broken = object : InstallationIdentity {
+            override suspend fun id(): String = throw AppException.InstallationUnreadable()
+        }
+        assertFailsWith<AppException.InstallationUnreadable> { DeviceSignInUseCase(auth, complete, clock, broken, FakePlatform) {}.start(SERVER) }
+        assertTrue(auth.installations.isEmpty())
+    }
+
+    @Test
+    fun theDeviceNameAndPlatformAreWhatTheServerTakes() {
+        fun platform(name: String, model: String) = object : PlatformInfo {
+            override val platform = name
+            override val deviceModel = model
+            override val appVersion = "1"
+        }
+        assertEquals("ios", platform("iOS", "iPhone").reportedPlatform)
+        assertEquals("windows", platform("Windows", "PC").reportedPlatform)
+        assertNull(platform("Test", "x").reportedPlatform)
+        assertEquals("Ostrom iOS · iPhone", platform("iOS", "iPhone").defaultDeviceName)
+        // A host name with control characters, or too long, still gives a name of 1 to 120 printable characters.
+        assertEquals("Ostrom Linux · boxname", platform("Linux", "box\u0007name\n").defaultDeviceName)
+        val long = platform("Linux", "h".repeat(300)).defaultDeviceName
+        assertEquals(120, long.length)
+        assertTrue(long.startsWith("Ostrom Linux · hhh"))
+        val emoji = platform("Linux", "h".repeat(104) + "\uD83D\uDE80").defaultDeviceName
+        assertEquals(119, emoji.length, "The emoji cut at 120 is dropped whole")
+    }
+
+    @Test
     fun theDeviceFlowEndsWhenTheCodeExpiresOrIsRefused() = runTest {
         auth.polls = MutableList(20) { { DevicePoll.Pending() } }
-        val device = DeviceSignInUseCase(auth, complete, clock) { clock.now += it }
+        val device = DeviceSignInUseCase(auth, complete, clock, FixedInstallation(), FakePlatform) { clock.now += it }
         assertFailsWith<AppException.SignInExpired> { device.await(device.start(SERVER)) }
         auth.polls = mutableListOf({ throw AppException.Unreachable() }, { throw AppException.SignInDenied() })
         assertFailsWith<AppException.SignInDenied> { device.await(device.start(SERVER)) }

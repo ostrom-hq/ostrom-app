@@ -14,13 +14,14 @@ import run.ostrom.app.domain.repositories.DevicePoll
 import run.ostrom.app.domain.repositories.FeaturesRepository
 import run.ostrom.app.domain.repositories.Member
 import run.ostrom.app.domain.repositories.NewSession
+import run.ostrom.app.domain.repositories.Installation
 
 /** The demo server: it signs nobody in (the demo account exists already) and answers its account from memory. */
 class DemoAuthRepository(private val demo: DemoMode) : AuthRepository {
     override suspend fun discover(origin: String): ServerInfo = throw AppException.NotOstrom()
     override fun prepareBrowserSignIn(origin: String, redirectUri: String, state: String): BrowserAttempt = throw AppException.NotOstrom()
     override suspend fun exchangeCode(origin: String, code: String, codeVerifier: String, redirectUri: String): NewSession = throw AppException.NotOstrom()
-    override suspend fun startDeviceLogin(server: ServerInfo): DeviceLogin = throw AppException.NotOstrom()
+    override suspend fun startDeviceLogin(server: ServerInfo, installation: Installation?): DeviceLogin = throw AppException.NotOstrom()
     override suspend fun pollDeviceLogin(origin: String, deviceCode: String): DevicePoll = throw AppException.NotOstrom()
     override suspend fun capabilities(origin: String, token: String): ServerCapabilities = throw AppException.NotOstrom()
     override suspend fun capabilities(accountId: String): ServerCapabilities =

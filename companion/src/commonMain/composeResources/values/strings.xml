@@ -73,6 +73,7 @@
 
     <string name="error_check_input">Check what you entered.</string>
     <string name="error_credential_storage">This device's secure storage refused access. Unlock it and try again.</string>
+    <string name="error_installation_unreadable">This computer's Ostrom identity (installation-id in the ostrom folder) cannot be read or created. If the file is there, remove it, then sign in again.</string>
     <string name="error_generic">Something went wrong.</string>
     <string name="error_invalid_origin">Enter the address of your Ostrom server, with https://.</string>
     <string name="error_no_github">This server does not offer GitHub sign-in.</string>

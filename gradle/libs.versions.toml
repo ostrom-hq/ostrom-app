@@ -23,6 +23,8 @@ multiplatform-settings = "1.3.0"
 phosphor-icon = "1.0.0"
 markdown-renderer = "0.45.0"
 java-keyring = "1.0.4"
+# The C library's flock on Linux, the CLI's lock (companion-desktop's CliFileLock); java-keyring's own version.
+jna = "5.13.0"
 jkeychain = "1.1.0"
 firebase-bom = "35.1.0"
 junit = "5.11.4"
@@ -74,6 +76,7 @@ multiplatform-settings-test = { module = "com.russhwolf:multiplatform-settings-t
 phosphor-icons = { module = "com.adamglin:phosphor-icon", version.ref = "phosphor-icon" }
 markdown-renderer-m3 = { module = "com.mikepenz:multiplatform-markdown-renderer-m3", version.ref = "markdown-renderer" }
 java-keyring = { module = "com.github.javakeyring:java-keyring", version.ref = "java-keyring" }
+jna = { module = "net.java.dev.jna:jna", version.ref = "jna" }
 jkeychain = { module = "pt.davidafsilva.apple:jkeychain", version.ref = "jkeychain" }
 firebase-bom = { module = "com.google.firebase:firebase-bom", version.ref = "firebase-bom" }
 firebase-messaging = { module = "com.google.firebase:firebase-messaging" }

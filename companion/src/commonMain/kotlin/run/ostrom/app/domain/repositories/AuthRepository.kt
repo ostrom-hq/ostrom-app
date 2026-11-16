@@ -22,6 +22,16 @@ class BrowserAttempt(val url: String, internal val codeVerifier: String) {
     override fun toString(): String = "BrowserAttempt($url)"
 }
 
+/**
+ * What a device sign-in says of this installation, so the server registers it as one device (`devices.v1`, as
+ * `ostrom login`): every later sign-in from it lands on the same device. A server without devices ignores it.
+ *
+ * @property id The installation id ([run.ostrom.app.domain.services.InstallationIdentity]).
+ * @property deviceName The name of the device this sign-in registers; a device already registered keeps its own.
+ * @property platform The system (`macos`, `windows`, `linux`, `ios`, `android`), null when it is none of those.
+ */
+data class Installation(val id: String, val deviceName: String, val platform: String?)
+
 /** One answer of the device flow's polling. */
 sealed interface DevicePoll {
     /** Not answered yet: ask again after the interval ([slowDown]: and add five seconds to it, as GitHub asks). */
@@ -53,8 +63,8 @@ interface AuthRepository {
     /** Exchanges the browser's one-time code for an app token (`POST /auth/mobile/token`). */
     suspend fun exchangeCode(origin: String, code: String, codeVerifier: String, redirectUri: String): NewSession
 
-    /** Starts the device flow of `ostrom login` (`POST /auth/device`). */
-    suspend fun startDeviceLogin(server: ServerInfo): DeviceLogin
+    /** Starts the device flow of `ostrom login` (`POST /auth/device`), registering [installation] as a device. */
+    suspend fun startDeviceLogin(server: ServerInfo, installation: Installation? = null): DeviceLogin
 
     /** Asks once whether the person entered the code (`POST /auth/device/token`). */
     suspend fun pollDeviceLogin(origin: String, deviceCode: String): DevicePoll

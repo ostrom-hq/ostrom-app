@@ -12,8 +12,13 @@ import io.ktor.client.request.HttpResponseData
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
+import io.ktor.http.content.OutgoingContent
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import run.ostrom.app.CountingRandom
 import run.ostrom.app.ORIGIN
 import run.ostrom.app.SERVER
@@ -21,6 +26,7 @@ import run.ostrom.app.account
 import run.ostrom.app.accounts
 import run.ostrom.app.domain.models.AppException
 import run.ostrom.app.domain.repositories.DevicePoll
+import run.ostrom.app.domain.repositories.Installation
 import run.ostrom.app.domain.services.PlatformInfo
 import run.ostrom.app.infrastructure.client.OstromClientProvider
 import run.ostrom.app.infrastructure.credentials.MemoryCredentialStore
@@ -151,6 +157,20 @@ class RemoteAuthRepositoryTest {
         assertTrue(RemoteAuthRepository.trustedSignInPage("https://app.example.org/device", "https://api.example.org"))
         assertTrue(RemoteAuthRepository.trustedSignInPage("http://localhost:8080/device", "http://localhost:8080"))
         assertFalse(RemoteAuthRepository.trustedSignInPage("http://ostrom.example.org/device", "https://ostrom.example.org"))
+    }
+
+    @Test
+    fun theDeviceFlowNamesThisInstallationOnlyWhenGivenOne() = runTest {
+        answer = json("""{"deviceCode":"dc","userCode":"ABCD-EFGH","verificationUri":"https://github.com/login/device","verificationUriComplete":"https://github.com/login/device?code=X","interval":5,"expiresIn":900}""")
+        repository.startDeviceLogin(SERVER, Installation("0f3c9a1e-2b4d-4c6e-8a0b-1c2d3e4f5a6b", "Ostrom macOS · studio", "macos"))
+        val body = Json.parseToJsonElement((requests.last().body as OutgoingContent.ByteArrayContent).bytes().decodeToString()).jsonObject
+        assertEquals("0f3c9a1e-2b4d-4c6e-8a0b-1c2d3e4f5a6b", body["installationId"]?.jsonPrimitive?.content)
+        assertEquals("Ostrom macOS · studio", body["deviceName"]?.jsonPrimitive?.content)
+        assertEquals("macos", body["platform"]?.jsonPrimitive?.content)
+        repository.startDeviceLogin(SERVER)
+        val bare = Json.parseToJsonElement((requests.last().body as OutgoingContent.ByteArrayContent).bytes().decodeToString()).jsonObject
+        assertNull(bare["installationId"]?.takeUnless { it is JsonNull })
+        assertNull(bare["platform"]?.takeUnless { it is JsonNull })
     }
 
     @Test

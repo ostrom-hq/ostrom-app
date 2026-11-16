@@ -12,13 +12,14 @@ import run.ostrom.app.domain.repositories.find
 import run.ostrom.app.domain.services.CliSession
 import run.ostrom.app.domain.services.CliUpdater
 import run.ostrom.app.domain.services.CredentialStore
+import run.ostrom.app.domain.services.InstallationIdentity
 import run.ostrom.app.infrastructure.credentials.KeyringBackend
 import run.ostrom.app.infrastructure.credentials.KeyringCredentialStore
 
 /**
  * The desktop's platform module: the JVM one of `:companion` (keyring, preferences, the JDK HTTP engine), the update
  * banner, then what replaces or adds to it on a computer. Loaded after the shared modules, its definitions override
- * theirs: the CLI's account and its token, the CLI's sign-out and update.
+ * theirs: the CLI's installation id, account and token, the CLI's sign-out and update.
  *
  * The CLI's account needs the OS secret store, where the CLI keeps its token: none on Windows (java-keyring does not
  * read the CLI's Credential Manager entry) nor on a Linux without Secret Service.
@@ -34,6 +35,10 @@ internal fun desktopOverrides(environment: DesktopEnvironment, keyring: KeyringB
     single { CliLocator(get(), get()) }
     single<CliUpdater> { DesktopCliUpdater(get(), get()) }
     single<CliSession> { DesktopCliSession(get(), get()) }
+    // The CLI's installation id, shared: the app and the CLI of this computer are one device.
+    environment.cliDirectory?.let { directory ->
+        single<InstallationIdentity> { SharedInstallationIdentity(directory, get(), get(), environment.os) }
+    }
     if (keyring != null) {
         val cli = CliKeyring.of(keyring)
         single { CliFiles(environment.cliDirectory, environment["OSTROM_URL"]) }

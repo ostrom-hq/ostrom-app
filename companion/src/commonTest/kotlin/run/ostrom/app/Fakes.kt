@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 package run.ostrom.app
 
+import run.ostrom.app.domain.repositories.Installation
+import run.ostrom.app.domain.services.InstallationIdentity
+import run.ostrom.app.domain.services.PlatformInfo
 import com.russhwolf.settings.MapSettings
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
@@ -38,6 +41,18 @@ class FixedClock(var now: Long = 1_000_000L) : Clock {
     override fun nowMillis(): Long = now
 }
 
+/** An [InstallationIdentity] that always answers [id]. */
+class FixedInstallation(private val id: String = "0f3c9a1e-2b4d-4c6e-8a0b-1c2d3e4f5a6b") : InstallationIdentity {
+    override suspend fun id(): String = id
+}
+
+/** A computer named `studio` on macOS. */
+object FakePlatform : PlatformInfo {
+    override val platform = "macOS"
+    override val deviceModel = "studio"
+    override val appVersion = "1.0.0"
+}
+
 class SequenceIds : IdGenerator {
     private var next = 0
     override fun newId(): String = "id-${++next}"
@@ -65,6 +80,7 @@ class FakeAuthRepository : AuthRepository {
     val released = mutableListOf<String>()
     val exchanges = mutableListOf<Triple<String, String, String>>()
     var preparedState: String? = null
+    val installations = mutableListOf<Installation?>()
 
     override suspend fun discover(origin: String): ServerInfo {
         discoverError?.let { throw it }
@@ -81,8 +97,8 @@ class FakeAuthRepository : AuthRepository {
         return exchanged
     }
 
-    override suspend fun startDeviceLogin(server: ServerInfo): DeviceLogin =
-        DeviceLogin(server, "ABCD-EFGH", "https://github.com/login/device", "device-code", intervalMillis = 5_000, expiresInMillis = 60_000)
+    override suspend fun startDeviceLogin(server: ServerInfo, installation: Installation?): DeviceLogin =
+        installations.add(installation).let { DeviceLogin(server, "ABCD-EFGH", "https://github.com/login/device", "device-code", intervalMillis = 5_000, expiresInMillis = 60_000) }
 
     override suspend fun pollDeviceLogin(origin: String, deviceCode: String): DevicePoll = polls.removeFirst().invoke()
 

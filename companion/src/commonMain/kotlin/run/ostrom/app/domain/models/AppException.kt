@@ -34,6 +34,11 @@ sealed class AppException(message: String) : Exception(message) {
      * this very request (unlock again, then answer again); otherwise a fresh sign-in, given in the console.
      */
     class StepUpRequired(val requestBound: Boolean) : AppException("Confirm this yes again.")
+    /**
+     * This computer's installation identity (`installation-id` in the `ostrom` CLI's folder, shared with the CLI) holds
+     * something else than an id, or cannot be read or written: it is never overwritten, the person removes it.
+     */
+    class InstallationUnreadable : AppException("This computer's Ostrom identity (installation-id in the ostrom folder) cannot be read or created. If the file is there, remove it, then sign in again.")
     class CredentialStorage : AppException("This device's secure storage refused to read or keep the sign-in. Unlock the device and try again.")
     /** The server refused to start or cancel a workflow run, for [reason]. */
     class WorkflowRefused(val reason: WorkflowRefusal) : AppException(
