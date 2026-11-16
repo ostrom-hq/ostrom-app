@@ -130,6 +130,15 @@ class SharedInstallationIdentityTest {
     }
 
     @Test
+    fun aLockHeldPastTheWaitIsSaidAsBusyAndNothingIsWritten() = withTemporaryDirectory { directory ->
+        runTest {
+            val stuck = CliFileLocker { throw CliLockBusyException(it) }
+            assertFailsWith<AppException.InstallationBusy> { identity(directory, locker = stuck).id() }
+            assertTrue(!directory.id().exists())
+        }
+    }
+
+    @Test
     fun aLockThatCannotBeTakenIsSaidAndNothingIsWritten() = withTemporaryDirectory { directory ->
         runTest {
             val refusing = CliFileLocker { throw IOException("read-only") }

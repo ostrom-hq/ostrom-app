@@ -37,6 +37,7 @@ import run.ostrom.app.resources.error_cloud_variables
 import run.ostrom.app.resources.error_cloud_github_not_paused
 import run.ostrom.app.resources.error_cloud_github_owner_only
 import run.ostrom.app.resources.error_credential_storage
+import run.ostrom.app.resources.error_installation_busy
 import run.ostrom.app.resources.error_installation_unreadable
 import run.ostrom.app.resources.error_github_account_in_use
 import run.ostrom.app.resources.error_github_app_misconfigured
@@ -143,6 +144,7 @@ private fun AppException.sentence(): Pair<StringResource, List<Any>> = when (thi
     is AppException.StepUpRequired -> Res.string.error_step_up to emptyList()
     is AppException.CredentialStorage -> Res.string.error_credential_storage to emptyList()
     is AppException.InstallationUnreadable -> Res.string.error_installation_unreadable to emptyList()
+    is AppException.InstallationBusy -> Res.string.error_installation_busy to emptyList()
     is AppException.WorkflowRefused -> when (reason) {
         WorkflowRefusal.FORBIDDEN -> Res.string.error_workflow_forbidden
         WorkflowRefusal.NOT_RUNNABLE -> Res.string.error_workflow_not_runnable

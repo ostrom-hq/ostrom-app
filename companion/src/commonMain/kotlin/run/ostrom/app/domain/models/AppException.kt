@@ -39,6 +39,11 @@ sealed class AppException(message: String) : Exception(message) {
      * something else than an id, or cannot be read or written: it is never overwritten, the person removes it.
      */
     class InstallationUnreadable : AppException("This computer's Ostrom identity (installation-id in the ostrom folder) cannot be read or created. If the file is there, remove it, then sign in again.")
+    /**
+     * Another process (an `ostrom` CLI command, maybe stuck) held the lock of this computer's installation identity
+     * (`installation-id.lock`) for the whole wait: the app does not wait forever (TeamCode's configuration lock).
+     */
+    class InstallationBusy : AppException("Another Ostrom command is creating this computer's identity (installation-id.lock in the ostrom folder). Wait for it to finish, or stop it, then sign in again.")
     class CredentialStorage : AppException("This device's secure storage refused to read or keep the sign-in. Unlock the device and try again.")
     /** The server refused to start or cancel a workflow run, for [reason]. */
     class WorkflowRefused(val reason: WorkflowRefusal) : AppException(

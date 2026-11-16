@@ -32,8 +32,10 @@ that embeds the framework `Companion`) and `companion-desktop/` (a window). It i
   `ostrom` CLI's own `installation-id`, beside its `config.toml`: the app and the CLI are one device. The app reads it,
   or creates it as the CLI does, under the CLI's lock (`installation-id.lock`: `flock` on macOS and Linux, `LockFileEx`
   on Windows), published complete and never over an existing file; a read is tried again 20 times 25 ms apart while
-  another first run publishes it. An id the app kept in its own settings is published there when the CLI has none yet.
-  A file that holds anything else is refused, and its removal asked for. The phones keep their id in their settings;
+  another first run publishes it. The lock is waited for 10 s at most, as TeamCode's configuration lock: a CLI stuck
+  while it holds it ends the sign-in with an error that names `installation-id.lock`, never an endless wait. An id the
+  app kept in its own settings is published there when the CLI has none yet. A file that holds anything else is
+  refused, and its removal asked for. The phones keep their id in their settings;
   their browser sign-in (`POST /auth/mobile/token`) does not carry it yet, so a phone registers no device.
 - Every new session's capabilities are read before it is kept: a server whose API version this app does not speak
   is refused, and the new session revoked. The organization the calls act in (`Ostrom-Org`) is the only membership,
