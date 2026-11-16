@@ -83,6 +83,8 @@ class RemoteApprovalRepositoryTest {
         assertEquals(emptyList(), approval.checks)
         assertNull(approval.action)
         assertNull(approval.diffStats)
+        // No risk is served: every answer asks the biometrics.
+        assertTrue(approval.needsBiometrics)
         assertEquals(ApprovalAsker("grace"), approval.who)
         assertEquals("git push origin main", approval.what?.command)
         assertEquals(ApprovalGate("Release", "Push to main"), approval.gate)
@@ -92,7 +94,7 @@ class RemoteApprovalRepositoryTest {
     }
 
     @Test
-    fun commitsWithoutDetailsAreTheirShasAndAnUnknownStatusIsUnknown() = runTest {
+    fun commitsAreTheirShasAndAnUnknownStatusIsUnknown() = runTest {
         answer = json(
             """{"pending":[],"recent":[{"approval":{"id":"a","title":"t","requestedFrom":"ada","channel":"app","status":"later",
             "shownDigest":"d","commits":["abc1234"],"decidedAt":"not a date"},
