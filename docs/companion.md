@@ -35,8 +35,9 @@ that embeds the framework `Companion`) and `companion-desktop/` (a window). It i
   another first run publishes it. The lock is waited for 10 s at most, as TeamCode's configuration lock: a CLI stuck
   while it holds it ends the sign-in with an error that names `installation-id.lock`, never an endless wait. An id the
   app kept in its own settings is published there when the CLI has none yet. A file that holds anything else is
-  refused, and its removal asked for. The phones keep their id in their settings;
-  their browser sign-in (`POST /auth/mobile/token`) does not carry it yet, so a phone registers no device.
+  refused, and its removal asked for. The phones keep their id in their settings and send it, with their name
+  (`Ostrom iOS · <model>`) and platform, with the code of their browser sign-in (`POST /auth/mobile/token`), as
+  TeamCode's companion does at its login: a phone is one device too.
 - Every new session's capabilities are read before it is kept: a server whose API version this app does not speak
   is refused, and the new session revoked. The organization the calls act in (`Ostrom-Org`) is the only membership,
   or the one `GET /auth/me` names; a member of several chooses it in Settings.

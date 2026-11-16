@@ -46,10 +46,10 @@ class SignInUseCasesTest {
     private val clock = FixedClock()
     private val state = base64Url(CountingRandom.nextBytes(16))
 
-    private fun browser(answer: (url: String) -> String?) = BrowserSignInUseCase(auth, BrowserSignIn { url, scheme ->
+    private fun browser(identity: InstallationIdentity = FixedInstallation(), answer: (url: String) -> String?) = BrowserSignInUseCase(auth, BrowserSignIn { url, scheme ->
         assertEquals("ostrom", scheme)
         answer(url)
-    }, CountingRandom, complete)
+    }, CountingRandom, complete, identity, FakePlatform)
 
     @Test
     fun originsAreNormalized() {
@@ -77,6 +77,21 @@ class SignInUseCasesTest {
         assertEquals(account.id, accounts.activeAccountId.value)
         assertEquals(Triple("c0de", "verifier", "ostrom://auth/callback"), auth.exchanges.single())
         assertEquals(state, auth.preparedState)
+    }
+
+    @Test
+    fun aPhoneSignInRegistersThisInstallationWithItsNameAndPlatform() = runTest {
+        browser(FixedInstallation("0f3c9a1e-2b4d-4c6e-8a0b-1c2d3e4f5a6b")) { "ostrom://auth/callback?code=c0de&state=${auth.preparedState}" }(SERVER)
+        assertEquals(listOf<Installation?>(Installation("0f3c9a1e-2b4d-4c6e-8a0b-1c2d3e4f5a6b", "Ostrom macOS · studio", "macos")), auth.installations)
+    }
+
+    @Test
+    fun anUnusableInstallationIdentityOpensNoBrowser() = runTest {
+        val broken = object : InstallationIdentity {
+            override suspend fun id(): String = throw AppException.InstallationUnreadable()
+        }
+        assertFailsWith<AppException.InstallationUnreadable> { browser(broken) { error("opened") }(SERVER) }
+        assertTrue(auth.exchanges.isEmpty())
     }
 
     @Test

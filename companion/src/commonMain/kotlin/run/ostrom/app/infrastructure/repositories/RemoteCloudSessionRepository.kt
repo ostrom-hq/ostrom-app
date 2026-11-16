@@ -22,7 +22,6 @@ import run.ostrom.app.domain.models.PermissionAnswer
 import run.ostrom.app.domain.models.SessionWaiting
 import run.ostrom.app.domain.repositories.CloudSessionRepository
 import run.ostrom.core.api.models.AnswerCloudPermissionRequest
-import run.ostrom.core.api.models.CloudAgentKind
 import run.ostrom.core.api.models.CloudInput
 import run.ostrom.core.api.models.CloudQuestionAnswer
 import run.ostrom.core.api.models.CloudEnvironment
@@ -179,7 +178,7 @@ private val REFUSAL_REASON = Regex("""\(([a-z][a-z0-9_]{0,63})\)""")
 
 /** A session on one of the member's devices: always a conversation, in a folder the device published. */
 internal fun NewDeviceSession.request() = CreateCloudSessionRequest(
-    agent = CloudAgentKind.entries.first { it.value == agent },
+    agent = agent,
     model = model,
     effort = effort,
     prompt = initialMessage,
@@ -194,7 +193,7 @@ internal fun NewDeviceSession.request() = CreateCloudSessionRequest(
 internal fun CloudInput.receipt() = InputReceipt(id, status, woke, reason)
 
 internal fun NewCloudSession.request() = CreateCloudSessionRequest(
-    agent = CloudAgentKind.entries.first { it.value == agent.wire },
+    agent = agent.wire,
     model = model,
     repo = repo,
     ref = ref,

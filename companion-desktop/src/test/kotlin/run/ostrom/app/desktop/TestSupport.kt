@@ -49,7 +49,7 @@ class RecordingAuth : AuthRepository {
 
     override suspend fun discover(origin: String): ServerInfo = error("unused")
     override fun prepareBrowserSignIn(origin: String, redirectUri: String, state: String): BrowserAttempt = error("unused")
-    override suspend fun exchangeCode(origin: String, code: String, codeVerifier: String, redirectUri: String): NewSession = error("unused")
+    override suspend fun exchangeCode(origin: String, code: String, codeVerifier: String, redirectUri: String, installation: Installation?): NewSession = error("unused")
     override suspend fun startDeviceLogin(server: ServerInfo, installation: Installation?): DeviceLogin = error("unused")
     override suspend fun pollDeviceLogin(origin: String, deviceCode: String): DevicePoll = error("unused")
     override suspend fun capabilities(accountId: String): ServerCapabilities = error("unused")

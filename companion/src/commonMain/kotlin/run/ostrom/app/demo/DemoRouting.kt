@@ -96,8 +96,8 @@ class DemoAwareAuthRepository(private val real: AuthRepository, private val demo
 
     override suspend fun discover(origin: String) = at(origin).discover(origin)
     override fun prepareBrowserSignIn(origin: String, redirectUri: String, state: String) = at(origin).prepareBrowserSignIn(origin, redirectUri, state)
-    override suspend fun exchangeCode(origin: String, code: String, codeVerifier: String, redirectUri: String) =
-        at(origin).exchangeCode(origin, code, codeVerifier, redirectUri)
+    override suspend fun exchangeCode(origin: String, code: String, codeVerifier: String, redirectUri: String, installation: Installation?) =
+        at(origin).exchangeCode(origin, code, codeVerifier, redirectUri, installation)
     override suspend fun startDeviceLogin(server: ServerInfo, installation: Installation?): DeviceLogin =
         at(server.origin).startDeviceLogin(server, installation)
     override suspend fun pollDeviceLogin(origin: String, deviceCode: String) = at(origin).pollDeviceLogin(origin, deviceCode)
