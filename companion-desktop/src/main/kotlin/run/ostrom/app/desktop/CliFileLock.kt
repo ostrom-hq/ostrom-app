@@ -133,7 +133,8 @@ internal class FlockFileLocker(private val timeoutMillis: Long) : CliFileLocker 
         val descriptor = interrupted("open $lockFile") { library.open(lockFile.toString(), O_RDWR or O_CLOEXEC) }
         try {
             untilDeadline(lockFile, deadline) { tryFlock(library, descriptor, lockFile) }
-        } catch (error: IOException) {
+        } catch (error: Throwable) {
+            // Busy, failed, or interrupted between two attempts: the descriptor never outlives the call.
             library.close(descriptor)
             throw error
         }

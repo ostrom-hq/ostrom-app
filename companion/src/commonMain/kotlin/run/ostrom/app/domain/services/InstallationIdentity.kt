@@ -8,6 +8,10 @@ package run.ostrom.app.domain.services
  * it is the CLI's own: the app and the CLI of one machine are one device.
  */
 interface InstallationIdentity {
-    /** @throws run.ostrom.app.domain.models.AppException.InstallationUnreadable When it cannot be read nor created. */
+    /**
+     * @throws run.ostrom.app.domain.models.AppException.InstallationUnreadable When it cannot be read nor created.
+     * @throws run.ostrom.app.domain.models.AppException.InstallationBusy When another process holds its lock past the
+     *   wait (on a computer).
+     */
     suspend fun id(): String
 }
