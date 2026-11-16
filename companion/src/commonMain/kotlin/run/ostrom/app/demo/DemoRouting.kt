@@ -11,6 +11,7 @@ import run.ostrom.app.domain.models.ServerInfo
 import run.ostrom.app.domain.repositories.AccountRepository
 import run.ostrom.app.domain.repositories.AuthRepository
 import run.ostrom.app.domain.repositories.FeaturesRepository
+import run.ostrom.app.domain.repositories.Installation
 import run.ostrom.app.domain.services.CredentialStore
 
 /**
@@ -97,7 +98,8 @@ class DemoAwareAuthRepository(private val real: AuthRepository, private val demo
     override fun prepareBrowserSignIn(origin: String, redirectUri: String, state: String) = at(origin).prepareBrowserSignIn(origin, redirectUri, state)
     override suspend fun exchangeCode(origin: String, code: String, codeVerifier: String, redirectUri: String) =
         at(origin).exchangeCode(origin, code, codeVerifier, redirectUri)
-    override suspend fun startDeviceLogin(server: ServerInfo): DeviceLogin = at(server.origin).startDeviceLogin(server)
+    override suspend fun startDeviceLogin(server: ServerInfo, installation: Installation?): DeviceLogin =
+        at(server.origin).startDeviceLogin(server, installation)
     override suspend fun pollDeviceLogin(origin: String, deviceCode: String) = at(origin).pollDeviceLogin(origin, deviceCode)
     override suspend fun capabilities(origin: String, token: String) = at(origin).capabilities(origin, token)
     override suspend fun capabilities(accountId: String) = of(accountId).capabilities(accountId)

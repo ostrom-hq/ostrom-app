@@ -12,6 +12,7 @@ import run.ostrom.app.domain.models.ServerInfo
 import run.ostrom.app.domain.repositories.AuthRepository
 import run.ostrom.app.domain.repositories.BrowserAttempt
 import run.ostrom.app.domain.repositories.DevicePoll
+import run.ostrom.app.domain.repositories.Installation
 import run.ostrom.app.domain.repositories.Member
 import run.ostrom.app.domain.repositories.NewSession
 import run.ostrom.app.domain.services.SecureRandom
@@ -48,8 +49,12 @@ class RemoteAuthRepository(
         NewSession(answer.token, answer.user.login, answer.user.name, answer.expiresAt?.let(::epochMillis), answer.unlockKey)
     }
 
-    override suspend fun startDeviceLogin(server: ServerInfo): DeviceLogin = detached(server.origin) { client ->
-        val start = client.auth.startDeviceLogin()
+    override suspend fun startDeviceLogin(server: ServerInfo, installation: Installation?): DeviceLogin = detached(server.origin) { client ->
+        val start = client.auth.startDeviceLogin(
+            installationId = installation?.id,
+            deviceName = installation?.deviceName,
+            platform = installation?.platform,
+        )
         val page = start.verificationUri
         if (!trustedSignInPage(page, server.origin) || page.any { it < ' ' || it == '\u007f' }) throw AppException.UntrustedSignInPage()
         if (start.deviceCode.isEmpty() || !USER_CODE.matches(start.userCode)) throw AppException.NotOstrom()

@@ -12,22 +12,31 @@ import run.ostrom.app.domain.models.ServerInfo
 import run.ostrom.app.domain.models.SignInMethod
 import run.ostrom.app.domain.repositories.AuthRepository
 import run.ostrom.app.domain.repositories.DevicePoll
+import run.ostrom.app.domain.repositories.Installation
+import run.ostrom.app.domain.services.InstallationIdentity
+import run.ostrom.app.domain.services.PlatformInfo
 
 /**
  * A computer's sign-in, the device flow of `ostrom login`: [start] gives the code and the page to enter it on (GitHub's,
  * or one of the server's own origin, checked by the repository), [await] asks the server every interval until the
  * person said yes, the code expired or they said no. A lost connection, a `5xx` or a `429` is asked again until the
  * expiry: the person may already have entered the code.
+ *
+ * The sign-in names this installation ([InstallationIdentity], its default name and its platform), so the server
+ * registers the computer as one device, the same one as its `ostrom` CLI ([InstallationIdentity] is the CLI's there).
  */
 class DeviceSignInUseCase(
     private val auth: AuthRepository,
     private val complete: CompleteSignInUseCase,
     private val clock: Clock,
+    private val installation: InstallationIdentity,
+    private val platform: PlatformInfo,
     private val sleep: suspend (Long) -> Unit = { delay(it) },
 ) {
     suspend fun start(server: ServerInfo): DeviceLogin {
         if (!server.offersGitHub) throw AppException.NoGitHubSignIn()
-        return auth.startDeviceLogin(server)
+        val self = Installation(installation.id(), platform.defaultDeviceName, platform.reportedPlatform)
+        return auth.startDeviceLogin(server, self)
     }
 
     suspend fun await(login: DeviceLogin): Account {

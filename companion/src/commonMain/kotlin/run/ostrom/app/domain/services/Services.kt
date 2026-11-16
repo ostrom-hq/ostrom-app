@@ -40,7 +40,24 @@ interface PlatformInfo {
 
     /** Phones sign in through the browser and hold an unlock key; computers use the device flow. */
     val isMobile: Boolean get() = platform == "iOS" || platform == "Android"
+
+    /** What a sign-in reports to the server (`ios`, `android`, `macos`, `windows`, `linux`); null for anything else. */
+    val reportedPlatform: String? get() = platform.lowercase().takeIf { it in REPORTED_PLATFORMS }
+
+    /**
+     * The name this installation's device takes on the server at its first sign-in, such as `Ostrom macOS · studio`: 1
+     * to 120 characters without control characters, as the server takes it. A device already registered keeps its name.
+     */
+    val defaultDeviceName: String
+        get() = "Ostrom $platform · $deviceModel".filterNot { it.isISOControl() }.trim().take(MAX_DEVICE_NAME)
+            // Never half of a character outside the BMP (an emoji in a host name).
+            .let { if (it.lastOrNull()?.isHighSurrogate() == true) it.dropLast(1) else it }.trimEnd()
 }
+
+private val REPORTED_PLATFORMS = setOf("ios", "android", "macos", "windows", "linux")
+
+/** The longest device name the server takes (`DeviceLimits.MAX_NAME`). */
+private const val MAX_DEVICE_NAME = 120
 
 /**
  * The system's browser sign-in session (ASWebAuthenticationSession on iOS, a Custom Tab on Android): opens [url] and

@@ -10,6 +10,7 @@ import run.ostrom.app.domain.models.ServerInfo
 import run.ostrom.app.domain.repositories.AuthRepository
 import run.ostrom.app.domain.repositories.BrowserAttempt
 import run.ostrom.app.domain.repositories.DevicePoll
+import run.ostrom.app.domain.repositories.Installation
 import run.ostrom.app.domain.repositories.Member
 import run.ostrom.app.domain.repositories.NewSession
 import run.ostrom.app.domain.services.Clock
@@ -49,7 +50,7 @@ class RecordingAuth : AuthRepository {
     override suspend fun discover(origin: String): ServerInfo = error("unused")
     override fun prepareBrowserSignIn(origin: String, redirectUri: String, state: String): BrowserAttempt = error("unused")
     override suspend fun exchangeCode(origin: String, code: String, codeVerifier: String, redirectUri: String): NewSession = error("unused")
-    override suspend fun startDeviceLogin(server: ServerInfo): DeviceLogin = error("unused")
+    override suspend fun startDeviceLogin(server: ServerInfo, installation: Installation?): DeviceLogin = error("unused")
     override suspend fun pollDeviceLogin(origin: String, deviceCode: String): DevicePoll = error("unused")
     override suspend fun capabilities(accountId: String): ServerCapabilities = error("unused")
     override suspend fun organizations(origin: String, token: String): List<Organization> = error("unused")
