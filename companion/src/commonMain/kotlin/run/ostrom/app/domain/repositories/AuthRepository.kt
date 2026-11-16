@@ -60,8 +60,11 @@ interface AuthRepository {
      */
     fun prepareBrowserSignIn(origin: String, redirectUri: String, state: String): BrowserAttempt
 
-    /** Exchanges the browser's one-time code for an app token (`POST /auth/mobile/token`). */
-    suspend fun exchangeCode(origin: String, code: String, codeVerifier: String, redirectUri: String): NewSession
+    /**
+     * Exchanges the browser's one-time code for an app token (`POST /auth/mobile/token`), registering [installation] as
+     * a device.
+     */
+    suspend fun exchangeCode(origin: String, code: String, codeVerifier: String, redirectUri: String, installation: Installation? = null): NewSession
 
     /** Starts the device flow of `ostrom login` (`POST /auth/device`), registering [installation] as a device. */
     suspend fun startDeviceLogin(server: ServerInfo, installation: Installation? = null): DeviceLogin

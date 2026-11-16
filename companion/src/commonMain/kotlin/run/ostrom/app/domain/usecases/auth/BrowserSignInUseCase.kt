@@ -7,7 +7,10 @@ import run.ostrom.app.domain.models.AppException
 import run.ostrom.app.domain.models.ServerInfo
 import run.ostrom.app.domain.models.SignInMethod
 import run.ostrom.app.domain.repositories.AuthRepository
+import run.ostrom.app.domain.repositories.Installation
 import run.ostrom.app.domain.services.BrowserSignIn
+import run.ostrom.app.domain.services.InstallationIdentity
+import run.ostrom.app.domain.services.PlatformInfo
 import run.ostrom.app.domain.services.SecureRandom
 
 /**
@@ -15,17 +18,24 @@ import run.ostrom.app.domain.services.SecureRandom
  * challenge and a state of this attempt, and comes back to [REDIRECT_URI] with a one-time code, exchanged for an app
  * token and its unlock key. Only the latest attempt connects: an earlier one's return, even with its own valid state,
  * connects nothing (the former app's AUDIT-SECU-APP-2 A4). Returns null when the person closed the browser.
+ *
+ * The exchange names this installation ([InstallationIdentity], its default name and its platform), as TeamCode's
+ * companion does at its login, so the server registers the phone as one device and every later sign-in lands on it.
  */
 class BrowserSignInUseCase(
     private val auth: AuthRepository,
     private val browser: BrowserSignIn,
     private val random: SecureRandom,
     private val complete: CompleteSignInUseCase,
+    private val installation: InstallationIdentity,
+    private val platform: PlatformInfo,
 ) {
     private var awaited: String? = null
 
     suspend operator fun invoke(server: ServerInfo): Account? {
         if (!server.offersGitHub) throw AppException.NoGitHubSignIn()
+        // Read before the browser opens: an identity that cannot be read stops the sign-in before the person signs in.
+        val self = Installation(installation.id(), platform.defaultDeviceName, platform.reportedPlatform)
         val state = base64Url(random.nextBytes(STATE_BYTES))
         awaited = state
         val attempt = auth.prepareBrowserSignIn(server.origin, REDIRECT_URI, state)
@@ -42,7 +52,7 @@ class BrowserSignInUseCase(
             throw if (query["error"] == "signup_closed" && query["state"] == state) AppException.SignUpClosed() else AppException.SignInDenied()
         }
         if (query["state"] != state) throw AppException.SignInMismatch()
-        val session = auth.exchangeCode(server.origin, code, attempt.codeVerifier, REDIRECT_URI)
+        val session = auth.exchangeCode(server.origin, code, attempt.codeVerifier, REDIRECT_URI, self)
         return complete(server, session, SignInMethod.BROWSER)
     }
 

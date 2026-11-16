@@ -141,6 +141,18 @@ class RemoteAuthRepositoryTest {
         assertEquals("Ada", session.name)
         assertEquals("uk", session.unlockKey)
         assertEquals(1_797_156_000_000L, session.expiresAt)
+        val bare = Json.parseToJsonElement((requests.last().body as OutgoingContent.ByteArrayContent).bytes().decodeToString()).jsonObject
+        assertNull(bare["installationId"]?.takeUnless { it is JsonNull })
+    }
+
+    @Test
+    fun thePhoneNamesThisInstallationWithTheCode() = runTest {
+        answer = json("""{"token":"osm_app","user":{"login":"ada"},"unlockKey":"uk"}""")
+        repository.exchangeCode(ORIGIN, "code", "verifier", "ostrom://auth/callback", Installation("0f3c9a1e-2b4d-4c6e-8a0b-1c2d3e4f5a6b", "Ostrom iOS · iPhone", "ios"))
+        val body = Json.parseToJsonElement((requests.last().body as OutgoingContent.ByteArrayContent).bytes().decodeToString()).jsonObject
+        assertEquals("0f3c9a1e-2b4d-4c6e-8a0b-1c2d3e4f5a6b", body["installationId"]?.jsonPrimitive?.content)
+        assertEquals("Ostrom iOS · iPhone", body["deviceName"]?.jsonPrimitive?.content)
+        assertEquals("ios", body["platform"]?.jsonPrimitive?.content)
     }
 
     @Test

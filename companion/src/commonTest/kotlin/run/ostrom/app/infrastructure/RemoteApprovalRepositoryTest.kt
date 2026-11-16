@@ -124,7 +124,7 @@ class RemoteApprovalRepositoryTest {
         val sent = body(request)
         assertTrue("\"answer\":\"reject\"" in sent, sent)
         assertTrue("\"shownDigest\":\"sha256:shown\"" in sent, sent)
-        assertTrue("\"comment\":\"Wait for the migration\"" in sent, sent)
+        assertTrue("\"note\":\"Wait for the migration\"" in sent, sent)
     }
 
     @Test

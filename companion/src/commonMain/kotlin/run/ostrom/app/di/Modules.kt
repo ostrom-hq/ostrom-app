@@ -55,7 +55,7 @@ val domainModule = module {
     single { InspectServerUseCase(get()) }
     single { CompleteSignInUseCase(get(), get(), get<DemoCredentialStore>(), get()) }
     // Resolved only where a BrowserSignIn exists (the phones' platform modules).
-    single { BrowserSignInUseCase(get(), get(), get(), get()) }
+    single { BrowserSignInUseCase(get(), get(), get(), get(), get(), get()) }
     single { DeviceSignInUseCase(get(), get(), get(), get(), get()) }
     // This phone stops taking the account's push first, while its session can still speak.
     single {

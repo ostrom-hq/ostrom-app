@@ -20,7 +20,7 @@ import run.ostrom.app.domain.repositories.Installation
 class DemoAuthRepository(private val demo: DemoMode) : AuthRepository {
     override suspend fun discover(origin: String): ServerInfo = throw AppException.NotOstrom()
     override fun prepareBrowserSignIn(origin: String, redirectUri: String, state: String): BrowserAttempt = throw AppException.NotOstrom()
-    override suspend fun exchangeCode(origin: String, code: String, codeVerifier: String, redirectUri: String): NewSession = throw AppException.NotOstrom()
+    override suspend fun exchangeCode(origin: String, code: String, codeVerifier: String, redirectUri: String, installation: Installation?): NewSession = throw AppException.NotOstrom()
     override suspend fun startDeviceLogin(server: ServerInfo, installation: Installation?): DeviceLogin = throw AppException.NotOstrom()
     override suspend fun pollDeviceLogin(origin: String, deviceCode: String): DevicePoll = throw AppException.NotOstrom()
     override suspend fun capabilities(origin: String, token: String): ServerCapabilities = throw AppException.NotOstrom()

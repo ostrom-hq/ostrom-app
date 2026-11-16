@@ -230,7 +230,7 @@ class ApprovalsFlowTest {
             tap("request-send-decline")
             waitUntil(timeoutMillis = 10_000) { answer in server.asked }
             val sent = server.sent.getValue(answer).single()
-            assertTrue("\"answer\":\"reject\"" in sent && "\"comment\":\"Split it in two\"" in sent, sent)
+            assertTrue("\"answer\":\"reject\"" in sent && "\"note\":\"Split it in two\"" in sent, sent)
             assertEquals(listOf("Decline “Push to main”"), gate.prompts)
         }
     }

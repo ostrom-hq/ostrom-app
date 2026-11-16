@@ -92,8 +92,9 @@ class FakeAuthRepository : AuthRepository {
         return BrowserAttempt("$origin/api/v1/auth/github/start?state=$state", "verifier")
     }
 
-    override suspend fun exchangeCode(origin: String, code: String, codeVerifier: String, redirectUri: String): NewSession {
+    override suspend fun exchangeCode(origin: String, code: String, codeVerifier: String, redirectUri: String, installation: Installation?): NewSession {
         exchanges += Triple(code, codeVerifier, redirectUri)
+        installations += installation
         return exchanged
     }
 

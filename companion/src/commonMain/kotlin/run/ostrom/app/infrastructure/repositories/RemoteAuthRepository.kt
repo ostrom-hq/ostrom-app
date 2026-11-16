@@ -44,8 +44,15 @@ class RemoteAuthRepository(
         }
     }
 
-    override suspend fun exchangeCode(origin: String, code: String, codeVerifier: String, redirectUri: String): NewSession = detached(origin) { client ->
-        val answer = client.auth.exchangeMobileCode(code, codeVerifier, redirectUri)
+    override suspend fun exchangeCode(origin: String, code: String, codeVerifier: String, redirectUri: String, installation: Installation?): NewSession = detached(origin) { client ->
+        val answer = client.auth.exchangeMobileCode(
+            code,
+            codeVerifier,
+            redirectUri,
+            installationId = installation?.id,
+            deviceName = installation?.deviceName,
+            platform = installation?.platform,
+        )
         NewSession(answer.token, answer.user.login, answer.user.name, answer.expiresAt?.let(::epochMillis), answer.unlockKey)
     }
 
