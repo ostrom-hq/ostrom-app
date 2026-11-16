@@ -139,14 +139,14 @@ class RemoteAuthRepositoryTest {
 
     @Test
     fun theDeviceFlowOnlyOpensATrustedPage() = runTest {
-        answer = json("""{"deviceCode":"dc","userCode":"ABCD-EFGH","verificationUri":"https://github.com/login/device","interval":0,"expiresIn":99999}""")
+        answer = json("""{"deviceCode":"dc","userCode":"ABCD-EFGH","verificationUri":"https://github.com/login/device","verificationUriComplete":"https://github.com/login/device?code=X","interval":0,"expiresIn":99999}""")
         val login = repository.startDeviceLogin(SERVER)
         assertEquals("ABCD-EFGH", login.userCode)
         assertEquals(1_000L, login.intervalMillis)
         assertEquals(1_800_000L, login.expiresInMillis)
-        answer = json("""{"deviceCode":"dc","userCode":"ABCD","verificationUri":"https://app.ostrom.example.org/device","interval":5,"expiresIn":900}""")
+        answer = json("""{"deviceCode":"dc","userCode":"ABCD","verificationUri":"https://app.ostrom.example.org/device","verificationUriComplete":"https://app.ostrom.example.org/device?code=X","interval":5,"expiresIn":900}""")
         assertFailsWith<AppException.UntrustedSignInPage> { repository.startDeviceLogin(SERVER) }
-        answer = json("""{"deviceCode":"dc","userCode":"ABCD","verificationUri":"https://evil.example.org/device","interval":5,"expiresIn":900}""")
+        answer = json("""{"deviceCode":"dc","userCode":"ABCD","verificationUri":"https://evil.example.org/device","verificationUriComplete":"https://evil.example.org/device?code=X","interval":5,"expiresIn":900}""")
         assertFailsWith<AppException.UntrustedSignInPage> { repository.startDeviceLogin(SERVER) }
         assertTrue(RemoteAuthRepository.trustedSignInPage("https://app.example.org/device", "https://api.example.org"))
         assertTrue(RemoteAuthRepository.trustedSignInPage("http://localhost:8080/device", "http://localhost:8080"))

@@ -16,17 +16,12 @@ import io.ktor.http.headersOf
 import kotlinx.coroutines.test.runTest
 import run.ostrom.app.account
 import run.ostrom.app.accounts
-import run.ostrom.app.domain.models.ActionKind
-import run.ostrom.app.domain.models.ActionRisk
 import run.ostrom.app.domain.models.AppException
 import run.ostrom.app.domain.models.ApprovalAnswer
 import run.ostrom.app.domain.models.ApprovalAsker
-import run.ostrom.app.domain.models.ApprovalCheck
 import run.ostrom.app.domain.models.ApprovalCommit
 import run.ostrom.app.domain.models.ApprovalGate
 import run.ostrom.app.domain.models.ApprovalStatus
-import run.ostrom.app.domain.models.CheckState
-import run.ostrom.app.domain.models.DiffStats
 import run.ostrom.app.domain.services.PlatformInfo
 import run.ostrom.app.infrastructure.client.OstromClientProvider
 import run.ostrom.app.infrastructure.credentials.MemoryCredentialStore
@@ -70,12 +65,8 @@ class RemoteApprovalRepositoryTest {
     private val view = """
         {"approval":{"id":"appr_0001","title":"Push to main","requestedFrom":"ada","channel":"app","status":"pending",
          "shownDigest":"sha256:shown","repo":"acme/api","sha":"c0ffee0","commits":["c0ffee0"],
-         "commitDetails":[{"sha":"c0ffee0","title":"Fix the login","author":"grace"}],
-         "checks":[{"name":"ci","state":"success"},{"name":"lint","state":"brand-new"}],
-         "evidence":[{"label":"Tests","value":"412 passed"}],"askedBy":["grace"],
-         "expiresAt":"2026-12-13T10:00:00Z","action":{"kind":"push","repo":"acme/api","ref":"main","headSha":"c0ffee0","risk":"high"},
-         "diffStats":{"files":3,"additions":40,"deletions":2}},
-         "who":{"dev":"grace","agent":"claude-code","model":"opus"},"what":{"command":"git push origin main"},
+         "evidence":[{"label":"Tests","value":"412 passed"}],"askedBy":["grace"]},
+         "who":{"dev":"grace"},"what":{"action":"push","command":"git push origin main"},"askedVia":[],
          "gate":{"workflowId":"w1","workflowName":"Release","nodeId":"n1","label":"Push to main","approvers":["ada"],"status":"accepted","enforce":true,"reason":"r"},
          "you":{"login":"ada","self":false,"canApprove":true}}
     """.trimIndent()
@@ -88,15 +79,14 @@ class RemoteApprovalRepositoryTest {
         assertEquals("/api/v1/approvals/appr_0001/view", requests.single().url.encodedPath)
         assertEquals("Bearer osm_t", requests.single().headers[HttpHeaders.Authorization])
         assertEquals(ApprovalStatus.PENDING, approval.status)
-        assertEquals(listOf(ApprovalCommit("c0ffee0", "Fix the login", "grace")), approval.commits)
-        assertEquals(listOf(ApprovalCheck("ci", CheckState.SUCCESS), ApprovalCheck("lint", CheckState.UNKNOWN)), approval.checks)
-        assertEquals(ActionKind.PUSH, approval.action?.kind)
-        assertEquals(ActionRisk.HIGH, approval.action?.risk)
-        assertEquals(DiffStats(3, 40, 2), approval.diffStats)
-        assertEquals(ApprovalAsker("grace", "claude-code", "opus"), approval.who)
+        assertEquals(listOf(ApprovalCommit("c0ffee0")), approval.commits)
+        assertEquals(emptyList(), approval.checks)
+        assertNull(approval.action)
+        assertNull(approval.diffStats)
+        assertEquals(ApprovalAsker("grace"), approval.who)
         assertEquals("git push origin main", approval.what?.command)
         assertEquals(ApprovalGate("Release", "Push to main"), approval.gate)
-        assertEquals(1_797_156_000_000L, approval.expiresAt)
+        assertNull(approval.expiresAt)
         assertTrue(approval.viewer.canApprove)
         assertFalse(approval.diffTruncated)
     }
@@ -105,7 +95,8 @@ class RemoteApprovalRepositoryTest {
     fun commitsWithoutDetailsAreTheirShasAndAnUnknownStatusIsUnknown() = runTest {
         answer = json(
             """{"pending":[],"recent":[{"approval":{"id":"a","title":"t","requestedFrom":"ada","channel":"app","status":"later",
-            "shownDigest":"d","commits":["abc1234"],"decidedAt":"not a date","diffTruncated":true},
+            "shownDigest":"d","commits":["abc1234"],"decidedAt":"not a date"},
+            "who":{},"what":{"action":"push"},"askedVia":[],
             "you":{"login":"ada","self":true,"canApprove":false,"reasonType":"self_approval_refused"}}],
             "operator":"ada","you":{"login":"ada","via":"app"}}""",
         )
@@ -115,7 +106,7 @@ class RemoteApprovalRepositoryTest {
         assertEquals(ApprovalStatus.UNKNOWN, recent.status)
         assertEquals(listOf(ApprovalCommit("abc1234")), recent.commits)
         assertNull(recent.decidedAt)
-        assertTrue(recent.diffTruncated)
+        assertFalse(recent.diffTruncated)
         assertTrue(recent.viewer.self)
         assertEquals("self_approval_refused", recent.viewer.reasonType)
         assertNull(recent.action)
@@ -131,7 +122,7 @@ class RemoteApprovalRepositoryTest {
         val sent = body(request)
         assertTrue("\"answer\":\"reject\"" in sent, sent)
         assertTrue("\"shownDigest\":\"sha256:shown\"" in sent, sent)
-        assertTrue("\"note\":\"Wait for the migration\"" in sent, sent)
+        assertTrue("\"comment\":\"Wait for the migration\"" in sent, sent)
     }
 
     @Test

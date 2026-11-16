@@ -32,7 +32,7 @@ class AppFlowTest {
     private fun server(apiVersion: Int = 1) = FakeServer(
         mutableMapOf(
             "GET /api/v1/auth/providers" to """{"methods":["github"],"signUp":"open"}""",
-            "POST /api/v1/auth/device" to """{"deviceCode":"dc","userCode":"WDJB-MJHT","verificationUri":"https://github.com/login/device","interval":1,"expiresIn":60}""",
+            "POST /api/v1/auth/device" to """{"deviceCode":"dc","userCode":"WDJB-MJHT","verificationUri":"https://github.com/login/device","verificationUriComplete":"https://github.com/login/device?code=X","interval":1,"expiresIn":60}""",
             "POST /api/v1/auth/device/token" to """{"token":"osm_desktop","login":"ada","scopes":[]}""",
             "GET /api/v1/capabilities" to """{"apiVersion":$apiVersion,"serverVersion":"1.4.0","features":["gates.v1"]}""",
             "GET /api/v1/me/organizations" to """{"items":[{"id":"o1","slug":"ae","name":"Analytical Engines","avatarUrl":"","role":"owner"}]}""",

@@ -22,7 +22,7 @@ class RemoteSpendingRepository(private val calls: AccountCalls) : SpendingReposi
             byAgent = report.byAgent.map { it.domain() },
             byRepo = report.byRepo.map { it.domain() },
             byPerson = report.byPerson.map { it.domain() },
-            exceeded = report.exceeded.map { ExceededBudget(it.scope, it.subject, it.label, it.period, it.usd, it.hardStop) },
+            exceeded = report.exceeded.map { ExceededBudget(it.scope, it.subject, null, it.period, it.usd, it.hardStop) },
         )
     }
 
@@ -34,8 +34,9 @@ class RemoteActivityRepository(private val calls: AccountCalls) : ActivityReposi
     override suspend fun page(accountId: String, before: String?): ActivityPage = calls.withAccount(accountId) { client ->
         val page = client.activity.page(before = before)
         ActivityPage(
+            // A gate item's request opens by its gate's id: the approval view takes the gate and answers the reader's own request.
             page.items.map { item ->
-                ActivityItem(item.id, millisOf(item.at), item.kind, item.actor.kind, item.actor.name, item.summary, item.repo, item.costUsd, item.approvalId)
+                ActivityItem(item.id, millisOf(item.at), item.kind, item.actor.kind, item.actor.name, item.summary, item.repo, item.costUsd, item.gateId)
             },
             page.next,
         )

@@ -66,7 +66,7 @@ class RemoteWaitRepositoryTest {
     }
 
     private fun wait(id: String, status: String = "open", resolver: String? = null, extra: String = "") = """
-        {"id":"$id","kind":"question","status":"$status","sessionId":"s1","assignee":"ada","createdAt":"2026-11-13T10:00:00Z",
+        {"id":"$id","kind":"question","status":"$status","sessionId":"s1","assignee":"ada","createdBy":"grace","createdAt":"2026-11-13T10:00:00Z",
          "question":{"title":"Which store?","body":"Pick one.","fields":[
             {"id":"store","type":"choice","label":"Store","required":true,"options":["App Store","Google Play"]},
             {"id":"ok","type":"boolean","label":"Sure?"},

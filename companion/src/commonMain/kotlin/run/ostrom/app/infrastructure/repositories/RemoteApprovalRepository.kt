@@ -1,13 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 package run.ostrom.app.infrastructure.repositories
 
-import run.ostrom.app.domain.models.ActionKind
-import run.ostrom.app.domain.models.ActionRisk
 import run.ostrom.app.domain.models.Approval
-import run.ostrom.app.domain.models.ApprovalAction
 import run.ostrom.app.domain.models.ApprovalAnswer
 import run.ostrom.app.domain.models.ApprovalAsker
-import run.ostrom.app.domain.models.ApprovalCheck
 import run.ostrom.app.domain.models.ApprovalCommit
 import run.ostrom.app.domain.models.ApprovalEvidence
 import run.ostrom.app.domain.models.ApprovalGate
@@ -15,8 +11,6 @@ import run.ostrom.app.domain.models.ApprovalQueue
 import run.ostrom.app.domain.models.ApprovalStatus
 import run.ostrom.app.domain.models.ApprovalTarget
 import run.ostrom.app.domain.models.ApprovalViewer
-import run.ostrom.app.domain.models.CheckState
-import run.ostrom.app.domain.models.DiffStats
 import run.ostrom.app.domain.repositories.ApprovalRepository
 import run.ostrom.core.api.models.ApprovalView
 import run.ostrom.core.api.models.ApprovalAnswer as ApiAnswer
@@ -45,11 +39,11 @@ class RemoteApprovalRepository(private val calls: AccountCalls) : ApprovalReposi
 
 internal fun ApiQueue.toDomain() = ApprovalQueue(pending.map { it.toDomain() }, recent.map { it.toDomain() })
 
-/** The request as the app shows it; a value of a newer server reads as `UNKNOWN`, an unreadable time as none. */
+/**
+ * The request as the app shows it; a value of a newer server reads as `UNKNOWN`, an unreadable time as none. The server
+ * sends no checks, commit details, gated action, diff size or expiry: those stay empty.
+ */
 internal fun ApprovalView.toDomain(): Approval {
-    val details = approval.commitDetails.orEmpty()
-    val commits = if (details.isNotEmpty()) details.map { ApprovalCommit(it.sha, it.title, it.author) }
-    else approval.commits.orEmpty().map { ApprovalCommit(it) }
     return Approval(
         id = approval.id,
         title = approval.title,
@@ -59,21 +53,14 @@ internal fun ApprovalView.toDomain(): Approval {
         viewer = ApprovalViewer(self = you.self, canApprove = you.canApprove, reasonType = you.reasonType),
         repo = approval.repo,
         sha = approval.sha,
-        commits = commits,
-        checks = approval.checks.orEmpty().map { ApprovalCheck(it.name, it.state.name.toEnum(CheckState.UNKNOWN)) },
+        commits = approval.commits.orEmpty().map { ApprovalCommit(it) },
         evidence = approval.evidence.map { ApprovalEvidence(it.label, it.value) },
         askedBy = approval.askedBy.orEmpty(),
         decidedBy = approval.decidedBy,
         decidedAt = approval.decidedAt?.let { RemoteAuthRepository.epochMillis(it) },
-        expiresAt = approval.expiresAt?.let { RemoteAuthRepository.epochMillis(it) },
         selfApproved = approval.selfApproved == true,
-        action = approval.action?.let {
-            ApprovalAction(it.kind.name.toEnum(ActionKind.UNKNOWN), it.repo, it.ref, it.headSha, it.baseSha, it.risk.name.toEnum(ActionRisk.UNKNOWN))
-        },
-        diffStats = approval.diffStats?.let { DiffStats(it.files, it.additions, it.deletions) },
-        diffTruncated = approval.diffTruncated == true,
-        who = who?.let { ApprovalAsker(it.dev, it.agent, it.model) },
-        what = what?.let { ApprovalTarget(it.action, it.command, it.repo) },
+        who = ApprovalAsker(who.dev),
+        what = ApprovalTarget(what.action, what.command, what.repo),
         gate = gate?.let { ApprovalGate(it.workflowName, it.label) },
         note = note,
     )

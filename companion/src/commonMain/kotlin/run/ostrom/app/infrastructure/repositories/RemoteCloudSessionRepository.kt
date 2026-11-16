@@ -205,9 +205,9 @@ internal fun NewCloudSession.request() = CreateCloudSessionRequest(
         CloudEnvironment(
             repositories = recipe.repositories.map { ApiCloudRepository(it.url, it.path, it.ref, it.branch) },
             workingDirectory = recipe.workingDirectory,
-            setup = CloudSetup(recipe.setupCreate, recipe.setupStart).takeIf { it.create.isNotEmpty() || it.start.isNotEmpty() },
+            setup = CloudSetup(recipe.setupCreate, recipe.setupStart),
             requiredVariables = recipe.requiredVariables,
-            requireGitHub = recipe.requireGitHub.takeIf { it },
+            requireGitHub = recipe.requireGitHub,
             gitEmailDomain = recipe.gitEmailDomain,
         )
     },

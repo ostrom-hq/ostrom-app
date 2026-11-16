@@ -25,7 +25,7 @@ class TransfersScreenTest {
 
     private fun session(id: String, status: String, owner: String = "m1", extra: String = "") =
         """{"id":"$id","name":"Mill","owner":"$owner","agent":"claude","model":"claude-opus","status":"$status","desiredStatus":"running","epoch":1,
-        "createdAt":"2026-11-14T09:00:00Z","updatedAt":"2026-11-14T09:01:00Z"$extra}"""
+        "limits":{"idleTimeoutMinutes":30,"maxRunMinutes":240,"restrictedEgress":false},"createdAt":"2026-11-14T09:00:00Z","updatedAt":"2026-11-14T09:01:00Z"$extra}"""
 
     private fun transfer(id: String, state: String, from: String = "m1", to: String = "m2", extra: String = "") =
         """{"id":"$id","sessionId":"s1abcdef99","fromMemberId":"$from","toMemberId":"$to","state":"$state","initiatedBy":"$from","resume":false,

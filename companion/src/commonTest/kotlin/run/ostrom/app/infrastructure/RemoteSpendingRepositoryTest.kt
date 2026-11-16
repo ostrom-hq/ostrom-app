@@ -88,7 +88,7 @@ class RemoteSpendingRepositoryTest {
         signedIn()
         bodies["/api/v1/activity"] = """
             {"items":[{"id":"i1","at":"2026-11-13T10:00:00Z","kind":"session.ended","actor":{"kind":"agent","name":"Codex"},
-              "summary":"Session ended","repo":"ae/web","costUsd":4.12,"approvalId":"apr1"}]}
+              "summary":"Session ended","repo":"ae/web","costUsd":4.12,"gateId":"g7"}]}
         """.trimIndent()
         val page = RemoteActivityRepository(calls).page("a1", before = "c2")
         assertEquals("c2", requests.single().url.parameters["before"])
@@ -98,7 +98,7 @@ class RemoteSpendingRepositoryTest {
         assertEquals("Codex", item.actorName)
         assertEquals(true, item.byAgent)
         assertEquals(4.12, item.costUsd)
-        assertEquals("apr1", item.approvalId)
+        assertEquals("g7", item.approvalId)
         assertEquals("ae/web", item.repo)
     }
 }
