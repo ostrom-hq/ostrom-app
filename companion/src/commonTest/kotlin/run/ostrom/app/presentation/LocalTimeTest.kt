@@ -24,6 +24,17 @@ class LocalTimeTest {
     }
 
     @Test
+    fun instantsBeforeTheEpochRoundDownToTheirDayAndMinute() {
+        assertEquals("1969-12-31 23:59", formatLocal(-1_000), "a second before the epoch")
+        assertEquals("1969-12-31 00:00", formatLocal(-86_400_000), "an exact day before")
+        assertEquals(-1L, localEpochDay(-1))
+        assertEquals(-1L, localEpochDay(-86_400_000))
+        // Before the year 0 the era of the calendar algorithm is negative: inexact, then exact.
+        assertEquals("0-02-29 00:00", formatLocal(-719_469L * 86_400_000), "the day before 0000-03-01")
+        assertEquals("-400-03-01 00:00", formatLocal(-865_565L * 86_400_000), "an exact era before")
+    }
+
+    @Test
     fun theZoneMovesTheDayAndTheClock() {
         utcOffsetMinutes = { 120 }
         assertEquals("2027-01-01 01:30", formatLocal(1_798_759_800_000))

@@ -268,6 +268,17 @@ class NewCloudSessionViewModelCoverageTest {
         assertTrue(model.st.resumeOpen)
     }
 
+    @Test fun aFolderTheDeviceDoesNotOfferIsNotTaken() = runTest(dispatcher) {
+        twoDevices()
+        val model = viewModel(); settle()
+        model.onTarget(SessionTarget.DEVICE); settle()
+        model.onDevice("d1"); settle()
+        model.onFolder("f1")
+        assertEquals("f1", model.st.folderId)
+        model.onFolder("not-a-folder")
+        assertEquals("f1", model.st.folderId, "an id the device did not list changes nothing")
+    }
+
     @Test fun foldersThatCannotBeReadShowTheErrorAndTheSameDeviceReadsThemAgain() = runTest(dispatcher) {
         twoDevices()
         devices.foldersResult = { throw AppException.Unreachable() }

@@ -123,7 +123,9 @@ class HistoryViewModel(
                     knownFor = fingerprint
                 }
                 val items = page.items.map(::withKnownResult)
-                state.update { if (it.account?.id != account.id) it else it.copy(entries = items, next = page.next, loaded = true, refreshing = false, failed = false) }
+                // No account guard: an account change cancels this job first (see init), and the scope above then throws
+                // CancellationException instead of returning, so this line only runs for the account that asked.
+                state.update { it.copy(entries = items, next = page.next, loaded = true, refreshing = false, failed = false) }
                 check(items, trusted)
             } catch (error: CancellationException) {
                 throw error

@@ -119,7 +119,7 @@ class ArtifactViewModel(
 
     /** Shows [number], with a ticket fixed on it. */
     fun selectVersion(number: Int) {
-        if (number == state.value.version && (state.value.opened != null || !embedded)) return
+        if (state.value.shows(number) && (state.value.opened != null || !embedded)) return
         renewedAt = null
         state.update { it.copy(version = number, loading = embedded, error = null, missingPage = false, page = null) }
         if (embedded) open(number)
@@ -174,7 +174,7 @@ class ArtifactViewModel(
                 val opened = openArtifact(route.accountId, route.artifactId, version)
                 state.update {
                     when {
-                        it.version != version -> it
+                        !it.shows(version) -> it
                         opened.ticket.contentUrl == missingIfSame -> it.copy(missingPage = true)
                         else -> it.copy(opened = opened, page = page?.let { path -> opened.prefix + path }, reload = it.reload + 1, missingPage = false, loading = false)
                     }
@@ -184,16 +184,17 @@ class ArtifactViewModel(
             } catch (error: Exception) {
                 // A renewal after a missing page that fails for a passing reason keeps the version shown: its ticket is still good.
                 if (missingIfSame != null && error !is AppException.NotFound) {
-                    state.update { if (it.version == version) it.copy(missingPage = true) else it }
+                    state.update { if (it.shows(version)) it.copy(missingPage = true) else it }
                     return@launch
                 }
-                state.update { if (it.version != version) it else it.copy(loading = false, opened = null, gone = error is AppException.NotFound, error = error.userMessage()) }
+                state.update { if (!it.shows(version)) it else it.copy(loading = false, opened = null, gone = error is AppException.NotFound, error = error.userMessage()) }
             }
         }
     }
-
-    private companion object {
-        const val WATCH_MILLIS = 30_000L
-        val RENEWAL_WINDOW = 1.minutes
-    }
 }
+
+private const val WATCH_MILLIS = 30_000L
+private val RENEWAL_WINDOW = 1.minutes
+
+/** Whether [version] is the one shown. Both sides nullable: a plain `Int` against `Int?` would add a null branch no test can reach. */
+private fun ArtifactUiState.shows(version: Int?): Boolean = this.version == version
