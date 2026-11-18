@@ -145,6 +145,17 @@ class ReceiptUseCasesTest {
     }
 
     @Test
+    fun aPinThatIsHexButNoKeyFailsClosedInsteadOfThrowing() {
+        // A corrupted store: 64 hex characters that a platform may refuse as an Ed25519 point. Never a crash, never a
+        // rotation trusted through it.
+        val corrupted = mapOf(a.publicKey.kid to "f".repeat(64))
+        assertTrue(ReceiptKeyPinning.trust(listOf(served(c, handover(a, c))), corrupted).keys.isEmpty())
+        assertTrue(ReceiptKeyPinning.readsAsKey(a.publicKey.hex()))
+        assertFalse(ReceiptKeyPinning.readsAsKey("F".repeat(64)), "upper case is not how this app writes a pin")
+        assertFalse(ReceiptKeyPinning.readsAsKey("ab"))
+    }
+
+    @Test
     fun onlyAnEd25519KeyUnderItsOwnIdIsUsable() {
         assertEquals(a.publicKey.kid, ReceiptKeyPinning.usable(served(a))?.kid)
         assertNull(ReceiptKeyPinning.usable(served(a).copy(alg = "RS256")))

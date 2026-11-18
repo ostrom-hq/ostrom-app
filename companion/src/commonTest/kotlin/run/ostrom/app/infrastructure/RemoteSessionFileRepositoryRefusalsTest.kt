@@ -29,6 +29,14 @@ class RemoteSessionFileRepositoryRefusalsTest {
         assertFailsWith<AppException.Unreachable> { upload() }
     }
 
+    @Test fun aFailureWithoutAnAnswerIsNotTheFilesRefusal() = runTest {
+        server.signedIn()
+        // Status 0 is no HTTP answer: never shown as the server refusing this file.
+        repeat(20) { server.json(refusal("transport_failed"), HttpStatusCode(0, "No answer")) }
+        val failure = assertFailsWith<AppException.Server> { upload() }
+        assertEquals(0, failure.statusCode)
+    }
+
     @Test fun aFreshProofIsAskedForAsForAnyCall() = runTest {
         server.signedIn()
         server.json(refusal("step_up_required"), HttpStatusCode.Forbidden)

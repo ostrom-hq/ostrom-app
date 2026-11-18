@@ -488,6 +488,44 @@ class CloudSessionViewModelCoverageTest {
     }
 
     @Test
+    fun theHeaderStartedBeforeTheRecordWasReadReadsItInsteadOfFailing() = runTest(dispatcher) {
+        val gate = CompletableDeferred<Unit>()
+        repo.sessionHold = { gate.await() }
+        val model = model()
+        model.visible(); runCurrent()
+        // Retry while the record is still on its way: the conversation, and so the header, start without a session.
+        model.retryTranscript(); runCurrent()
+        assertNull(model.uiState.value.session)
+        advanceTimeBy(10_001); runCurrent()
+        assertEquals(2, gets(), "the first read and the header's")
+        gate.complete(Unit); runCurrent()
+        assertEquals("s1", model.uiState.value.session?.id)
+        // The record's own start of the conversation finds the header running: one header, one read each 10 s.
+        repo.sessionHold = {}
+        advanceTimeBy(10_000); runCurrent()
+        assertEquals(3, gets())
+        model.hidden()
+    }
+
+    @Test
+    fun aHeaderStoppedFromElsewhereStartsAgainWithTheNextRead() = runTest(dispatcher) {
+        val model = model()
+        model.visible(); settle()
+        // A read cancelled from elsewhere (a client closed under it) ends the header's loop.
+        repo.sessionFailure = CancellationException("client closed")
+        advanceTimeBy(10_000); runCurrent()
+        repo.sessionFailure = null
+        val stopped = gets()
+        advanceTimeBy(20_000); runCurrent()
+        assertEquals(stopped, gets(), "the header no longer reads")
+        model.load(); settle()
+        val loaded = gets()
+        advanceTimeBy(10_000); runCurrent()
+        assertEquals(loaded + 1, gets(), "the next read started the header again")
+        model.hidden()
+    }
+
+    @Test
     fun aFailedStreamStopsAndRetryFollowsAgain() = runTest(dispatcher) {
         val model = model()
         model.visible(); settle()

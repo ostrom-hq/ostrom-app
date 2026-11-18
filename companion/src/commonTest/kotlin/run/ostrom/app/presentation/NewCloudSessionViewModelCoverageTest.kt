@@ -126,8 +126,17 @@ class NewCloudSessionViewModelCoverageTest {
     // ---- The derived flags, on states built directly ------------------------------------------------------------
 
     @Test fun thePickerShowsOnlyWhenEveryConditionHolds() {
-        val base = NewCloudSessionUiState(target = SessionTarget.DEVICE, onDevices = true, resumes = true, folderId = "f1", deviceAgent = "claude")
+        val base = NewCloudSessionUiState(target = SessionTarget.DEVICE, onDevices = true, resumes = true, deviceId = "d1", folderId = "f1", deviceAgent = "claude")
         assertTrue(base.showsResume)
+        assertEquals("d1" to "f1", base.resumeFrom)
+        // A folder without its device never happens; were it to, nothing would be listed rather than a crash.
+        assertFalse(base.copy(deviceId = null).showsResume)
+        // The pure steps behind the model: nothing listed stays nothing listed, and an older page never repeats one shown.
+        assertNull(NewCloudSessionUiState().devicesWithout("d1"))
+        val one = ResumableSession("r1", "First", 1L, 1)
+        val two = ResumableSession("r2", "Second", 2L, 2)
+        assertEquals(listOf(two), NewCloudSessionUiState().withResumable("c1", listOf(two), null).resumable)
+        assertEquals(listOf(one, two), base.copy(resumable = listOf(one)).withResumable("c1", listOf(one, two), "c2").resumable)
         assertFalse(base.copy(target = SessionTarget.CLOUD).showsResume)
         assertFalse(base.copy(onDevices = false).showsResume)
         assertFalse(base.copy(resumes = false).showsResume)
@@ -400,6 +409,11 @@ class NewCloudSessionViewModelCoverageTest {
         model.onResumeOpen(); settle()
         assertTrue(model.st.resumeOpen)
         assertEquals(1, reads("resumable"), "the list is already there")
+        // Codex continues no conversation: the picker hides, and its next page is not read meanwhile.
+        model.onDeviceAgent("codex")
+        model.onResumeMore(); settle()
+        assertEquals(1, reads("resumable"))
+        model.onDeviceAgent("claude")
         model.onResumeMore(); settle()
         assertEquals(listOf(a, b), model.st.resumable, "the page repeats a conversation already shown: it is not added twice")
         assertNull(model.st.resumableNext)

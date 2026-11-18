@@ -41,6 +41,20 @@ data class HistoryUiState(
 ) {
     /** Receipts are shown, but the last refresh failed. */
     val stale: Boolean get() = failed && entries.isNotEmpty()
+
+    /**
+     * The [results] checked for [accountId], each on the row of the same receipt (the same content: the same id and
+     * signature check the same way). Nothing changes once the list is another account's.
+     */
+    /** The first page read for [accountId]; nothing changes once the list is another account's. */
+    internal fun withFirstPage(accountId: String, items: List<HistoryEntry>, next: String?): HistoryUiState =
+        if (account?.id != accountId) this else copy(entries = items, next = next, loaded = true, refreshing = false, failed = false)
+
+    internal fun withChecked(accountId: String, results: List<HistoryEntry>): HistoryUiState {
+        if (account?.id != accountId) return this
+        val checked = results.associateBy { it.raw }
+        return copy(entries = entries.map { entry -> checked[entry.raw] ?: entry })
+    }
 }
 
 /**
@@ -123,10 +137,10 @@ class HistoryViewModel(
                     knownFor = fingerprint
                 }
                 val items = page.items.map(::withKnownResult)
-                // No account guard: an account change cancels this job first (see init), and the scope above then throws
-                // CancellationException instead of returning, so this line only runs for the account that asked.
-                state.update { it.copy(entries = items, next = page.next, loaded = true, refreshing = false, failed = false) }
-                check(items, trusted)
+                // An account change cancels this job first (see init), so the scope above throws instead of returning; the
+                // guard holds whatever reaches here.
+                state.update { it.withFirstPage(account.id, items, page.next) }
+                check(account.id, items, trusted)
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Exception) {
@@ -154,7 +168,7 @@ class HistoryViewModel(
                     added = page.items.filter { entry -> entry.summary?.let { seen.add(it.id) } ?: true }.map(::withKnownResult)
                     now.copy(entries = now.entries + added, next = page.next, loadingMore = false)
                 }
-                check(added, trusted)
+                check(account.id, added, trusted)
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Exception) {
@@ -170,14 +184,13 @@ class HistoryViewModel(
     }
 
     /** Verifies the [entries] not checked yet, off the main thread, then shows each result on the row of the same receipt. */
-    private suspend fun check(entries: List<HistoryEntry>, trusted: List<ReceiptPublicKey>) {
+    private suspend fun check(accountId: String, entries: List<HistoryEntry>, trusted: List<ReceiptPublicKey>) {
         val pending = entries.filter { it.check == ReceiptCheck.Checking }
         if (pending.isEmpty()) return
         val results = checkReceipts(pending, trusted)
         results.forEach { entry -> entry.summary?.let { known[it.id] = entry.raw to entry.check } }
-        // Cancelled with the account's change, so never answered after it: the rows are still this account's.
-        state.update { now ->
-            now.copy(entries = now.entries.map { entry -> results.firstOrNull { it.raw === entry.raw } ?: entry })
-        }
+        // An account change cancels this first, but a check that ignores it (a verification that never suspends) still
+        // answers: the guard keeps another account's rows as they are.
+        state.update { it.withChecked(accountId, results) }
     }
 }

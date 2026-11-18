@@ -162,9 +162,9 @@ class WaitsViewModel(
             try {
                 val page = loadWaits(account.id, filter.status, token)
                 state.update { now ->
-                    // The list moved on meanwhile (a reload from the feed): this page no longer follows it. Another filter cancels
-                    // this job (see [setFilter]), so only the cursor needs comparing.
-                    if (now.shownNext != token) return@update now.copy(loadingMore = false)
+                    // The list moved on meanwhile (a reload from the feed, another filter): this page no longer follows it. Another
+                    // filter cancels this job too, but a page already read is not taken back by that, and cursors may coincide.
+                    if (now.filter != filter || now.shownNext != token) return@update now.copy(loadingMore = false)
                     if (filter == WaitFilter.OPEN) now.copy(waits = now.waits.withMore(page.waits), nextBefore = page.nextBefore, loadingMore = false, error = false)
                     else now.copy(history = now.history.withMore(page.waits), historyNext = page.nextBefore, loadingMore = false, error = false)
                 }

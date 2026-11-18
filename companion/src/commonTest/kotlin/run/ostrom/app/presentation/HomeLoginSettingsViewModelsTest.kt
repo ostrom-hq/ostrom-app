@@ -7,7 +7,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
@@ -133,6 +135,29 @@ class HomeLoginSettingsViewModelsTest {
         val none = home(accounts(), features)
         none.onForeground()
         assertEquals(2, features.reads)
+    }
+
+    @Test
+    fun aForegroundRefreshNotStartedYetIsNotDoubled() = runTest {
+        // On a dispatcher that queues (not the immediate main one), the refresh launched by the first return has not marked
+        // itself refreshing when the second return comes.
+        val queued = StandardTestDispatcher(testScheduler)
+        Dispatchers.setMain(queued)
+        credentials.write("a1", "tok")
+        val features = Features().apply { error = AppException.Unreachable() }
+        val model = home(accounts().also { it.save(account()) }, features)
+        runCurrent()
+        assertEquals(1, features.reads)
+        features.error = null
+        model.onForeground()
+        model.onForeground()
+        runCurrent()
+        assertEquals(2, features.reads)
+        // Once it ended, a later return after the wait asks again.
+        clock.now += HomeViewModel.RECHECK_AFTER_MILLIS
+        model.onForeground()
+        runCurrent()
+        assertEquals(3, features.reads)
     }
 
     @Test

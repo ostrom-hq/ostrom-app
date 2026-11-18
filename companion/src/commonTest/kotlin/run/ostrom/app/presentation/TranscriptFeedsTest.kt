@@ -251,12 +251,28 @@ class TranscriptFeedsTest {
     @Test
     fun aFeedPageMovesOnlyItsOwnCursor() {
         val main = Transcript().withLatest(mainPage)
-        val withWorker = main.withFeed("w1", workerPage)
+        val withWorker = main.withFeed("w1", null, workerPage)
         assertEquals(40L, withWorker.nextBefore)
         assertEquals(mapOf<String, Long?>("w1" to 70L), withWorker.feeds)
         assertEquals(main.newestSeq, 90L)
         assertEquals(90L, withWorker.newestSeq, "a feed page never raises the newest sequence")
-        assertEquals(mapOf<String, Long?>("w1" to null), withWorker.withFeed("w1", olderWorker).feeds)
-        assertEquals(40L, withWorker.withFeed("w1", olderWorker).nextBefore)
+        assertEquals(mapOf<String, Long?>("w1" to null), withWorker.withFeed("w1", 70L, olderWorker).feeds)
+        assertEquals(40L, withWorker.withFeed("w1", 70L, olderWorker).nextBefore)
+    }
+
+    @Test
+    fun aPageAskedFromACursorNoLongerCurrentAddsItsEventsButNeverMovesTheCursorBack() {
+        val main = Transcript().withLatest(mainPage)
+        // The main thread: asked before 40, then again before 40 once the first answer moved the cursor to the end.
+        val older = main.withOlder(40L, olderMain)
+        assertNull(older.nextBefore)
+        val late = older.withOlder(40L, TranscriptPage(listOf(TranscriptEvent.AgentMessage(30, 30, "Late", null)), nextBefore = 30, lastSeq = 90))
+        assertNull(late.nextBefore, "the cursor stays where the newer answer put it")
+        assertEquals(listOf(20L, 30L, 40L), late.events.map { it.seq })
+        assertEquals(40L, main.withOlder(30L, olderMain).nextBefore, "asked from a cursor the thread no longer has")
+        // A feed: its newest page arriving after it was read, and an older page asked from a cursor it no longer has.
+        val read = main.withFeed("w1", null, workerPage).withFeed("w1", 70L, olderWorker)
+        assertEquals(mapOf<String, Long?>("w1" to null), read.withFeed("w1", null, workerPage).feeds)
+        assertEquals(mapOf<String, Long?>("w1" to null), read.withFeed("w1", 70L, workerPage).feeds)
     }
 }

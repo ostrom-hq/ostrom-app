@@ -9,6 +9,7 @@ import kotlin.test.Test
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import run.ostrom.app.infrastructure.repositories.readReceipt
+import run.ostrom.app.infrastructure.repositories.textAt
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
@@ -43,5 +44,16 @@ class RemoteReceiptRepositoryAttestationTest {
             assertNull(entry.summary, extra)
             assertEquals(raw, entry.raw, "the object is kept for its signature whatever its shape")
         }
+    }
+
+    @Test fun aKindThisVersionDoesNotKnowIsShownAsWrittenAndAnyOtherShapeReadsAsEmpty() {
+        val unknown = """{"id":"rcpt_n","subject":{"kind":"budget","id":"b1","digest":"d"},"initiator":"ada","rules":[],"decisions":[],"createdAt":"2026-11-13T09:00:00.000Z","signature":"s"}"""
+        assertEquals("budget", readReceipt(Json.parseToJsonElement(unknown).jsonObject).summary?.subjectKind)
+        fun text(json: String) = textAt(Json.parseToJsonElement(json).jsonObject, "subject", "kind")
+        assertEquals("budget", text("""{"subject":{"kind":"budget"}}"""))
+        assertEquals("", text("""{}"""), "no subject")
+        assertEquals("", text("""{"subject":"budget"}"""), "a subject that is no object")
+        assertEquals("", text("""{"subject":{}}"""), "no kind")
+        assertEquals("", text("""{"subject":{"kind":{"name":"budget"}}}"""), "a kind that is no text")
     }
 }

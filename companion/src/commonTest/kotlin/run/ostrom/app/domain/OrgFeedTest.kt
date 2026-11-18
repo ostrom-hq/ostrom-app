@@ -73,6 +73,31 @@ class OrgFeedTest {
         connection.cancel()
     }
 
+    @Test fun aClosingDueAfterAFollowerCameBackLeavesTheConnectionOpen() = runTest {
+        // The closing is not cancelled when a follower comes back (on another thread it could already be past its delay):
+        // it falls due, finds itself replaced, and leaves the connection to the follower.
+        val feed = feed()
+        val first = launch { feed.follow("a1").collect { } }
+        runCurrent()
+        first.cancel(); runCurrent()
+        advanceTimeBy(4_000); runCurrent()
+        val back = launch { feed.follow("a1").collect { } }
+        runCurrent()
+        advanceTimeBy(2_000); runCurrent()
+        assertEquals(1, feed.openConnections())
+        assertEquals(1, events.asked.size)
+        // A second leave starts a newer closing: the first one, due earlier, closes nothing either.
+        back.cancel(); runCurrent()
+        advanceTimeBy(2_000); runCurrent()
+        val again = launch { feed.follow("a1").collect { } }
+        runCurrent(); again.cancel(); runCurrent()
+        advanceTimeBy(3_500); runCurrent()
+        assertEquals(1, feed.openConnections())
+        advanceTimeBy(1_501); runCurrent()
+        assertEquals(0, feed.openConnections())
+        assertEquals(1, events.asked.size)
+    }
+
     @Test fun eachAccountHasItsOwnConnection() = runTest {
         val feed = feed()
         val a = launch { feed.follow("a1").collect { } }

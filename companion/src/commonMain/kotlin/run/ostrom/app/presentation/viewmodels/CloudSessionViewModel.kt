@@ -360,13 +360,14 @@ class CloudSessionViewModel(
         val uses = conversation ?: return
         files?.load()
         // The transcript does not carry pauses, resumes or a failed pod: the header is read again while visible.
-        if (header == null) header = viewModelScope.launch {
+        // A header that stopped (a read cancelled from elsewhere ends it) is started again.
+        if (header?.isActive != true) header = viewModelScope.launch {
             while (true) {
                 delay(HEADER_MILLIS)
-                // An ended session no longer changes: nothing to read.
+                // An ended session no longer changes: nothing to read. Without the record yet (a retry before it was read),
+                // it is read here too.
                 val current = state.value
-                // (The header only runs once the record was read, so a session is there.)
-                if (current.gone || current.session!!.status.ended) continue
+                if (current.gone || current.session?.let { it.status.ended } == true) continue
                 refreshSessionQuietly()
             }
         }
@@ -433,9 +434,9 @@ class CloudSessionViewModel(
         viewModelScope.launch {
             try {
                 transcriptLock.withLock {
-                    // (No other page of the main thread can arrive meanwhile: the in-flight flag lets one load run at a time.)
                     val page = uses.loadTranscript(route.accountId, route.sessionId, before, if (state.value.feeds) MAIN_FEED else null)
-                    state.update { it.copy(transcript = it.transcript.withOlder(page)) }
+                    // Another page may have arrived meanwhile: the cursor then stays (see [Transcript.withOlder]).
+                    state.update { it.copy(transcript = it.transcript.withOlder(before, page)) }
                 }
             } catch (error: CancellationException) {
                 throw error
@@ -461,9 +462,9 @@ class CloudSessionViewModel(
         viewModelScope.launch {
             try {
                 transcriptLock.withLock {
-                    // (No other page of this feed can arrive meanwhile: its id is in [loadingFeeds] until this load ends.)
                     val page = uses.loadTranscript(route.accountId, route.sessionId, before, feed)
-                    state.update { it.withTranscript(it.transcript.withFeed(feed, page)) }
+                    // Another page of this feed may have arrived meanwhile: its cursor then stays (see [Transcript.withFeed]).
+                    state.update { it.withTranscript(it.transcript.withFeed(feed, before, page)) }
                 }
             } catch (error: CancellationException) {
                 throw error

@@ -27,6 +27,7 @@ import run.ostrom.app.domain.usecases.receipts.CheckReceiptsUseCase
 import run.ostrom.app.domain.usecases.receipts.LoadReceiptsUseCase
 import run.ostrom.app.domain.usecases.receipts.TrustedReceiptKeysUseCase
 import run.ostrom.app.fakeGuard
+import run.ostrom.app.presentation.viewmodels.HistoryUiState
 import run.ostrom.app.presentation.viewmodels.HistoryViewModel
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
@@ -81,6 +82,27 @@ class HistoryViewModelTest {
         raw(id, extra),
         if (readable && id != null) ReceiptSummary(id, "approved", false, "ada", "gate", "g1", 1_000L) else null,
     )
+
+    @Test
+    fun resultsAndPagesLandOnlyOnTheAccountThatAskedAndOnTheSameReceipt() {
+        val one = entry("r1")
+        val two = entry("r2")
+        val shown = HistoryUiState(account = account("a1"), entries = listOf(one, two))
+        val verified = one.copy(check = ReceiptCheck.Verified("k1"))
+        // The same content read again (another object) shows the same result; another receipt keeps its own.
+        val again = shown.copy(entries = listOf(entry("r1"), two)).withChecked("a1", listOf(verified))
+        assertEquals(listOf(ReceiptCheck.Verified("k1"), two.check), again.entries.map { it.check })
+        // Another account's list, or none, is left as it is.
+        assertEquals(shown, shown.withChecked("a2", listOf(verified)))
+        assertEquals(HistoryUiState(), HistoryUiState().withChecked("a1", listOf(verified)))
+        assertEquals(shown, shown.withFirstPage("a2", listOf(entry("r9")), "c9"))
+        assertEquals(HistoryUiState(), HistoryUiState().withFirstPage("a1", listOf(entry("r9")), "c9"))
+        val first = shown.copy(refreshing = true).withFirstPage("a1", listOf(entry("r9")), "c9")
+        assertEquals(listOf("r9"), first.entries.map { it.summary?.id })
+        assertEquals("c9", first.next)
+        assertTrue(first.loaded)
+        assertFalse(first.refreshing)
+    }
 
     @Test
     fun receiptsAreCheckedAndOlderPagesNeverRepeatOneAlreadyShown() = runTest {

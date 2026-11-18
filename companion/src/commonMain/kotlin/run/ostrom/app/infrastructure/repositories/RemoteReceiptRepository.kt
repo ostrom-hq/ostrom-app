@@ -4,8 +4,8 @@ package run.ostrom.app.infrastructure.repositories
 
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonPrimitive
 import run.ostrom.app.domain.models.HistoryEntry
 import run.ostrom.app.domain.models.KeyHandover
 import run.ostrom.app.domain.models.ReceiptCheckNode
@@ -55,7 +55,7 @@ fun readReceipt(raw: JsonObject): HistoryEntry {
 private fun Receipt.summary(raw: JsonObject): ReceiptSummary {
     val decision = decisions.lastOrNull()
     // A kind this version does not know is shown as the server wrote it.
-    val kind = if (subject.kind == ReceiptSubjectKind.UNKNOWN) raw.getValue("subject").jsonObject.getValue("kind").jsonPrimitive.content else subject.kind.value
+    val kind = if (subject.kind == ReceiptSubjectKind.UNKNOWN) textAt(raw, "subject", "kind") else subject.kind.value
     return ReceiptSummary(
         id = id,
         result = decision?.result,
@@ -79,4 +79,11 @@ private fun CheckAttestation.origin(): RunOrigin = when (this) {
     CheckAttestation.ISOLATED_RUNNER -> RunOrigin.ISOLATED_RUNNER
     CheckAttestation.CI -> RunOrigin.CI
     CheckAttestation.UNKNOWN -> RunOrigin.UNKNOWN
+}
+
+/** The text at [path] in [raw]; empty when anything along it is missing or of another shape, never a failure. */
+internal fun textAt(raw: JsonObject, vararg path: String): String {
+    var at: JsonElement = raw
+    for (key in path) at = (at as? JsonObject)?.get(key) ?: return ""
+    return (at as? JsonPrimitive)?.content.orEmpty()
 }

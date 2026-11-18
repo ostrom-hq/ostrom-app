@@ -70,8 +70,8 @@ class HomeViewModel(
     /** The app came back to the foreground: the server is asked again if it was not asked recently. */
     fun onForeground() {
         val id = accounts.activeAccountId.value ?: return
-        // A refresh running (this one's own included: it marks itself refreshing as it starts) is not doubled.
-        if (status.value.refreshing) return
+        // A refresh running is not doubled, nor one launched that has not started yet (it marks itself refreshing only then).
+        if (status.value.refreshing || foreground?.isActive == true) return
         // Not `now - checkedAt` against a sentinel: Long.MIN_VALUE overflowed and blocked every retry.
         val last = checkedAt
         if (last != null && clock.nowMillis() - last < RECHECK_AFTER_MILLIS) return

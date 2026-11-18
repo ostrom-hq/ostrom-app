@@ -5,6 +5,8 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -316,6 +318,29 @@ class WaitsViewModelTest {
         assertFalse(model.st.loadingMore)
         assertEquals(listOf("w1"), model.st.waits.map { it.id })
         assertEquals("n2", model.st.nextBefore)
+    }
+
+    @Test fun aPageOfTheListLeftIsDroppedEvenWhenItsCursorMatchesTheNewOne() = runTest(dispatcher) {
+        // A read that ignores the cancellation of another filter (a page already on its way) still answers; the answered
+        // list's cursor happens to be the same text. The page follows nothing shown now.
+        val gate = CompletableDeferred<Unit>()
+        waits.onList = { status, before ->
+            when {
+                status == WaitStatus.OPEN && before == null -> WaitPage(listOf(wait("w1")), "c")
+                status == WaitStatus.OPEN -> { withContext(NonCancellable) { gate.await() }; WaitPage(listOf(wait("w9")), null) }
+                else -> WaitPage(listOf(wait("h1")), "c")
+            }
+        }
+        val model = vm(); settle()
+        model.start(); settle()
+        model.loadMore(); settle()
+        model.setFilter(WaitFilter.ANSWERED); settle()
+        assertEquals("c", model.st.shownNext)
+        gate.complete(Unit); settle()
+        assertEquals(listOf("h1"), model.st.history.map { it.id })
+        assertEquals(listOf("w1"), model.st.waits.map { it.id })
+        assertEquals("c", model.st.nextBefore)
+        assertFalse(model.st.loadingMore)
     }
 
     @Test fun switchingAccountDropsThePageInFlight() = runTest(dispatcher) {
