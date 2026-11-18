@@ -51,7 +51,8 @@ class HomeViewModel(
     private val clock: Clock,
 ) : ViewModel() {
     private val status = MutableStateFlow(HomeUiState())
-    private var checkedAt = Long.MIN_VALUE
+    /** When the server was last read; null until a read succeeds (then the foreground always asks). */
+    private var checkedAt: Long? = null
     private var foreground: Job? = null
     val uiState: StateFlow<HomeUiState> = combine(accounts.accounts, accounts.activeAccountId, status) { list, active, status ->
         status.copy(account = list.firstOrNull { it.id == active })
@@ -70,7 +71,10 @@ class HomeViewModel(
     fun onForeground() {
         val id = accounts.activeAccountId.value ?: return
         // A refresh running (this one's own included: it marks itself refreshing as it starts) is not doubled.
-        if (status.value.refreshing || clock.nowMillis() - checkedAt < RECHECK_AFTER_MILLIS) return
+        if (status.value.refreshing) return
+        // Not `now - checkedAt` against a sentinel: Long.MIN_VALUE overflowed and blocked every retry.
+        val last = checkedAt
+        if (last != null && clock.nowMillis() - last < RECHECK_AFTER_MILLIS) return
         foreground = viewModelScope.launch { refresh(id) }
     }
 

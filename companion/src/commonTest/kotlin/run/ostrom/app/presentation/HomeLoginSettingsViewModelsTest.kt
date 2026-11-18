@@ -71,8 +71,10 @@ class HomeLoginSettingsViewModelsTest {
         var gate: CompletableDeferred<ServerCapabilities>? = null
         var reads = 0
         var cachedCaps: ServerCapabilities? = null
+        var error: Exception? = null
         override suspend fun capabilities(accountId: String, refresh: Boolean): ServerCapabilities {
             reads++
+            error?.let { throw it }
             return gate?.await() ?: caps
         }
         override fun cached(accountId: String): ServerCapabilities? = cachedCaps
@@ -131,6 +133,20 @@ class HomeLoginSettingsViewModelsTest {
         val none = home(accounts(), features)
         none.onForeground()
         assertEquals(2, features.reads)
+    }
+
+    @Test
+    fun aServerUnreadAtStartIsAskedAgainAsSoonAsTheAppReturns() = runTest {
+        // Regression: the last check started at Long.MIN_VALUE, `now - checkedAt` overflowed, and the app never asked again.
+        credentials.write("a1", "tok")
+        val features = Features().apply { error = AppException.Unreachable() }
+        val model = home(accounts().also { it.save(account()) }, features)
+        assertEquals(1, features.reads)
+        assertFalse(model.uiState.value.serves("gates.v1"))
+        features.error = null
+        model.onForeground()
+        assertEquals(2, features.reads)
+        assertTrue(model.uiState.value.serves("gates.v1"))
     }
 
     @Test
