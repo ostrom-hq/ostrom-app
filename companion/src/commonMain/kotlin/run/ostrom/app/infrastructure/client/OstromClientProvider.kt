@@ -29,10 +29,11 @@ class OstromClientProvider(
     private val clients = mutableMapOf<String, Pair<String, OstromClient>>()
 
     suspend fun forAccount(accountId: String, origin: String): OstromClient = lock.withLock {
-        clients[accountId]?.takeIf { it.first == origin }?.second ?: create(origin, { readToken(accountId) }, { accounts.find(accountId)?.organizationId }).also {
-            clients.remove(accountId)?.second?.close()
-            clients[accountId] = origin to it
-        }
+        val kept = clients[accountId]
+        if (kept != null && kept.first == origin) return@withLock kept.second
+        // Another server for this account: its client goes.
+        kept?.let { it.second.close() }
+        create(origin, { readToken(accountId) }, { accounts.find(accountId)?.organizationId }).also { clients[accountId] = origin to it }
     }
 
     /** A client for calls before an account exists (discovery, sign-in, the new session's first reads); close it after use. */
@@ -46,7 +47,7 @@ class OstromClientProvider(
         create(origin, { readToken(accountId) }, { organizationId })
 
     suspend fun release(accountId: String) {
-        lock.withLock { clients.remove(accountId) }?.second?.close()
+        lock.withLock { clients.remove(accountId) }?.let { it.second.close() }
     }
 
     private fun create(origin: String, token: suspend () -> String?, organization: suspend () -> String?) =

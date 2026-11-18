@@ -21,11 +21,16 @@ class RemoteReceiptRepositoryAttestationTest {
         fun node(id: String, attestation: String) = """{"id":"$id","workflowId":"w","kind":"check","label":"$id","outcome":"passed","attestation":"$attestation"}"""
         server.json(
             """{"items":[{"id":"rcpt_c","subject":{"kind":"workflow","id":"w@p","digest":"d"},"initiator":"ada","rules":[],"decisions":[],
-            "nodes":[${node("laptop", "workstation_declared")},${node("runner", "isolated_runner")}],"createdAt":"2026-11-13T09:00:00.000Z","signature":"s"}]}""",
+            "nodes":[${node("laptop", "workstation_declared")},${node("runner", "isolated_runner")},{"id":"old","workflowId":"w","kind":"check","label":"old","outcome":"passed"}],"createdAt":"2026-11-13T09:00:00.000Z","signature":"s"}]}""",
         )
         val summary = RemoteReceiptRepository(server.calls).page("a1").items.single().summary!!
         assertEquals(
-            listOf(ReceiptCheckNode("laptop", "passed", RunOrigin.WORKSTATION_DECLARED), ReceiptCheckNode("runner", "passed", RunOrigin.ISOLATED_RUNNER)),
+            listOf(
+                ReceiptCheckNode("laptop", "passed", RunOrigin.WORKSTATION_DECLARED),
+                ReceiptCheckNode("runner", "passed", RunOrigin.ISOLATED_RUNNER),
+                // A check of a server that did not say where it ran.
+                ReceiptCheckNode("old", "passed", null),
+            ),
             summary.checkNodes,
         )
     }

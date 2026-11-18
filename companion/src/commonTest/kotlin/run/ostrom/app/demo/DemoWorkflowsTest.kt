@@ -7,8 +7,10 @@ import run.ostrom.app.domain.models.AppException
 import run.ostrom.app.domain.models.DraftNode
 import run.ostrom.app.domain.models.NodeKind
 import run.ostrom.app.domain.models.RunStatus
+import run.ostrom.app.domain.models.Workflow
 import run.ostrom.app.domain.models.WorkflowDraft
 import run.ostrom.app.domain.models.WorkflowEditRefusal
+import run.ostrom.app.domain.models.WorkflowNode
 import run.ostrom.app.domain.models.WorkflowRefusal
 import run.ostrom.app.domain.models.WorkflowWrite
 import kotlin.test.Test
@@ -133,14 +135,17 @@ class DemoWorkflowsTest {
         assertFailsWith<AppException.NotFound> { editor.save(account, release.copy(id = "ghost"), release.draft) }
     }
 
-    @Test fun savingAWorkflowWithoutAVersionBeginsAtVersionOne() = runTest {
-        val created = (editor.create(account, WorkflowDraft(name = "N")) as WorkflowWrite.Applied).value
-        val read = editor.editable(account, created)
-        editor.save(account, read.copy(version = read.version), read.draft)
-        assertEquals(2, editor.editable(account, created).version)
-        val noVersion = read.copy(id = DemoWorkflowIds.TRIAGE, version = 1)
-        editor.save(account, noVersion, noVersion.draft)
-        assertEquals(2, editor.editable(account, DemoWorkflowIds.TRIAGE).version)
+    @Test fun aWorkflowWithoutDescriptionOrInstructionsOpensWithEmptyOnes() {
+        val bare = Workflow(
+            "w", "Bare", "engineering", null, 4, emptyList(), "accepted", "a", emptyList(),
+            listOf(WorkflowNode("a", NodeKind.AGENT, "Write", null), WorkflowNode("b", NodeKind.WAIT, "Approve", "ignored")), null,
+        )
+        val opened = bare.editable()
+        assertEquals(4, opened.version)
+        assertEquals("", opened.draft.description)
+        assertEquals(listOf("", ""), opened.draft.nodes.map { it.instruction })
+        assertEquals(listOf("", "Approve"), opened.draft.nodes.map { it.question })
+        assertEquals(listOf("b", null), opened.draft.edges.map { it.to })
     }
 
     @Test fun aDeletedWorkflowDisappearsFromEverywhere() = runTest {

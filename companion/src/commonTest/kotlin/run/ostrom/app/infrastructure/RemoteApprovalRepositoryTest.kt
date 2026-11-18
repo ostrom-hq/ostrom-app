@@ -27,6 +27,7 @@ import run.ostrom.app.infrastructure.client.OstromClientProvider
 import run.ostrom.app.infrastructure.credentials.MemoryCredentialStore
 import run.ostrom.app.infrastructure.repositories.AccountCalls
 import run.ostrom.app.infrastructure.repositories.RemoteApprovalRepository
+import run.ostrom.app.infrastructure.repositories.toDomain
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -149,5 +150,13 @@ class RemoteApprovalRepositoryTest {
         assertFailsWith<AppException.OrganizationRequired> { repository.queue("a1") }
         answer = json("""{"error":{"type":"not_found","message":"m"}}""", HttpStatusCode.NotFound)
         assertFailsWith<AppException.NotFound> { repository.view("a1", "gone") }
+    }
+
+    @Test
+    fun everyStatusOfTheContractReadsAsTheAppsOwn() {
+        assertEquals(
+            listOf(ApprovalStatus.PENDING, ApprovalStatus.APPROVED, ApprovalStatus.REJECTED, ApprovalStatus.EXPIRED, ApprovalStatus.UNKNOWN),
+            run.ostrom.core.api.models.ApprovalStatus.entries.map { it.toDomain() },
+        )
     }
 }

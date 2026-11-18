@@ -86,13 +86,13 @@ private class JavaKeyringBackend(private val keyring: Keyring) : KeyringBackend 
             // first is "no token", recognized by the exact phrases of its backends: Windows ("Password not Found"),
             // the macOS Keychain status text ("could not be found in the keychain") and Secret Service ("No stored
             // credentials match"). Anything else is an error, never a silent sign-out.
-            if (MISSING_ENTRY.any { it in error.message.orEmpty().lowercase() }) null else throw error
+            if (MISSING_ENTRY.any { it in error.message.toString().lowercase() }) null else throw error
         }
     override fun set(service: String, account: String, secret: String) = keyring.setPassword(service, account, secret)
     override fun delete(service: String, account: String) {
         try { keyring.deletePassword(service, account) } catch (error: PasswordAccessException) {
             // Already absent is success; a refusal (a locked keyring) is reported, like on read.
-            if (MISSING_ENTRY.none { it in error.message.orEmpty().lowercase() }) throw error
+            if (MISSING_ENTRY.none { it in error.message.toString().lowercase() }) throw error
         }
     }
 }

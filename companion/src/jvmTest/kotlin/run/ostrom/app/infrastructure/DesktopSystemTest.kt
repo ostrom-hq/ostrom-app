@@ -2,9 +2,10 @@
 package run.ostrom.app.infrastructure
 
 import run.ostrom.app.BuildInfo
-import run.ostrom.app.domain.services.PlatformInfo
 import run.ostrom.app.infrastructure.system.DesktopPlatformInfo
 import run.ostrom.app.infrastructure.system.JavaSecureRandom
+import run.ostrom.app.infrastructure.system.deviceModelOf
+import run.ostrom.app.infrastructure.system.platformOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
@@ -12,45 +13,20 @@ import kotlin.test.assertTrue
 
 /** What the desktop reports about itself, and its random bytes. */
 class DesktopSystemTest {
-    /** Loads the classes of [DesktopPlatformInfo] anew, so that its initializer reads the JVM's current `os.name`. */
-    private class Isolated(parent: ClassLoader) : ClassLoader(parent) {
-        private val prefix = DesktopPlatformInfo::class.java.name
-
-        override fun loadClass(name: String, resolve: Boolean): Class<*> {
-            if (!name.startsWith(prefix)) return super.loadClass(name, resolve)
-            synchronized(getClassLoadingLock(name)) {
-                findLoadedClass(name)?.let { return it }
-                val bytes = parent.getResourceAsStream(name.replace('.', '/') + ".class")!!.readBytes()
-                return defineClass(name, bytes, 0, bytes.size)
-            }
-        }
-    }
-
-    /** A [DesktopPlatformInfo] as if the JVM reported [osName], since the object reads it once. */
-    private fun platformOn(osName: String): PlatformInfo {
-        val previous = System.getProperty("os.name")
-        System.setProperty("os.name", osName)
-        try {
-            val loaded = Class.forName(DesktopPlatformInfo::class.java.name, true, Isolated(DesktopPlatformInfo::class.java.classLoader))
-            return loaded.getField("INSTANCE").get(null) as PlatformInfo
-        } finally {
-            System.setProperty("os.name", previous)
-        }
-    }
-
     @Test fun theOperatingSystemIsNamedFromTheJvmsOsName() {
-        assertEquals("macOS", platformOn("Mac OS X").platform)
-        assertEquals("macOS", platformOn("mac os x").platform)
-        assertEquals("Windows", platformOn("Windows 11").platform)
-        assertEquals("Linux", platformOn("Linux").platform)
-        assertEquals("Linux", platformOn("FreeBSD").platform, "any other system is called Linux")
+        assertEquals("macOS", platformOf("Mac OS X"))
+        assertEquals("macOS", platformOf("mac os x"))
+        assertEquals("Windows", platformOf("Windows 11"))
+        assertEquals("Linux", platformOf("Linux"))
+        assertEquals("Linux", platformOf("FreeBSD"), "any other system is called Linux")
+        assertEquals("Linux", platformOf(null))
     }
 
     @Test fun theDeviceModelIsTheHostNameOfTheEnvironmentOrTheSystemNamed() {
-        val info = platformOn("Mac OS X")
-        val expected = System.getenv("COMPUTERNAME") ?: System.getenv("HOSTNAME") ?: "macOS desktop"
-        assertEquals(expected, info.deviceModel)
-        assertEquals(expected, info.deviceModel, "read once")
+        assertEquals("PC-1", deviceModelOf("Windows", mapOf("COMPUTERNAME" to "PC-1", "HOSTNAME" to "h")::get))
+        assertEquals("studio", deviceModelOf("Linux", mapOf("HOSTNAME" to "studio")::get))
+        assertEquals("macOS desktop", deviceModelOf("macOS", emptyMap<String, String>()::get))
+        assertEquals(DesktopPlatformInfo.deviceModel, DesktopPlatformInfo.deviceModel, "read once")
     }
 
     @Test fun theVersionIsTheBuildsAndTheSharedObjectAnswersWithTheRealSystem() {

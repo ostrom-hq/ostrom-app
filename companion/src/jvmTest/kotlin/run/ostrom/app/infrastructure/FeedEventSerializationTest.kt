@@ -2,14 +2,17 @@
 package run.ostrom.app.infrastructure
 
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 
 /**
  * The event the organization feed reads is private to its repository and only ever decoded there; this writes it back
@@ -45,5 +48,18 @@ class FeedEventSerializationTest {
         val wire: JsonObject = buildJsonObject { put("seq", 9L); put("subjectId", "r3"); put("data", JsonPrimitive("text")) }
         val read = Json.decodeFromJsonElement(serializer, wire)
         assertEquals(wire, encoded(read))
+    }
+
+    @Test fun aWriterSpellingOutDefaultsWritesTheMissingFieldsAsNull() {
+        val wire = buildJsonObject { put("seq", 4L); put("subjectId", "r4") }
+        val read = Json.decodeFromJsonElement(serializer, wire)
+        assertEquals(
+            buildJsonObject { put("seq", 4L); put("subjectId", "r4"); put("memberId", JsonNull); put("data", JsonNull) },
+            Json { encodeDefaults = true }.encodeToJsonElement(serializer, read),
+        )
+    }
+
+    @Test fun anEventWithoutItsSubjectIsNotRead() {
+        assertFailsWith<SerializationException> { Json.decodeFromJsonElement(serializer, buildJsonObject { put("seq", 5L) }) }
     }
 }

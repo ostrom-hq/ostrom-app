@@ -15,6 +15,7 @@ import run.ostrom.app.domain.repositories.ApprovalRepository
 import run.ostrom.core.api.models.ApprovalView
 import run.ostrom.core.api.models.ApprovalAnswer as ApiAnswer
 import run.ostrom.core.api.models.ApprovalQueue as ApiQueue
+import run.ostrom.core.api.models.ApprovalStatus as ApiStatus
 
 /** [ApprovalRepository] over the typed client's `approvals` and `auth.unlock`; failures translated by [AccountCalls]. */
 class RemoteApprovalRepository(private val calls: AccountCalls) : ApprovalRepository {
@@ -47,7 +48,7 @@ internal fun ApprovalView.toDomain(): Approval {
     return Approval(
         id = approval.id,
         title = approval.title,
-        status = approval.status.name.toEnum(ApprovalStatus.UNKNOWN),
+        status = approval.status.toDomain(),
         shownDigest = approval.shownDigest,
         requestedFrom = approval.requestedFrom,
         viewer = ApprovalViewer(self = you.self, canApprove = you.canApprove, reasonType = you.reasonType),
@@ -67,4 +68,10 @@ internal fun ApprovalView.toDomain(): Approval {
 }
 
 /** The domain's value of the same name, or [unknown]. */
-private inline fun <reified E : Enum<E>> String.toEnum(unknown: E): E = enumValues<E>().firstOrNull { it.name == this } ?: unknown
+internal fun ApiStatus.toDomain(): ApprovalStatus = when (this) {
+    ApiStatus.PENDING -> ApprovalStatus.PENDING
+    ApiStatus.APPROVED -> ApprovalStatus.APPROVED
+    ApiStatus.REJECTED -> ApprovalStatus.REJECTED
+    ApiStatus.EXPIRED -> ApprovalStatus.EXPIRED
+    ApiStatus.UNKNOWN -> ApprovalStatus.UNKNOWN
+}

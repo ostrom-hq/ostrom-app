@@ -47,7 +47,7 @@ internal fun CloudEvent.domain(): TranscriptEvent {
             seq, at, data.text("id").orEmpty(), data.text("name") ?: "tool", data["input"].pretty(), toolSummary(data["input"]), parent,
         )
         CloudEventTypes.TOOL_RESULT -> TranscriptEvent.ToolResult(
-            seq, at, data.text("id").orEmpty(), data["output"].let { (it as? JsonPrimitive)?.takeIf { p -> p.isString }?.content ?: it.pretty() },
+            seq, at, data.text("id").orEmpty(), data["output"].let { if (it is JsonPrimitive && it.isString) it.content else it.pretty() },
             data["isError"].boolean() == true, data["exitCode"].int(), parent,
         )
         CloudEventTypes.TURN -> TranscriptEvent.Turn(seq, at, TurnPhase.of(data.text("phase")), data["durationMs"].long(), data["steps"].int())
@@ -78,7 +78,7 @@ private fun permissionRequest(seq: Long, at: Long, data: JsonObject): Transcript
         val text = fields.text("question") ?: return@mapIndexedNotNull null
         val options = (fields["options"] as? JsonArray).orEmpty().map { option ->
             val o = option as? JsonObject
-            AgentQuestionOption(o?.text("label").orEmpty(), o?.text("description")?.takeIf(String::isNotBlank))
+            AgentQuestionOption(o?.text("label").orEmpty(), o?.text("description").orEmpty().ifBlank { null })
         }
         AgentQuestion(index, text, fields.text("header")?.takeIf(String::isNotBlank), options, fields["multiSelect"].boolean() == true)
     }.distinctBy { it.text }

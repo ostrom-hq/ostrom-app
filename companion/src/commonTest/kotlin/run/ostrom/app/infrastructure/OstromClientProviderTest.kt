@@ -34,6 +34,16 @@ class OstromClientProviderTest {
         assertEquals("Ostrom-App/1.0.0 (Test)", request.headers[HttpHeaders.UserAgent])
     }
 
+    @Test fun aClientOfAnAccountRemovedMeanwhileNamesNoOrganization() = runTest {
+        server.signedIn()
+        server.accounts.update(account(origin = ORIGIN).copy(organizationId = "org-1"))
+        val client = server.provider.forAccount("a1", ORIGIN)
+        server.accounts.remove("a1")
+        server.json(empty)
+        client.organizations.mine()
+        assertNull(server.requests.single().headers["Ostrom-Org"])
+    }
+
     @Test fun aTokenWrittenAfterTheClientWasCreatedIsUsedAtOnce() = runTest {
         server.signedIn()
         val client = server.provider.forAccount("a1", ORIGIN)

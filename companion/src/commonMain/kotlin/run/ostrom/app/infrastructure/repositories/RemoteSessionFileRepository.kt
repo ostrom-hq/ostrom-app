@@ -42,7 +42,8 @@ class RemoteSessionFileRepository(private val calls: AccountCalls) : SessionFile
     /** The refusal of the file itself; null for what any call translates (signed out, the session gone, rate limits). */
     private fun refusal(error: OstromException): AppException.FileRefused? = when {
         error.type == CloudFilesClient.FILE_INTEGRITY_FAILED -> AppException.FileRefused(error.type, 0)
-        error.status == 0 || error.status == 401 || error.status == 404 -> null
+        // An upload's only status 0 is the integrity check above; a dropped connection is no OstromException.
+        error.status == 401 || error.status == 404 -> null
         // An organization still to choose, or a fresh proof to give: translated as for any call.
         error.status == 409 && error.type == ORG_REQUIRED || error.status == 403 && error.type == STEP_UP_REQUIRED -> null
         else -> AppException.FileRefused(error.type, error.status, error.retryAfterSeconds)

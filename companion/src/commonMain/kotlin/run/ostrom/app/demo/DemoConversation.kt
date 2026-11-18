@@ -112,7 +112,7 @@ internal fun DemoStore.stoppedTask(sessionId: String, taskId: String, at: Long):
 
 private fun DemoStore.append(sessionId: String, events: (seq: () -> Long) -> List<TranscriptEvent>) {
     val all = transcripts.value
-    var last = all[sessionId]?.lastOrNull()?.seq ?: 0
+    var last = all[sessionId]?.lastOrNull().let { if (it == null) 0L else it.seq }
     transcripts.value = all + (sessionId to all[sessionId].orEmpty() + events { ++last })
 }
 
@@ -149,7 +149,7 @@ class DemoTranscriptRepository(private val demo: DemoMode) : TranscriptRepositor
                 emit(LiveUpdate.Item(event))
                 last = event.seq
             }
-            val ended = session?.status?.ended == true
+            val ended = session != null && session.status.ended
             if (ended) emit(LiveUpdate.Ended)
             !ended
         })
