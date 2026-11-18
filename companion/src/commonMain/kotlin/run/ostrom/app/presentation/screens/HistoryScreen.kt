@@ -23,8 +23,8 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -37,15 +37,12 @@ import com.adamglin.PhosphorIcons
 import com.adamglin.phosphoricons.Regular
 import com.adamglin.phosphoricons.regular.Receipt
 import com.adamglin.phosphoricons.regular.Warning
-import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import run.ostrom.app.domain.models.CheckRun
 import run.ostrom.app.domain.models.HistoryEntry
 import run.ostrom.app.domain.models.ReceiptCheck
-import run.ostrom.app.domain.models.ReceiptRejection
 import run.ostrom.app.domain.models.ReceiptSummary
-import run.ostrom.app.domain.models.RunOrigin
 import run.ostrom.app.presentation.components.AppButton
 import run.ostrom.app.presentation.components.AppCard
 import run.ostrom.app.presentation.components.Banner
@@ -73,17 +70,6 @@ import run.ostrom.app.resources.history_error
 import run.ostrom.app.resources.history_intro
 import run.ostrom.app.resources.history_more_failed
 import run.ostrom.app.resources.history_no_key
-import run.ostrom.app.resources.history_origin_ci
-import run.ostrom.app.resources.history_origin_isolated_runner
-import run.ostrom.app.resources.history_origin_unknown
-import run.ostrom.app.resources.history_origin_unverified
-import run.ostrom.app.resources.history_origin_workstation_declared
-import run.ostrom.app.resources.history_reason_bad_signature
-import run.ostrom.app.resources.history_reason_digest_mismatch
-import run.ostrom.app.resources.history_reason_malformed
-import run.ostrom.app.resources.history_reason_missing_signature
-import run.ostrom.app.resources.history_reason_unknown_algorithm
-import run.ostrom.app.resources.history_reason_unknown_key
 import run.ostrom.app.resources.history_rejected
 import run.ostrom.app.resources.history_rejected_by
 import run.ostrom.app.resources.history_self_approved
@@ -161,23 +147,6 @@ fun HistoryScreen(viewModel: HistoryViewModel = koinViewModel()) {
     }
 }
 
-/**
- * Each row's key: the receipt's id, which stays when a newer receipt comes first; a repeated id (a server bug) gets its
- * rank among them, and a receipt this app cannot read its position.
- */
-private fun rowKeys(entries: List<HistoryEntry>): List<String> {
-    val seen = HashMap<String, Int>()
-    return entries.mapIndexed { index, entry ->
-        val id = entry.summary?.id ?: return@mapIndexed "unreadable:$index"
-        val rank = seen.getOrElse(id) { 0 }
-        seen[id] = rank + 1
-        if (rank == 0) "receipt:$id" else "receipt:$id#$rank"
-    }
-}
-
-/** The tag of a receipt's row: its id, or its position when this app cannot read it. */
-private fun rowTag(index: Int, entry: HistoryEntry) = "receipt-${entry.summary?.id ?: "unreadable-$index"}"
-
 /** A receipt as the History tab shows it: also the whole page of one receipt ([ReceiptScreen]). */
 @Composable
 internal fun ReceiptRow(index: Int, entry: HistoryEntry, today: Long) {
@@ -217,14 +186,6 @@ private fun CheckRunLine(run: CheckRun, modifier: Modifier) {
     }
 }
 
-private fun originText(origin: RunOrigin): StringResource = when (origin) {
-    RunOrigin.WORKSTATION_DECLARED -> Res.string.history_origin_workstation_declared
-    RunOrigin.ISOLATED_RUNNER -> Res.string.history_origin_isolated_runner
-    RunOrigin.CI -> Res.string.history_origin_ci
-    RunOrigin.UNKNOWN -> Res.string.history_origin_unknown
-    RunOrigin.UNVERIFIED -> Res.string.history_origin_unverified
-}
-
 @Composable
 private fun CheckLine(check: ReceiptCheck) {
     val colors = Ostrom.colors
@@ -236,13 +197,4 @@ private fun CheckLine(check: ReceiptCheck) {
         ReceiptCheck.Unavailable -> Triple(stringResource(Res.string.history_unavailable), colors.muted, "check-unavailable")
     }
     Text(text, color = color, fontSize = 12.5.sp, fontWeight = FontWeight.Bold, modifier = Modifier.testTag(tag))
-}
-
-private fun reasonText(reason: ReceiptRejection): StringResource = when (reason) {
-    ReceiptRejection.MALFORMED -> Res.string.history_reason_malformed
-    ReceiptRejection.MISSING_SIGNATURE -> Res.string.history_reason_missing_signature
-    ReceiptRejection.UNKNOWN_ALGORITHM -> Res.string.history_reason_unknown_algorithm
-    ReceiptRejection.UNKNOWN_KEY -> Res.string.history_reason_unknown_key
-    ReceiptRejection.DIGEST_MISMATCH -> Res.string.history_reason_digest_mismatch
-    ReceiptRejection.BAD_SIGNATURE -> Res.string.history_reason_bad_signature
 }

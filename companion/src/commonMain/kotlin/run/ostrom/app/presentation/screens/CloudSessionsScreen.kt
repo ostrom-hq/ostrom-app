@@ -21,11 +21,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -228,9 +228,6 @@ private fun CloudSessionCard(session: CloudSession, now: Long, showKind: Boolean
         if (meta.isNotEmpty()) Text(meta.joinToString(" · "), style = MetaStyle, color = colors.muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
-
-/** What a cloud session is called: its name, else its repository's, else its agent. */
-internal fun CloudSession.title(): String = name?.takeIf { it.isNotBlank() } ?: repo?.substringAfterLast('/') ?: agent
 
 /** The session's status, accented while it runs or is on its way, red when it failed. */
 @Composable

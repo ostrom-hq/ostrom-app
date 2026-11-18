@@ -14,8 +14,8 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -44,11 +44,7 @@ import run.ostrom.app.resources.action_close
 import run.ostrom.app.resources.update_action
 import run.ostrom.app.resources.update_available_detail
 import run.ostrom.app.resources.update_available_title
-import run.ostrom.app.resources.update_failed_failed
-import run.ostrom.app.resources.update_failed_not_installed
-import run.ostrom.app.resources.update_failed_still_running
 import run.ostrom.app.resources.update_failed_title
-import run.ostrom.app.resources.update_failed_unexpected
 import run.ostrom.app.resources.update_not_now
 import run.ostrom.app.resources.update_try_again
 import run.ostrom.app.resources.update_updated_detail
@@ -129,11 +125,4 @@ fun UpdateBannerContent(state: UpdateBannerState, onUpdate: () -> Unit, onDismis
         }
         HorizontalDivider(color = colors.line)
     }
-}
-
-private fun CliUpdateException.Reason.sentence() = when (this) {
-    CliUpdateException.Reason.NOT_INSTALLED -> Res.string.update_failed_not_installed
-    CliUpdateException.Reason.STILL_RUNNING -> Res.string.update_failed_still_running
-    CliUpdateException.Reason.FAILED -> Res.string.update_failed_failed
-    CliUpdateException.Reason.UNEXPECTED_OUTPUT -> Res.string.update_failed_unexpected
 }

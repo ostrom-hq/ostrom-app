@@ -12,13 +12,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfoV2
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.staticCompositionLocalOf
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.graphics.Color
@@ -29,7 +28,6 @@ import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEvent
@@ -37,10 +35,8 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.isAltPressed
 import androidx.compose.ui.input.key.isCtrlPressed
 import androidx.compose.ui.input.key.isMetaPressed
-import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
-import androidx.compose.ui.input.key.utf16CodePoint
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.SemanticsPropertyKey
@@ -66,32 +62,6 @@ fun isWideWindow(): Boolean = currentWindowAdaptiveInfoV2().windowSizeClass.let 
 
 /** Provided by the app: true when the window shows the sidebar layout ([isWideWindow]). Sheets become dialogs then. */
 val LocalWideLayout = compositionLocalOf { false }
-
-/**
- * The window's title bar when the app draws under it (the desktop on macOS, [WindowTitleBar.MAC]): its [height], and the
- * [start] the window's own buttons take at its left. The sidebar puts its header beside those buttons, and a screen without
- * the sidebar starts below the bar. None elsewhere, and in fullscreen, where macOS hides the bar.
- */
-@Immutable
-data class WindowTitleBar(val height: Dp = 0.dp, val start: Dp = 0.dp) {
-    companion object {
-        /**
-         * macOS's title bar with the full-size content view: 28 points tall, its three buttons from 9 to 63 points; the
-         * header starts one button's gap after them.
-         */
-        val MAC = WindowTitleBar(height = 28.dp, start = 76.dp)
-
-        /**
-         * macOS 26 and later seat the buttons lower (about 20 points from the top) and bigger: the bar is taller so the
-         * header, centered in it, sits on their line instead of above it; the header starts after the wider group.
-         */
-        val MAC_TAHOE = WindowTitleBar(height = 40.dp, start = 84.dp)
-
-        /** The bar of the macOS at [osVersion] (`os.version`: "15.6.1", "26.0"); the older one when unknown. */
-        fun forMac(osVersion: String?): WindowTitleBar =
-            if ((osVersion?.substringBefore('.')?.trim()?.toIntOrNull() ?: 0) >= 26) MAC_TAHOE else MAC
-    }
-}
 
 /** Provided by the desktop: the title bar the app draws under, [WindowTitleBar]. */
 val LocalWindowTitleBar = staticCompositionLocalOf { WindowTitleBar() }
@@ -157,26 +127,6 @@ fun Modifier.focusRing(shape: Shape): Modifier = composed {
 
 /** Whether [focusRing] draws its ring, for tests. */
 val FocusRingShown = SemanticsPropertyKey<Boolean>("FocusRingShown")
-
-/** What Enter does in a text field that submits ([enterAction]). */
-enum class EnterAction { SUBMIT, NEWLINE, PASS }
-
-/**
- * Enter sends, Shift+Enter and Alt+Enter break the line (Ctrl+Enter and Cmd+Enter send too), only from a physical
- * keyboard: an on-screen keyboard's Enter keeps breaking the line. A single-line field has no line to break.
- */
-fun enterAction(event: KeyEvent, singleLine: Boolean, hardware: Boolean = event.isFromHardwareKeyboard()): EnterAction {
-    if (!hardware || !event.isEnter()) return EnterAction.PASS
-    return when {
-        event.isCtrlPressed || event.isMetaPressed -> EnterAction.SUBMIT
-        event.isShiftPressed || event.isAltPressed -> if (singleLine) EnterAction.PASS else EnterAction.NEWLINE
-        else -> EnterAction.SUBMIT
-    }
-}
-
-/** The Enter key, or the line feed it types (the desktop delivers the typed character as its own event). */
-internal fun KeyEvent.isEnter(): Boolean =
-    key == Key.Enter || key == Key.NumPadEnter || (type == KeyEventType.Unknown && (utf16CodePoint == '\n'.code || utf16CodePoint == '\r'.code))
 
 /**
  * A secondary click (right click, two-finger click) on [content] opens a menu where the pointer is. CMP's

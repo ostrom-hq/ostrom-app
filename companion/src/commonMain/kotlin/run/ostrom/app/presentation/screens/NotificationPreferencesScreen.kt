@@ -22,14 +22,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 import run.ostrom.app.domain.models.NotificationChannels
 import run.ostrom.app.domain.models.NotificationKind
 import run.ostrom.app.domain.models.NotificationToggle
 import run.ostrom.app.domain.models.PushTestOutcome
 import run.ostrom.app.domain.models.PushTestPhone
-import run.ostrom.app.domain.models.PushTestStatus
 import run.ostrom.app.domain.models.visibleCode
 import run.ostrom.app.presentation.components.AppButton
 import run.ostrom.app.presentation.components.Banner
@@ -51,23 +49,12 @@ import run.ostrom.app.resources.Res
 import run.ostrom.app.resources.action_retry
 import run.ostrom.app.resources.notifications_channel_other
 import run.ostrom.app.resources.notifications_channel_push
-import run.ostrom.app.resources.notifications_decisions
-import run.ostrom.app.resources.notifications_kind_session_failed
-import run.ostrom.app.resources.notifications_kind_session_failed_hint
-import run.ostrom.app.resources.notifications_kind_turn_completed
-import run.ostrom.app.resources.notifications_kind_turn_completed_hint
-import run.ostrom.app.resources.notifications_kind_turn_failed
-import run.ostrom.app.resources.notifications_kind_turn_failed_hint
-import run.ostrom.app.resources.notifications_kind_waiting
-import run.ostrom.app.resources.notifications_kind_waiting_hint
 import run.ostrom.app.resources.notifications_no_channel
 import run.ostrom.app.resources.notifications_note
 import run.ostrom.app.resources.notifications_quiet_hours
 import run.ostrom.app.resources.notifications_quiet_hours_range
-import run.ostrom.app.resources.notifications_requests
 import run.ostrom.app.resources.notifications_requests_section
 import run.ostrom.app.resources.notifications_save_failed
-import run.ostrom.app.resources.notifications_spending
 import run.ostrom.app.resources.notifications_test_button
 import run.ostrom.app.resources.notifications_test_hint
 import run.ostrom.app.resources.notifications_test_no_phone
@@ -78,11 +65,6 @@ import run.ostrom.app.resources.notifications_test_section
 import run.ostrom.app.resources.notifications_test_sent
 import run.ostrom.app.resources.notifications_test_undelivered
 import run.ostrom.app.resources.notifications_title
-import run.ostrom.app.resources.push_test_status_other
-import run.ostrom.app.resources.push_test_status_rejected
-import run.ostrom.app.resources.push_test_status_retry
-import run.ostrom.app.resources.push_test_status_sent
-import run.ostrom.app.resources.push_test_status_unregistered
 import run.ostrom.app.resources.settings_title
 
 /**
@@ -224,32 +206,4 @@ private fun PushTestPhone.words(number: Int): String {
     val status = stringResource(status.label())
     return visibleCode(error)?.let { stringResource(Res.string.notifications_test_phone_code, number, status, it) }
         ?: stringResource(Res.string.notifications_test_phone, number, status)
-}
-
-private fun PushTestStatus.label(): StringResource = when (this) {
-    PushTestStatus.SENT -> Res.string.push_test_status_sent
-    PushTestStatus.UNREGISTERED -> Res.string.push_test_status_unregistered
-    PushTestStatus.RETRY -> Res.string.push_test_status_retry
-    PushTestStatus.REJECTED -> Res.string.push_test_status_rejected
-    PushTestStatus.OTHER -> Res.string.push_test_status_other
-}
-
-private fun NotificationKind.title(): StringResource = when (this) {
-    NotificationKind.WAITING -> Res.string.notifications_kind_waiting
-    NotificationKind.TURN_COMPLETED -> Res.string.notifications_kind_turn_completed
-    NotificationKind.TURN_FAILED -> Res.string.notifications_kind_turn_failed
-    NotificationKind.SESSION_FAILED -> Res.string.notifications_kind_session_failed
-}
-
-private fun NotificationKind.hint(): StringResource = when (this) {
-    NotificationKind.WAITING -> Res.string.notifications_kind_waiting_hint
-    NotificationKind.TURN_COMPLETED -> Res.string.notifications_kind_turn_completed_hint
-    NotificationKind.TURN_FAILED -> Res.string.notifications_kind_turn_failed_hint
-    NotificationKind.SESSION_FAILED -> Res.string.notifications_kind_session_failed_hint
-}
-
-private fun NotificationToggle.label(): StringResource = when (this) {
-    NotificationToggle.REQUESTS -> Res.string.notifications_requests
-    NotificationToggle.DECISIONS -> Res.string.notifications_decisions
-    NotificationToggle.SPENDING -> Res.string.notifications_spending
 }

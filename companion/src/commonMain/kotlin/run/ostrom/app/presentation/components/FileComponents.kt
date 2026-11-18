@@ -22,10 +22,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -176,26 +176,3 @@ fun fileProblemText(problem: FileProblem): String = when (problem) {
     FileProblem.SessionGone -> stringResource(Res.string.file_problem_gone)
     is FileProblem.Other -> stringResource(Res.string.file_problem_other, problem.code ?: "error")
 }
-
-/** A size as `512 B`, `245 KB` or `1.2 MB` (powers of 1024), as the CLI words it. */
-fun sizeLabel(bytes: Long): String = when {
-    bytes >= 1024L * 1024 -> "${(bytes * 10 + 512 * 1024) / (1024 * 1024) / 10.0} MB"
-    bytes >= 1024 -> "${bytes / 1024} KB"
-    else -> "$bytes B"
-}
-
-/** The types a team takes, by their common names: `PNG, JPEG, PDF, text`. */
-fun typesLabel(types: List<String>): String = types.joinToString(", ") { TYPE_LABELS[it] ?: it }
-
-internal fun waitLabel(seconds: Long): String = when {
-    seconds >= 3600 -> "${(seconds + 1800) / 3600} h"
-    seconds >= 60 -> "${(seconds + 30) / 60} min"
-    else -> "$seconds s"
-}
-
-private fun isImage(name: String) = name.substringAfterLast('.', "").lowercase() in setOf("png", "jpg", "jpeg", "webp", "gif")
-
-private val TYPE_LABELS = mapOf(
-    "image/png" to "PNG", "image/jpeg" to "JPEG", "image/webp" to "WebP", "image/gif" to "GIF", "application/pdf" to "PDF",
-    "text/plain" to "text", "text/markdown" to "Markdown", "text/csv" to "CSV", "application/json" to "JSON",
-)

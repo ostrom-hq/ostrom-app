@@ -64,9 +64,6 @@ import run.ostrom.app.resources.todo_status_abandoned
 import run.ostrom.app.resources.todo_status_done
 import run.ostrom.app.resources.todo_unverified
 
-/** "4 / 9": the todo's counter. */
-fun todoCounter(todo: SessionTodo) = "${todo.done} / ${todo.total}"
-
 /**
  * A session's todo, kept current by the feed: the plan's reference, the counter and its bar, the item in progress, the
  * items in order with their state, end condition and last proof, those added along the way and those dropped (with
