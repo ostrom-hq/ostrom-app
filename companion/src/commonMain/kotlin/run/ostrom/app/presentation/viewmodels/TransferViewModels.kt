@@ -161,7 +161,7 @@ class TransfersViewModel(
 
     fun setDirection(direction: TransferDirection) {
         state.update { it.copy(direction = direction, error = null) }
-        if (state.value.lists[direction]?.loaded != true) refresh()
+        if (direction !in state.value.lists) refresh() // a list is only ever stored once read
     }
 
     /** The newest page of the shown direction again: a decision made elsewhere shows. */
@@ -203,7 +203,7 @@ class TransfersViewModel(
             try {
                 val page = transfers.page(route.accountId, direction, before)
                 state.update { s ->
-                    val list = s.lists[direction] ?: TransferListState()
+                    val list = s.lists.getValue(direction) // the cursor came from this direction's list, which is never removed
                     // A refresh meanwhile replaced the list: this page belongs to the old one.
                     if (list.nextBefore != before) return@update s.copy(loadingMore = false)
                     val known = list.transfers.map { it.id }.toSet()
@@ -218,7 +218,10 @@ class TransfersViewModel(
     }
 
     /** What the member may do with [transfer]. */
-    fun actions(transfer: SessionTransfer): Set<TransferAction> = account()?.let { TransferRules.actions(it, transfer) } ?: emptySet()
+    fun actions(transfer: SessionTransfer): Set<TransferAction> {
+        val account = account() ?: return emptySet()
+        return TransferRules.actions(account, transfer)
+    }
 
     fun accept(transfer: SessionTransfer) = decide(transfer, TransferAction.ACCEPT) { transfers.accept(route.accountId, transfer.id) }
     fun decline(transfer: SessionTransfer) = decide(transfer, TransferAction.DECLINE) { transfers.decline(route.accountId, transfer.id) }

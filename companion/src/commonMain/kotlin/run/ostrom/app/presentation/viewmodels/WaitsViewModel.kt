@@ -99,7 +99,7 @@ class WaitsViewModel(
     init {
         viewModelScope.launch {
             combine(accounts.accounts, accounts.activeAccountId) { list, id -> list.firstOrNull { it.id == id } }
-                .distinctUntilChanged { old, new -> old?.id == new?.id && old?.signedIn == new?.signedIn && old?.login == new?.login && old?.origin == new?.origin }
+                .distinctUntilChanged { old, new -> old.sameIdentity(new) }
                 .collect { account -> paging?.cancel(); paging = null; state.value = WaitsUiState(account = account); restart() }
         }
     }
@@ -162,8 +162,9 @@ class WaitsViewModel(
             try {
                 val page = loadWaits(account.id, filter.status, token)
                 state.update { now ->
-                    // The list moved on meanwhile (a reload from the feed, another filter): this page no longer follows it.
-                    if (now.filter != filter || now.shownNext != token) return@update now.copy(loadingMore = false)
+                    // The list moved on meanwhile (a reload from the feed): this page no longer follows it. Another filter cancels
+                    // this job (see [setFilter]), so only the cursor needs comparing.
+                    if (now.shownNext != token) return@update now.copy(loadingMore = false)
                     if (filter == WaitFilter.OPEN) now.copy(waits = now.waits.withMore(page.waits), nextBefore = page.nextBefore, loadingMore = false, error = false)
                     else now.copy(history = now.history.withMore(page.waits), historyNext = page.nextBefore, loadingMore = false, error = false)
                 }
@@ -181,6 +182,10 @@ class WaitsViewModel(
         state.update { it.copy(error = false) }
         viewModelScope.launch { try { reload(account.id) } catch (error: AppException.Unauthorized) { state.update { it.copy(error = true) } } }
     }
+
+    /** Both are the same account as far as this model shows it (a rename or a new server version changes nothing here). */
+    private fun Account?.sameIdentity(other: Account?): Boolean =
+        if (this == null || other == null) this == other else id == other.id && signedIn == other.signedIn && login == other.login && origin == other.origin
 
     private fun List<Wait>.withMore(more: List<Wait>): List<Wait> {
         val seen = mapTo(HashSet()) { it.id }
@@ -206,10 +211,9 @@ class WaitsViewModel(
         follow = viewModelScope.launch {
             try {
                 followWaits(account.id).collect { signal ->
-                    when (signal) {
-                        WaitsSignal.Reload -> reload(account.id)
-                        is WaitsSignal.Connection -> state.update { it.copy(reconnecting = signal.reconnecting) }
-                    }
+                    // Two signals only: an `if` rather than an exhaustive `when`, whose last arm keeps an unreachable no-match branch.
+                    if (signal is WaitsSignal.Connection) state.update { it.copy(reconnecting = signal.reconnecting) }
+                    else reload(account.id)
                 }
             } catch (error: CancellationException) {
                 throw error

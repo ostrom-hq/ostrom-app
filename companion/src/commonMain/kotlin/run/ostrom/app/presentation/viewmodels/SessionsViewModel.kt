@@ -85,7 +85,8 @@ class SessionsViewModel(
 
     /** The first page again; the older pages already read stay after it. */
     fun reload() {
-        val account = state.value.account?.takeIf { it.signedIn } ?: return
+        val account = state.value.account ?: return
+        if (!account.signedIn) return
         load?.cancel()
         state.update { it.copy(loading = true, loadingMore = false, error = null) }
         load = viewModelScope.launch { page(account.id, state.value.filter, before = null) }
@@ -94,9 +95,10 @@ class SessionsViewModel(
     /** The next page, once: a request already running is not doubled. */
     fun loadMore() {
         val current = state.value
-        val account = current.account?.takeIf { it.signedIn } ?: return
+        val account = current.account ?: return
+        if (!account.signedIn) return
         val before = current.next ?: return
-        if (load?.isActive == true) return
+        if (load!!.isActive) return // a cursor exists only once a page was read, which always went through [load]
         state.update { it.copy(loadingMore = true, error = null) }
         load = viewModelScope.launch { page(account.id, current.filter, before) }
     }
@@ -107,19 +109,22 @@ class SessionsViewModel(
         if (!started || account == null || !account.signedIn) return
         follow = viewModelScope.launch {
             try {
-                followSessions(account.id).collect { signal ->
-                    when (signal) {
-                        FeedSignal.Reload -> reload()
-                        is FeedSignal.Changed -> Unit
-                        is FeedSignal.Connection -> state.update { it.copy(reconnecting = signal.reconnecting) }
-                    }
-                }
+                followSessions(account.id).collect(::onSignal)
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Exception) {
                 // The follow ended (a refusal, a signed-out account): what is shown stays, a return loads again.
                 state.update { it.copy(reconnecting = false) }
             }
+        }
+    }
+
+    /** An event of the feed changes nothing here (the feed has no session event); a reload and the connection's state do. */
+    internal fun onSignal(signal: FeedSignal) {
+        when (signal) {
+            FeedSignal.Reload -> reload()
+            is FeedSignal.Changed -> Unit
+            is FeedSignal.Connection -> state.update { it.copy(reconnecting = signal.reconnecting) }
         }
     }
 

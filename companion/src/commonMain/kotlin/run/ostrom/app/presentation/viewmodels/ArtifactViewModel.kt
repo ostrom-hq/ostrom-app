@@ -56,6 +56,7 @@ class ArtifactViewModel(
     private val getArtifact: GetArtifactUseCase,
     private val openArtifact: OpenArtifactUseCase,
     private val embedded: Boolean,
+    private val timeSource: TimeSource = TimeSource.Monotonic,
 ) : ViewModel() {
     private val state = MutableStateFlow(ArtifactUiState(version = route.version))
     val uiState: StateFlow<ArtifactUiState> = state.asStateFlow()
@@ -77,8 +78,10 @@ class ArtifactViewModel(
                 val (artifact, versions, viewerUrl) = getArtifact(route.accountId, route.artifactId)
                 val version = state.value.version ?: artifact.latestVersion
                 // A version newer than every one listed was just announced (a list read a moment early): its ticket says.
-                if (versions.isNotEmpty() && versions.none { it.number == version } && version <= versions.maxOf { it.number }) throw AppException.NotFound()
-                val reopen = embedded && state.value.opened?.ticket?.version != version
+                val newest = versions.maxOfOrNull { it.number }
+                if (newest != null && versions.none { it.number == version } && version <= newest) throw AppException.NotFound()
+                val opened = state.value.opened
+                val reopen = embedded && (opened == null || opened.ticket.version != version)
                 state.update { it.copy(artifact = artifact, viewerUrl = viewerUrl, versions = versions, version = version, loading = reopen) }
                 if (reopen) open(version)
             } catch (error: CancellationException) {
@@ -90,7 +93,7 @@ class ArtifactViewModel(
     }
 
     fun start() {
-        if (watch?.isActive == true) return
+        if (watch != null) return // [stop] clears it: a watch only ends there
         watch = viewModelScope.launch {
             while (true) {
                 delay(WATCH_MILLIS)
@@ -158,8 +161,9 @@ class ArtifactViewModel(
 
     /** True when a silent reload already happened within a minute (so a failing page never loops); marks this one otherwise. */
     private fun recentlyRenewed(): Boolean {
-        if (renewedAt?.let { it.elapsedNow() < RENEWAL_WINDOW } == true) return true
-        renewedAt = TimeSource.Monotonic.markNow()
+        val mark = renewedAt
+        if (mark != null && mark.elapsedNow() < RENEWAL_WINDOW) return true
+        renewedAt = timeSource.markNow()
         return false
     }
 
