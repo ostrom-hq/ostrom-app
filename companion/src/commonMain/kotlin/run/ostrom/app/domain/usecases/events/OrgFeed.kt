@@ -56,7 +56,7 @@ class OrgFeed(
         var followers = 0
         var open = false
         var end: Element.End? = null
-        var job: Job? = null
+        lateinit var job: Job
         var closing: Job? = null
     }
 
@@ -113,9 +113,10 @@ class OrgFeed(
         connection.closing = scope.launch {
             delay(lingerMillis)
             lock.withLock {
-                if (connection.followers > 0 || connections[accountId] !== connection) return@launch
+                // A follower back meanwhile cancelled this under the lock; a stream that ended may have made way for a new connection.
+                if (connections[accountId] !== connection) return@launch
                 connections.remove(accountId)
-                connection.job?.cancel()
+                connection.job.cancel()
             }
         }
     }

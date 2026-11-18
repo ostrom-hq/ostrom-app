@@ -39,18 +39,19 @@ class CompleteSignInUseCase(
         }
         val existing = accounts.accounts.value.firstOrNull { it.origin == server.origin && it.login == session.login }
         val organization = organizationOf(server.origin, session.token)
+        val organizationId = if (organization != null) organization.id else existing?.organizationId
         val account = Account(
-            id = existing?.id ?: ids.newId(),
+            id = if (existing != null) existing.id else ids.newId(),
             origin = server.origin,
             login = session.login,
             name = session.name,
-            organizationId = organization?.id ?: existing?.organizationId,
-            organizationName = organization?.name ?: existing?.organizationName,
+            organizationId = organizationId,
+            organizationName = if (organization != null) organization.name else existing?.organizationName,
             expiresAt = session.expiresAt,
             serverVersion = capabilities.serverVersion,
             method = method,
             // The same membership while the organization is the same: the pushes name it.
-            memberId = existing?.memberId?.takeIf { existing.organizationId == (organization?.id ?: existing.organizationId) },
+            memberId = existing?.memberId?.takeIf { existing.organizationId == organizationId },
         )
         val replaced = existing?.let { readQuietly(it.id) }
         // The token first: an account is never listed as signed in without its credential.

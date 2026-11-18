@@ -68,7 +68,8 @@ object ReceiptKeyPinning {
             for ((candidate, key) in candidates) {
                 val rotation = candidate.rotation ?: continue
                 if (key.kid in trusted) continue
-                val by = trusted[rotation.kid]?.let(::publicKeyOf) ?: continue
+                // A pin is this app's own hex of a key it read (checked above): it reads back as one.
+                val by = ReceiptPublicKey.fromRaw((trusted[rotation.kid] ?: continue).hexToBytes())
                 if (!verifyRotation(key, rotation.signature, by)) continue
                 trusted[key.kid] = key.toRaw().toHex()
                 grew = true
@@ -76,12 +77,6 @@ object ReceiptKeyPinning {
         }
         val keys = candidates.map { it.second }.filter { trusted[it.kid] == it.toRaw().toHex() }.distinctBy { it.kid }
         return Trust(keys, trusted, changed = trusted.size > kept.size)
-    }
-
-    private fun publicKeyOf(rawHex: String): ReceiptPublicKey? = try {
-        ReceiptPublicKey.fromRaw(rawHex.hexToBytes())
-    } catch (_: Exception) {
-        null
     }
 }
 

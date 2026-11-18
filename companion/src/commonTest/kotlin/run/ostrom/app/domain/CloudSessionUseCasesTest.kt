@@ -200,6 +200,7 @@ class CloudSessionUseCasesTest {
         assertEquals(CloudSessionProblem.TOO_MANY,
             problem(NewCloudSession(CloudAgent.CLAUDE, recipe = CloudRecipe(List(17) { CloudRepository("https://github.com/acme/r$it") }))))
         assertEquals(CloudSessionProblem.TOO_MANY, problem(NewCloudSession(CloudAgent.CLAUDE, recipe = CloudRecipe(setupStart = List(17) { "echo $it" }))))
+        assertEquals(CloudSessionProblem.TOO_MANY, problem(NewCloudSession(CloudAgent.CLAUDE, recipe = CloudRecipe(setupCreate = List(17) { "echo $it" }))))
         assertEquals(CloudSessionProblem.VARIABLES, problem(NewCloudSession(CloudAgent.CLAUDE, recipe = CloudRecipe(requiredVariables = listOf("lower")))))
         assertEquals(CloudSessionProblem.VARIABLES, problem(NewCloudSession(CloudAgent.CLAUDE, recipe = CloudRecipe(requiredVariables = listOf("A", "A")))))
         assertEquals(CloudSessionProblem.VARIABLES, problem(NewCloudSession(CloudAgent.CLAUDE, recipe = CloudRecipe(requiredVariables = List(65) { "V$it" }))))

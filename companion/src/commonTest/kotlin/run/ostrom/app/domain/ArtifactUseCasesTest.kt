@@ -98,6 +98,9 @@ class ArtifactUseCasesTest {
         assertEquals("invalid_ticket", assertFailsWith<AppException.Server> { open("a1", id, null) }.code)
         artifacts.tickets = { _, _ -> ArtifactTicket("other", 2, "$content/a/other/t/", null) }
         assertFailsWith<AppException.Server> { open("a1", id, null) }
+        // A ticket for another version than the one asked.
+        artifacts.tickets = { a, _ -> ArtifactTicket(a, 3, "$content/a/$a/t/", null) }
+        assertEquals("invalid_ticket", assertFailsWith<AppException.Server> { open("a1", id, 2) }.code)
         artifacts.tickets = { a, _ -> ArtifactTicket(a, 2, "$content/a/$a/t/", null) }
         assertFailsWith<AppException.Server> { open("a1", id, 3) }
         assertFailsWith<AppException.NotFound> { open("a1", "../x", null) }

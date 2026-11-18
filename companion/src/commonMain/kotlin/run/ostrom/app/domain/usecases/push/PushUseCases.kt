@@ -144,8 +144,8 @@ class ShareSignedInAccountsUseCase(
  * keeps its language and region, anything else is left out rather than refusing the whole registration.
  */
 internal fun pushLocale(tag: String?): String? {
-    val parts = tag?.trim()?.split('-', '_')
-        ?.takeIf { it.first().length in 2..3 && it.first().all(Char::isLetter) && !it.first().equals(UNDETERMINED, ignoreCase = true) }
+    val parts = tag.orEmpty().trim().split('-', '_')
+        .takeIf { it.first().length in 2..3 && it.first().all(Char::isLetter) && !it.first().equals(UNDETERMINED, ignoreCase = true) }
         ?: return null
     val kept = listOf(parts.first()) + parts.drop(1).takeWhile { it.length in 2..8 && it.all(Char::isLetterOrDigit) }.take(2)
     return kept.joinToString("-").takeIf { LOCALE.matches(it) }

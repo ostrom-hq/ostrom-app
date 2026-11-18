@@ -100,4 +100,20 @@ class TransferUseCasesTest {
         assertEquals(mapOf("m2" to "grace", "m1" to "ada"), list.names("a1"))
         assertEquals(emptyMap(), TransferListUseCase(transfers, accountsOf(), fakeGuard()).names("a1"))
     }
+
+    @Test fun nothingIsOfferedForAnAccountThatIsGoneOrSignedOutOrASessionItCannotTransfer() = runTest {
+        val none = TransferAvailabilityUseCase(accounts(), features)
+        assertFalse(none.available("a1"))
+        assertFalse(none.canTransfer("a1", cloudSession("s1", ownerId = "m1")))
+        assertFalse(TransferAvailabilityUseCase(accountsOf(member().copy(signedIn = false)), features).canTransfer("a1", cloudSession("s1", ownerId = "m1")))
+        assertFalse(TransferAvailabilityUseCase(accountsOf(member()), features).canTransfer("a1", cloudSession("s1", ownerId = "m9")))
+    }
+
+    @Test fun recipientsAndTransfersOfAnAccountThatIsGoneAreRefused() = runTest {
+        assertFailsWith<AppException.Unauthorized> { LoadRecipientsUseCase(transfers, accounts(), fakeGuard())("a1", "m1") }
+        assertFailsWith<AppException.Unauthorized> {
+            TransferSessionUseCase(transfers, features, accounts(), fakeGuard())("a1", "s1", "m1", TransferRequest("m2"), "k1")
+        }
+        assertTrue(transfers.calls.isEmpty())
+    }
 }

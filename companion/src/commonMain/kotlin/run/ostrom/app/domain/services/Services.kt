@@ -51,7 +51,7 @@ interface PlatformInfo {
     val defaultDeviceName: String
         get() = "Ostrom $platform · $deviceModel".filterNot { it.isISOControl() }.trim().take(MAX_DEVICE_NAME)
             // Never half of a character outside the BMP (an emoji in a host name).
-            .let { if (it.lastOrNull()?.isHighSurrogate() == true) it.dropLast(1) else it }.trimEnd()
+            .let { if (it.last().isHighSurrogate()) it.dropLast(1) else it }.trimEnd()
 }
 
 private val REPORTED_PLATFORMS = setOf("ios", "android", "macos", "windows", "linux")

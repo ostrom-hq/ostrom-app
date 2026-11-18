@@ -113,8 +113,12 @@ object WorkflowChecks {
         val maxNodes = draft.limits.maxNodes ?: DEFAULT_NODES
         if (limitsOk && nodes.size > maxNodes) sink.add(ProblemRule.TOO_MANY_NODES, maxNodes.toString())
         ids.groupBy { it }.filter { it.value.size > 1 }.keys.forEach { sink.at(it, ProblemRule.NODE_DUPLICATE, it) }
-        draft.edges.filter { it.to != null && it.to !in ids }.forEach { sink.at(it.from.takeIf { from -> from in ids }, ProblemRule.TRANSITION_TARGET, it.from, it.to.orEmpty()) }
-        val start = draft.first ?: return
+        for (edge in draft.edges) {
+            val to = edge.to ?: continue
+            if (to !in ids) sink.at(edge.from.takeIf { it in ids }, ProblemRule.TRANSITION_TARGET, edge.from, to)
+        }
+        // Played by the server, so it has a step: the start, else the first one.
+        val start = draft.start ?: nodes.first().id
         val first = draft.node(start)
         if (first == null) {
             sink.add(ProblemRule.START_MISSING, start)
@@ -143,8 +147,8 @@ object WorkflowChecks {
         if (node.title.trim().length !in 1..MAX_TITLE) sink.add(ProblemRule.TITLE, MAX_TITLE.toString())
         if ((node.maxVisits ?: 1) !in 1..MAX_NODE_VISITS) sink.add(ProblemRule.MAX_VISITS, MAX_NODE_VISITS.toString())
         templates(node).flatMap(::placeholders).distinct().forEach { name ->
-            val input = inputRef.matchEntire(name)?.groupValues?.get(1)
-            val other = nodeRef.matchEntire(name)?.groupValues?.get(1)
+            val input = inputRef.matchEntire(name)?.let { it.groupValues[1] }
+            val other = nodeRef.matchEntire(name)?.let { it.groupValues[1] }
             val known = when {
                 input != null -> input in inputs
                 other != null -> other in ids && other != node.id

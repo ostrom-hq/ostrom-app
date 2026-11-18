@@ -163,7 +163,7 @@ fun checkNewCloudSession(form: NewCloudSession, recipeServed: Boolean, conversat
     // A conversation only where the server runs one, and only for an agent it runs headless; a terminal otherwise.
     val mode = if (conversationServed && form.agent in CloudSessionRules.CONVERSATION_AGENTS) form.mode else CloudSessionMode.TERMINAL
     val base = NewCloudSession(form.agent, name = name, model = form.model.orNull(), prompt = prompt, mode = mode)
-    val recipe = form.recipe?.takeIf { recipeServed }?.tidy()?.takeIf { !it.empty }
+    val recipe = form.recipe?.takeIf { recipeServed }?.let { given -> given.tidy().takeIf { !it.empty } }
     if (recipe != null) {
         val commands = recipe.setupCreate + recipe.setupStart
         if (recipe.repositories.size > CloudSessionRules.MAX_REPOSITORIES || recipe.setupCreate.size > CloudSessionRules.MAX_COMMANDS ||
@@ -183,7 +183,7 @@ fun checkNewCloudSession(form: NewCloudSession, recipeServed: Boolean, conversat
     return base.copy(repo = repo, ref = form.ref.orNull())
 }
 
-private fun String?.orNull(): String? = this?.trim()?.takeIf { it.isNotEmpty() }
+private fun String?.orNull(): String? = orEmpty().trim().ifEmpty { null }
 
 private fun CloudRecipe.tidy() = CloudRecipe(
     // Only a row left wholly empty is dropped; one with a directory, ref or branch but no address is kept, and refused.

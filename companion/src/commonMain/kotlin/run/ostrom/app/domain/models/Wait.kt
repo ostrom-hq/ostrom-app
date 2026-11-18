@@ -112,11 +112,16 @@ data class Wait(
     val status: WaitStatus get() = if (open) WaitStatus.OPEN else if (cancelled) WaitStatus.CANCELLED else WaitStatus.RESOLVED
 
     /** The action chosen, in the words of the wait's own action. */
-    val answerActionLabel: String? get() = answer?.let { given -> actions.firstOrNull { it.id == given.action }?.label ?: given.action }
+    val answerActionLabel: String?
+        get() {
+            val given = answer ?: return null
+            val action = actions.firstOrNull { it.id == given.action } ?: return given.action
+            return action.label
+        }
 
     /** The values given, one line per field in the wait's order (a value of a field the wait no longer shows keeps its id). */
     fun answerLines(): List<AnswerLine> {
-        val values = answer?.values ?: return emptyList()
+        val values = (answer ?: return emptyList()).values
         val known = fields.filter { it.id in values && it.type != FieldType.INFO }.map { field -> AnswerLine(field.label, values.getValue(field.id).shown(field)) }
         val unknown = values.filterKeys { id -> fields.none { it.id == id } }.map { (id, value) -> AnswerLine(id, value.shown(null)) }
         return known + unknown
@@ -135,10 +140,13 @@ sealed interface AnswerValue {
 
 private fun JsonElement.shown(field: WaitField?): AnswerValue {
     if (field?.type == FieldType.SECRET) return AnswerValue.Secret((this as? JsonPrimitive)?.content == "provided")
-    fun label(value: String) = field?.options?.firstOrNull { it.value == value }?.label ?: value
+    fun label(value: String): String {
+        val option = field?.options.orEmpty().firstOrNull { it.value == value } ?: return value
+        return option.label
+    }
     return when (this) {
         is JsonPrimitive -> if (!isString && (content == "true" || content == "false")) AnswerValue.Flag(content == "true") else AnswerValue.Words(label(content))
-        is JsonArray -> AnswerValue.Words(joinToString(", ") { (it as? JsonPrimitive)?.content?.let(::label) ?: it.toString() })
+        is JsonArray -> AnswerValue.Words(joinToString(", ") { if (it is JsonPrimitive) label(it.content) else it.toString() })
         else -> AnswerValue.Words(toString())
     }
 }

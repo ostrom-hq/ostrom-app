@@ -24,6 +24,7 @@ import run.ostrom.app.domain.usecases.auth.AccountGuard
 import run.ostrom.core.receipts.ReceiptPublicKey
 import run.ostrom.core.receipts.ReceiptVerification
 import run.ostrom.core.receipts.ReceiptVerificationFailure
+import run.ostrom.core.receipts.ReceiptVerifier
 import run.ostrom.core.receipts.ReceiptVerifierImpl
 
 /** A page of receipts, the first one when [before] is null; [AppException.Unsupported] from a server without receipts. */
@@ -61,7 +62,7 @@ class TrustedReceiptKeysUseCase(
     private val dispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) {
     suspend operator fun invoke(accountId: String): List<ReceiptPublicKey> = guard(accountId) {
-        val origin = accounts.find(accountId)?.origin ?: throw AppException.Unauthorized()
+        val origin = (accounts.find(accountId) ?: throw AppException.Unauthorized()).origin
         val served = receipts.keys(accountId)
         val kept = try {
             pins.read(origin)
@@ -94,7 +95,7 @@ class CheckReceiptsUseCase(private val dispatcher: CoroutineDispatcher = Dispatc
 }
 
 /** What this device finds of one receipt's signature; [NoKey][ReceiptCheck.NoKey] when no key is trusted. */
-internal fun checkReceipt(raw: JsonObject, anyKey: Boolean, verifier: ReceiptVerifierImpl): ReceiptCheck {
+internal fun checkReceipt(raw: JsonObject, anyKey: Boolean, verifier: ReceiptVerifier): ReceiptCheck {
     if (!anyKey) return ReceiptCheck.NoKey
     val result = try {
         verifier.verify(raw)

@@ -89,7 +89,7 @@ sealed class AppException(message: String) : Exception(message) {
     )
     /** The server refused a transfer of a cloud session or a decision on one, with its error key [code] (`transfer_pending`, `recipient_ineligible`...). */
     class TransferRefused(val code: String) :
-        AppException("The server refused the transfer" + (visibleCode(code)?.let { " ($it)" } ?: "") + ".")
+        AppException(withCode("The server refused the transfer", code))
     /** The transfer form breaks [problem]: nothing was sent. */
     class TransferInvalid(val problem: TransferProblem) : AppException(
         when (problem) {
@@ -140,7 +140,7 @@ sealed class AppException(message: String) : Exception(message) {
             "device_no_answer" -> "The device did not answer in time. Try again."
             "resume_unsupported" -> "Only a Claude Code session continues a conversation of the device."
             "invalid_resume" -> "Choose one of the conversations the device listed."
-            else -> "The server refused to start the session on this device" + (visibleCode(code)?.let { " ($it)" } ?: "") + "."
+            else -> withCode("The server refused to start the session on this device", code)
         },
     ) {
         companion object {
@@ -167,10 +167,10 @@ sealed class AppException(message: String) : Exception(message) {
      * check made here, such as `file_integrity_failed`), or the file could not be read (`file_unreadable`).
      */
     class FileRefused(val code: String?, val statusCode: Int, val retryAfterSeconds: Long? = null) :
-        AppException("The file was refused" + (visibleCode(code)?.let { " ($it)" } ?: "") + ".")
+        AppException(withCode("The file was refused", code))
     /** The server refused with [code] (its stable error key, shown only when it is one) and [statusCode]. */
     class Server(val statusCode: Int, val code: String?) :
-        AppException("The server returned HTTP $statusCode" + (visibleCode(code)?.let { " ($it)" } ?: "") + ".")
+        AppException(withCode("The server returned HTTP $statusCode", code))
 }
 
 /** Error codes are short snake_case identifiers; anything else from the server is not shown. */
@@ -178,6 +178,12 @@ private val CODE = Regex("[a-z][a-z0-9_]{0,63}")
 
 /** [code] when it is safe to show, null otherwise. */
 fun visibleCode(code: String?): String? = code?.takeIf { it.matches(CODE) }
+
+/** [text] as a sentence, naming [code] in brackets when it is a stable key. */
+private fun withCode(text: String, code: String?): String {
+    val shown = visibleCode(code) ?: return "$text."
+    return "$text ($shown)."
+}
 
 /** Why an `ostrom://open?url=` link is not opened. */
 enum class LinkRefusal {

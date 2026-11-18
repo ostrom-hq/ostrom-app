@@ -66,7 +66,7 @@ data class NewDeviceSession(
     val resumeSessionId: String? = null,
 ) {
     fun normalized(): NewDeviceSession = copy(
-        name = name.trim(), model = model?.trim()?.ifEmpty { null }, effort = effort?.trim()?.ifEmpty { null },
+        name = name.trim(), model = model.orEmpty().trim().ifEmpty { null }, effort = effort.orEmpty().trim().ifEmpty { null },
         initialMessage = initialMessage?.takeIf { it.isNotBlank() }, resumeSessionId = resumeSessionId?.takeIf { agent == "claude" },
     )
 }
