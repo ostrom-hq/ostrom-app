@@ -275,10 +275,11 @@ class CloudSessionViewModel(
                 val announced = if (talks) conversation.control.options(route.accountId) else ConversationOptions()
                 state.update {
                     // A read that started before an action's answer is older than it: the action's session stays.
-                    val shown = if (asked == actions || it.session == null) session else it.session
+                    // (An action's answer always sets the session, so one is there whenever [actions] moved.)
+                    val shown = if (asked == actions) session else it.session!!
                     it.copy(
                         session = shown, loading = false, gone = false, githubAccessOffered = offered, options = announced, canControl = owns(shown),
-                        memberId = conversation?.accounts?.find(route.accountId)?.memberId,
+                        memberId = if (conversation != null) conversation.accounts.find(route.accountId)?.memberId else null,
                     )
                 }
                 if (talks && announced.conversation && started) startConversation()
@@ -350,21 +351,22 @@ class CloudSessionViewModel(
     /** Bumped by each action's answer: a header read that started before it is older and is dropped. */
     private var actions = 0
 
-    private fun owns(session: CloudSession?): Boolean {
+    private fun owns(session: CloudSession): Boolean {
         val uses = conversation ?: return false
-        return session != null && ControlConversationUseCase.canControl(uses.accounts.find(route.accountId)?.memberId, session)
+        return ControlConversationUseCase.canControl(uses.accounts.find(route.accountId)?.memberId, session)
     }
 
     private fun startConversation() {
         val uses = conversation ?: return
         files?.load()
         // The transcript does not carry pauses, resumes or a failed pod: the header is read again while visible.
-        if (header?.isActive != true) header = viewModelScope.launch {
+        if (header == null) header = viewModelScope.launch {
             while (true) {
                 delay(HEADER_MILLIS)
                 // An ended session no longer changes: nothing to read.
                 val current = state.value
-                if (current.gone || current.session?.status?.ended == true) continue
+                // (The header only runs once the record was read, so a session is there.)
+                if (current.gone || current.session!!.status.ended) continue
                 refreshSessionQuietly()
             }
         }
@@ -431,8 +433,7 @@ class CloudSessionViewModel(
         viewModelScope.launch {
             try {
                 transcriptLock.withLock {
-                    // Another page may have arrived meanwhile.
-                    if (state.value.transcript.nextBefore != before) return@withLock
+                    // (No other page of the main thread can arrive meanwhile: the in-flight flag lets one load run at a time.)
                     val page = uses.loadTranscript(route.accountId, route.sessionId, before, if (state.value.feeds) MAIN_FEED else null)
                     state.update { it.copy(transcript = it.transcript.withOlder(page)) }
                 }
@@ -460,9 +461,7 @@ class CloudSessionViewModel(
         viewModelScope.launch {
             try {
                 transcriptLock.withLock {
-                    // Another page may have arrived meanwhile.
-                    val now = state.value.transcript.feeds
-                    if ((feed in now) != read || now[feed] != before && read) return@withLock
+                    // (No other page of this feed can arrive meanwhile: its id is in [loadingFeeds] until this load ends.)
                     val page = uses.loadTranscript(route.accountId, route.sessionId, before, feed)
                     state.update { it.withTranscript(it.transcript.withFeed(feed, page)) }
                 }
@@ -496,7 +495,7 @@ class CloudSessionViewModel(
      * one runs asks for one more read after it, a second later at the earliest: a burst of events costs two reads, not one each.
      */
     private fun refreshAgents() {
-        val uses = conversation ?: return
+        val uses = conversation!! // only called while following, which needs a conversation
         if (!state.value.feeds) return
         if (agentsJob?.isActive == true) { agentsAgain = true; return }
         agentsJob = viewModelScope.launch {
@@ -533,7 +532,7 @@ class CloudSessionViewModel(
         }
         // A new message replaces what the last action said (a refused draft, nothing to interrupt).
         state.update { it.copy(draft = "", pending = it.pending + message, notice = null) }
-        if (attached.isNotEmpty()) files?.clear()
+        if (attached.isNotEmpty()) files!!.clear() // the files to send came from [files]
         deliver(message)
     }
 
@@ -562,7 +561,7 @@ class CloudSessionViewModel(
     }
 
     private fun deliver(message: PendingMessage) {
-        val uses = conversation ?: return
+        val uses = conversation!! // a message exists only with a conversation
         viewModelScope.launch {
             val result = uses.sendMessage(route.accountId, route.sessionId, message)
             state.update { current ->
@@ -761,7 +760,7 @@ class CloudSessionViewModel(
     }
 
     private fun deliverAnswer(card: PermissionCard, answer: PermissionAnswer) {
-        val uses = conversation ?: return
+        val uses = conversation!! // a card exists only with a conversation
         val requestId = card.requestId
         // The same answer keeps its key; another one (an edit, Deny after a failed Send) gets a new one.
         val key = card.draft.key?.takeIf { card.draft.sending == answer } ?: uses.answerPermission.key()
@@ -788,7 +787,7 @@ class CloudSessionViewModel(
     }
 
     /** A refusal in words: the server's error key when it is one, never its message. */
-    private fun refusal(outcome: AnswerOutcome.Refused): Failure = (outcome.code?.let { AppException.Server(HTTP_FORBIDDEN, it) } ?: AppException.Server(HTTP_FORBIDDEN, null)).userMessage()
+    private fun refusal(outcome: AnswerOutcome.Refused): Failure = AppException.Server(HTTP_FORBIDDEN, outcome.code).userMessage()
 
     private fun PermissionDraft.edited() = copy(state = AnswerState.EDITING, sending = null, key = null, reason = null)
 

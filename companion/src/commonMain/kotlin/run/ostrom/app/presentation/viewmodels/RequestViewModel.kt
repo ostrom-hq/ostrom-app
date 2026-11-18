@@ -53,10 +53,11 @@ data class RequestUiState(
     /** The problem said under the request; a change always wins. */
     val shownProblem: DecisionProblem? get() = if (changed) DecisionProblem.CHANGED else problem
 
-    val open: Boolean get() = approval?.open == true
-    val askedByMe: Boolean get() = approval?.viewer?.self == true
+    // `a != null && a.x` rather than `a?.x == true`: the viewer of a request is never null, so a chained `?.` would keep a null check no state reaches.
+    val open: Boolean get() = approval != null && approval.open
+    val askedByMe: Boolean get() = approval != null && approval.viewer.self
     val noApprove: NoApprove? get() = approval?.noApprove
-    val mayApprove: Boolean get() = approval?.mayApprove == true
+    val mayApprove: Boolean get() = approval != null && approval.mayApprove
 }
 
 /**
@@ -72,7 +73,8 @@ class RequestViewModel(
 ) : ViewModel() {
     private val state = MutableStateFlow(RequestUiState(consoleUrl = consoleUrl()))
     val uiState: StateFlow<RequestUiState> = state.asStateFlow()
-    private var reading: Job? = null
+    // Starts completed (never null): the first read replaces it, so no reader has to test for "no read yet".
+    private var reading: Job = Job().apply { complete() }
 
     init {
         load()
@@ -80,7 +82,7 @@ class RequestViewModel(
 
     /** Reads the request again; never while an answer is on its way (its own result is read after it). */
     fun load() {
-        if (state.value.sending != null || reading?.isActive == true) return
+        if (state.value.sending != null || reading.isActive) return
         reading = viewModelScope.launch { read() }
     }
 
@@ -99,7 +101,7 @@ class RequestViewModel(
 
     /** The person read the request as it is now: answers are bound to this reading. */
     fun reread() {
-        state.update { current -> current.copy(pinned = current.approval?.reading ?: current.pinned, problem = null, consoleFailed = false) }
+        state.update { current -> current.copy(pinned = current.approval.let { if (it != null) it.reading else current.pinned }, problem = null, consoleFailed = false) }
     }
 
     fun startDecline() = state.update { it.copy(declining = true) }
@@ -112,14 +114,18 @@ class RequestViewModel(
     fun approve(prompt: String) = send(ApprovalAnswer.APPROVE, null, prompt)
 
     /** Says no with the reason typed; nothing goes without one. */
-    fun decline(prompt: String) = send(ApprovalAnswer.REJECT, state.value.reason, prompt)
+    fun decline(prompt: String) {
+        val reason = state.value.reason
+        if (reason.isBlank()) return
+        send(ApprovalAnswer.REJECT, reason, prompt)
+    }
 
     private fun send(choice: ApprovalAnswer, note: String?, prompt: String) {
         val current = state.value
         val approval = current.approval ?: return
-        if (current.sending != null || current.changed || current.pinned == null) return
-        if (choice == ApprovalAnswer.REJECT && note.isNullOrBlank()) return
-        reading?.cancel()
+        // The approval and the pinned reading are always set together, so no state has an approval without its pinned reading.
+        if (current.sending != null || current.changed) return
+        reading.cancel()
         state.update { it.copy(sending = choice, problem = null, consoleFailed = false) }
         viewModelScope.launch {
             val result = try {

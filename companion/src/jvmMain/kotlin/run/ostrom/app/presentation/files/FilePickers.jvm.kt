@@ -79,20 +79,19 @@ actual fun FileDropArea(enabled: Boolean, onDropped: (List<PickedFile>) -> Unit,
             override fun onEnded(event: DragAndDropEvent) { dropping = false }
             override fun onDrop(event: DragAndDropEvent): Boolean {
                 dropping = false
-                val files = droppedFiles(event) ?: return false
+                val files = droppedFileList(event.awtTransferable) ?: return false
                 dropped(desktopFiles(files))
                 return true
             }
         }
     }
-    Box(if (enabled) modifier.dragAndDropTarget(shouldStartDragAndDrop = { droppedFiles(it) != null }, target = target) else modifier) {
+    Box(if (enabled) modifier.dragAndDropTarget(shouldStartDragAndDrop = { droppedFileList(it.awtTransferable) != null }, target = target) else modifier) {
         content(enabled && dropping)
     }
 }
 
-@OptIn(ExperimentalComposeUiApi::class)
-private fun droppedFiles(event: DragAndDropEvent): List<File>? = try {
-    val transferable = event.awtTransferable
+/** The files a drop carries, null when it carries anything else (or cannot be read). */
+internal fun droppedFileList(transferable: Transferable): List<File>? = try {
     if (!transferable.isDataFlavorSupported(DataFlavor.javaFileListFlavor)) null
     else (transferable.getTransferData(DataFlavor.javaFileListFlavor) as? List<*>)?.filterIsInstance<File>()
 } catch (_: Exception) {

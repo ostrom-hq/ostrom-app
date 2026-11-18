@@ -54,15 +54,16 @@ class WorkflowRunsViewModel(
     val uiState: StateFlow<WorkflowRunsUiState> = state.asStateFlow()
     private var started = false
     private var follow: Job? = null
-    private var load: Job? = null
+    // Never null: a cursor only exists once a page was asked, so "a read is on its way" is a plain question of the last one.
+    private var load: Job = Job().apply { complete() }
     private var pendingReload: Job? = null
 
     init {
         viewModelScope.launch {
             val accountIds = if (of != null) flowOf(of.accountId)
-            else combine(accounts.accounts, accounts.activeAccountId) { list, id -> list.firstOrNull { it.id == id }?.takeIf(Account::signedIn)?.id }
+            else combine(accounts.accounts, accounts.activeAccountId) { list, id -> list.firstOrNull { it.id == id && it.signedIn }?.id }
             accountIds.distinctUntilChanged().collect { accountId ->
-                load?.cancel()
+                load.cancel()
                 state.value = WorkflowRunsUiState(accountId = accountId, filter = state.value.filter)
                 restart()
             }
@@ -87,7 +88,7 @@ class WorkflowRunsViewModel(
     /** The first page again; the latest load wins. */
     fun reload() {
         val accountId = state.value.accountId ?: return
-        load?.cancel()
+        load.cancel()
         state.update { it.copy(loading = true, loadingMore = false, error = null) }
         load = viewModelScope.launch { page(accountId, state.value.filter, before = null) }
     }
@@ -96,7 +97,7 @@ class WorkflowRunsViewModel(
         val current = state.value
         val accountId = current.accountId ?: return
         val before = current.next ?: return
-        if (load?.isActive == true) return
+        if (load.isActive) return
         state.update { it.copy(loadingMore = true, error = null) }
         load = viewModelScope.launch { page(accountId, current.filter, before) }
     }

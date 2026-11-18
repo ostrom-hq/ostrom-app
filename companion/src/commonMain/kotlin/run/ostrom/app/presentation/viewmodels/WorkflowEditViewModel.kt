@@ -94,7 +94,7 @@ class WorkflowEditViewModel(
             val others = async { optional { loadWorkflows(route.accountId) } }
             try {
                 val editing = route.workflowId?.let { loadEditable(route.accountId, it) }
-                val draft = editing?.draft ?: state.value.draft
+                val draft = if (editing != null) editing.draft else state.value.draft
                 val catalogue = others.await()
                 state.update {
                     it.copy(

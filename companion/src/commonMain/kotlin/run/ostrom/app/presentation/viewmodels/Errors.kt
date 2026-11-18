@@ -116,9 +116,10 @@ fun Failure.words(): String = resource?.let { stringResource(it, *args.toTypedAr
 
 /** The sentence shown for a failure: the domain's own messages, never a server-provided text. */
 internal fun Throwable.userMessage(): Failure = when (this) {
-    is AppException.RateLimited -> retryAfterSeconds?.let { Failure("Too many attempts. Try again in $it s.", Res.string.error_rate_limited_in, listOf(it)) }
-        ?: Failure(message ?: GENERIC, Res.string.error_rate_limited)
-    is AppException -> sentence().let { (resource, args) -> Failure(message ?: GENERIC, resource, args) }
+    is AppException ->
+        if (this is AppException.RateLimited && retryAfterSeconds != null) Failure("Too many attempts. Try again in $retryAfterSeconds s.", Res.string.error_rate_limited_in, listOf(retryAfterSeconds))
+        // An AppException always carries its message.
+        else sentence().let { (resource, args) -> Failure(message!!, resource, args) }
     is IllegalArgumentException -> message?.let { Failure(it) } ?: Failure("Check what you entered.", Res.string.error_check_input)
     else -> Failure(GENERIC, Res.string.error_generic)
 }
@@ -176,7 +177,7 @@ private fun AppException.sentence(): Pair<StringResource, List<Any>> = when (thi
         CloudSessionRefusal.GITHUB_OWNER_ONLY -> Res.string.error_cloud_github_owner_only
         CloudSessionRefusal.GITHUB_NOT_PAUSED -> Res.string.error_cloud_github_not_paused
     } to emptyList()
-    is AppException.FileRefused -> visibleCode(code)?.let { Res.string.error_file_refused_code to listOf<Any>(it) } ?: (Res.string.error_file_refused to emptyList())
+    is AppException.FileRefused -> visibleCode(code).let { shown -> if (shown != null) Res.string.error_file_refused_code to listOf<Any>(shown) else Res.string.error_file_refused to emptyList() }
     is AppException.TransferRefused -> visibleCode(code)?.let { Res.string.transfer_refused_other to listOf<Any>(it) } ?: (Res.string.error_transfer_refused to emptyList())
     is AppException.TransferInvalid -> when (problem) {
         TransferProblem.RECIPIENT -> Res.string.error_transfer_recipient

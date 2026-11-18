@@ -74,12 +74,15 @@ class UpdateBannerViewModel(
             }
         }
         val installed = try { updater.installedVersion() } catch (error: CancellationException) { throw error } catch (_: Exception) { null }
-        val target = UpdatePolicy.target(installed, latest)?.takeIf { it != preferences.dismissedVersion }
+        // Offered only for a CLI that is installed: a version to bring needs one to replace.
+        val available = installed?.let { cli ->
+            UpdatePolicy.target(cli, latest)?.takeIf { it != preferences.dismissedVersion }?.let { UpdateBannerState.Available(it, cli) }
+        }
         state.update { current ->
             when (current) {
                 // An update in progress, its result or its failure stays on screen until the person acts on it.
                 is UpdateBannerState.Updating, is UpdateBannerState.Updated, is UpdateBannerState.Failed -> current
-                else -> if (target != null && installed != null) UpdateBannerState.Available(target, installed) else UpdateBannerState.Hidden
+                else -> available ?: UpdateBannerState.Hidden
             }
         }
         return next
@@ -95,21 +98,22 @@ class UpdateBannerViewModel(
         }
         state.value = UpdateBannerState.Updating(version)
         viewModelScope.launch {
+            var output = emptyList<String>()
             try {
                 val installed = updater.update { line ->
-                    state.update { if (it is UpdateBannerState.Updating) it.copy(output = (it.output + line).takeLast(MAX_OUTPUT_LINES)) else it }
+                    output = (output + line).takeLast(MAX_OUTPUT_LINES)
+                    state.update { if (it is UpdateBannerState.Updating) it.copy(output = output) else it }
                 }
                 state.value = installed?.let { UpdateBannerState.Updated(it) }
                     ?: UpdateBannerState.Failed(version, CliUpdateException.Reason.NOT_INSTALLED)
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Exception) {
-                val output = (state.value as? UpdateBannerState.Updating)?.output.orEmpty()
                 val failure = error as? CliUpdateException
                 state.value = UpdateBannerState.Failed(
                     version,
-                    failure?.reason ?: CliUpdateException.Reason.FAILED,
-                    failure?.lines?.takeIf { it.isNotEmpty() } ?: output,
+                    if (failure != null) failure.reason else CliUpdateException.Reason.FAILED,
+                    failure?.let { it.lines.takeIf { lines -> lines.isNotEmpty() } } ?: output,
                 )
             }
         }

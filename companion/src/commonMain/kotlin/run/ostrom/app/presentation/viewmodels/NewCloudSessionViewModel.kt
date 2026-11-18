@@ -159,7 +159,7 @@ class NewCloudSessionViewModel(
     private val devices: DeviceSessionUseCases? = null,
     preferences: PreferencesRepository? = null,
 ) : ViewModel() {
-    private val state = MutableStateFlow(NewCloudSessionUiState(permissionMode = preferences?.permissionMode ?: PermissionMode.ASK))
+    private val state = MutableStateFlow(NewCloudSessionUiState(permissionMode = if (preferences != null) preferences.permissionMode else PermissionMode.ASK))
     val uiState: StateFlow<NewCloudSessionUiState> = state.asStateFlow()
 
     /**
@@ -223,7 +223,7 @@ class NewCloudSessionViewModel(
                     it.copy(devices = found, loadingDevices = false, deviceId = kept, folders = if (kept == it.deviceId) it.folders else null,
                         folderId = if (kept == it.deviceId) it.folderId else null)
                 }
-                kept?.let { loadFoldersOf(it, keepError) }
+                kept?.let { loadFoldersOf(uses, it, keepError) }
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Exception) {
@@ -234,16 +234,16 @@ class NewCloudSessionViewModel(
     }
 
     fun onDevice(id: String) {
+        val uses = devices ?: return
         if (state.value.creating || state.value.devices?.none { it.id == id } != false) return
         // The same device again only reads its folders again after they failed.
         if (id == state.value.deviceId && state.value.folders != null && state.value.createError == null) return
         edit { it.copy(deviceId = id, folders = null, deviceResumes = false).withFolder(null) }
-        loadFoldersOf(id)
+        loadFoldersOf(uses, id)
     }
 
     /** The folders [deviceId] offers now; one folder alone is chosen. Only the answer for the device still chosen counts. */
-    private fun loadFoldersOf(deviceId: String, keepError: Boolean = false) {
-        val uses = devices ?: return
+    private fun loadFoldersOf(uses: DeviceSessionUseCases, deviceId: String, keepError: Boolean = false) {
         foldersJob?.cancel()
         change { it.copy(loadingFolders = true, createError = if (keepError) it.createError else null) }
         foldersJob = viewModelScope.launch {
@@ -261,7 +261,8 @@ class NewCloudSessionViewModel(
                 // again, which could still name it (its presence lags) and lead back here.
                 val message = error.userMessage()
                 if (error.isDeviceGone()) change {
-                    it.copy(devices = it.devices?.filter { device -> device.id != deviceId }, deviceId = null, folders = null, loadingFolders = false, createError = message)
+                    // The devices were read before any folder was asked of one: never null here.
+                    it.copy(devices = it.devices!!.filter { device -> device.id != deviceId }, deviceId = null, folders = null, loadingFolders = false, createError = message)
                         .withFolder(null)
                 } else change { it.copy(loadingFolders = false, folders = it.folders ?: emptyList(), createError = message) }
             }
@@ -269,7 +270,8 @@ class NewCloudSessionViewModel(
     }
 
     fun onFolder(id: String) {
-        if (state.value.folders?.none { it.id == id } != false) return
+        val folders = state.value.folders ?: return
+        if (folders.none { it.id == id }) return
         edit { it.withFolder(id) }
     }
 
@@ -278,17 +280,24 @@ class NewCloudSessionViewModel(
 
     /** Opens or closes the picker; the first opening reads the folder's conversations on the device. */
     fun onResumeOpen() {
+        val uses = devices ?: return
         val current = state.value
         if (current.creating || !current.showsResume || !current.deviceResumes) return
         change { it.copy(resumeOpen = !it.resumeOpen) }
-        if (state.value.resumeOpen && current.resumable == null && !current.loadingResumable) loadResumableOf(null)
+        if (state.value.resumeOpen && current.resumable == null && !current.loadingResumable) loadResumableOf(uses, null)
     }
 
     /** Reads the conversations again after a failure. */
-    fun onResumeRetry() { if (state.value.showsResume && state.value.deviceResumes && !state.value.loadingResumable) loadResumableOf(null) }
+    fun onResumeRetry() {
+        val uses = devices ?: return
+        if (state.value.showsResume && state.value.deviceResumes && !state.value.loadingResumable) loadResumableOf(uses, null)
+    }
 
     /** The next, older page, added under the ones shown. */
-    fun onResumeMore() { state.value.resumableNext?.let { if (!state.value.loadingResumable) loadResumableOf(it) } }
+    fun onResumeMore() {
+        val uses = devices ?: return
+        state.value.resumableNext?.let { if (!state.value.loadingResumable) loadResumableOf(uses, it) }
+    }
 
     /** [id] null: none, a new conversation. Closes the picker. */
     fun onResume(id: String?) {
@@ -297,10 +306,10 @@ class NewCloudSessionViewModel(
     }
 
     /** Only the answer for the device and folder still chosen counts. */
-    private fun loadResumableOf(before: String?) {
-        val uses = devices ?: return
-        val deviceId = state.value.deviceId ?: return
-        val folderId = state.value.folderId ?: return
+    private fun loadResumableOf(uses: DeviceSessionUseCases, before: String?) {
+        // Only asked while the picker shows (a folder is chosen, and a folder only comes with its device).
+        val deviceId = state.value.deviceId!!
+        val folderId = state.value.folderId!!
         resumableJob?.cancel()
         change { it.copy(loadingResumable = true, resumableError = null) }
         resumableJob = viewModelScope.launch {
@@ -308,7 +317,11 @@ class NewCloudSessionViewModel(
                 val page = uses.loadResumable(route.accountId, deviceId, folderId, before)
                 if (state.value.deviceId != deviceId || state.value.folderId != folderId) return@launch
                 change {
-                    val shown = if (before == null) page.sessions else it.resumable.orEmpty() + page.sessions.filter { s -> it.resumable.orEmpty().none { k -> k.id == s.id } }
+                    // An older page is only asked for once a list (and its cursor) is shown: never null here.
+                    val shown = if (before == null) page.sessions else {
+                        val known = it.resumable!!
+                        known + page.sessions.filter { s -> known.none { k -> k.id == s.id } }
+                    }
                     it.copy(resumable = shown, resumableNext = page.nextBefore, loadingResumable = false)
                 }
             } catch (error: CancellationException) {
@@ -407,7 +420,8 @@ class NewCloudSessionViewModel(
         viewModelScope.launch {
             try {
                 val session = when (current.target) {
-                    SessionTarget.DEVICE -> (devices ?: return@launch).create(route.accountId, current.deviceForm(), pressKey)
+                    // A device target only exists once load() saw the device use cases.
+                    SessionTarget.DEVICE -> devices!!.create(route.accountId, current.deviceForm(), pressKey)
                     SessionTarget.CLOUD -> createSession(route.accountId, current.form(), pressKey)
                 }
                 state.update { it.copy(creating = false, created = session) }
@@ -417,7 +431,8 @@ class NewCloudSessionViewModel(
                 state.update { it.copy(creating = false, createError = error.userMessage()) }
                 when {
                     error.isDeviceGone() -> reloadDevices(keepError = true)
-                    error is AppException.DeviceRefused && error.code == FOLDER_NOT_PUBLISHED -> current.deviceId?.let { loadFoldersOf(it, keepError = true) }
+                    // A device session is only created with a device chosen.
+                    error is AppException.DeviceRefused && error.code == FOLDER_NOT_PUBLISHED -> loadFoldersOf(devices!!, current.deviceId!!, keepError = true)
                 }
             }
         }

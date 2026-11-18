@@ -94,7 +94,7 @@ class HistoryViewModel(
 
     fun refresh() = load()
 
-    fun retry() = if (state.value.moreFailed && state.value.next != null) loadMore() else load()
+    fun retry() = if (state.value.moreFailed) loadMore() else load()
 
     private fun load() {
         val account = state.value.account?.takeIf { it.signedIn } ?: return
@@ -124,7 +124,7 @@ class HistoryViewModel(
                 }
                 val items = page.items.map(::withKnownResult)
                 state.update { if (it.account?.id != account.id) it else it.copy(entries = items, next = page.next, loaded = true, refreshing = false, failed = false) }
-                check(account.id, items, trusted)
+                check(items, trusted)
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Exception) {
@@ -136,7 +136,8 @@ class HistoryViewModel(
     /** The older page, from the cursor the last page gave; a receipt already shown is not repeated. */
     fun loadMore() {
         val current = state.value
-        val account = current.account?.takeIf { it.signedIn } ?: return
+        val account = current.account ?: return
+        if (!account.signedIn) return
         val cursor = current.next ?: return
         if (current.loadingMore || current.refreshing) return
         state.update { it.copy(loadingMore = true, moreFailed = false) }
@@ -148,10 +149,10 @@ class HistoryViewModel(
                 state.update { now ->
                     if (now.account?.id != account.id || now.next != cursor) return@update now.copy(loadingMore = false)
                     val seen = now.entries.mapNotNullTo(HashSet()) { it.summary?.id }
-                    added = page.items.filter { entry -> entry.summary?.id?.let(seen::add) ?: true }.map(::withKnownResult)
+                    added = page.items.filter { entry -> entry.summary?.let { seen.add(it.id) } ?: true }.map(::withKnownResult)
                     now.copy(entries = now.entries + added, next = page.next, loadingMore = false)
                 }
-                check(account.id, added, trusted)
+                check(added, trusted)
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Exception) {
@@ -162,25 +163,19 @@ class HistoryViewModel(
 
     /** The entry with the result already found for the same content under the same keys, else as it is. */
     private fun withKnownResult(entry: HistoryEntry): HistoryEntry {
-        val (content, check) = entry.summary?.id?.let(known::get) ?: return entry
+        val (content, check) = entry.summary?.let { known[it.id] } ?: return entry
         return if (content == entry.raw) entry.copy(check = check) else entry
     }
 
     /** Verifies the [entries] not checked yet, off the main thread, then shows each result on the row of the same receipt. */
-    private suspend fun check(accountId: String, entries: List<HistoryEntry>, trusted: List<ReceiptPublicKey>) {
+    private suspend fun check(entries: List<HistoryEntry>, trusted: List<ReceiptPublicKey>) {
         val pending = entries.filter { it.check == ReceiptCheck.Checking }
         if (pending.isEmpty()) return
         val results = checkReceipts(pending, trusted)
-        results.forEach { entry -> entry.summary?.id?.let { known[it] = entry.raw to entry.check } }
-        val checked = results.associateBy { IdentityKey(it.raw) }
+        results.forEach { entry -> entry.summary?.let { known[it.id] = entry.raw to entry.check } }
+        // Cancelled with the account's change, so never answered after it: the rows are still this account's.
         state.update { now ->
-            if (now.account?.id != accountId) now else now.copy(entries = now.entries.map { entry -> checked[IdentityKey(entry.raw)] ?: entry })
+            now.copy(entries = now.entries.map { entry -> results.firstOrNull { it.raw === entry.raw } ?: entry })
         }
-    }
-
-    /** The very object read from the server: a result found on one receipt is never shown on another. Hashed by its id only. */
-    private class IdentityKey(val raw: JsonObject) {
-        override fun equals(other: Any?) = other is IdentityKey && other.raw === raw
-        override fun hashCode() = raw["id"]?.hashCode() ?: 0
     }
 }

@@ -46,10 +46,10 @@ data class WorkflowsUiState(
     /** An owner or an admin (or a role that cannot be read): the editors' rule shows to them, read only. */
     val administers: Boolean = false,
 ) {
-    val empty: Boolean get() = workflows?.isEmpty() == true && !loading
+    val empty: Boolean get() = workflows != null && workflows.isEmpty() && !loading
 
     /** New shows unless the settings say the person may not decide workflows. */
-    val canCreate: Boolean get() = account?.signedIn == true && rights?.mayDecide != false
+    val canCreate: Boolean get() = account != null && account.signedIn && (rights == null || rights.mayDecide)
 }
 
 /** The saved workflows of the active account, read only. They have no feed event: read at each return ([start]) and on [reload]. */
@@ -126,12 +126,12 @@ data class WorkflowUiState(
     val deleted: Boolean = false,
 ) {
     /** Edit shows for who may decide, on a workflow whose every node kind this app knows. */
-    val canEdit: Boolean get() = mayDecide && workflow?.nodes?.none { it.kind == NodeKind.UNKNOWN } == true
+    val canEdit: Boolean get() = mayDecide && workflow != null && workflow.nodes.none { it.kind == NodeKind.UNKNOWN }
 
     val canDelete: Boolean get() = mayDecide && workflow != null && !deleting && deleteHeld == null && !deleted
 
     /** Start shows on an accepted workflow, for who may start it. */
-    val canStart: Boolean get() = managesRuns && workflow?.runnable == true
+    val canStart: Boolean get() = managesRuns && workflow != null && workflow.runnable
 }
 
 /** One workflow, read only, with Start: read on open and on [load]. Its runs are a [WorkflowRunsViewModel] of their own. */
@@ -207,10 +207,10 @@ data class WorkflowStartUiState(
     /** The run that started: the screen moves to it. */
     val started: WorkflowRun? = null,
 ) {
-    fun valueOf(inputId: String): String = inputs[inputId] ?: workflow?.inputs?.firstOrNull { it.id == inputId }?.default.orEmpty()
+    fun valueOf(inputId: String): String = inputs[inputId] ?: workflow?.let { w -> w.inputs.firstOrNull { it.id == inputId }?.default }.orEmpty()
 
     /** Every required input has a value (typed, or its default). */
-    val filled: Boolean get() = workflow?.inputs?.all { !it.required || valueOf(it.id).isNotBlank() } == true
+    val filled: Boolean get() = workflow != null && workflow.inputs.all { !it.required || valueOf(it.id).isNotBlank() }
 
     val canStart: Boolean get() = workflow != null && filled && !starting && started == null
 }
@@ -253,7 +253,8 @@ class WorkflowStartViewModel(
     }
 
     fun onInput(id: String, value: String) {
-        val max = state.value.workflow?.inputs?.firstOrNull { it.id == id }?.maxLength ?: return
+        val workflow = state.value.workflow ?: return
+        val max = workflow.inputs.firstOrNull { it.id == id }?.maxLength ?: return
         val entered = value.take(max)
         if (state.value.inputs[id] != entered) key = ids.newId()
         state.update { it.copy(inputs = it.inputs + (id to entered), startError = null) }

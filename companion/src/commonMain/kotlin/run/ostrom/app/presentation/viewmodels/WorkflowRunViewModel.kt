@@ -34,7 +34,7 @@ data class WorkflowRunUiState(
     val actionError: Failure? = null,
 ) {
     /** Cancel shows on a run that has not ended, for who may cancel it. */
-    val canCancel: Boolean get() = managesRuns && run?.status?.active == true && !cancelling
+    val canCancel: Boolean get() = managesRuns && run != null && run.status.active && !cancelling
 }
 
 /**
@@ -110,8 +110,8 @@ class WorkflowRunViewModel(
         viewModelScope.launch {
             try {
                 val cancelled = cancelRun(route.accountId, run)
-                // The answer carries no visits: keep the timeline, take the status.
-                state.update { it.copy(cancelling = false, run = cancelled.copy(visits = it.run?.visits ?: run.visits)) }
+                // The answer carries no visits: keep the timeline (the run read, never cleared once set), take the status.
+                state.update { it.copy(cancelling = false, run = cancelled.copy(visits = it.run!!.visits)) }
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Exception) {
