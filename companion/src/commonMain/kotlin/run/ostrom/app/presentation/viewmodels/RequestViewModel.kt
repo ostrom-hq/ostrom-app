@@ -50,6 +50,9 @@ data class RequestUiState(
     /** What the screen shows is no longer what the person read: no answer goes until they read it again. */
     val changed: Boolean get() = approval != null && pinned != null && approval.reading != pinned
 
+    /** An answer may go now: none on its way, and bound to a reading the person pinned that is still what is shown. */
+    val answerable: Boolean get() = sending == null && pinned != null && !changed
+
     /** The problem said under the request; a change always wins. */
     val shownProblem: DecisionProblem? get() = if (changed) DecisionProblem.CHANGED else problem
 
@@ -123,8 +126,7 @@ class RequestViewModel(
     private fun send(choice: ApprovalAnswer, note: String?, prompt: String) {
         val current = state.value
         val approval = current.approval ?: return
-        // The approval and the pinned reading are always set together, so no state has an approval without its pinned reading.
-        if (current.sending != null || current.changed) return
+        if (!current.answerable) return
         reading.cancel()
         state.update { it.copy(sending = choice, problem = null, consoleFailed = false) }
         viewModelScope.launch {

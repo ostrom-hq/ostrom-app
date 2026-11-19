@@ -29,6 +29,9 @@ internal fun demoWorkflows(store: DemoStore): List<Workflow> {
     return (builtIn + created).filter { it.id !in deleted }
 }
 
+/** A demo workflow's version; every one has one (the built-in ones theirs, the editor's its own), else it is the first. */
+internal fun demoVersion(version: Int?): Int = version ?: 1
+
 /** A built-in workflow as the editor opens it: its nodes in order, each leading to the next, the last ending the run. */
 internal fun Workflow.editable(): EditableWorkflow {
     val nodes = nodes.map { node ->
@@ -77,8 +80,7 @@ class DemoWorkflowEditorRepository(private val demo: DemoMode, private val clock
         val store = demo.store()
         val (current, status) = opened(store, workflow.id)
         if (current.version != workflow.version) throw AppException.WorkflowEditRefused(WorkflowEditRefusal.STALE)
-        // Every demo workflow has a version (see DemoWorkflowRepository.start).
-        keep(store, EditableWorkflow(workflow.id, current.version!! + 1, draft), status)
+        keep(store, EditableWorkflow(workflow.id, demoVersion(current.version) + 1, draft), status)
         return WorkflowWrite.Applied(workflow.id)
     }
 

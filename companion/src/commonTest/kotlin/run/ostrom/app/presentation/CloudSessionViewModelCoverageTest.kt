@@ -366,6 +366,7 @@ class CloudSessionViewModelCoverageTest {
         model.interrupt(); model.setModel("claude-x"); model.setEffort("high"); model.revokeBypass()
         model.askStop("b1"); model.confirmStop()
         model.attach(listOf(picked("a.png"))); model.explainFiles(); model.retryFile("x"); model.removeFile("x"); model.dismissFileNotice()
+        model.retry("m1"); model.sendAnswers("r1"); model.allowTool("r1"); model.deny("r1"); model.retryAnswer("r1")
         settle()
         assertEquals("b1", model.uiState.value.confirmStop, "nothing confirms a stop here")
         assertEquals("hi", model.uiState.value.draft)

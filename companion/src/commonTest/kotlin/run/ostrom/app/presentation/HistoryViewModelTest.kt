@@ -92,6 +92,9 @@ class HistoryViewModelTest {
         // The same content read again (another object) shows the same result; another receipt keeps its own.
         val again = shown.copy(entries = listOf(entry("r1"), two)).withChecked("a1", listOf(verified))
         assertEquals(listOf(ReceiptCheck.Verified("k1"), two.check), again.entries.map { it.check })
+        // A row of the same id with other content (changed on the server) keeps its own state.
+        val changed = shown.copy(entries = listOf(entry("r1", "edited"))).withChecked("a1", listOf(verified))
+        assertEquals(ReceiptCheck.Checking, changed.entries.single().check)
         // Another account's list, or none, is left as it is.
         assertEquals(shown, shown.withChecked("a2", listOf(verified)))
         assertEquals(HistoryUiState(), HistoryUiState().withChecked("a1", listOf(verified)))

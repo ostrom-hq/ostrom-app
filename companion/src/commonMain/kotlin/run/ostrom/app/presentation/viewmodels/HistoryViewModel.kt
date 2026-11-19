@@ -43,8 +43,9 @@ data class HistoryUiState(
     val stale: Boolean get() = failed && entries.isNotEmpty()
 
     /**
-     * The [results] checked for [accountId], each on the row of the same receipt (the same content: the same id and
-     * signature check the same way). Nothing changes once the list is another account's.
+     * The [results] checked for [accountId], each on the row of the same receipt: the same id and the same content, which
+     * check the same way. A row of the same id with other content keeps its own. Nothing changes once the list is another
+     * account's.
      */
     /** The first page read for [accountId]; nothing changes once the list is another account's. */
     internal fun withFirstPage(accountId: String, items: List<HistoryEntry>, next: String?): HistoryUiState =
@@ -52,8 +53,9 @@ data class HistoryUiState(
 
     internal fun withChecked(accountId: String, results: List<HistoryEntry>): HistoryUiState {
         if (account?.id != accountId) return this
-        val checked = results.associateBy { it.raw }
-        return copy(entries = entries.map { entry -> checked[entry.raw] ?: entry })
+        // By id first (a cheap hash), then the whole content, which is the same object, compared at once, but for a row read again.
+        val checked = results.associateBy { it.raw["id"] }
+        return copy(entries = entries.map { entry -> checked[entry.raw["id"]]?.takeIf { it.raw == entry.raw } ?: entry })
     }
 }
 

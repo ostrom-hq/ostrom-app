@@ -28,6 +28,12 @@ class DemoWorkflowsTest {
     private val editor = DemoWorkflowEditorRepository(demo, clock)
     private val account = DemoContent.ACCOUNT_ID
 
+    @Test
+    fun aDemoWorkflowWithoutAVersionIsItsFirst() {
+        assertEquals(1, demoVersion(null))
+        assertEquals(3, demoVersion(3))
+    }
+
     @Test fun theWorkflowsAreTheBuiltInOnesAndOneIsFoundById() = runTest {
         assertEquals(listOf(DemoWorkflowIds.RELEASE, DemoWorkflowIds.TRIAGE), workflows.workflows(account).map { it.id })
         assertEquals("Release the engine", workflows.workflow(account, DemoWorkflowIds.RELEASE).name)

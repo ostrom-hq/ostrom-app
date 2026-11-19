@@ -132,9 +132,8 @@ class DemoWorkflowRepository(private val demo: DemoMode, private val clock: Cloc
         val now = clock.nowMillis()
         // The trigger passes at once; the run moves on its first real node.
         val first = workflow.nodes.firstOrNull { it.kind != NodeKind.TRIGGER } ?: workflow.nodes.first()
-        // Every demo workflow has a version: the built-in ones theirs, the edited and created ones the editor's.
         val run = WorkflowRun(
-            "demo-run-started-${store.startedRuns.value.size + 1}", workflow.id, workflow.name, workflow.version!!, RunStatus.RUNNING, store.account.value.login,
+            "demo-run-started-${store.startedRuns.value.size + 1}", workflow.id, workflow.name, demoVersion(workflow.version), RunStatus.RUNNING, store.account.value.login,
             "manual", inputs, first.id, first.kind, null, null, workflow.repos.firstOrNull(),
             listOf(RunVisit(1, first.id, first.label, first.kind, "active", null, null, null, null, null, null, now, null)),
             null, null, null, null, now, null,

@@ -17,6 +17,7 @@ import run.ostrom.app.domain.models.CloudRecipe
 import run.ostrom.app.domain.models.CloudRepository
 import run.ostrom.app.domain.models.CloudSession
 import run.ostrom.app.domain.models.CloudSessionMode
+import run.ostrom.app.domain.models.CloudSessionProblem
 import run.ostrom.app.domain.models.DeviceFolder
 import run.ostrom.app.domain.models.HostDevice
 import run.ostrom.app.domain.models.NewCloudSession
@@ -191,6 +192,12 @@ class NewCloudSessionViewModel(
     private var devicesJob: Job? = null
     private var foldersJob: Job? = null
     private var resumableJob: Job? = null
+
+    /**
+     * Starts a session on a device. The device target is offered only with the device use cases ([load]); without them
+     * a device session is refused as having no device, never started in the cloud instead.
+     */
+    private val createOnDevice: suspend (String, NewDeviceSession, String) -> CloudSession = devices?.let { uses -> uses.create::invoke } ?: ::noDeviceToCreateOn
 
     init { load() }
 
@@ -428,23 +435,21 @@ class NewCloudSessionViewModel(
         if (keyedForm != null && sent != keyedForm) key = ids.newId()
         keyedForm = sent
         val pressKey = key
-        // The device use cases when the target is a device (load() offers that target only with them); null for the cloud.
-        val device = devices.takeIf { current.target == SessionTarget.DEVICE }
         state.update { it.copy(creating = true, createError = null) }
         viewModelScope.launch {
             try {
-                val session = if (device != null) device.create(route.accountId, current.deviceForm(), pressKey)
-                    else createSession(route.accountId, current.form(), pressKey)
+                val session = when (current.target) {
+                    SessionTarget.DEVICE -> createOnDevice(route.accountId, current.deviceForm(), pressKey)
+                    SessionTarget.CLOUD -> createSession(route.accountId, current.form(), pressKey)
+                }
                 state.update { it.copy(creating = false, created = session) }
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Exception) {
                 state.update { it.copy(creating = false, createError = error.userMessage()) }
-                if (device != null) when {
-                    error.isDeviceGone() -> reloadDevices(keepError = true)
-                    // The device of the form as sent (canCreate needs one).
-                    error is AppException.DeviceRefused && error.code == FOLDER_NOT_PUBLISHED -> loadFoldersOf(device, current.deviceForm().deviceId, keepError = true)
-                }
+                // The device gone, or its folder no longer published: the devices are read again, then the chosen device's
+                // folders (the refusal stays shown).
+                if (error.isDeviceGone() || error is AppException.DeviceRefused && error.code == FOLDER_NOT_PUBLISHED) reloadDevices(keepError = true)
             }
         }
     }
@@ -456,6 +461,10 @@ class NewCloudSessionViewModel(
 }
 
 /** What the form uses to start a session on one of the member's devices (`runners.cloud.remote.daemon.v1`). */
+/** A device session asked of a build without the device use cases: refused as having no device to start on. */
+internal suspend fun noDeviceToCreateOn(accountId: String, form: NewDeviceSession, idempotencyKey: String): CloudSession =
+    throw AppException.CloudSessionInvalid(CloudSessionProblem.CHOOSE_DEVICE)
+
 class DeviceSessionUseCases(
     val loadDevices: LoadHostDevicesUseCase,
     val loadFolders: LoadDeviceFoldersUseCase,

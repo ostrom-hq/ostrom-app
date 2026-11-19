@@ -20,6 +20,7 @@ import run.ostrom.app.SequenceIds
 import run.ostrom.app.domain.cloudSession
 import run.ostrom.app.domain.models.AppException
 import run.ostrom.app.domain.models.CloudAgent
+import run.ostrom.app.domain.models.CloudSessionProblem
 import run.ostrom.app.domain.models.CloudRepository
 import run.ostrom.app.domain.models.DeviceFolder
 import run.ostrom.app.domain.models.DeviceFolders
@@ -44,9 +45,11 @@ import run.ostrom.app.presentation.viewmodels.CloudField
 import run.ostrom.app.presentation.viewmodels.DeviceSessionUseCases
 import run.ostrom.app.presentation.viewmodels.Failure
 import run.ostrom.app.presentation.viewmodels.NewCloudSessionUiState
+import run.ostrom.app.presentation.viewmodels.noDeviceToCreateOn
 import run.ostrom.app.presentation.viewmodels.NewCloudSessionViewModel
 import run.ostrom.app.presentation.viewmodels.RepositoryField
 import run.ostrom.app.presentation.viewmodels.SessionTarget
+import kotlin.test.assertFailsWith
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -159,6 +162,11 @@ class NewCloudSessionViewModelCoverageTest {
         assertFalse(device.copy(deviceId = null).canCreate)
         assertFalse(device.copy(folderId = null).canCreate)
         assertFalse(device.copy(name = "  ").canCreate)
+    }
+
+    @Test fun aDeviceSessionWithoutTheDeviceUseCasesIsRefusedNeverStartedInTheCloud() = runTest(dispatcher) {
+        val refused = assertFailsWith<AppException.CloudSessionInvalid> { noDeviceToCreateOn("a1", NewCloudSessionUiState().deviceForm(), "k") }
+        assertEquals(CloudSessionProblem.CHOOSE_DEVICE, refused.problem)
     }
 
     @Test fun aDeviceFormWithoutADeviceOrFolderSendsEmptyIds() {

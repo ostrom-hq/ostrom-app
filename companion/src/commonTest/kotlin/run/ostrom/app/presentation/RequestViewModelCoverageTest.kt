@@ -109,6 +109,11 @@ class RequestViewModelCoverageTest {
         assertFalse(RequestUiState(approval = pending, pinned = null).changed, "nothing pinned yet")
         assertFalse(RequestUiState(approval = pending, pinned = pending.reading).changed)
         assertTrue(RequestUiState(approval = pending, pinned = pendingApproval(digest = "sha256:other").reading).changed)
+        // An answer goes only bound to a pinned reading that is still the one shown, and never twice at once.
+        assertTrue(RequestUiState(approval = pending, pinned = pending.reading).answerable)
+        assertFalse(RequestUiState(approval = pending, pinned = null).answerable, "nothing pinned to bind the answer to")
+        assertFalse(RequestUiState(approval = pending, pinned = pendingApproval(digest = "sha256:other").reading).answerable)
+        assertFalse(RequestUiState(approval = pending, pinned = pending.reading, sending = ApprovalAnswer.APPROVE).answerable)
     }
 
     @Test fun aReadInFlightIsNotStartedAgainAndNothingGoesBeforeTheRequestIsRead() = runTest {
