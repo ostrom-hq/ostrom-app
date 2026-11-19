@@ -79,7 +79,7 @@ class ArtifactsViewModel(private val accounts: AccountRepository, private val lo
         val current = state.value
         val account = current.account?.takeIf { it.signedIn } ?: return
         val before = current.next ?: return
-        if (load?.isActive == true) return
+        if (load!!.isActive) return // a cursor exists only once a page was read, which always went through [load]
         state.update { it.copy(loadingMore = true, error = null) }
         load = viewModelScope.launch { page(account.id, before) }
     }

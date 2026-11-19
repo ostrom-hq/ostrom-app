@@ -55,7 +55,7 @@ class SessionFilesUseCase(
      */
     fun typeOf(file: PickedFile, policy: FilePolicy): String? {
         files.typeFor(file.name)?.let { return it }
-        val reported = file.type?.substringBefore(';')?.trim()?.lowercase()?.takeIf { it.isNotEmpty() && it != OCTET_STREAM } ?: return null
+        val reported = file.type.orEmpty().substringBefore(';').trim().lowercase().takeIf { it.isNotEmpty() && it != OCTET_STREAM } ?: return null
         return if (reported !in policy.types && reported.startsWith("text/") && TEXT in policy.types) TEXT else reported
     }
 
@@ -128,7 +128,7 @@ object PhotoSizing {
 
     /** The name a reduced photo is sent under: [name] with a `.jpg` extension (a HEIC photo becomes a JPEG). */
     fun jpegName(name: String?): String {
-        val base = name?.substringAfterLast('/')?.substringBeforeLast('.')?.trim()?.takeIf { it.isNotEmpty() } ?: "photo"
+        val base = name.orEmpty().substringAfterLast('/').substringBeforeLast('.').trim().ifEmpty { "photo" }
         return "$base.jpg"
     }
 }

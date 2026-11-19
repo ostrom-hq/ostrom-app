@@ -37,7 +37,7 @@ class RemoteMemberSetupRepository(private val calls: AccountCalls) : MemberSetup
             url = url.takeIf { kind == McpTransport.HTTP }?.let(::shown),
             launcher = stdio?.launcher,
             packageName = stdio?.packageName,
-            secretNames = (secretNames.orEmpty() + stdio?.secretEnv?.values.orEmpty()).distinct().sorted(),
+            secretNames = (secretNames + stdio?.secretEnv.orEmpty().values).distinct().sorted(),
             enabled = enabled,
             process = if (kind == McpTransport.STDIO) McpProcess.parse(state, failure) else McpProcess.Untracked,
         )

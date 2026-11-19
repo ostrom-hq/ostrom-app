@@ -25,7 +25,7 @@ class DemoMode(private val clock: Clock) {
     private val current = MutableStateFlow<DemoStore?>(null)
 
     /** The demo account while the demo runs; null otherwise. */
-    val account: Account? get() = current.value?.account?.value
+    val account: Account? get() = current.value?.let { it.account.value }
 
     val active: Boolean get() = current.value != null
 

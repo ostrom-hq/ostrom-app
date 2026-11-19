@@ -71,7 +71,11 @@ data class WorkflowRun(
     val endedAt: Long?,
 ) {
     /** The node in progress: the active visit's title on a single read, else the node's id. */
-    val currentTitle: String? get() = visits.lastOrNull { it.active }?.title ?: currentNodeId?.takeIf { status.active }
+    val currentTitle: String?
+        get() {
+            val visit = visits.lastOrNull { it.active } ?: return currentNodeId?.takeIf { status.active }
+            return visit.title
+        }
 
     /** How long it ran (until it ended, else until [now]); null without a readable start. */
     fun durationMillis(now: Long): Long? = startedAt?.let { (endedAt ?: maxOf(now, it)) - it }

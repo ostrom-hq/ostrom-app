@@ -134,7 +134,7 @@ internal fun ApiCloudSession.domain() = CloudSession(
     desiredStatus = desiredStatus,
     phase = phase,
     failure = failure?.let { CloudFailure(it.code, it.message, it.retryable) },
-    limits = limits?.let { CloudLimits(it.idleTimeoutMinutes, it.maxRunMinutes, it.restrictedEgress) },
+    limits = CloudLimits(limits.idleTimeoutMinutes, limits.maxRunMinutes, limits.restrictedEgress),
     createdAt = millisOf(createdAt),
     updatedAt = millisOf(updatedAt),
     readyAt = millisOf(readyAt),
@@ -145,8 +145,8 @@ internal fun ApiCloudSession.domain() = CloudSession(
         CloudRecipe(
             repositories = recipe.repositories.map { CloudRepository(it.url, it.path, it.ref, it.branch) },
             workingDirectory = recipe.workingDirectory,
-            setupCreate = recipe.setup?.create.orEmpty(),
-            setupStart = recipe.setup?.start.orEmpty(),
+            setupCreate = recipe.setup.create,
+            setupStart = recipe.setup.start,
             requiredVariables = recipe.requiredVariables,
             requireGitHub = recipe.requireGitHub == true,
             gitEmailDomain = recipe.gitEmailDomain,
@@ -159,7 +159,7 @@ internal fun ApiCloudSession.domain() = CloudSession(
     host = host?.takeIf { kind == CloudSessionKinds.REMOTE }?.let {
         SessionHost(it.deviceName, it.platform, it.osVersion, it.directoryName, it.online, removed = it.deviceId == null, permissionMode = it.permissionMode)
     },
-    refusalReason = failure?.takeIf { it.code == CloudSession.HOST_REFUSED }?.message?.let(::refusalReason),
+    refusalReason = failure?.takeIf { it.code == CloudSession.HOST_REFUSED }?.let { refusalReason(it.message) },
     mode = if (mode == CONVERSATION_MODE) CloudSessionMode.CONVERSATION else CloudSessionMode.TERMINAL,
     effort = effort,
     permissionBypass = permissionBypass == true,
@@ -172,7 +172,7 @@ private const val CONVERSATION_MODE = "conversation"
  * The daemon's reason code in a `host_refused` failure, which the server words "The device refused to start this session
  * (folder_missing).": only a short snake_case code is kept, never the rest of a server text.
  */
-internal fun refusalReason(message: String): String? = REFUSAL_REASON.findAll(message).lastOrNull()?.groupValues?.get(1)
+internal fun refusalReason(message: String): String? = REFUSAL_REASON.findAll(message).lastOrNull()?.let { it.groupValues[1] }
 
 private val REFUSAL_REASON = Regex("""\(([a-z][a-z0-9_]{0,63})\)""")
 

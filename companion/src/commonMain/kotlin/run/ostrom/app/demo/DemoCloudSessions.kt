@@ -130,7 +130,8 @@ class DemoCloudSessionRepository(private val demo: DemoMode, private val clock: 
     override suspend fun create(accountId: String, session: NewCloudSession, idempotencyKey: String): CloudSession {
         val store = demo.store()
         val now = clock.nowMillis()
-        val name = session.name ?: (session.recipe?.repositories?.firstOrNull()?.url ?: session.repo)?.substringAfterLast('/')?.removeSuffix(".git") ?: session.agent.wire
+        val source = session.recipe?.repositories.orEmpty().firstOrNull().let { if (it != null) it.url else session.repo }
+        val name = session.name ?: if (source != null) source.substringAfterLast('/').removeSuffix(".git") else session.agent.wire
         val created = CloudSession(
             "demo-cloud-new-${store.cloudSessions.value.size + 1}", name, session.agent.wire, session.model, session.repo, session.ref, CloudSessionStatus.RUNNING,
             "running", null, null, demoLimits, now, now, now, now, null, null, session.recipe,

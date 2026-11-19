@@ -42,7 +42,7 @@ class AnswerApprovalUseCase(
      * @param prompt What the biometric prompt says.
      */
     suspend operator fun invoke(accountId: String, approval: Approval, answer: ApprovalAnswer, note: String?, prompt: String): AnswerResult {
-        val reason = note?.trim()?.takeIf { it.isNotEmpty() }
+        val reason = note.orEmpty().trim().ifEmpty { null }
         val allowed = approval.open && when (answer) {
             ApprovalAnswer.APPROVE -> approval.mayApprove
             ApprovalAnswer.REJECT -> reason != null

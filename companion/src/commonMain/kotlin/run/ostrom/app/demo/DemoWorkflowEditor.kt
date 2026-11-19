@@ -24,13 +24,16 @@ internal data class EditedWorkflow(val editable: EditableWorkflow, val workflow:
 internal fun demoWorkflows(store: DemoStore): List<Workflow> {
     val edited = store.editedWorkflows.value
     val deleted = store.deletedWorkflows.value
-    val builtIn = builtInWorkflows().map { edited[it.id]?.workflow ?: it }
+    val builtIn = builtInWorkflows().map { workflow -> edited[workflow.id].let { if (it != null) it.workflow else workflow } }
     val created = edited.values.map { it.workflow }.filter { created -> builtInWorkflows().none { it.id == created.id } }
     return (builtIn + created).filter { it.id !in deleted }
 }
 
+/** A demo workflow's version; every one has one (the built-in ones theirs, the editor's its own), else it is the first. */
+internal fun demoVersion(version: Int?): Int = version ?: 1
+
 /** A built-in workflow as the editor opens it: its nodes in order, each leading to the next, the last ending the run. */
-private fun Workflow.editable(): EditableWorkflow {
+internal fun Workflow.editable(): EditableWorkflow {
     val nodes = nodes.map { node ->
         DraftNode(
             id = node.id, kind = node.kind, title = node.label,
@@ -55,11 +58,15 @@ class DemoWorkflowEditorRepository(private val demo: DemoMode, private val clock
     }
 
     override suspend fun editable(accountId: String, workflowId: String): EditableWorkflow {
-        val store = demo.store()
+        return opened(demo.store(), workflowId).first
+    }
+
+    /** The workflow as the editor opens it, and its status. */
+    private fun opened(store: DemoStore, workflowId: String): Pair<EditableWorkflow, String> {
         if (workflowId in store.deletedWorkflows.value) throw AppException.NotFound()
-        return store.editedWorkflows.value[workflowId]?.editable
-            ?: builtInWorkflows().firstOrNull { it.id == workflowId }?.editable()
-            ?: throw AppException.NotFound()
+        store.editedWorkflows.value[workflowId]?.let { return it.editable to it.workflow.status }
+        val builtIn = builtInWorkflows().firstOrNull { it.id == workflowId } ?: throw AppException.NotFound()
+        return builtIn.editable() to builtIn.status
     }
 
     override suspend fun create(accountId: String, draft: WorkflowDraft): WorkflowWrite<String> {
@@ -71,10 +78,9 @@ class DemoWorkflowEditorRepository(private val demo: DemoMode, private val clock
 
     override suspend fun save(accountId: String, workflow: EditableWorkflow, draft: WorkflowDraft): WorkflowWrite<String> {
         val store = demo.store()
-        val current = editable(accountId, workflow.id)
+        val (current, status) = opened(store, workflow.id)
         if (current.version != workflow.version) throw AppException.WorkflowEditRefused(WorkflowEditRefusal.STALE)
-        val status = demoWorkflows(store).firstOrNull { it.id == workflow.id }?.status ?: "accepted"
-        keep(store, EditableWorkflow(workflow.id, (workflow.version ?: 0) + 1, draft), status)
+        keep(store, EditableWorkflow(workflow.id, demoVersion(current.version) + 1, draft), status)
         return WorkflowWrite.Applied(workflow.id)
     }
 

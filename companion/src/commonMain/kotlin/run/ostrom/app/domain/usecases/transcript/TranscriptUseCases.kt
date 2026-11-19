@@ -57,14 +57,23 @@ data class Transcript(
      */
     val feeds: Map<String, Long?> = emptyMap(),
 ) {
-    /** A page of one subagent's feed, the newest or an older one: its own cursor moves, the main agent's and [newestSeq] do not. */
-    fun withFeed(feed: String, page: TranscriptPage): Transcript = merged(page.events).let { it.copy(feeds = it.feeds + (feed to page.nextBefore)) }
+    /**
+     * A page of one subagent's feed, asked [before] a cursor (null: its newest page): its own cursor moves, the main agent's
+     * and [newestSeq] do not. A page asked from a cursor the feed no longer has (another page came first) adds its events
+     * but never moves the cursor back.
+     */
+    fun withFeed(feed: String, before: Long?, page: TranscriptPage): Transcript {
+        val current = if (before == null) feed !in feeds else feeds[feed] == before
+        return merged(page.events).let { if (current) it.copy(feeds = it.feeds + (feed to page.nextBefore)) else it }
+    }
 
 
     /** The first page: the newest events. */
     fun withLatest(page: TranscriptPage): Transcript = merged(page.events).copy(nextBefore = page.nextBefore).let { it.copy(newestSeq = maxOf(it.newestSeq, page.lastSeq)) }
 
-    fun withOlder(page: TranscriptPage): Transcript = merged(page.events).copy(nextBefore = page.nextBefore)
+    /** The main agent's page asked [before] a cursor; one asked from a cursor no longer current adds its events only. */
+    fun withOlder(before: Long, page: TranscriptPage): Transcript =
+        merged(page.events).let { if (nextBefore == before) it.copy(nextBefore = page.nextBefore) else it }
 
     fun withLive(event: TranscriptEvent): Transcript = merged(listOf(event))
 

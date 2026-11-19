@@ -107,5 +107,3 @@ private fun CodeBlock(code: String, style: TextStyle) {
 }
 
 private val COPY_BUTTON_SIZE = 32.dp
-
-private fun Modifier.fillMaxWidth(): Modifier = this.then(Modifier.fillMaxWidth())

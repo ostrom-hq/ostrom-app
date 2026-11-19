@@ -57,7 +57,7 @@ object ReceiptKeyPinning {
 
     /** [kept]: the pins of the server, empty before its first view, null when they could not be read (nothing trusted). */
     fun trust(served: List<ServedReceiptKey>, kept: Map<String, String>?): Trust {
-        if (kept == null || kept.values.any { !RAW_KEY_HEX.matches(it) }) return Trust(emptyList(), kept.orEmpty(), changed = false)
+        if (kept == null || !kept.values.all(::readsAsKey)) return Trust(emptyList(), kept.orEmpty(), changed = false)
         val candidates = served.mapNotNull { candidate -> usable(candidate)?.let { candidate to it } }
         val firstView = kept.isEmpty()
         val trusted = kept.toMutableMap()
@@ -68,7 +68,8 @@ object ReceiptKeyPinning {
             for ((candidate, key) in candidates) {
                 val rotation = candidate.rotation ?: continue
                 if (key.kid in trusted) continue
-                val by = trusted[rotation.kid]?.let(::publicKeyOf) ?: continue
+                // Every pin read back as a key above, and a pin added here is a key's own bytes: this never throws.
+                val by = ReceiptPublicKey.fromRaw((trusted[rotation.kid] ?: continue).hexToBytes())
                 if (!verifyRotation(key, rotation.signature, by)) continue
                 trusted[key.kid] = key.toRaw().toHex()
                 grew = true
@@ -78,11 +79,11 @@ object ReceiptKeyPinning {
         return Trust(keys, trusted, changed = trusted.size > kept.size)
     }
 
-    private fun publicKeyOf(rawHex: String): ReceiptPublicKey? = try {
-        ReceiptPublicKey.fromRaw(rawHex.hexToBytes())
-    } catch (_: Exception) {
-        null
-    }
+    /** A pin that reads back as a key: 64 lowercase hex characters of 32 bytes a platform takes as an Ed25519 key. */
+    internal fun readsAsKey(pin: String): Boolean = runCatching {
+        require(RAW_KEY_HEX.matches(pin))
+        ReceiptPublicKey.fromRaw(pin.hexToBytes())
+    }.isSuccess
 }
 
 internal fun ByteArray.toHex(): String = joinToString("") { (it.toInt() and 0xff).toString(16).padStart(2, '0') }

@@ -40,22 +40,6 @@ fun hostName(host: SessionHost?): String = when {
     else -> host.deviceName?.takeIf { it.isNotBlank() } ?: stringResource(Res.string.session_host_unnamed)
 }
 
-/** The system a device reports, worded as its vendor does; null until the device reported it. */
-fun systemOf(host: SessionHost): String? = systemOf(host.platform, host.osVersion)
-
-fun systemOf(platform: String?, osVersion: String?): String? {
-    val name = when (platform) {
-        null -> return null
-        "macos" -> "macOS"
-        "windows" -> "Windows"
-        "linux" -> "Linux"
-        "ios" -> "iOS"
-        "android" -> "Android"
-        else -> platform
-    }
-    return listOfNotNull(name, osVersion?.takeIf { it.isNotBlank() }).joinToString(" ")
-}
-
 /**
  * Where the session runs: "Cloud", "Remote · <device>" or the local run; a device that stopped answering is marked
  * offline next to it, one that did not start the session yet or refused it too.

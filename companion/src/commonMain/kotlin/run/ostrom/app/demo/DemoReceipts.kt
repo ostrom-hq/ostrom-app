@@ -5,8 +5,8 @@ import kotlin.time.Instant
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import run.ostrom.app.domain.models.AppException
 import run.ostrom.app.domain.models.HistoryEntry
 import run.ostrom.app.domain.models.ReceiptPage
@@ -86,7 +86,7 @@ class DemoReceiptRepository(private val demo: DemoMode) : ReceiptRepository {
     }
 
     override suspend fun get(accountId: String, id: String): HistoryEntry = withContext(Dispatchers.Default) {
-        val raw = demo.store().receipts.firstOrNull { (it["id"] as? JsonPrimitive)?.content == id } ?: throw AppException.NotFound()
+        val raw = demo.store().receipts.firstOrNull { it.getValue("id").jsonPrimitive.content == id } ?: throw AppException.NotFound()
         readReceipt(raw)
     }
 

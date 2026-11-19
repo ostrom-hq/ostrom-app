@@ -68,16 +68,17 @@ class NotificationSettingsViewModel(
         val switch = NotificationSwitch(channel, kind)
         val before = settings.isOn(channel, kind)
         if (current.loading || switch in current.saving || before == enabled) return
-        state.update { it.copy(settings = it.settings?.with(channel, kind, enabled), saving = it.saving + switch, error = null) }
+        state.update { it.copy(settings = settings.with(channel, kind, enabled), saving = it.saving + switch, error = null) }
         viewModelScope.launch {
             try {
                 val saved = set(route.accountId, channel, kind, enabled)
-                state.update { it.copy(settings = saved.keeping(it.saving - switch, it.settings), saving = it.saving - switch) }
+                // The settings were read before this switch could flip (toggle returns without them), and are never cleared.
+                state.update { it.copy(settings = saved.keeping(it.saving - switch, it.settings!!), saving = it.saving - switch) }
             } catch (error: CancellationException) {
-                state.update { it.copy(settings = it.settings?.with(channel, kind, before), saving = it.saving - switch) }
+                state.update { it.copy(settings = it.settings!!.with(channel, kind, before), saving = it.saving - switch) }
                 throw error
             } catch (error: Exception) {
-                state.update { it.copy(settings = it.settings?.with(channel, kind, before), saving = it.saving - switch, error = error.userMessage()) }
+                state.update { it.copy(settings = it.settings!!.with(channel, kind, before), saving = it.saving - switch, error = error.userMessage()) }
             }
         }
     }
@@ -100,5 +101,5 @@ class NotificationSettingsViewModel(
 }
 
 /** The server's answer, with the switches still being saved kept in the position they were flipped to. */
-private fun NotificationSettings.keeping(pending: Set<NotificationSwitch>, shown: NotificationSettings?): NotificationSettings =
-    pending.fold(this) { settings, switch -> settings.with(switch.channel, switch.kind, shown?.isOn(switch.channel, switch.kind) ?: true) }
+private fun NotificationSettings.keeping(pending: Set<NotificationSwitch>, shown: NotificationSettings): NotificationSettings =
+    pending.fold(this) { settings, switch -> settings.with(switch.channel, switch.kind, shown.isOn(switch.channel, switch.kind)) }

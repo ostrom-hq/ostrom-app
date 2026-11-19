@@ -35,6 +35,9 @@ import run.ostrom.app.domain.repositories.ReceiptRepository
 import run.ostrom.app.domain.usecases.auth.AccountGuard
 import run.ostrom.app.domain.usecases.auth.RefreshAccountUseCase
 import run.ostrom.app.domain.usecases.receipts.CheckReceiptsUseCase
+import run.ostrom.app.domain.usecases.receipts.checkReceipt
+import run.ostrom.core.receipts.ReceiptVerifier
+import run.ostrom.core.receipts.ReceiptVerifierImpl
 import run.ostrom.app.domain.usecases.receipts.GetReceiptUseCase
 import run.ostrom.app.domain.usecases.receipts.LoadReceiptsUseCase
 import run.ostrom.app.domain.usecases.receipts.ReceiptKeyPinning
@@ -115,6 +118,8 @@ class ReceiptUseCasesTest {
 
     @Test
     fun aRotationSignedByAnUntrustedKeyOrUnreadableIsRefused() {
+        // A pin under A's id that holds another key does not check A's signature.
+        assertTrue(ReceiptKeyPinning.trust(listOf(served(c, handover(a, c))), mapOf(a.publicKey.kid to b.publicKey.hex())).keys.isEmpty())
         assertTrue(ReceiptKeyPinning.trust(listOf(served(c, handover(b, c))), pins(a)).keys.isEmpty(), "B is not trusted")
         // Claims A handed over, but B signed it.
         val forged = KeyHandover(a.publicKey.kid, handover(b, c).signature)
@@ -137,6 +142,17 @@ class ReceiptUseCasesTest {
         assertTrue(unread.keys.isEmpty())
         assertFalse(unread.changed)
         assertTrue(ReceiptKeyPinning.trust(listOf(served(a)), mapOf(a.publicKey.kid to "not hex")).keys.isEmpty())
+    }
+
+    @Test
+    fun aPinThatIsHexButNoKeyFailsClosedInsteadOfThrowing() {
+        // A corrupted store: 64 hex characters that a platform may refuse as an Ed25519 point. Never a crash, never a
+        // rotation trusted through it.
+        val corrupted = mapOf(a.publicKey.kid to "f".repeat(64))
+        assertTrue(ReceiptKeyPinning.trust(listOf(served(c, handover(a, c))), corrupted).keys.isEmpty())
+        assertTrue(ReceiptKeyPinning.readsAsKey(a.publicKey.hex()))
+        assertFalse(ReceiptKeyPinning.readsAsKey("F".repeat(64)), "upper case is not how this app writes a pin")
+        assertFalse(ReceiptKeyPinning.readsAsKey("ab"))
     }
 
     @Test
@@ -272,5 +288,58 @@ class ReceiptUseCasesTest {
         assertTrue(TrustedReceiptKeysUseCase(receipts, locked, list, guard())("a1").isEmpty())
         val refusing = FakePins().apply { writeFails = true }
         assertEquals(listOf(a.publicKey.kid), TrustedReceiptKeysUseCase(receipts, refusing, list, guard())("a1").map { it.kid })
+    }
+
+    @Test
+    fun aReceiptTooDeepToReadIsMalformedAndAForeignSignatureIsBad() = runTest {
+        var deep: kotlinx.serialization.json.JsonElement = JsonPrimitive("bottom")
+        repeat(70) { deep = buildJsonObject { put("x", deep) } }
+        val malformed = JsonObject(body() + ("deep" to deep))
+        // B's signature of the same body under A's key id: the digest matches, the signature does not.
+        val byA = ReceiptSignerImpl(a).sign(body())
+        val byB = ReceiptSignerImpl(b).sign(body())
+        val sigOfB = (byB["signature"] as JsonPrimitive).content.substringAfter(";sig=")
+        val forged = JsonObject(byA + ("signature" to JsonPrimitive((byA["signature"] as JsonPrimitive).content.substringBefore(";sig=") + ";sig=" + sigOfB)))
+        val results = CheckReceiptsUseCase()(listOf(HistoryEntry(malformed, null), HistoryEntry(forged, null)), listOf(a.publicKey)).map { it.check }
+        assertEquals(listOf(ReceiptCheck.Rejected(ReceiptRejection.MALFORMED), ReceiptCheck.Rejected(ReceiptRejection.BAD_SIGNATURE)), results)
+    }
+
+    @Test
+    fun aPlatformThatCannotVerifyNeverCallsAReceiptVerifiedNorTampered() {
+        val unavailable = object : ReceiptVerifier { override fun verify(receipt: JsonObject) = throw UnsupportedOperationException("no Ed25519") }
+        assertEquals(ReceiptCheck.Unavailable, checkReceipt(body(), anyKey = true, verifier = unavailable))
+        assertEquals(ReceiptCheck.NoKey, checkReceipt(body(), anyKey = false, verifier = ReceiptVerifierImpl(emptyList())))
+    }
+
+    @Test
+    fun aReceiptWhoseIdIsNotAStringIsNotTheOneAsked() = runTest {
+        val numbered = JsonObject(body() + ("id" to JsonPrimitive(1)))
+        val get = GetReceiptUseCase(FakeReceipts(byId = mapOf("1" to numbered, "rcpt_x" to JsonObject(body() - "id"))), FakeFeatures(setOf(Features.RECEIPTS)), guard())
+        assertFailsWith<AppException.NotFound> { get("a1", "1") }
+        assertFailsWith<AppException.NotFound> { get("a1", "rcpt_x") }
+    }
+
+    @Test
+    fun anAccountThatIsGoneHasNoTrustedKeys() = runTest {
+        val trusted = TrustedReceiptKeysUseCase(FakeReceipts(listOf(served(a))), FakePins(), accounts(), guard())
+        assertFailsWith<AppException.Unauthorized> { trusted("a1") }
+    }
+
+    @Test
+    fun aServedKeyThatIsNotAnEd25519KeyOfItsIdIsNotUsable() {
+        assertNull(ReceiptKeyPinning.usable(ServedReceiptKey(a.publicKey.kid, "RSA", a.publicKey.toSpkiPem(), null)))
+        assertNull(ReceiptKeyPinning.usable(ServedReceiptKey(a.publicKey.kid, "Ed25519", "not a pem", null)))
+        assertNull(ReceiptKeyPinning.usable(ServedReceiptKey(b.publicKey.kid, "Ed25519", a.publicKey.toSpkiPem(), null)))
+        assertEquals(a.publicKey.kid, ReceiptKeyPinning.usable(ServedReceiptKey(a.publicKey.kid, "ed25519", a.publicKey.toSpkiPem(), null))?.kid)
+        // On a first view, an unusable key is not pinned.
+        val trust = ReceiptKeyPinning.trust(listOf(ServedReceiptKey(b.publicKey.kid, "RSA", b.publicKey.toSpkiPem(), null), served(a)), emptyMap())
+        assertEquals(pins(a), trust.pins)
+    }
+
+    @Test
+    fun aRotationHandedOverByAKeyNotTrustedIsIgnored() {
+        val trust = ReceiptKeyPinning.trust(listOf(served(a), served(c, handover(b, c))), pins(a))
+        assertEquals(listOf(a.publicKey.kid), trust.keys.map { it.kid })
+        assertFalse(trust.changed)
     }
 }

@@ -57,7 +57,7 @@ jobs:
       - name: Test (JVM with Compose UI tests, Android host, desktop), coverage gate, assemble the Android and desktop apps
         run: >-
           ./gradlew -Postrom.core.path=.core
-          :companion:jvmTest :companion:koverVerify :companion:testAndroidHostTest
+          :companion:jvmTest :companion:koverVerifyJvm :companion:testAndroidHostTest
           :companion-android:assembleDebug :companion-desktop:compileKotlin :companion-desktop:test
       - name: Keep the unsigned debug APK
         if: github.event_name == 'push'

@@ -54,7 +54,8 @@ class RemoteWorkflowRepository(private val calls: AccountCalls) : WorkflowReposi
     }
 
     private fun refusalOf(error: OstromException): WorkflowRefusal? {
-        val key = error.message.orEmpty().substringBefore(':').trim()
+        // An OstromException always has its message.
+        val key = error.message!!.substringBefore(':').trim()
         return when {
             error.status == 403 && error.type == "forbidden" -> WorkflowRefusal.FORBIDDEN
             error.status == 400 && error.type == "invalid_request" -> WorkflowRefusal.INVALID_INPUTS
@@ -84,7 +85,7 @@ internal fun ApiRunStatus.domain(): RunStatus = RunStatus.entries.firstOrNull { 
 /** What a node does, in one line: its command, its message, its instructions, its wait's title, the workflow it calls. */
 private fun ApiWorkflowNode.detailLine(): String? =
     listOfNotNull(detail, run?.command, run?.instructions, run?.message, wait?.title, workflowId?.let { "→ $it" })
-        .firstOrNull { it.isNotBlank() }?.lineSequence()?.first()?.trim()
+        .firstOrNull { it.isNotBlank() }?.let { it.lineSequence().first().trim() }
 
 internal fun ApiWorkflow.domain() = Workflow(
     id = id, name = name, domain = domain, description = description, version = version, repos = repos.orEmpty(), status = status.value,

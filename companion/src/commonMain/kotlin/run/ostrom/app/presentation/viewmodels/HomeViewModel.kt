@@ -33,7 +33,7 @@ data class HomeUiState(
     val error: Failure? = null,
 ) {
     /** Whether the server announces [feature]; false until the capabilities are read. */
-    fun serves(feature: String): Boolean = capabilities?.features?.contains(feature) == true
+    fun serves(feature: String): Boolean = capabilities != null && feature in capabilities.features
 }
 
 /** A server this app does not speak. [apiVersion] is null for a server too old to say which version it speaks. */
@@ -51,7 +51,8 @@ class HomeViewModel(
     private val clock: Clock,
 ) : ViewModel() {
     private val status = MutableStateFlow(HomeUiState())
-    private var checkedAt = Long.MIN_VALUE
+    /** When the server was last read; null until a read succeeds (then the foreground always asks). */
+    private var checkedAt: Long? = null
     private var foreground: Job? = null
     val uiState: StateFlow<HomeUiState> = combine(accounts.accounts, accounts.activeAccountId, status) { list, active, status ->
         status.copy(account = list.firstOrNull { it.id == active })
@@ -69,7 +70,11 @@ class HomeViewModel(
     /** The app came back to the foreground: the server is asked again if it was not asked recently. */
     fun onForeground() {
         val id = accounts.activeAccountId.value ?: return
-        if (status.value.refreshing || foreground?.isActive == true || clock.nowMillis() - checkedAt < RECHECK_AFTER_MILLIS) return
+        // A refresh running is not doubled, nor one launched that has not started yet (it marks itself refreshing only then).
+        if (status.value.refreshing || foreground?.isActive == true) return
+        // Not `now - checkedAt` against a sentinel: Long.MIN_VALUE overflowed and blocked every retry.
+        val last = checkedAt
+        if (last != null && clock.nowMillis() - last < RECHECK_AFTER_MILLIS) return
         foreground = viewModelScope.launch { refresh(id) }
     }
 

@@ -10,8 +10,8 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
@@ -21,7 +21,6 @@ import androidx.compose.ui.unit.sp
 import com.adamglin.PhosphorIcons
 import com.adamglin.phosphoricons.Regular
 import com.adamglin.phosphoricons.regular.ArrowsLeftRight
-import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 import run.ostrom.app.domain.models.CloudSession
@@ -43,27 +42,7 @@ import run.ostrom.app.resources.transfer_problem_profile
 import run.ostrom.app.resources.transfer_problem_quota
 import run.ostrom.app.resources.transfer_problem_timeout
 import run.ostrom.app.resources.transfer_problem_unavailable
-import run.ostrom.app.resources.transfer_refused_busy
-import run.ostrom.app.resources.transfer_refused_conflict
-import run.ostrom.app.resources.transfer_refused_disabled
-import run.ostrom.app.resources.transfer_refused_expired
-import run.ostrom.app.resources.transfer_refused_forbidden
-import run.ostrom.app.resources.transfer_refused_invalid
-import run.ostrom.app.resources.transfer_refused_not_open
-import run.ostrom.app.resources.transfer_refused_not_running
 import run.ostrom.app.resources.transfer_refused_other
-import run.ostrom.app.resources.transfer_refused_pending
-import run.ostrom.app.resources.transfer_refused_preparing
-import run.ostrom.app.resources.transfer_refused_recipient
-import run.ostrom.app.resources.transfer_refused_transferring
-import run.ostrom.app.resources.transfer_state_accepted
-import run.ostrom.app.resources.transfer_state_cancelled
-import run.ostrom.app.resources.transfer_state_completed
-import run.ostrom.app.resources.transfer_state_declined
-import run.ostrom.app.resources.transfer_state_expired
-import run.ostrom.app.resources.transfer_state_failed
-import run.ostrom.app.resources.transfer_state_offered
-import run.ostrom.app.resources.transfer_state_unknown
 import run.ostrom.app.resources.transfers_title
 
 /** The sentence for a refusal of the server, by its error key; an unknown key is named as is. */
@@ -71,22 +50,6 @@ import run.ostrom.app.resources.transfers_title
 fun transferErrorText(error: TransferError): String = when (error) {
     is TransferError.Text -> error.text.words()
     is TransferError.Refused -> refusal(error.code)?.let { stringResource(it) } ?: stringResource(Res.string.transfer_refused_other, error.code)
-}
-
-private fun refusal(code: String): StringResource? = when (code) {
-    "transfer_pending" -> Res.string.transfer_refused_pending
-    "session_preparing" -> Res.string.transfer_refused_preparing
-    "session_not_running" -> Res.string.transfer_refused_not_running
-    "session_transferring", "transfer_in_progress" -> Res.string.transfer_refused_transferring
-    "session_busy" -> Res.string.transfer_refused_busy
-    "transfer_disabled" -> Res.string.transfer_refused_disabled
-    "transfer_forbidden", "forbidden" -> Res.string.transfer_refused_forbidden
-    "transfer_expired" -> Res.string.transfer_refused_expired
-    "transfer_not_open" -> Res.string.transfer_refused_not_open
-    "idempotency_conflict" -> Res.string.transfer_refused_conflict
-    "invalid_transfer" -> Res.string.transfer_refused_invalid
-    "recipient_ineligible" -> Res.string.transfer_refused_recipient
-    else -> null
 }
 
 /** Why a transfer failed or was cancelled (its failure code), in a few words; an unknown code is named as is. */
@@ -104,17 +67,6 @@ fun transferProblem(code: String): String = when (code) {
     "session_not_running" -> stringResource(Res.string.transfer_problem_not_running)
     "owner_changed" -> stringResource(Res.string.transfer_problem_owner_changed)
     else -> code
-}
-
-fun TransferState.label(): StringResource = when (this) {
-    TransferState.OFFERED -> Res.string.transfer_state_offered
-    TransferState.ACCEPTED -> Res.string.transfer_state_accepted
-    TransferState.COMPLETED -> Res.string.transfer_state_completed
-    TransferState.DECLINED -> Res.string.transfer_state_declined
-    TransferState.CANCELLED -> Res.string.transfer_state_cancelled
-    TransferState.EXPIRED -> Res.string.transfer_state_expired
-    TransferState.FAILED -> Res.string.transfer_state_failed
-    TransferState.UNKNOWN -> Res.string.transfer_state_unknown
 }
 
 /** Waiting offers in amber, a change of owner under way with the accent, failures red, the rest muted. */

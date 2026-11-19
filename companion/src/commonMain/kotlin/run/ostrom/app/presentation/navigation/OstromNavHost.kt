@@ -22,14 +22,11 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
-import kotlinx.coroutines.CancellationException
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.parameter.parametersOf
-import run.ostrom.app.domain.models.Features
 import run.ostrom.app.domain.repositories.FeaturesRepository
-import run.ostrom.app.domain.repositories.has
 import run.ostrom.app.domain.usecases.approvals.PhoneUnlock
 import run.ostrom.app.domain.usecases.links.ArtifactLinks
 import run.ostrom.app.domain.usecases.push.NotificationTarget
@@ -102,15 +99,8 @@ fun OstromNavHost(rootViewModel: RootViewModel = koinViewModel(), unlock: PhoneU
     val navController = rememberNavController()
     // A tab a tapped notification, or a pushed screen, asks the tabs to show.
     var requestedTab by remember { mutableStateOf<MainTab?>(null) }
-    fun opensSessions(accountId: String) = features.cached(accountId)?.features?.contains(Features.SESSIONS) == true
-    // Read again when nothing was cached yet (a cold start from the notification); offline, what was cached decides.
-    suspend fun servesSessions(accountId: String): Boolean = try {
-        features.has(accountId, Features.SESSIONS)
-    } catch (e: CancellationException) {
-        throw e
-    } catch (e: Exception) {
-        opensSessions(accountId)
-    }
+    fun opensSessions(accountId: String) = features.opensSessions(accountId)
+    suspend fun servesSessions(accountId: String) = features.servesSessions(accountId)
     // Captured once: the first sign-in navigates explicitly instead of rebuilding the graph.
     val startDestination: Any = remember { if (rootViewModel.hasAccounts.value) MainRoute else AddServerRoute }
     // The last account signed out (or the demo ended): back to the first screen, with nothing to go back to.
@@ -295,7 +285,7 @@ fun OstromNavHost(rootViewModel: RootViewModel = koinViewModel(), unlock: PhoneU
             val viewModel: CloudSessionViewModel = koinViewModel { parametersOf(route) }
             var transferring by remember { mutableStateOf<TransferRoute?>(null) }
             CloudSessionScreen(viewModel, onBack = { navController.popBackStack() }, extraActions = { session ->
-                TransferButton(route.accountId, session) { session.ownerId?.let { transferring = TransferRoute(route.accountId, session.id, it) } }
+                TransferButton(route.accountId, session) { transferRouteOf(route.accountId, session)?.let { transferring = it } }
             })
             transferring?.let { transfer ->
                 SheetViewModels {

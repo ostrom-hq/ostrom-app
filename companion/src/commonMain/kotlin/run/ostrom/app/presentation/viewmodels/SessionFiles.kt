@@ -105,7 +105,10 @@ class SessionFiles(
     fun dismissNotice() = write { it.copy(notice = null) }
 
     /** The uploaded files, in order, for the message being sent; null while one still uploads or failed. */
-    fun uploaded(): List<UploadedFile>? = read().takeIf { it.ready }?.files?.map { it.uploaded!! }
+    fun uploaded(): List<UploadedFile>? {
+        val state = read()
+        return if (state.ready) state.files.map { it.uploaded!! } else null
+    }
 
     /** The message took the files: the composer starts over. */
     fun clear() {
@@ -115,7 +118,7 @@ class SessionFiles(
     }
 
     private fun upload(localId: String, policy: FilePolicy) {
-        val (file, key) = sources[localId] ?: return
+        val (file, key) = sources.getValue(localId) // both callers set the source first
         uploads[localId] = scope.launch {
             var shown = -1
             val outcome = useCase.upload(accountId, sessionId, file, policy, key) { sent, total ->

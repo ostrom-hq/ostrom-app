@@ -187,12 +187,12 @@ private fun subagentsRead(events: List<TranscriptEvent>, running: Boolean, tasks
  */
 fun threadEvents(events: List<TranscriptEvent>, thread: String?): List<TranscriptEvent> = if (thread == null) events.filter { it.parent() == null }
     else events.mapNotNull { event ->
-        if (event.parent() != thread) return@mapNotNull null
         when (event) {
-            is TranscriptEvent.ToolCall -> event.copy(parentToolUseId = null)
-            is TranscriptEvent.ToolResult -> event.copy(parentToolUseId = null)
-            is TranscriptEvent.AgentMessage -> event.copy(parentToolUseId = null)
-            else -> event
+            is TranscriptEvent.ToolCall -> if (event.parentToolUseId == thread) event.copy(parentToolUseId = null) else null
+            is TranscriptEvent.ToolResult -> if (event.parentToolUseId == thread) event.copy(parentToolUseId = null) else null
+            is TranscriptEvent.AgentMessage -> if (event.parentToolUseId == thread) event.copy(parentToolUseId = null) else null
+            // Only a tool use, its result and the agent's text carry a parent: no other event belongs to a subagent's thread.
+            else -> null
         }
     }
 

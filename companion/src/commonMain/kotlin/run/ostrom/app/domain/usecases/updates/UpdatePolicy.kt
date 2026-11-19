@@ -58,8 +58,5 @@ object UpdatePolicy {
             }
             return left.size.compareTo(right.size)
         }
-
-        override fun equals(other: Any?) = other is Version && compareTo(other) == 0
-        override fun hashCode() = value.hashCode()
     }
 }

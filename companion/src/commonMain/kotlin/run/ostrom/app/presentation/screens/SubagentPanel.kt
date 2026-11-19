@@ -25,9 +25,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfoV2
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -42,7 +42,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
-import androidx.window.core.layout.WindowSizeClass
 import com.adamglin.PhosphorIcons
 import com.adamglin.phosphoricons.Regular
 import com.adamglin.phosphoricons.regular.ArrowLeft
@@ -67,8 +66,6 @@ import run.ostrom.app.presentation.components.windowTitleBarPadding
 import run.ostrom.app.presentation.theme.MetaStyle
 import run.ostrom.app.presentation.theme.Radii
 import run.ostrom.app.presentation.theme.Ostrom
-import run.ostrom.app.presentation.transcript.BackgroundCommand
-import run.ostrom.app.presentation.transcript.LiveTasks
 import run.ostrom.app.presentation.transcript.Subagent
 import run.ostrom.app.presentation.transcript.SubagentState
 import run.ostrom.app.resources.Res
@@ -105,64 +102,12 @@ import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 import org.koin.mp.KoinPlatform
 
-/**
- * Where the panel of what runs in a session goes, by Material's window size classes, the breakpoints the left sidebar
- * already uses ([isWideWindow][run.ostrom.app.presentation.components.isWideWindow]).
- */
-enum class SubagentPanelMode {
-    /** Compact width, or shorter than medium (a phone, in either orientation): a screen of its own, entered and left. */
-    SCREEN,
-    /** Medium and expanded (600 to 1199 dp): the sidebar already takes a column; the panel slides over the conversation. */
-    OVERLAY,
-    /** Large (1200 to 1599 dp): a column beside the conversation. */
-    SIDE,
-    /** Extra-large (1600 dp and more): beside it too, and an open subagent gets its own column next to the main thread. */
-    SIDE_AND_THREAD,
-}
-
-enum class PanelPlacement { NONE, SCREEN, OVERLAY, SIDE }
-
-/** What shows: the panel's [panel] placement, and an open subagent [threadBeside] the main thread or [threadReplacesMain]. */
-data class SubagentLayout(val panel: PanelPlacement, val threadBeside: Boolean, val threadReplacesMain: Boolean)
-
-fun subagentPanelMode(widthDp: Int, heightDp: Int): SubagentPanelMode = when {
-    widthDp < WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND || heightDp < WindowSizeClass.HEIGHT_DP_MEDIUM_LOWER_BOUND -> SubagentPanelMode.SCREEN
-    widthDp < WindowSizeClass.WIDTH_DP_LARGE_LOWER_BOUND -> SubagentPanelMode.OVERLAY
-    widthDp < WindowSizeClass.WIDTH_DP_EXTRA_LARGE_LOWER_BOUND -> SubagentPanelMode.SIDE
-    else -> SubagentPanelMode.SIDE_AND_THREAD
-}
-
-/**
- * The layout for [mode]. Nothing shows without subagents, commands or wake-ups ([hasContent]). A screen or an overlay
- * opens on demand ([panelOpen]); a side panel shows unless the member hid it ([panelHidden]). The open subagent and both
- * flags live in the view model, so a resize only moves them: narrowed from a side panel, the panel folds away rather
- * than covering the conversation unasked, and the open subagent stays open.
- */
-fun subagentLayout(mode: SubagentPanelMode, hasContent: Boolean, panelOpen: Boolean, panelHidden: Boolean, threadOpen: Boolean): SubagentLayout {
-    if (!hasContent) return SubagentLayout(PanelPlacement.NONE, threadBeside = false, threadReplacesMain = false)
-    val panel = when (mode) {
-        SubagentPanelMode.SCREEN -> if (panelOpen) PanelPlacement.SCREEN else PanelPlacement.NONE
-        SubagentPanelMode.OVERLAY -> if (panelOpen) PanelPlacement.OVERLAY else PanelPlacement.NONE
-        SubagentPanelMode.SIDE, SubagentPanelMode.SIDE_AND_THREAD -> if (panelHidden) PanelPlacement.NONE else PanelPlacement.SIDE
-    }
-    val beside = threadOpen && mode == SubagentPanelMode.SIDE_AND_THREAD
-    return SubagentLayout(panel, threadBeside = beside, threadReplacesMain = threadOpen && !beside)
-}
-
 /** The current window's [SubagentPanelMode]. */
 @Composable
 fun currentSubagentPanelMode(): SubagentPanelMode = currentWindowAdaptiveInfoV2().windowSizeClass.let { subagentPanelMode(it.minWidthDp, it.minHeightDp) }
 
 /** The panel's width beside or over the conversation. */
 val SubagentPanelWidth = 312.dp
-
-/** Everything the panel lists, derived from the transcript ([subagentsOf][run.ostrom.app.presentation.transcript.subagentsOf]). */
-data class RunningWork(val subagents: List<Subagent>, val live: LiveTasks?, val commands: List<BackgroundCommand>) {
-    val scheduled: Int get() = live?.scheduled ?: 0
-    val hasContent: Boolean get() = subagents.isNotEmpty() || commands.isNotEmpty() || scheduled > 0
-    /** What runs now: active subagents, background commands and monitors, scheduled wake-ups. */
-    val running: Int get() = subagents.count { it.active } + commands.size + scheduled
-}
 
 /**
  * The clock, every second while something runs (durations count up), every 30 s otherwise. The app's [AppClock] when

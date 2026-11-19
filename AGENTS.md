@@ -41,7 +41,9 @@ All repository content (code, comments, docs, commits, pull requests) is in Engl
    never in settings, logs or crash reports. Never log tokens, prompts or response bodies.
 6. All user-facing text through `Res.string`, in English and French (`LocalizationTest`); the apostrophe stays bare.
 7. Tests: TDD. Domain and repositories in `commonTest` (fakes, Ktor `MockEngine`), screens as Compose UI tests on the
-   desktop JVM (`jvmTest`, the whole `App()` on a fake server); Kover's gate on the domain must stay green.
+   desktop JVM (`jvmTest`, the whole `App()` on a fake server); the shared code (`commonMain` and `jvmMain`, measured on
+   the JVM) is gated at 100 % of lines and branches (`:companion:koverVerifyJvm`), with the Compose UI and the OS glue
+   excluded as listed in `companion/build.gradle.kts`: pure logic goes in its own counted file, never in a Compose file.
 8. The demo (`demo/`) answers from memory and creates no HTTP client; a new screen adds its demo content.
 9. No simulator or emulator run is required locally: CI builds and tests every platform.
 10. Every source file starts with `// SPDX-License-Identifier: Apache-2.0` (`LicenseRef-Ostrom-Enterprise` under `ee/`).

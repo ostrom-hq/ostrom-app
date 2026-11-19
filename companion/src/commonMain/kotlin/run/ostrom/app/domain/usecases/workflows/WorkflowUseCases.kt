@@ -80,11 +80,10 @@ class CanManageRunsUseCase(private val auth: AuthRepository, private val account
         }
         return role == null || role in MANAGERS
     }
-
-    private companion object {
-        val MANAGERS = setOf("owner", "admin")
-    }
 }
+
+/** The roles that start and cancel runs. */
+private val MANAGERS = setOf("owner", "admin")
 
 /**
  * Checks what is entered before anything is sent (the server checks again and its refusals are worded by key): a
@@ -146,4 +145,4 @@ fun OrgChange.concernsRunsOf(workflowId: String?): Boolean =
 
 /** Whether a run event concerns the run [runId]: the run itself, or one of its sub-workflows' runs it shows. */
 fun OrgChange.concernsRun(run: WorkflowRun?, runId: String): Boolean =
-    type == OrgChange.RUN_UPDATED && (subjectId == runId || run?.visits?.any { it.childRunId == subjectId } == true)
+    type == OrgChange.RUN_UPDATED && (subjectId == runId || run != null && run.visits.any { it.childRunId == subjectId })

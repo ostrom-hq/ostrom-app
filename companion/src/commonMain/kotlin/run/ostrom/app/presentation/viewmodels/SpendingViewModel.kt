@@ -125,7 +125,7 @@ class ActivityViewModel(private val accounts: AccountRepository, private val loa
         load()
     }
 
-    fun retry() = if (moreFailed && state.value.next != null) loadMore() else load()
+    fun retry() = if (moreFailed) loadMore() else load()
 
     private fun load() {
         val account = state.value.account?.takeIf { it.signedIn } ?: return

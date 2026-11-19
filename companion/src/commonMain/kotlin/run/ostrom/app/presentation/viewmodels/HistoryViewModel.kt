@@ -41,6 +41,22 @@ data class HistoryUiState(
 ) {
     /** Receipts are shown, but the last refresh failed. */
     val stale: Boolean get() = failed && entries.isNotEmpty()
+
+    /**
+     * The [results] checked for [accountId], each on the row of the same receipt: the same id and the same content, which
+     * check the same way. A row of the same id with other content keeps its own. Nothing changes once the list is another
+     * account's.
+     */
+    /** The first page read for [accountId]; nothing changes once the list is another account's. */
+    internal fun withFirstPage(accountId: String, items: List<HistoryEntry>, next: String?): HistoryUiState =
+        if (account?.id != accountId) this else copy(entries = items, next = next, loaded = true, refreshing = false, failed = false)
+
+    internal fun withChecked(accountId: String, results: List<HistoryEntry>): HistoryUiState {
+        if (account?.id != accountId) return this
+        // By id first (a cheap hash), then the whole content, which is the same object, compared at once, but for a row read again.
+        val checked = results.associateBy { it.raw["id"] }
+        return copy(entries = entries.map { entry -> checked[entry.raw["id"]]?.takeIf { it.raw == entry.raw } ?: entry })
+    }
 }
 
 /**
@@ -94,7 +110,7 @@ class HistoryViewModel(
 
     fun refresh() = load()
 
-    fun retry() = if (state.value.moreFailed && state.value.next != null) loadMore() else load()
+    fun retry() = if (state.value.moreFailed) loadMore() else load()
 
     private fun load() {
         val account = state.value.account?.takeIf { it.signedIn } ?: return
@@ -123,7 +139,9 @@ class HistoryViewModel(
                     knownFor = fingerprint
                 }
                 val items = page.items.map(::withKnownResult)
-                state.update { if (it.account?.id != account.id) it else it.copy(entries = items, next = page.next, loaded = true, refreshing = false, failed = false) }
+                // An account change cancels this job first (see init), so the scope above throws instead of returning; the
+                // guard holds whatever reaches here.
+                state.update { it.withFirstPage(account.id, items, page.next) }
                 check(account.id, items, trusted)
             } catch (error: CancellationException) {
                 throw error
@@ -136,7 +154,8 @@ class HistoryViewModel(
     /** The older page, from the cursor the last page gave; a receipt already shown is not repeated. */
     fun loadMore() {
         val current = state.value
-        val account = current.account?.takeIf { it.signedIn } ?: return
+        val account = current.account ?: return
+        if (!account.signedIn) return
         val cursor = current.next ?: return
         if (current.loadingMore || current.refreshing) return
         state.update { it.copy(loadingMore = true, moreFailed = false) }
@@ -148,7 +167,7 @@ class HistoryViewModel(
                 state.update { now ->
                     if (now.account?.id != account.id || now.next != cursor) return@update now.copy(loadingMore = false)
                     val seen = now.entries.mapNotNullTo(HashSet()) { it.summary?.id }
-                    added = page.items.filter { entry -> entry.summary?.id?.let(seen::add) ?: true }.map(::withKnownResult)
+                    added = page.items.filter { entry -> entry.summary?.let { seen.add(it.id) } ?: true }.map(::withKnownResult)
                     now.copy(entries = now.entries + added, next = page.next, loadingMore = false)
                 }
                 check(account.id, added, trusted)
@@ -162,7 +181,7 @@ class HistoryViewModel(
 
     /** The entry with the result already found for the same content under the same keys, else as it is. */
     private fun withKnownResult(entry: HistoryEntry): HistoryEntry {
-        val (content, check) = entry.summary?.id?.let(known::get) ?: return entry
+        val (content, check) = entry.summary?.let { known[it.id] } ?: return entry
         return if (content == entry.raw) entry.copy(check = check) else entry
     }
 
@@ -171,16 +190,9 @@ class HistoryViewModel(
         val pending = entries.filter { it.check == ReceiptCheck.Checking }
         if (pending.isEmpty()) return
         val results = checkReceipts(pending, trusted)
-        results.forEach { entry -> entry.summary?.id?.let { known[it] = entry.raw to entry.check } }
-        val checked = results.associateBy { IdentityKey(it.raw) }
-        state.update { now ->
-            if (now.account?.id != accountId) now else now.copy(entries = now.entries.map { entry -> checked[IdentityKey(entry.raw)] ?: entry })
-        }
-    }
-
-    /** The very object read from the server: a result found on one receipt is never shown on another. Hashed by its id only. */
-    private class IdentityKey(val raw: JsonObject) {
-        override fun equals(other: Any?) = other is IdentityKey && other.raw === raw
-        override fun hashCode() = raw["id"]?.hashCode() ?: 0
+        results.forEach { entry -> entry.summary?.let { known[it.id] = entry.raw to entry.check } }
+        // An account change cancels this first, but a check that ignores it (a verification that never suspends) still
+        // answers: the guard keeps another account's rows as they are.
+        state.update { it.withChecked(accountId, results) }
     }
 }

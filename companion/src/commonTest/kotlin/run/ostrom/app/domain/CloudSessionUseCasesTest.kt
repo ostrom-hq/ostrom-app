@@ -200,6 +200,7 @@ class CloudSessionUseCasesTest {
         assertEquals(CloudSessionProblem.TOO_MANY,
             problem(NewCloudSession(CloudAgent.CLAUDE, recipe = CloudRecipe(List(17) { CloudRepository("https://github.com/acme/r$it") }))))
         assertEquals(CloudSessionProblem.TOO_MANY, problem(NewCloudSession(CloudAgent.CLAUDE, recipe = CloudRecipe(setupStart = List(17) { "echo $it" }))))
+        assertEquals(CloudSessionProblem.TOO_MANY, problem(NewCloudSession(CloudAgent.CLAUDE, recipe = CloudRecipe(setupCreate = List(17) { "echo $it" }))))
         assertEquals(CloudSessionProblem.VARIABLES, problem(NewCloudSession(CloudAgent.CLAUDE, recipe = CloudRecipe(requiredVariables = listOf("lower")))))
         assertEquals(CloudSessionProblem.VARIABLES, problem(NewCloudSession(CloudAgent.CLAUDE, recipe = CloudRecipe(requiredVariables = listOf("A", "A")))))
         assertEquals(CloudSessionProblem.VARIABLES, problem(NewCloudSession(CloudAgent.CLAUDE, recipe = CloudRecipe(requiredVariables = List(65) { "V$it" }))))
@@ -221,6 +222,8 @@ class CloudSessionUseCasesTest {
         assertFalse(ended.canPause || ended.canResume || ended.canStop)
         assertFalse(cloudSession(desired = "terminated").canStop, "A stop already asked")
         assertFalse(cloudSession(status = CloudSessionStatus.PAUSED, desired = "running").canResume, "A resume already asked")
+        assertTrue(cloudSession(status = CloudSessionStatus.PAUSING, desired = "paused").canResume, "a pause under way may be resumed")
+        assertFalse(cloudSession(status = CloudSessionStatus.PAUSED, desired = "terminated").canResume, "a stop already asked")
         assertEquals(CloudSessionStatus.PAUSING, control.pause("a1", running).status)
         assertEquals(CloudSessionStatus.RESUMING, control.resume("a1", paused).status)
         control.stop("a1", paused)

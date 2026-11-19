@@ -80,7 +80,8 @@ class RemoteWorkflowEditorRepository(
     }
 
     private fun refusalOf(error: OstromException, creating: Boolean): WorkflowEditRefusal? {
-        val keys = setOfNotNull(error.type, error.message.orEmpty().substringBefore(':').trim())
+        // An OstromException always has its message.
+        val keys = setOfNotNull(error.type, error.message!!.substringBefore(':').trim())
         return when {
             "workflow_editors_only" in keys -> WorkflowEditRefusal.EDITORS_ONLY
             "workflow_conflict" in keys -> WorkflowEditRefusal.STALE
@@ -147,7 +148,7 @@ internal fun ApiWorkflow.editable() = EditableWorkflow(
  */
 internal fun WorkflowDraft.apply(stored: ApiWorkflow?, id: String, now: Instant): ApiWorkflow {
     val nodes = nodes.map { node ->
-        val origin = stored?.nodes?.firstOrNull { it.id == node.originId }?.takeIf { it.kind.domain() == node.kind }
+        val origin = stored?.nodes.orEmpty().firstOrNull { it.id == node.originId }?.takeIf { it.kind.domain() == node.kind }
         node.apply(origin ?: ApiWorkflowNode(node.id, node.kind.api(), node.title))
     }
     val limits = limits.takeIf { it != DraftLimits() }?.let { WorkflowLimits(it.maxNodes, it.maxVisits, it.maxDepth) }
@@ -164,9 +165,9 @@ private fun DraftNode.apply(origin: ApiWorkflowNode): ApiWorkflowNode {
     return when (kind) {
         NodeKind.AGENT -> node.copy(
             run = (node.run ?: NodeRun()).copy(
-                instructions = instruction.ifBlank { null }, agent = agent?.trim()?.ifEmpty { null }, model = model?.trim()?.ifEmpty { null },
+                instructions = instruction.ifBlank { null }, agent = agent.orEmpty().trim().ifEmpty { null }, model = model.orEmpty().trim().ifEmpty { null },
                 deliverable = deliverable?.let { d ->
-                    Deliverable(d.type, d.label?.trim()?.ifEmpty { null }, d.schema?.takeIf { it.isNotBlank() }?.let(schemaJson::parseToJsonElement), d.domain?.trim()?.ifEmpty { null })
+                    Deliverable(d.type, d.label.orEmpty().trim().ifEmpty { null }, d.schema?.takeIf { it.isNotBlank() }?.let(schemaJson::parseToJsonElement), d.domain.orEmpty().trim().ifEmpty { null })
                 },
             ),
         )
@@ -175,7 +176,7 @@ private fun DraftNode.apply(origin: ApiWorkflowNode): ApiWorkflowNode {
             val actions = actions.map { a -> WaitAction(a.id, a.label.trim(), wait.actions.firstOrNull { it.id == a.id }?.requires.orEmpty(), a.style) }
             node.copy(wait = wait.copy(title = question.trim(), body = instruction.ifBlank { null }, actions = actions))
         }
-        NodeKind.WORKFLOW -> node.copy(workflowId = workflowId?.trim()?.ifEmpty { null }, arguments = arguments.ifEmpty { null })
+        NodeKind.WORKFLOW -> node.copy(workflowId = workflowId.orEmpty().trim().ifEmpty { null }, arguments = arguments.ifEmpty { null })
         else -> node
     }
 }

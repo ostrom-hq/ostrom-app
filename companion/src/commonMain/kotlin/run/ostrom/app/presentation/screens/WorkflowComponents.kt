@@ -21,7 +21,6 @@ import run.ostrom.app.domain.models.WorkflowRun
 import run.ostrom.app.presentation.components.AppCard
 import run.ostrom.app.presentation.components.Chip
 import run.ostrom.app.presentation.components.Segmented
-import run.ostrom.app.presentation.components.Tone
 import run.ostrom.app.presentation.theme.MetaStyle
 import run.ostrom.app.presentation.theme.Ostrom
 import run.ostrom.app.resources.Res
@@ -65,14 +64,6 @@ internal fun runStatusWords(status: RunStatus): String = stringResource(when (st
     RunStatus.CANCELLED -> Res.string.workflow_status_cancelled
     RunStatus.UNKNOWN -> Res.string.workflow_status_unknown
 })
-
-internal fun runStatusTone(status: RunStatus): Tone = when (status) {
-    RunStatus.RUNNING, RunStatus.QUEUED -> Tone.ACCENT
-    RunStatus.WAITING -> Tone.WARN
-    RunStatus.FAILED -> Tone.DANGER
-    RunStatus.SUCCEEDED -> Tone.NEUTRAL
-    RunStatus.CANCELLED, RunStatus.UNKNOWN -> Tone.MUTED
-}
 
 @Composable
 internal fun nodeKindWords(kind: NodeKind): String = stringResource(when (kind) {

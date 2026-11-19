@@ -38,7 +38,6 @@ import com.adamglin.phosphoricons.regular.Warning
 import kotlinx.coroutines.CancellationException
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
-import run.ostrom.app.domain.models.ActionKind
 import run.ostrom.app.domain.models.Approval
 import run.ostrom.app.domain.models.ApprovalAnswer
 import run.ostrom.app.domain.models.ApprovalStatus
@@ -54,7 +53,6 @@ import run.ostrom.app.presentation.components.ButtonKind
 import run.ostrom.app.presentation.components.Centered
 import run.ostrom.app.presentation.components.EmptyState
 import run.ostrom.app.presentation.components.Group
-import run.ostrom.app.presentation.components.GroupDivider
 import run.ostrom.app.presentation.components.GroupRow
 import run.ostrom.app.presentation.components.NavBar
 import run.ostrom.app.presentation.components.SectionTitle
@@ -77,10 +75,6 @@ import run.ostrom.app.resources.approvals_in_minutes
 import run.ostrom.app.resources.approvals_retry
 import run.ostrom.app.resources.approvals_title
 import run.ostrom.app.resources.request_agent
-import run.ostrom.app.resources.request_approve
-import run.ostrom.app.resources.request_approve_deploy
-import run.ostrom.app.resources.request_approve_merge
-import run.ostrom.app.resources.request_approve_push
 import run.ostrom.app.resources.request_approved_by
 import run.ostrom.app.resources.request_approved_by_at
 import run.ostrom.app.resources.request_approver
@@ -116,20 +110,6 @@ import run.ostrom.app.resources.request_head
 import run.ostrom.app.resources.request_note
 import run.ostrom.app.resources.request_open_console
 import run.ostrom.app.resources.request_people
-import run.ostrom.app.resources.request_problem_already_decided
-import run.ostrom.app.resources.request_problem_biometrics_failed
-import run.ostrom.app.resources.request_problem_biometrics_unavailable
-import run.ostrom.app.resources.request_problem_changed
-import run.ostrom.app.resources.request_problem_failed
-import run.ostrom.app.resources.request_problem_forbidden
-import run.ostrom.app.resources.request_problem_offline
-import run.ostrom.app.resources.request_problem_org_required
-import run.ostrom.app.resources.request_problem_self_approval
-import run.ostrom.app.resources.request_problem_session_expired
-import run.ostrom.app.resources.request_problem_step_up
-import run.ostrom.app.resources.request_problem_unlock_again
-import run.ostrom.app.resources.request_problem_unlock_offline
-import run.ostrom.app.resources.request_problem_unlock_refused
 import run.ostrom.app.resources.request_reason
 import run.ostrom.app.resources.request_ref
 import run.ostrom.app.resources.request_repository
@@ -357,14 +337,6 @@ private fun Actions(state: RequestUiState, approval: Approval, viewModel: Reques
     }
 }
 
-/** "Approve push", "Approve merge", "Approve deploy": the button names what the yes lets through. */
-private fun approveLabel(kind: ActionKind?): StringResource = when (kind) {
-    ActionKind.PUSH -> Res.string.request_approve_push
-    ActionKind.MERGE -> Res.string.request_approve_merge
-    ActionKind.DEPLOY -> Res.string.request_approve_deploy
-    else -> Res.string.request_approve
-}
-
 @Composable
 private fun ConsoleButton(state: RequestUiState, viewModel: RequestViewModel, kind: ButtonKind) {
     val url = state.consoleUrl ?: return
@@ -398,23 +370,6 @@ private fun ConsoleLink(state: RequestUiState, viewModel: RequestViewModel) {
             viewModel.linkCopied()
         }, kind = ButtonKind.SECONDARY, small = true, fill = false, modifier = Modifier.testTag("request-copy-console"))
     }
-}
-
-private fun DecisionProblem.words(): StringResource = when (this) {
-    DecisionProblem.BIOMETRICS_UNAVAILABLE -> Res.string.request_problem_biometrics_unavailable
-    DecisionProblem.BIOMETRICS_FAILED -> Res.string.request_problem_biometrics_failed
-    DecisionProblem.UNLOCK_REFUSED -> Res.string.request_problem_unlock_refused
-    DecisionProblem.UNLOCK_OFFLINE -> Res.string.request_problem_unlock_offline
-    DecisionProblem.STEP_UP -> Res.string.request_problem_step_up
-    DecisionProblem.UNLOCK_AGAIN -> Res.string.request_problem_unlock_again
-    DecisionProblem.SELF_APPROVAL -> Res.string.request_problem_self_approval
-    DecisionProblem.ORG_REQUIRED -> Res.string.request_problem_org_required
-    DecisionProblem.CHANGED -> Res.string.request_problem_changed
-    DecisionProblem.ALREADY_DECIDED -> Res.string.request_problem_already_decided
-    DecisionProblem.FORBIDDEN -> Res.string.request_problem_forbidden
-    DecisionProblem.OFFLINE -> Res.string.request_problem_offline
-    DecisionProblem.SESSION_EXPIRED -> Res.string.request_problem_session_expired
-    DecisionProblem.FAILED -> Res.string.request_problem_failed
 }
 
 /** "5 min ago" for a past time, "in 5 min" for a coming one. */

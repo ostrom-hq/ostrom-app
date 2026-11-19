@@ -66,7 +66,8 @@ class OpenArtifactUseCase(private val artifacts: ArtifactRepository, private val
         if (!ARTIFACT_ID.matches(artifactId)) throw AppException.NotFound()
         if (!features.has(accountId, Features.ARTIFACTS)) throw AppException.Unsupported(Features.ARTIFACTS)
         val ticket = artifacts.ticket(accountId, artifactId, version)
-        if (ticket.artifactId != artifactId || (version != null && ticket.version != version)) throw AppException.Server(200, "invalid_ticket")
+        // The version asked, else any.
+        if (ticket.artifactId != artifactId || ticket.version != (version ?: ticket.version)) throw AppException.Server(200, "invalid_ticket")
         val html = ticket.inlineHtml
         if (html != null) {
             OpenedArtifact(ticket, prefix = "", html = html)

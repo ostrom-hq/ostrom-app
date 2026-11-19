@@ -4,6 +4,7 @@ package run.ostrom.app.infrastructure.repositories
 
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
 import run.ostrom.app.domain.models.HistoryEntry
 import run.ostrom.app.domain.models.KeyHandover
@@ -45,8 +46,7 @@ fun readReceipt(raw: JsonObject): HistoryEntry {
     val receipt = try {
         ReceiptJson.decodeFromJsonElement(Receipt.serializer(), raw)
     } catch (_: SerializationException) {
-        null
-    } catch (_: IllegalArgumentException) {
+        // Every decoding failure is one (an IllegalArgumentException too): the model has no checks of its own.
         null
     }
     return HistoryEntry(raw, receipt?.summary(raw))
@@ -55,27 +55,35 @@ fun readReceipt(raw: JsonObject): HistoryEntry {
 private fun Receipt.summary(raw: JsonObject): ReceiptSummary {
     val decision = decisions.lastOrNull()
     // A kind this version does not know is shown as the server wrote it.
-    val kind = if (subject.kind == ReceiptSubjectKind.UNKNOWN) ((raw["subject"] as? JsonObject)?.get("kind") as? JsonPrimitive)?.content.orEmpty() else subject.kind.value
+    val kind = if (subject.kind == ReceiptSubjectKind.UNKNOWN) textAt(raw, "subject", "kind") else subject.kind.value
     return ReceiptSummary(
         id = id,
         result = decision?.result,
         selfApproved = decision?.selfApproved == true,
-        by = decision?.by ?: initiator,
+        by = if (decision != null) decision.by else initiator,
         subjectKind = kind,
         subjectId = subject.id,
-        at = millisOf(decision?.at ?: createdAt),
+        at = millisOf(if (decision != null) decision.at else createdAt),
         checkNodes = nodes.orEmpty().filter { it.kind == "check" }.map { node ->
             ReceiptCheckNode(
                 node.label,
                 node.outcome,
-                when (node.attestation) {
-                    null -> null
-                    CheckAttestation.WORKSTATION_DECLARED -> RunOrigin.WORKSTATION_DECLARED
-                    CheckAttestation.ISOLATED_RUNNER -> RunOrigin.ISOLATED_RUNNER
-                    CheckAttestation.CI -> RunOrigin.CI
-                    CheckAttestation.UNKNOWN -> RunOrigin.UNKNOWN
-                },
+                node.attestation?.origin(),
             )
         },
     )
+}
+
+private fun CheckAttestation.origin(): RunOrigin = when (this) {
+    CheckAttestation.WORKSTATION_DECLARED -> RunOrigin.WORKSTATION_DECLARED
+    CheckAttestation.ISOLATED_RUNNER -> RunOrigin.ISOLATED_RUNNER
+    CheckAttestation.CI -> RunOrigin.CI
+    CheckAttestation.UNKNOWN -> RunOrigin.UNKNOWN
+}
+
+/** The text at [path] in [raw]; empty when anything along it is missing or of another shape, never a failure. */
+internal fun textAt(raw: JsonObject, vararg path: String): String {
+    var at: JsonElement = raw
+    for (key in path) at = (at as? JsonObject)?.get(key) ?: return ""
+    return (at as? JsonPrimitive)?.content.orEmpty()
 }

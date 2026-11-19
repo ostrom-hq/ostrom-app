@@ -143,23 +143,23 @@ object WaitAnswerBuilder {
             }
             val input = inputs[field.id] ?: field.initialInput()
             val value: JsonElement? = when (field.type) {
-                FieldType.SECRET -> (input as? FieldInput.Secret)?.value?.takeIf { it.isNotBlank() }?.let { text ->
+                FieldType.SECRET -> (input as? FieldInput.Secret)?.value.orEmpty().takeIf { it.isNotBlank() }?.let { text ->
                     if (text.encodeToByteArray().size > MAX_SECRET_BYTES || '\u0000' in text) throw problem(Reason.TOO_LONG)
                     JsonPrimitive(text)
                 }
                 // A required box must be checked (a consent); an optional one sends its yes or its no.
                 FieldType.CONFIRM -> (input as? FieldInput.Flag)?.takeIf { it.value || !needed }?.let { JsonPrimitive(it.value) }
-                FieldType.CHOICE -> (input as? FieldInput.Chosen)?.values?.filter { it.isNotBlank() }?.takeIf { it.isNotEmpty() }?.let { chosen ->
+                FieldType.CHOICE -> (input as? FieldInput.Chosen)?.values.orEmpty().filter { it.isNotBlank() }.takeIf { it.isNotEmpty() }?.let { chosen ->
                     if (field.multiple) JsonArray(chosen.map(::JsonPrimitive)) else JsonPrimitive(chosen.first())
                 }
-                FieldType.NUMBER -> (input as? FieldInput.Text)?.value?.trim()?.takeIf { it.isNotEmpty() }?.let { text ->
-                    text.toLongOrNull()?.let(::JsonPrimitive) ?: text.toDoubleOrNull()?.takeIf { it.isFinite() }?.let(::JsonPrimitive) ?: throw problem(Reason.NOT_A_NUMBER)
+                FieldType.NUMBER -> (input as? FieldInput.Text)?.value.orEmpty().trim().takeIf { it.isNotEmpty() }?.let { text ->
+                    JsonPrimitive(text.toLongOrNull() ?: text.toDoubleOrNull()?.takeIf { it.isFinite() } ?: throw problem(Reason.NOT_A_NUMBER))
                 }
-                FieldType.DATE -> (input as? FieldInput.Text)?.value?.trim()?.takeIf { it.isNotEmpty() }?.let { text ->
+                FieldType.DATE -> (input as? FieldInput.Text)?.value.orEmpty().trim().takeIf { it.isNotEmpty() }?.let { text ->
                     if (!isDate(text)) throw problem(Reason.NOT_A_DATE)
                     JsonPrimitive(text)
                 }
-                else -> (input as? FieldInput.Text)?.value?.takeIf { it.isNotBlank() }?.let { text ->
+                else -> (input as? FieldInput.Text)?.value.orEmpty().takeIf { it.isNotBlank() }?.let { text ->
                     if (text.length > (field.maxLength ?: DEFAULT_TEXT)) throw problem(Reason.TOO_LONG)
                     JsonPrimitive(text)
                 }
@@ -175,7 +175,7 @@ object WaitAnswerBuilder {
     private val DATE = Regex("""(\d{4})-(\d{2})-(\d{2})""")
 
     private fun isDate(text: String): Boolean {
-        val (year, month, day) = DATE.matchEntire(text)?.destructured ?: return false
+        val (year, month, day) = (DATE.matchEntire(text) ?: return false).destructured
         val m = month.toInt(); val d = day.toInt(); val y = year.toInt()
         val leap = (y % 4 == 0 && y % 100 != 0) || y % 400 == 0
         val days = intArrayOf(31, if (leap) 29 else 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)

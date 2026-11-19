@@ -20,7 +20,7 @@ class CachedFeaturesRepository(private val auth: AuthRepository, private val acc
     private var cache: Map<String, Pair<String, ServerCapabilities>> = emptyMap()
 
     override suspend fun capabilities(accountId: String, refresh: Boolean): ServerCapabilities {
-        val origin = accounts.find(accountId)?.origin ?: throw AppException.Unauthorized()
+        val origin = (accounts.find(accountId) ?: throw AppException.Unauthorized()).origin
         if (!refresh) lock.withLock { cache[accountId]?.takeIf { it.first == origin }?.let { return it.second } }
         val capabilities = auth.capabilities(accountId)
         lock.withLock { cache = cache + (accountId to (origin to capabilities)) }
@@ -28,7 +28,7 @@ class CachedFeaturesRepository(private val auth: AuthRepository, private val acc
     }
 
     override fun cached(accountId: String): ServerCapabilities? {
-        val origin = accounts.find(accountId)?.origin ?: return null
+        val origin = (accounts.find(accountId) ?: return null).origin
         return cache[accountId]?.takeIf { it.first == origin }?.second
     }
 }

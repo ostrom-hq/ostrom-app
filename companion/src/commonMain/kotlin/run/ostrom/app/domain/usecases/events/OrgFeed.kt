@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.onSubscription
 import kotlinx.coroutines.flow.transformWhile
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -56,7 +57,7 @@ class OrgFeed(
         var followers = 0
         var open = false
         var end: Element.End? = null
-        var job: Job? = null
+        lateinit var job: Job
         var closing: Job? = null
     }
 
@@ -103,7 +104,8 @@ class OrgFeed(
             created.job = scope.launch { run(accountId, created) }
         }
         connection.followers++
-        connection.closing?.cancel(); connection.closing = null
+        // Not cancelled: a closing already past its delay on another thread would still run. It finds itself replaced.
+        connection.closing = null
         connection
     }
 
@@ -113,9 +115,11 @@ class OrgFeed(
         connection.closing = scope.launch {
             delay(lingerMillis)
             lock.withLock {
-                if (connection.followers > 0 || connections[accountId] !== connection) return@launch
+                // Decided under the lock: a follower back meanwhile cleared this closing (and a later leave set a newer one);
+                // a stream that ended may have made way for a new connection.
+                if (connection.closing !== coroutineContext.job || connections[accountId] !== connection) return@launch
                 connections.remove(accountId)
-                connection.job?.cancel()
+                connection.job.cancel()
             }
         }
     }

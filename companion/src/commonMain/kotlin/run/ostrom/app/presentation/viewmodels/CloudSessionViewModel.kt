@@ -275,10 +275,10 @@ class CloudSessionViewModel(
                 val announced = if (talks) conversation.control.options(route.accountId) else ConversationOptions()
                 state.update {
                     // A read that started before an action's answer is older than it: the action's session stays.
-                    val shown = if (asked == actions || it.session == null) session else it.session
+                    val shown = it.session.takeIf { asked != actions } ?: session
                     it.copy(
                         session = shown, loading = false, gone = false, githubAccessOffered = offered, options = announced, canControl = owns(shown),
-                        memberId = conversation?.accounts?.find(route.accountId)?.memberId,
+                        memberId = if (conversation != null) conversation.accounts.find(route.accountId)?.memberId else null,
                     )
                 }
                 if (talks && announced.conversation && started) startConversation()
@@ -350,21 +350,23 @@ class CloudSessionViewModel(
     /** Bumped by each action's answer: a header read that started before it is older and is dropped. */
     private var actions = 0
 
-    private fun owns(session: CloudSession?): Boolean {
+    private fun owns(session: CloudSession): Boolean {
         val uses = conversation ?: return false
-        return session != null && ControlConversationUseCase.canControl(uses.accounts.find(route.accountId)?.memberId, session)
+        return ControlConversationUseCase.canControl(uses.accounts.find(route.accountId)?.memberId, session)
     }
 
     private fun startConversation() {
         val uses = conversation ?: return
         files?.load()
         // The transcript does not carry pauses, resumes or a failed pod: the header is read again while visible.
+        // A header that stopped (a read cancelled from elsewhere ends it) is started again.
         if (header?.isActive != true) header = viewModelScope.launch {
             while (true) {
                 delay(HEADER_MILLIS)
-                // An ended session no longer changes: nothing to read.
+                // An ended session no longer changes: nothing to read. Without the record yet (a retry before it was read),
+                // it is read here too.
                 val current = state.value
-                if (current.gone || current.session?.status?.ended == true) continue
+                if (current.gone || current.session?.let { it.status.ended } == true) continue
                 refreshSessionQuietly()
             }
         }
@@ -382,18 +384,18 @@ class CloudSessionViewModel(
                         state.update { it.withTranscript(it.transcript.withLatest(page)).copy(loaded = true) }
                     }
                 }
-                refreshAgents()
+                refreshAgents(uses)
                 var reconnected = false
                 uses.followTranscript(route.accountId, route.sessionId, state.value.transcript.newestSeq).collect { update ->
                     when (update) {
                         is LiveUpdate.Opened -> {
                             state.update { it.copy(live = LiveState.LIVE) }
                             // Back after a cut: the session may have been paused or resumed meanwhile.
-                            if (reconnected) { reconnected = false; viewModelScope.launch { refreshSessionQuietly() }; refreshAgents() }
+                            if (reconnected) { reconnected = false; viewModelScope.launch { refreshSessionQuietly() }; refreshAgents(uses) }
                         }
                         is LiveUpdate.Item -> {
                             state.update { it.withTranscript(it.transcript.withLive(update.value)).withTasks(update.value).copy(live = LiveState.LIVE) }
-                            if (changesAgents(update.value)) refreshAgents()
+                            if (changesAgents(update.value)) refreshAgents(uses)
                         }
                         is LiveUpdate.Reconnecting -> { reconnected = true; state.update { it.copy(live = LiveState.RECONNECTING) } }
                         LiveUpdate.Gap -> Unit
@@ -431,10 +433,9 @@ class CloudSessionViewModel(
         viewModelScope.launch {
             try {
                 transcriptLock.withLock {
-                    // Another page may have arrived meanwhile.
-                    if (state.value.transcript.nextBefore != before) return@withLock
                     val page = uses.loadTranscript(route.accountId, route.sessionId, before, if (state.value.feeds) MAIN_FEED else null)
-                    state.update { it.copy(transcript = it.transcript.withOlder(page)) }
+                    // Another page may have arrived meanwhile: the cursor then stays (see [Transcript.withOlder]).
+                    state.update { it.copy(transcript = it.transcript.withOlder(before, page)) }
                 }
             } catch (error: CancellationException) {
                 throw error
@@ -460,11 +461,9 @@ class CloudSessionViewModel(
         viewModelScope.launch {
             try {
                 transcriptLock.withLock {
-                    // Another page may have arrived meanwhile.
-                    val now = state.value.transcript.feeds
-                    if ((feed in now) != read || now[feed] != before && read) return@withLock
                     val page = uses.loadTranscript(route.accountId, route.sessionId, before, feed)
-                    state.update { it.withTranscript(it.transcript.withFeed(feed, page)) }
+                    // Another page of this feed may have arrived meanwhile: its cursor then stays (see [Transcript.withFeed]).
+                    state.update { it.withTranscript(it.transcript.withFeed(feed, before, page)) }
                 }
             } catch (error: CancellationException) {
                 throw error
@@ -495,8 +494,7 @@ class CloudSessionViewModel(
      * Reads the server's list of subagents: their start, state and step count without their events loaded. A request while
      * one runs asks for one more read after it, a second later at the earliest: a burst of events costs two reads, not one each.
      */
-    private fun refreshAgents() {
-        val uses = conversation ?: return
+    private fun refreshAgents(uses: CloudConversationUseCases) {
         if (!state.value.feeds) return
         if (agentsJob?.isActive == true) { agentsAgain = true; return }
         agentsJob = viewModelScope.launch {
@@ -533,8 +531,8 @@ class CloudSessionViewModel(
         }
         // A new message replaces what the last action said (a refused draft, nothing to interrupt).
         state.update { it.copy(draft = "", pending = it.pending + message, notice = null) }
-        if (attached.isNotEmpty()) files?.clear()
-        deliver(message)
+        files?.let { if (attached.isNotEmpty()) it.clear() }
+        deliver(uses, message)
     }
 
     // ---- Files of the next message ------------------------------------------------------------------------------------
@@ -551,18 +549,18 @@ class CloudSessionViewModel(
 
     /** Sends a failed message again with the same id: the server never queues it twice. */
     fun retry(clientMessageId: String) {
+        val uses = conversation ?: return
         val message = state.value.pending.firstOrNull { it.clientMessageId == clientMessageId && it.state == PendingMessage.State.FAILED } ?: return
         val sending = message.copy(state = PendingMessage.State.SENDING, reason = null)
         state.update { current -> current.copy(pending = current.pending.map { if (it.clientMessageId == clientMessageId) sending else it }) }
-        deliver(sending)
+        deliver(uses, sending)
     }
 
     fun discard(clientMessageId: String) = state.update { current ->
         current.copy(pending = current.pending.filterNot { it.clientMessageId == clientMessageId && it.state != PendingMessage.State.SENDING })
     }
 
-    private fun deliver(message: PendingMessage) {
-        val uses = conversation ?: return
+    private fun deliver(uses: CloudConversationUseCases, message: PendingMessage) {
         viewModelScope.launch {
             val result = uses.sendMessage(route.accountId, route.sessionId, message)
             state.update { current ->
@@ -703,17 +701,19 @@ class CloudSessionViewModel(
 
     /** On the last question: sends every answer in one request. */
     fun sendAnswers(requestId: String) {
+        val uses = conversation ?: return
         val card = cardFor(requestId) ?: return
         if (!card.editable || !card.answerable || !card.request.question || !card.last) return
         val answers = PermissionRules.answers(card.request.questions, card.draft.choices) ?: return
-        deliverAnswer(card, PermissionAnswer(requestId, allow = true, answers = answers))
+        deliverAnswer(uses, card, PermissionAnswer(requestId, allow = true, answers = answers))
     }
 
     /** Allows a tool use. */
     fun allowTool(requestId: String) {
+        val uses = conversation ?: return
         val card = cardFor(requestId) ?: return
         if (!card.editable || !card.answerable || card.request.question) return
-        deliverAnswer(card, PermissionAnswer(requestId, allow = true))
+        deliverAnswer(uses, card, PermissionAnswer(requestId, allow = true))
     }
 
     /**
@@ -726,7 +726,7 @@ class CloudSessionViewModel(
         if (!card.editable || !card.answerable || card.request.question || state.value.busy) return
         busy { uses ->
             changed(uses.control.setPermissionBypass(route.accountId, route.sessionId, true))
-            cardFor(requestId)?.let { current -> if (current.editable) deliverAnswer(current, PermissionAnswer(requestId, allow = true)) }
+            cardFor(requestId)?.let { current -> if (current.editable) deliverAnswer(uses, current, PermissionAnswer(requestId, allow = true)) }
         }
     }
 
@@ -735,17 +735,19 @@ class CloudSessionViewModel(
 
     /** Declines a question or denies a tool use. */
     fun deny(requestId: String) {
+        val uses = conversation ?: return
         val card = cardFor(requestId) ?: return
         if (!card.editable) return
-        deliverAnswer(card, PermissionAnswer(requestId, allow = false))
+        deliverAnswer(uses, card, PermissionAnswer(requestId, allow = false))
     }
 
     /** Sends a failed answer again, the same body under the same key: the server never applies it twice. */
     fun retryAnswer(requestId: String) {
+        val uses = conversation ?: return
         val card = cardFor(requestId) ?: return
         val answer = card.draft.sending ?: return
         if (card.draft.state != AnswerState.FAILED) return
-        deliverAnswer(card, answer)
+        deliverAnswer(uses, card, answer)
     }
 
     private fun cardFor(requestId: String): PermissionCard? = state.value.permission?.takeIf { it.requestId == requestId && requestId.isNotEmpty() }
@@ -760,8 +762,7 @@ class CloudSessionViewModel(
         state.update { it.copy(drafts = it.drafts + (requestId to next)) }
     }
 
-    private fun deliverAnswer(card: PermissionCard, answer: PermissionAnswer) {
-        val uses = conversation ?: return
+    private fun deliverAnswer(uses: CloudConversationUseCases, card: PermissionCard, answer: PermissionAnswer) {
         val requestId = card.requestId
         // The same answer keeps its key; another one (an edit, Deny after a failed Send) gets a new one.
         val key = card.draft.key?.takeIf { card.draft.sending == answer } ?: uses.answerPermission.key()
@@ -788,7 +789,7 @@ class CloudSessionViewModel(
     }
 
     /** A refusal in words: the server's error key when it is one, never its message. */
-    private fun refusal(outcome: AnswerOutcome.Refused): Failure = (outcome.code?.let { AppException.Server(HTTP_FORBIDDEN, it) } ?: AppException.Server(HTTP_FORBIDDEN, null)).userMessage()
+    private fun refusal(outcome: AnswerOutcome.Refused): Failure = AppException.Server(HTTP_FORBIDDEN, outcome.code).userMessage()
 
     private fun PermissionDraft.edited() = copy(state = AnswerState.EDITING, sending = null, key = null, reason = null)
 

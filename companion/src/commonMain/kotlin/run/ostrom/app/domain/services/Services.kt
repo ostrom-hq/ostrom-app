@@ -49,9 +49,12 @@ interface PlatformInfo {
      * to 120 characters without control characters, as the server takes it. A device already registered keeps its name.
      */
     val defaultDeviceName: String
-        get() = "Ostrom $platform · $deviceModel".filterNot { it.isISOControl() }.trim().take(MAX_DEVICE_NAME)
-            // Never half of a character outside the BMP (an emoji in a host name).
-            .let { if (it.lastOrNull()?.isHighSurrogate() == true) it.dropLast(1) else it }.trimEnd()
+        get() {
+            val name = "Ostrom $platform · $deviceModel".filterNot { it.isISOControl() }.trim()
+            // Never half of a character outside the BMP (an emoji in a host name): the cut moves before it.
+            val cut = if (name.length > MAX_DEVICE_NAME && name[MAX_DEVICE_NAME - 1].isHighSurrogate()) MAX_DEVICE_NAME - 1 else MAX_DEVICE_NAME
+            return name.take(cut).trimEnd()
+        }
 }
 
 private val REPORTED_PLATFORMS = setOf("ios", "android", "macos", "windows", "linux")
